@@ -22,20 +22,24 @@
   toucher un tracé ou sa fiche le sélectionne. Choix à l'arrêt uniquement : pendant le guidage rien ne change,
   le recalcul automatique garde les réglages de la variante choisie.
 
-- [ ] **Phase 7 — Vue satellite + partage** (deux petites fonctions regroupées, faites en premier)
-  **Vue satellite :**
-  Bouton de couche « Plan / Satellite », hors guidage et pendant la préparation du trajet (repérer l'entrée camion d'un
-  client ou d'un dépôt). France : photos aériennes de l'IGN (Géoplateforme `data.geopf.fr`, gratuites, sans clé,
-  attribution IGN). Hors de France : seulement une source gratuite dont les conditions d'utilisation le permettent,
-  vérifiées et citées ; sinon garder le plan.
-  **Partage avec des amis :**
-  Avec le partage Android (Web Share API), sans serveur :
-  - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
-  - un lieu ou une position ponctuelle (lien carte) ;
-  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) — seulement une fois la
-    phase 3 faite ;
-  - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
-  Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
+- [x] **Phase 7 — Vue satellite + partage** (deux petites fonctions regroupées, faites en premier)
+  **Vue satellite :** boutons « Plan / Satellite » sur la carte, à l'arrêt (repérer l'entrée camion d'un client ou
+  d'un dépôt) ; pendant le guidage, plan uniquement et pas de bouton. France (métropole, Corse, outre-mer) : photos
+  aériennes IGN `ORTHOIMAGERY.ORTHOPHOTOS` (Géoplateforme `data.geopf.fr`, WMTS PM, JPEG, zoom 19, sans clé, Licence
+  Ouverte, attribution IGN), sous les libellés du fond, tracés et marqueurs par-dessus. Hors de France : aucune source
+  gratuite dont les conditions l'autorisent clairement → « Vue satellite disponible en France uniquement », plan gardé.
+  Choix mémorisé (`settings.mapLayer`), tuiles jamais mises en cache.
+  **Partage avec des amis** (Web Share API, sinon copie du lien ou téléchargement, sans serveur) :
+  - un itinéraire : lien (départ, arrivée, péages/ferries, variante choisie dans le # de l'URL) qui pré-remplit le
+    formulaire sans rien calculer, ou fichier GPX 1.1 ; départ « Ma position » partagé seulement si « Inclure mon point
+    de départ » est coché (sinon lien sans départ, GPX commençant au premier carrefour après 500 m) ;
+  - un lieu ou ma position : lien de carte OpenStreetMap ;
+  - l'appli : son adresse, chacun avec sa propre clé HeiGIT gratuite.
+  Le profil véhicule et la clé ne sont jamais partagés ; un lien reçu est validé et affiché en texte brut.
+  Pas de position en direct (il faudrait un serveur).
+  **Reste pour après la phase 3 :** mes signalements en fichier à importer dans le Gabarit d'un ami (fusion sans doublons).
+  **Idée pour plus tard :** vue satellite hors de France avec les orthophotos ouvertes nationales — Belgique (NGI /
+  régions), Espagne (PNOA, IGN España), Suisse (swisstopo SWISSIMAGE) — après vérification de leurs conditions.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu

@@ -13,6 +13,11 @@ import { guidanceParams, reroutedOption } from './lib/route-options.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
 import { createNavigation } from './ui/navigation.js';
+import { createLayerSwitch } from './ui/layer-switch.js';
+import { createShare } from './ui/share.js';
+import {
+  decodeRouteLink, findVariantIndex, SHARED_ROUTE_TEXT, SHARED_ROUTE_NO_KEY_TEXT, VARIANT_MISSING_TEXT,
+} from './lib/share.js';
 
 function pickStorage() {
   try {
@@ -33,9 +38,13 @@ const notesNode = $('#route-notes');
 const navStartBtn = $('#btn-nav-start');
 /**
  * Itinéraires proposés au dernier calcul (sert au guidage et à la simulation) :
- * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, toLabel }.
+ * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, fromLabel, toLabel, startIsMyPosition }.
  */
 let choice = null;
+/** Dernière position GPS connue [lon, lat] (partage « Ma position »). */
+let myPosition = null;
+/** Lien de partage reçu : variante à présélectionner au prochain calcul vers la même arrivée. */
+let pendingShared = null;
 
 function update(fn) {
   data = fn(data);
@@ -56,10 +65,19 @@ function errorText(err) {
 let map = null;
 const theme = createThemeController((t) => map?.setTheme(t));
 theme.setMode(data.settings.theme);
-map = createMap($('#map'), $('#map-fallback'), theme.theme);
-window.addEventListener('resize', () => map.resize());
-
 const setSetting = (patch) => update((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
+// Fond « Plan / Satellite » (à l'arrêt) : choix mémorisé dans les réglages.
+const layerSwitch = createLayerSwitch({
+  root: $('#layer-switch'),
+  message: $('#layer-message'),
+  initial: data.settings.mapLayer,
+  onChange: (layer) => { setSetting({ mapLayer: layer }); map?.setLayer(layer); },
+});
+map = createMap($('#map'), $('#map-fallback'), theme.theme, {
+  layer: data.settings.mapLayer,
+  onLayerView: (view) => layerSwitch.render(view),
+});
+window.addEventListener('resize', () => map.resize());
 
 // Guidage : voix, écran allumé, navigation (GPS réel ou simulation)
 const voice = createVoice({ enabled: data.settings.voice });
@@ -77,7 +95,7 @@ navigation = createNavigation({
     if (!choice) return;
     choice = {
       ...choice, options: [reroutedOption(choice.options[choice.selected], route)], failures: [], selected: 0,
-      start: route.coordinates[0],
+      start: route.coordinates[0], startIsMyPosition: true, // recalcul depuis la position GPS
     };
     renderChoice();
   },
@@ -140,7 +158,7 @@ const form = createRouteForm({
   getApiKey: () => store.getApiKey(),
   initial: data.settings,
   onOptionsChange: (o) => update((d) => ({ ...d, settings: { ...d.settings, ...o } })),
-  onPosition: (lonlat) => map.setMyPosition(lonlat),
+  onPosition: (lonlat) => { myPosition = lonlat; map.setMyPosition(lonlat); },
   onError: (err) => showMessage(messageNode, errorText(err)),
   onSubmit: async (p) => {
     const vehicle = activeVehicle(data);
@@ -148,14 +166,24 @@ const form = createRouteForm({
     form.setBusy(true);
     try {
       const { options, failures } = await fetchRouteOptions({ apiKey: store.getApiKey(), vehicle, ...p });
+      // Lien partagé : la variante choisie par l'expéditeur est présélectionnée (choix modifiable à l'arrêt).
+      let selected = 0;
+      const shared = pendingShared;
+      pendingShared = null;
+      if (shared && shared.end[0] === p.end[0] && shared.end[1] === p.end[1] && shared.variant !== 'recommended') {
+        const i = findVariantIndex(options, shared.variant);
+        if (i >= 0) selected = i;
+        else showMessage(messageNode, VARIANT_MISSING_TEXT, 'info');
+      }
       choice = {
-        options, failures, selected: 0, vehicle, start: p.start, end: p.end,
-        avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, toLabel: p.toLabel,
+        options, failures, selected, vehicle, start: p.start, end: p.end,
+        avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, fromLabel: p.fromLabel, toLabel: p.toLabel,
+        startIsMyPosition: p.startIsMyPosition,
       };
       // Fiches d'abord : le panneau grandit et la carte rétrécit ; le cadrage se fait ensuite sur la bonne taille.
       renderChoice();
       navStartBtn.hidden = false;
-      map.showRoutes(options.map((o) => o.route), 0);
+      map.showRoutes(options.map((o) => o.route), selected);
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
@@ -173,10 +201,34 @@ const form = createRouteForm({
   },
 });
 
+createShare({ getChoice: () => choice, getMyPosition: () => myPosition });
+
+/**
+ * Lien de partage reçu (# de l'URL) : formulaire pré-rempli, jamais de calcul ni de guidage automatique.
+ * Le # est effacé ensuite (un rechargement ne le resert pas). Aucun texte reçu n'est inséré en HTML.
+ */
+function readSharedLink() {
+  const result = decodeRouteLink(window.location.hash);
+  if (!result) return;
+  try {
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  } catch {
+    // history indisponible : sans conséquence
+  }
+  if (navigation.active) return; // aucune saisie pendant le guidage
+  if (!result.ok) { showMessage(messageNode, result.error); return; }
+  const shared = result.route;
+  form.prefill(shared);
+  pendingShared = { end: [shared.to.lon, shared.to.lat], variant: shared.variant };
+  showMessage(messageNode, store.getApiKey() ? SHARED_ROUTE_TEXT : SHARED_ROUTE_NO_KEY_TEXT, 'info');
+}
+
 refreshHeader();
 if (!store.getApiKey()) {
   showMessage(messageNode, 'Bienvenue ! Commence par saisir ta clé OpenRouteService dans Réglages (⚙).', 'info');
 }
+readSharedLink();
+window.addEventListener('hashchange', readSharedLink);
 window.addEventListener('offline', () => showMessage(messageNode, 'Hors ligne : le calcul d\'itinéraire a besoin du réseau.'));
 window.addEventListener('online', () => showMessage(messageNode, ''));
 

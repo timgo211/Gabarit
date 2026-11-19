@@ -136,7 +136,7 @@ export function createRouteForm(opts) {
       }
     }
     opts.onSubmit({
-      start, end: [to.lon, to.lat], fromLabel, toLabel: to.label,
+      start, end: [to.lon, to.lat], fromLabel, toLabel: to.label, startIsMyPosition: !from,
       avoidTolls: avoidTolls.checked, avoidFerries: avoidFerries.checked,
     });
   });
@@ -145,6 +145,18 @@ export function createRouteForm(opts) {
   locate().catch(() => {});
 
   return {
+    /**
+     * Pré-remplit le formulaire (lien de partage reçu, déjà validé par decodeRouteLink). Aucun calcul lancé.
+     * from null : départ = ma position GPS. Les cases ne sont pas enregistrées dans les réglages.
+     */
+    prefill(shared) {
+      from = shared.from ? { ...shared.from } : null;
+      to = { ...shared.to };
+      fromInput.value = from ? from.label : '';
+      toInput.value = to.label;
+      avoidTolls.checked = !!shared.avoidTolls;
+      avoidFerries.checked = !!shared.avoidFerries;
+    },
     setBusy(busy) {
       const btn = $('#btn-route');
       btn.disabled = busy;

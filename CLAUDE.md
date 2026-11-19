@@ -17,12 +17,15 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     `nav-sim.js` (fausse position GPS pour la simulation)
   - itinéraires proposés : `route-options.js` (Recommandé + `alternative_routes` ou variantes, budget de requêtes,
     doublons, noms, écarts, textes des fiches, tracé touché sur la carte)
+  - phase 7 : `map-layers.js` (Plan / Satellite IGN, zone France, plan forcé en guidage), `share.js` (lien
+    d'itinéraire dans le #, validation des liens reçus, GPX 1.1, lien OpenStreetMap, choix partage / copie / téléchargement)
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
+  - `layer-switch.js` (boutons Plan / Satellite), `share.js` (fenêtre « Partager »)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
   `ors-directions-alternatives.json` = 3 itinéraires, `ors-variant-*.json` = variantes, Recommandé et Plus court identiques)
-- `docs/ROADMAP.md` : phases 1 à 6 ; `tools/make-icons.mjs` : génère les PNG
+- `docs/ROADMAP.md` : phases 1 à 7 ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
 ```
@@ -50,6 +53,12 @@ node --test
   2 points seulement) uniquement si départ–arrivée ≤ 100 km **à vol d'oiseau** (ORS mesure ainsi, sinon erreur 2004) ;
   sinon, ou si ORS ne renvoie qu'un itinéraire : Plus court + Sans péage (Plus rapide si péages évités ou absents).
   Le choix se fait à l'arrêt ; le recalcul en guidage garde `preference`/péages de la variante choisie.
+- Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
+  France seulement (`isInFrance`), jamais pendant le guidage, choix dans `settings.mapLayer`. data.geopf.fr est bloqué
+  depuis le conteneur : GetCapabilities lu via xyzservices / iTowns / osmlab editor-layer-index sur GitHub.
+- Partage : liste blanche des champs (jamais clé ni véhicule) ; départ « Ma position » exclu sauf case cochée (GPX : tracé
+  dès le premier carrefour après 500 m) ; lien reçu validé par `decodeRouteLink` (ne lève jamais), affiché en textContent,
+  # effacé après lecture, jamais de calcul ni de guidage automatique.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

@@ -1,14 +1,18 @@
 // Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracés des itinéraires (choisi en couleur, autres en gris),
-// position, suivi en guidage. MapLibre est chargé par index.html (window.maplibregl, version épinglée).
+// position, suivi en guidage, vue satellite IGN (phase 7, à l'arrêt seulement).
+// MapLibre est chargé par index.html (window.maplibregl, version épinglée).
 
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
+import { IGN_ORTHO, satelliteView, sanitizeMapLayer } from '../lib/map-layers.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const ROUTE_LAYERS = ['route-hit', 'route-line', 'route-casing', 'route-alt-line', 'route-alt-casing'];
 /** Marge de toucher autour du doigt (px), en plus de la largeur invisible du tracé. */
 const TAP_MARGIN_PX = 10;
+const SAT_SOURCE = 'ign-ortho';
+const SAT_LAYER = 'ign-ortho';
 
 /** Premier style qui répond (fetch rapide), sinon null. */
 async function pickStyle(urls) {
@@ -50,7 +54,13 @@ function vehicleElement() {
   return node;
 }
 
-export function createMap(container, fallbackNode, initialTheme) {
+/**
+ * @param {HTMLElement} container
+ * @param {HTMLElement} fallbackNode
+ * @param {'day'|'night'} initialTheme
+ * @param {{ layer?:string, onLayerView?:(view:{photos:boolean,message:string,button:boolean})=>void }} [opts]
+ */
+export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   const lib = window.maplibregl;
   let map = null;
   let routes = []; // [{ coordinates, bbox }] : itinéraires affichés
@@ -60,6 +70,8 @@ export function createMap(container, fallbackNode, initialTheme) {
   let navigating = false;
   let onGesture = null;
   let onPick = null;
+  let layer = sanitizeMapLayer(opts.layer);
+  let lastView = null;
   const markers = { start: null, end: null, me: null };
 
   function routesData() {
@@ -119,6 +131,35 @@ export function createMap(container, fallbackNode, initialTheme) {
     if (next !== null) onPick(next);
   }
 
+  /**
+   * Photos IGN : couche raster glissée sous les libellés du fond (les noms de rues restent lisibles) ; les tracés,
+   * ajoutés au-dessus, et les marqueurs (éléments HTML) restent toujours visibles par-dessus.
+   */
+  function addSatelliteLayer() {
+    if (!map || map.getSource(SAT_SOURCE)) { applyLayer(); return; }
+    map.addSource(SAT_SOURCE, {
+      type: 'raster', tiles: IGN_ORTHO.tiles, tileSize: IGN_ORTHO.tileSize,
+      minzoom: IGN_ORTHO.minzoom, maxzoom: IGN_ORTHO.maxzoom, attribution: IGN_ORTHO.attribution,
+    });
+    const style = map.getStyle();
+    const firstSymbol = style?.layers?.find((l) => l.type === 'symbol')?.id;
+    const beforeId = firstSymbol ?? (map.getLayer(ROUTE_LAYERS[4]) ? ROUTE_LAYERS[4] : undefined);
+    map.addLayer({ id: SAT_LAYER, type: 'raster', source: SAT_SOURCE, layout: { visibility: 'none' } }, beforeId);
+    applyLayer();
+  }
+
+  /** Montre ou masque les photos selon le choix, le centre de la carte et le guidage. */
+  function applyLayer() {
+    const c = map?.getCenter();
+    // Pas de carte (hors ligne, MapLibre absent) : pas de bouton.
+    const view = map ? satelliteView({ layer, center: [c.lng, c.lat], navigating }) : { photos: false, message: '', button: false };
+    if (map?.getLayer(SAT_LAYER)) map.setLayoutProperty(SAT_LAYER, 'visibility', view.photos ? 'visible' : 'none');
+    if (!lastView || lastView.photos !== view.photos || lastView.message !== view.message || lastView.button !== view.button) {
+      lastView = view;
+      opts.onLayerView?.(view);
+    }
+  }
+
   function fitRoute(duration = 800) {
     const b = routeBbox && routeBbox.length >= 4 ? [[routeBbox[0], routeBbox[1]], [routeBbox[2], routeBbox[3]]] : null;
     if (map && b) map.resize(); // le panneau a pu changer de hauteur (fiches) : cadrer sur la taille réelle
@@ -141,6 +182,8 @@ export function createMap(container, fallbackNode, initialTheme) {
         map.on(ev, (e) => { if (e.originalEvent && navigating) onGesture?.(); });
       }
       map.on('click', onMapClick);
+      map.on('style.load', addSatelliteLayer); // aussi après un changement de style (thème jour / nuit)
+      map.on('moveend', applyLayer);
     } else {
       map.setStyle(url);
     }
@@ -149,6 +192,7 @@ export function createMap(container, fallbackNode, initialTheme) {
 
   if (!lib) {
     fallbackNode.hidden = false;
+    applyLayer();
   } else {
     loadStyle();
   }
@@ -233,6 +277,7 @@ export function createMap(container, fallbackNode, initialTheme) {
     /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
     setNavigating(on) {
       navigating = on;
+      applyLayer(); // guidage : plan uniquement, sans bouton
       if (!map) return;
       map.resize();
       if (!on) {
@@ -248,6 +293,11 @@ export function createMap(container, fallbackNode, initialTheme) {
     },
     resize() {
       map?.resize();
+    },
+    /** Couche de fond choisie : 'plan' ou 'satellite'. */
+    setLayer(next) {
+      layer = sanitizeMapLayer(next);
+      applyLayer();
     },
   };
 }

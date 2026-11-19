@@ -5,6 +5,7 @@
 import { normalizeVehicle, validateVehicle, defaultVehicle, parseNumber } from './vehicle.js';
 import { THEME_MODES } from './theme.js';
 import { isSimSpeed, SIM_DEFAULT_SPEED } from './nav-sim.js';
+import { sanitizeMapLayer, DEFAULT_MAP_LAYER } from './map-layers.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -41,6 +42,7 @@ export function emptyData() {
     trips: [],
     settings: {
       theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
+      mapLayer: DEFAULT_MAP_LAYER,
     },
   };
 }
@@ -82,6 +84,7 @@ export function sanitizeData(raw) {
       voice: s.voice !== false, // guidage vocal activé par défaut
       simSpeed: isSimSpeed(s.simSpeed) ? s.simSpeed : SIM_DEFAULT_SPEED,
       dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut (vrais prix : phase 4)
+      mapLayer: sanitizeMapLayer(s.mapLayer), // « plan » ou « satellite » (phase 7)
     },
   };
 }
