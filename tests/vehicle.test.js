@@ -44,3 +44,12 @@ test('vignette Crit\'Air inconnue → NC à la normalisation', () => {
   assert.equal(normalizeVehicle({ critair: '9' }).critair, 'NC');
   assert.ok(validateVehicle({ ...defaultVehicle(), critair: '9' }).errors.critair);
 });
+
+test('phase 5 : situation vis-à-vis des interdictions PL (concerné par défaut, valeur inconnue refusée à la lecture)', async () => {
+  const { normalizeVehicle, validateVehicle, defaultVehicle } = await import('../src/lib/vehicle.js');
+  assert.equal(defaultVehicle().banStatus, 'concerned');
+  assert.equal(normalizeVehicle({ name: 'X' }).banStatus, 'concerned', 'ancien profil');
+  assert.equal(normalizeVehicle({ ...defaultVehicle(), banStatus: 'art4' }).banStatus, 'art4');
+  assert.equal(normalizeVehicle({ ...defaultVehicle(), banStatus: 'n\'importe quoi' }).banStatus, 'concerned');
+  assert.equal(validateVehicle({ ...normalizeVehicle(defaultVehicle()), banStatus: 'x' }).errors.banStatus, 'Valeur invalide.');
+});

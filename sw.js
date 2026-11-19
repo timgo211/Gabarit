@@ -6,7 +6,7 @@
 
 import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 
-const VERSION = 'v12';
+const VERSION = 'v13';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -26,6 +26,8 @@ const APP_FILES = [
   './src/lib/config.js',
   './src/lib/coords.js',
   './src/lib/format.js',
+  './src/lib/hgv-bans.js',
+  './src/lib/holidays.js',
   './src/lib/map-layers.js',
   './src/lib/nav-anim.js',
   './src/lib/nav-geo.js',
@@ -37,11 +39,15 @@ const APP_FILES = [
   './src/lib/ors-response.js',
   './src/lib/prefs.js',
   './src/lib/route-options.js',
+  './src/lib/route-rules.js',
+  './src/lib/route-samples.js',
   './src/lib/share.js',
   './src/lib/store.js',
   './src/lib/sw-routing.js',
   './src/lib/theme.js',
   './src/lib/vehicle.js',
+  './src/lib/zfe-convert.js',
+  './src/lib/zfe.js',
   './src/ui/api.js',
   './src/ui/areas.js',
   './src/ui/dom.js',

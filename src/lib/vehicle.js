@@ -3,6 +3,13 @@
 export const CRITAIR_VALUES = ['0', '1', '2', '3', '4', '5', 'NC'];
 
 /**
+ * Interdictions PL des week-ends et jours fériés (phase 5, arrêté du 16 avril 2021) : véhicule concerné, transport de
+ * l'article 4 (denrées périssables, animaux vivants… : seule la réglementation Île-de-France de l'art. 3 s'applique),
+ * ou véhicule spécialisé / agricole de l'annexe II (non concerné). Libellés : BAN_STATUS de hgv-bans.js.
+ */
+export const BAN_STATUS_VALUES = ['concerned', 'art4', 'exempt'];
+
+/**
  * Champs numériques : unité, bornes acceptées, obligatoire ou non.
  * Les bornes sont larges (convois exceptionnels possibles) mais écartent les fautes de frappe.
  */
@@ -37,6 +44,7 @@ export function defaultVehicle() {
     maxSpeed: 90,
     consumption: 32,
     critair: '1',
+    banStatus: 'concerned',
   };
 }
 
@@ -57,6 +65,7 @@ export function normalizeVehicle(raw) {
     name: typeof raw?.name === 'string' ? raw.name.trim() : '',
     hazmat: raw?.hazmat === true || raw?.hazmat === 'on' || raw?.hazmat === 'true',
     critair: CRITAIR_VALUES.includes(String(raw?.critair)) ? String(raw.critair) : 'NC',
+    banStatus: BAN_STATUS_VALUES.includes(raw?.banStatus) ? raw.banStatus : 'concerned',
   };
   for (const key of Object.keys(NUMERIC_FIELDS)) {
     v[key] = parseNumber(raw?.[key]);
@@ -91,5 +100,6 @@ export function validateVehicle(v) {
   }
   if (!CRITAIR_VALUES.includes(v.critair)) errors.critair = 'Vignette Crit\'Air inconnue.';
   if (typeof v.hazmat !== 'boolean') errors.hazmat = 'Valeur invalide.';
+  if (!BAN_STATUS_VALUES.includes(v.banStatus)) errors.banStatus = 'Valeur invalide.';
   return { valid: Object.keys(errors).length === 0, errors };
 }

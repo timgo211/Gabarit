@@ -234,6 +234,15 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card-facts { font-size: .95rem; }
 .route-card-delta { font-weight: 700; font-variant-numeric: tabular-nums; }
 .route-card-note { color: var(--warn); font-weight: 600; font-size: .9rem; }
+/* Réglementation (phase 5) : ZFE interdite, interdiction PL sur le trajet. */
+.route-card-rules { color: var(--danger); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.rules-notes { margin: 10px 0 0; padding-left: 20px; font-size: .9rem; }
+.rules-notes li { overflow-wrap: anywhere; margin: 4px 0; }
+.rules-notes .warn { color: var(--danger); font-weight: 600; }
+.rules-notes .info { color: var(--muted); }
+.rules-notes a { margin-left: 6px; }
+.rules-source { color: var(--muted); font-size: .8rem; margin: 6px 0 0; overflow-wrap: anywhere; }
+.btn-avoid-zfe { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 
 /* Dialogues */
@@ -295,6 +304,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   --nav-sep: rgba(11, 15, 20, .22);
   --nav-alert-bg: #b3261e;
   --nav-alert-fg: #ffffff;
+  --nav-rule-bg: #ffd54f;
+  --nav-rule-fg: #1a1200;
   --arrow-fill: #0b57d0;
   --arrow-stroke: #ffffff;
 }
@@ -307,6 +318,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   --nav-card-fg: #f2f4f7;
   --nav-alert-bg: #ff6b5e;
   --nav-alert-fg: #0b0f14;
+  --nav-rule-bg: #ffb000;
+  --nav-rule-fg: #0b0f14;
 }
 
 .btn-start { margin-top: 12px; }
@@ -360,6 +373,14 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 }
 
 .nav-alert.info { background: var(--nav-card); color: var(--nav-card-fg); border: 2px solid var(--nav-accent); }
+/* Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche ; une ligne par alerte, jamais coupée. */
+.nav-rule {
+  justify-self: start; max-width: 100%; min-width: 0; padding: 8px 14px; border-radius: var(--radius);
+  background: var(--nav-rule-bg); color: var(--nav-rule-fg); font-weight: 700; font-size: 1.05rem; line-height: 1.25;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow-wrap: anywhere;
+}
+.nav-rule span { display: block; }
+@media (max-width: 600px) { .nav-rule { font-size: .95rem; padding: 6px 10px; } }
 .nav-reroute { justify-self: start; min-height: 64px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 
 /* Bas de l'écran : boutons de carte (à droite), nom de la route, barre du bas. */

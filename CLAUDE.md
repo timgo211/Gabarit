@@ -23,6 +23,10 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
+  - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
+    polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
+    `hgv-bans.js` (interdictions PL week-ends / jours fériés, calendrier annuel, Île-de-France, guidage),
+    `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -38,6 +42,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
+- `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
+  lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
+- fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
   réelles du xlsx concédé 2025)
@@ -53,13 +60,14 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot
+                                   #   | overview | press | areas | foot | rules
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
 un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
-émulé). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
+21 h 57). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -136,6 +144,21 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
   n'échoue que si les deux échouent. Fixture `official-sca-2025-*.xml` = lignes réelles lues par l'Action ;
   bison-fute.gouv.fr, transport.data.gouv.fr et overpass-api.de sont bloqués depuis le conteneur. Pas d'occupation en
   temps réel gratuite en France (Allemagne : SID / Mobilithek, pour plus tard).
+- Réglementation (phase 5) — ZFE : `data/zfe.json` (BNZFE, licence ODbL d'après data.gouv.fr, source citée dans les
+  notes) ; seuil du schéma etalab (« V4 » = Crit'Air 4, 5 et non classés interdits, ordre EL < V1… V5 < NC), règles
+  `pl_*` au-delà de 3,5 t sinon `vul_*`, null = pas de restriction ; tronçon spécial (voies.geojson) à 20 m prime sur
+  la zone, dernière zone du fichier prioritaire ; horaires illisibles = restriction supposée, texte « à vérifier ».
+  Base réelle : identifiants « 1 », codes commune, SIREN à 10 chiffres, horaires « NC » (noms : `zfe_ids.csv`, zone
+  qui contient, sinon site web) ; tronçons sans effet (même règle que la zone) retirés. « Éviter la ZFE » : à
+  l'arrêt, une requête ORS `options.avoid_polygons` ; API publique (giscience.github.io/openrouteservice/
+  hosted-api-restrictions) : 150 km à vol d'oiseau avec zones à éviter, 200 km² et 20 km par polygone → zones
+  découpées en carrés de 12 km, message clair sinon (distance, départ ou arrivée dans la zone) ; recalcul en guidage :
+  zones gardées seulement sous 150 km. Interdictions PL : arrêté du 16 avril 2021 (pas celui de 2015, abrogé) + arrêté
+  annuel (`SUMMER_SATURDAYS`, `WINTER_AURA_SATURDAYS`, à compléter chaque année ; année absente → rappel
+  bison-fute.gouv.fr) ; heure locale de la tablette ; Île-de-France et réseau AURA reconnus par la référence de route
+  des étapes ORS (« à vérifier ») ; `vehicle.banStatus`. Guidage : `view.rules` (bandeau `#nav-rule`, une ligne par
+  alerte), voix si `settings.ruleVoice` (par défaut oui). legifrance.gouv.fr répond 403 depuis le conteneur : arrêtés
+  lus en PDF du JO sur bison-fute.gouv.fr. Tests de dates : `process.env.TZ = 'Europe/Paris'` en tête du fichier.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

@@ -8,8 +8,10 @@ import { createRouteForm } from './ui/route-form.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
-import { fetchRouteOptions } from './ui/api.js';
-import { guidanceParams, reroutedOption } from './lib/route-options.js';
+import { fetchRouteOptions, fetchRoute } from './ui/api.js';
+import { guidanceParams, reroutedOption, noZfeOption } from './lib/route-options.js';
+import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
+import { routeRules, rulesSourceText } from './lib/route-rules.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
 import { createNavigation } from './ui/navigation.js';
@@ -134,9 +136,98 @@ const areas = createAreas({
   onPool: (pool) => navigation.setAreas(pool),
 });
 
+// ───────── Réglementation (phase 5) : ZFE (data/zfe.json) et interdictions PL ─────────
+/** ZFE lues (parseZfeData), null tant qu'elles ne sont pas arrivées ou si le fichier est illisible. */
+let zfeData = null;
+let zfeFailed = false;
+let avoidBusy = false;
+fetch(ZFE.DATA_PATH, { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => {
+    zfeData = j ? parseZfeData(j) : null;
+    zfeFailed = !zfeData;
+  })
+  .catch(() => { zfeFailed = true; })
+  .finally(() => renderChoice());
+
+/** Réglementation déjà calculée par itinéraire (même minute de départ, mêmes données) : un toucher ne recalcule rien. */
+const rulesCache = new WeakMap();
+function rulesOf(route, vehicle, departure) {
+  const minute = Math.floor(departure.getTime() / 60000);
+  const hit = rulesCache.get(route);
+  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle) return hit.rules;
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, rules });
+  return rules;
+}
+
+/** Réglementation de chaque itinéraire proposé, d'après l'heure de départ (maintenant). */
+function choiceRules() {
+  if (!choice) return null;
+  const departure = new Date();
+  return choice.options.map((o) => {
+    const r = { ...rulesOf(o.route, choice.vehicle, departure) };
+    r.lines = [...r.lines];
+    if (zfeFailed) r.lines.unshift({ level: 'info', text: 'Zones à faibles émissions indisponibles (fichier non chargé) : vérifie la signalisation.' });
+    return r;
+  });
+}
+
+/** Contours des ZFE traversées par l'itinéraire choisi (rouge : interdite au véhicule). */
+function showZfeOnMap(rules) {
+  const passages = rules?.[choice?.selected ?? 0]?.passages ?? [];
+  const seen = new Map();
+  for (const p of passages) {
+    const prev = seen.get(p.zone);
+    seen.set(p.zone, { name: p.name, banned: p.banned || !!prev?.banned, polygons: p.zone.polygons });
+  }
+  map.showZfe([...seen.values()]);
+}
+
+/**
+ * « Éviter la ZFE » (à l'arrêt) : une requête ORS avec les ZFE interdites en options.avoid_polygons, mêmes réglages
+ * que l'itinéraire choisi. Limites de l'API publique (150 km à vol d'oiseau…) : message clair, pas de requête.
+ */
+async function avoidZfe() {
+  if (!choice || navigation.active || avoidBusy) return;
+  const option = choice.options[choice.selected];
+  const rules = rulesOf(option.route, choice.vehicle, new Date());
+  const zones = [...new Set(rules.banned.map((p) => p.zone))];
+  const plan = avoidPolygonsFor(zones, { start: choice.start, end: choice.end });
+  if (!plan.ok) { showMessage(messageNode, plan.text); return; }
+  avoidBusy = true;
+  renderChoice();
+  showMessage(messageNode, '');
+  try {
+    const route = await fetchRoute({
+      apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
+      avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
+      avoidPolygons: plan.geometry,
+    });
+    if (!choice || navigation.active) return;
+    const nz = noZfeOption(option, route, plan.geometry, zones.map((z) => z.name));
+    const options = [...choice.options.filter((o) => o.key !== 'nozfe'), nz];
+    choice = { ...choice, options, selected: options.length - 1 };
+    map.showRoutes(options.map((o) => o.route), choice.selected);
+    areas.select(route); // aires déjà trouvées replacées (la requête Overpass couvrait les premiers itinéraires)
+    const still = rulesOf(route, choice.vehicle, new Date()).banned;
+    if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
+  } catch (err) {
+    showMessage(messageNode, `Éviter la ZFE : ${errorText(err) || 'calcul impossible.'}`);
+  } finally {
+    avoidBusy = false;
+    renderChoice();
+  }
+}
+
 function renderChoice() {
   if (!choice) return;
-  renderRouteChoice(summaryNode, notesNode, { choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute });
+  const rules = choiceRules();
+  renderRouteChoice(summaryNode, notesNode, {
+    choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
+    rules, rulesSource: rulesSourceText(zfeData), onAvoidZfe: avoidZfe, avoidBusy,
+  });
+  showZfeOnMap(rules);
 }
 
 /** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
@@ -162,6 +253,7 @@ function startGuidance(simulate = null) {
     simulate,
     areas: areas.pool,
     announceAreas: data.settings.areaVoice,
+    rules: { vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice },
   });
   return null;
 }
@@ -198,6 +290,7 @@ const settings = createSettings({
   },
   onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
   onAreaVoiceChange: (on) => setSetting({ areaVoice: on }),
+  onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
 });
 createVehicles({ getData: () => data, update });
 
@@ -245,6 +338,7 @@ const form = createRouteForm({
       navStartBtn.hidden = true;
       choice = null;
       areas.clear();
+      map.showZfe([]);
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {
       form.setBusy(false);

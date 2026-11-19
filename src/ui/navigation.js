@@ -9,6 +9,8 @@
 // tracé seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
 // Encart « Prochaines aires » (phase 9) : ouvert ou fermé d'un seul appui, rempli par le moteur à chaque position ;
 // toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
+// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min » et voix,
+// lecture seule (aucun bouton).
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
@@ -18,6 +20,7 @@ import {
   setNavigationAreas, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea } from '../lib/areas-route.js';
+import { avoidForReroute } from '../lib/zfe.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
 import {
@@ -49,6 +52,7 @@ export function createNavigation(ctx) {
     instr: $('#nav-instr'),
     then: $('#nav-then'),
     alert: $('#nav-alert'),
+    rule: $('#nav-rule'),
     reroute: $('#btn-nav-reroute'),
     remaining: $('#nav-remaining'),
     time: $('#nav-time'),
@@ -239,6 +243,18 @@ export function createNavigation(ctx) {
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
     renderAlert(view);
 
+    // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
+    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text].filter(Boolean);
+    if (ui.rule.dataset.text !== rules.join('\n')) {
+      ui.rule.dataset.text = rules.join('\n');
+      ui.rule.replaceChildren(...rules.map((t) => {
+        const line = document.createElement('span');
+        line.textContent = t;
+        return line;
+      }));
+    }
+    ui.rule.hidden = !rules.length;
+
     ui.road.textContent = view.roadName ?? '';
     ui.road.hidden = !view.roadName;
     renderAreas(view);
@@ -285,6 +301,7 @@ export function createNavigation(ctx) {
         apiKey: ctx.getApiKey(), vehicle: session.vehicle, start: from, end: session.params.end,
         avoidTolls: session.params.avoidTolls, avoidFerries: session.params.avoidFerries,
         preference: session.params.preference ?? null,
+        avoidPolygons: avoidForReroute(session.params.avoidPolygons, from, session.params.end),
       });
       if (s !== session) return; // guidage arrêté entre-temps
       const done = rerouteDone(s.state, route);
@@ -395,11 +412,11 @@ export function createNavigation(ctx) {
    * @param {{ route:object, params:{ end:number[], avoidTolls:boolean, avoidFerries:boolean, preference?:string|null },
    *   vehicle:object, simulate?:{ speedKmh:number }|null }} p
    */
-  function start({ route, params, vehicle, simulate = null, areas = null, announceAreas = false }) {
+  function start({ route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null }) {
     if (s) stop();
     const now = Date.now();
     s = {
-      state: startNavigation(route, { destination: params.end, now, areas, announceAreas }),
+      state: startNavigation(route, { destination: params.end, now, areas, announceAreas, rules }),
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0,
       params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
       layer: GUIDANCE_START_LAYER, layerMessage: '',
@@ -418,6 +435,7 @@ export function createNavigation(ctx) {
     ui.stop.textContent = '■ Arrêter';
     ui.then.hidden = true;
     ui.alert.hidden = true;
+    ui.rule.hidden = true;
     ui.reroute.hidden = true;
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';

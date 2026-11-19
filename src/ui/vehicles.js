@@ -1,7 +1,8 @@
 // Écran Véhicules : liste, profil actif, création / modification / suppression.
 
 import { $, el, wireDialog } from './dom.js';
-import { NUMERIC_FIELDS, CRITAIR_VALUES, normalizeVehicle, validateVehicle, defaultVehicle } from '../lib/vehicle.js';
+import { NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle } from '../lib/vehicle.js';
+import { BAN_STATUS } from '../lib/hgv-bans.js';
 
 const fmt = (x) => (x === null || x === undefined ? '' : String(x).replace('.', ','));
 
@@ -11,6 +12,8 @@ function dims(v) {
   p.push(`${fmt(v.maxSpeed)} km/h`);
   if (v.hazmat) p.push('ADR');
   p.push(`Crit'Air ${v.critair}`);
+  if (v.banStatus === 'art4') p.push('art. 4');
+  if (v.banStatus === 'exempt') p.push('spécialisé');
   return p.join(' · ');
 }
 
@@ -80,6 +83,13 @@ export function createVehicles(ctx) {
         el('select', { id: 'veh-critair', name: 'critair' },
           CRITAIR_VALUES.map((c) => el('option', { value: c, text: c === 'NC' ? 'Non classé' : c, selected: c === v.critair }))),
         el('p', { class: 'err', 'data-err': 'critair' }),
+      ]),
+      el('div', { class: 'full' }, [
+        el('label', { for: 'veh-ban', text: 'Interdictions PL week-ends et jours fériés (plus de 7,5 t)' }),
+        el('select', { id: 'veh-ban', name: 'banStatus' },
+          BAN_STATUS_VALUES.map((c) => el('option', { value: c, text: BAN_STATUS[c], selected: c === (v.banStatus ?? 'concerned') }))),
+        el('p', { class: 'hint', text: 'Article 4 : au moins la moitié du chargement en denrées périssables ou animaux vivants, presse, fret aérien… (arrêté du 16 avril 2021). Justificatifs à bord.' }),
+        el('p', { class: 'err', 'data-err': 'banStatus' }),
       ]),
       el('label', { class: 'toggle full' }, [
         el('input', { type: 'checkbox', name: 'hazmat', checked: v.hazmat }),

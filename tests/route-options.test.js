@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   computeRouteOptions, planVariants, wantsAlternatives, sharedShare, isNearDuplicate, dedupeOptions, nameAlternatives,
-  describeOption, deltaText, failureText, guidanceParams, reroutedOption, routesBbox, pickRouteAt, requestFor,
+  describeOption, deltaText, failureText, guidanceParams, reroutedOption, noZfeOption, routesBbox, pickRouteAt, requestFor,
   VARIANTS, ROUTE_OPTIONS,
 } from '../src/lib/route-options.js';
 import { destinationPoint } from '../src/lib/nav-geo.js';
@@ -275,7 +275,7 @@ test('guidage : le recalcul garde les réglages de la variante choisie', () => {
   const base = { start: LYON, end: CLERMONT, avoidFerries: true };
   const opt = (variant, avoidTolls = false) => ({ request: requestFor(variant, avoidTolls) });
   assert.deepEqual(guidanceParams(opt(VARIANTS.recommended), base),
-    { start: LYON, end: CLERMONT, avoidFerries: true, avoidTolls: false, preference: null });
+    { start: LYON, end: CLERMONT, avoidFerries: true, avoidTolls: false, preference: null, avoidPolygons: null });
   assert.equal(guidanceParams(opt(VARIANTS.shortest), base).preference, 'shortest');
   assert.equal(guidanceParams(opt(VARIANTS.noToll), base).avoidTolls, true);
   assert.equal(guidanceParams(opt(VARIANTS.fastest, true), base).avoidTolls, true);
@@ -284,6 +284,12 @@ test('guidage : le recalcul garde les réglages de la variante choisie', () => {
   const r = reroutedOption({ request: requestFor(VARIANTS.shortest) }, route);
   assert.equal(r.label, 'Recalculé en route');
   assert.equal(r.request.preference, 'shortest');
+  // « Sans ZFE » (phase 5) : mêmes réglages + zones à éviter, gardées au recalcul.
+  const zones = { type: 'MultiPolygon', coordinates: [[[[4.8, 45.7], [4.9, 45.7], [4.9, 45.8], [4.8, 45.7]]]] };
+  const nz = noZfeOption({ request: requestFor(VARIANTS.shortest) }, route, zones, ['Métropole de Lyon']);
+  assert.deepEqual([nz.key, nz.label, nz.note], ['nozfe', 'Sans ZFE', 'Évite : Métropole de Lyon.']);
+  assert.equal(guidanceParams(nz, base).avoidPolygons, zones);
+  assert.equal(guidanceParams(nz, base).preference, 'shortest');
 });
 
 test('carte : emprise commune et tracé touché', () => {

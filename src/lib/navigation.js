@@ -13,6 +13,8 @@ import {
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
 import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
+import { zfeAlongRoute, guidanceZfe } from './zfe.js';
+import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -130,15 +132,29 @@ function placeAreas(pool, route) {
   return Array.isArray(pool) && pool.length ? placeAlongRoute(pool, route) : [];
 }
 
+/** ZFE interdites sur un itinéraire (phase 5), d'après l'heure de passage estimée depuis `now`. */
+function placeZfe(rules, route, now) {
+  if (!rules?.zfe || !rules.vehicle) return [];
+  return zfeAlongRoute(route, { data: rules.zfe, vehicle: rules.vehicle, departure: new Date(now || Date.now()) })
+    .filter((p) => p.banned);
+}
+
 /**
  * Démarre le guidage.
  * @param {object} route itinéraire lu par parseDirections
- * @param {{ destination?:number[]|null, now?:number, areas?:object[]|null, announceAreas?:boolean }} opts
+ * @param {{ destination?:number[]|null, now?:number, areas?:object[]|null, announceAreas?:boolean,
+ *   rules?:{ vehicle:object, zfe?:object|null, voice?:boolean }|null }} opts
  *   destination choisie [lon, lat] (peut être hors route) ; areas : aires trouvées au calcul (phase 9, mergeAreas) ;
- *   announceAreas : annonce vocale vers 10 km avant une aire (réglage, désactivé par défaut)
+ *   announceAreas : annonce vocale vers 10 km avant une aire (réglage, désactivé par défaut) ;
+ *   rules (phase 5) : profil véhicule et ZFE (parseZfeData) pour les alertes ZFE et interdictions PL, voice :
+ *   alertes dites à voix haute (réglage, activé par défaut)
  */
-export function startNavigation(route, { destination = null, now = 0, areas = null, announceAreas = false } = {}) {
+export function startNavigation(route, { destination = null, now = 0, areas = null, announceAreas = false, rules = null } = {}) {
   return {
+    rules: rules?.vehicle ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false } : null,
+    zfe: placeZfe(rules, route, now),
+    zfeAnnounced: {},
+    bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     route: prepareRoute(route),
     source: route,
     areaPool: Array.isArray(areas) ? areas : [],
@@ -277,6 +293,22 @@ export function updateNavigation(state, fix) {
     }
   }
 
+  // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
+  // seulement, rien à toucher.
+  const rules = { zfe: null, ban: null };
+  if (s.rules && !s.arrived) {
+    const z = guidanceZfe(s.zfe, loc.along, s.zfeAnnounced);
+    s.zfeAnnounced = z.announced;
+    rules.zfe = z.view;
+    const b = guidanceBan(s.bans, { now: t, arrival: t + remainingDuration(s.route, loc.along) * 1000, lonlat: p });
+    s.bans = { ...s.bans, announced: b.announced };
+    rules.ban = b.view ? { ...b.view, text: banBannerText(b.view) } : null;
+    if (s.rules.voice) {
+      if (z.speak && onRoute && !s.rerouting) events.push({ type: 'speak', text: z.speak });
+      if (b.speak) events.push({ type: 'speak', text: b.speak });
+    }
+  }
+
   const view = {
     position: onRoute ? loc.point : p,
     rawPosition: p,
@@ -301,6 +333,8 @@ export function updateNavigation(state, fix) {
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
     /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
     nextAreas: s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al)),
+    /** Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null }. */
+    rules,
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -412,6 +446,7 @@ export function rerouteDone(state, route) {
     route: prepareRoute(route),
     source: route,
     areas: placeAreas(state.areaPool, route),
+    zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
     segIndex: null,
     along: 0,
     announced: {},

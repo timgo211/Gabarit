@@ -61,12 +61,13 @@ function postDirections(apiKey, req) {
 }
 
 /**
- * Calcule un itinéraire camion (recalcul en guidage). preference : celle de la variante choisie (null = recommandé).
+ * Calcule un itinéraire camion (recalcul en guidage, « Éviter la ZFE »). preference : celle de la variante choisie
+ * (null = recommandé) ; avoidPolygons : zones à éviter (GeoJSON).
  * @returns route analysée (voir parseDirections).
  */
-export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null }) {
+export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null }) {
   requireKey(apiKey);
-  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries, preference });
+  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons });
   const json = await postDirections(apiKey, req);
   try {
     return parseDirections(json);

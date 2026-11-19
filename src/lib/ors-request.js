@@ -34,13 +34,13 @@ export function buildRestrictions(vehicle) {
 /**
  * Requête d'itinéraire camion.
  * @param {{ start:[number,number], end:[number,number], vehicle:object, avoidTolls?:boolean, avoidFerries?:boolean,
- *   preference?:'recommended'|'fastest'|'shortest'|null, alternatives?:number }} p
+ *   preference?:'recommended'|'fastest'|'shortest'|null, alternatives?:number, avoidPolygons?:object|null }} p
  *   start/end en [longitude, latitude] ; preference absente → défaut ORS (« recommended ») ;
  *   alternatives = nombre d'itinéraires voulus (2 ou 3, itinéraire principal compris) → alternative_routes.target_count.
  * @returns {{ url:string, method:'POST', body:object }}
  */
 export function buildDirectionsRequest({
-  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, alternatives = 0,
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, alternatives = 0, avoidPolygons = null,
 }) {
   if (!isLonLat(start)) throw new TypeError('Point de départ invalide.');
   if (!isLonLat(end)) throw new TypeError("Point d'arrivée invalide.");
@@ -57,6 +57,12 @@ export function buildDirectionsRequest({
   if (avoidTolls) avoid.push('tollways');
   if (avoidFerries) avoid.push('ferries');
   if (avoid.length) options.avoid_features = avoid;
+  // Zones à éviter (phase 5, « Éviter la ZFE ») : GeoJSON Polygon ou MultiPolygon (options.avoid_polygons, doc ORS
+  // docs/api-reference/endpoints/directions/routing-options.md) ; limites de l'API publique : voir ZFE dans zfe.js.
+  if (avoidPolygons && (avoidPolygons.type === 'Polygon' || avoidPolygons.type === 'MultiPolygon')
+    && Array.isArray(avoidPolygons.coordinates) && avoidPolygons.coordinates.length) {
+    options.avoid_polygons = { type: avoidPolygons.type, coordinates: avoidPolygons.coordinates };
+  }
   const restrictions = buildRestrictions(vehicle);
   if (Object.keys(restrictions).length) options.profile_params = { restrictions };
 

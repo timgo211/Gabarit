@@ -98,6 +98,22 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
   hebdomadaire) avec alerte selon ma vignette Crit'Air ; interdictions PL les week-ends et jours fériés ; temps de
   conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
   (Open-Meteo). Vérifier chaque règle sur une source officielle avant de coder et la citer en commentaire.
+  - [x] **ZFE** (PR A) : base nationale (aires + tronçons spéciaux, licence ODbL d'après data.gouv.fr) copiée chaque
+    lundi dans `data/zfe.json` par l'Action « ZFE (base nationale) » ; seuil Crit'Air du schéma etalab (V3 = Crit'Air
+    3, 4, 5 et non classés interdits), règles PL au-delà de 3,5 t, horaires (« 24/7 », « Mo-Fr 07:00-9:00 », « PH off »),
+    dates d'entrée en vigueur, tronçons spéciaux prioritaires sur la zone ; fiche d'itinéraire et notes (lien vers
+    l'arrêté), contours sur la carte, bouton « Éviter la ZFE » à l'arrêt (options.avoid_polygons d'ORS, zones découpées
+    en carrés de 12 km ; message clair au-delà de 150 km à vol d'oiseau, limite de l'API publique) ; en guidage,
+    bandeau sous 20 km et annonce vers 5 km. Les ZFE restent en vigueur (suppression censurée, décision 2026-903 DC).
+  - [x] **Interdictions PL week-ends et jours fériés** (PR A) : arrêté du 16 avril 2021 (l'arrêté du 2 mars 2015 est
+    abrogé) : plus de 7,5 t, samedi et veille de jour férié 22 h → dimanche et jour férié 22 h ; samedis d'été et
+    d'hiver (Auvergne-Rhône-Alpes) de l'arrêté annuel (2026 : arrêté du 26 décembre 2025) ; Île-de-France (art. 3, A6,
+    A10, A12, A13, A106, selon le sens) ; jours fériés calculés ; profil : « Concerné », « Transport de l'article 4 »
+    ou « Véhicule spécialisé / agricole ». Fiche : « Interdiction PL samedi 22 h → dimanche 22 h : vous y seriez vers
+    km 412 » ; guidage : annonces 1 h et 15 min avant si l'arrivée est après le début, bandeau. Vérifié avec le
+    calendrier 2026 de la brochure Bison Futé (écarts du 4 avril et du 9 mai en Île-de-France : l'appli suit l'arrêté).
+  - [ ] Temps de conduite et pauses (PR B).
+  - [ ] Alerte vent fort (PR B).
 
 - [ ] **Phase 5b — ADR (matières dangereuses)**
   Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D

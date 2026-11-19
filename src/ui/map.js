@@ -19,6 +19,9 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const ROUTE_LAYERS = ['route-hit', 'route-line', 'route-casing', 'route-alt-line', 'route-alt-casing'];
 /** Marge de toucher autour du doigt (px), en plus de la largeur invisible du tracé. */
 const TAP_MARGIN_PX = 10;
+/** ZFE (phase 5) : contours sous les libellés, au-dessus des photos ; rouge si interdite au véhicule. */
+const ZFE_SOURCE = 'zfe';
+const ZFE_LAYERS = ['zfe-fill', 'zfe-line'];
 const SAT_SOURCE = 'ign-ortho';
 const SAT_LAYER = 'ign-ortho';
 /** Contexte WebGL perdu : délai avant de recréer la carte s'il n'est pas rendu (retour au premier plan / page visible). */
@@ -115,6 +118,35 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let areaItems = [];
   let areaMarkers = [];
   let onArea = null;
+  /** ZFE affichées (phase 5) : [{ name, banned, polygons }]. */
+  let zfeItems = [];
+
+  function zfeData() {
+    return {
+      type: 'FeatureCollection',
+      features: zfeItems.map((z) => ({
+        type: 'Feature',
+        properties: { name: z.name, banned: !!z.banned },
+        geometry: { type: 'MultiPolygon', coordinates: z.polygons },
+      })),
+    };
+  }
+
+  /** Contours des ZFE du trajet, sous les libellés du fond et au-dessus des photos IGN. */
+  function addZfeLayers() {
+    if (!map) return;
+    const src = map.getSource(ZFE_SOURCE);
+    if (src) { src.setData(zfeData()); return; }
+    if (!zfeItems.length) return;
+    map.addSource(ZFE_SOURCE, { type: 'geojson', data: zfeData() });
+    const firstSymbol = map.getStyle()?.layers?.find((l) => l.type === 'symbol')?.id;
+    const color = ['case', ['get', 'banned'], '#c62828', '#e08a00'];
+    map.addLayer({ id: 'zfe-fill', type: 'fill', source: ZFE_SOURCE, paint: { 'fill-color': color, 'fill-opacity': 0.12 } }, firstSymbol);
+    map.addLayer({
+      id: 'zfe-line', type: 'line', source: ZFE_SOURCE,
+      paint: { 'line-color': color, 'line-width': 2.5, 'line-dasharray': [2, 1.5], 'line-opacity': 0.85 },
+    }, firstSymbol);
+  }
 
   function routesData() {
     return {
@@ -228,7 +260,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function transformStyle(prev, next) {
     const c = routeColors();
     const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
-    return carryOverlay(prev, next, { below: [SAT_LAYER], above: [...ROUTE_LAYERS].reverse(), paint });
+    return carryOverlay(prev, next, { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
   }
 
   /** Crée la carte MapLibre (au démarrage, ou pour remplacer une carte dont le contexte WebGL est perdu). */
@@ -250,6 +282,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     map.on('click', onMapClick);
     wireLongPress();
     map.on('style.load', addSatelliteLayer); // aussi après une reconstruction complète du style
+    map.on('style.load', addZfeLayers);
     map.on('moveend', applyLayer);
     map.on('webglcontextlost', () => {
       lost = true;
@@ -482,6 +515,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     showAreas(items) {
       areaItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
       drawAreas();
+    },
+    /** Contours des ZFE du trajet (phase 5) : [{ name, banned, polygons }] ; liste vide = aucun contour. */
+    showZfe(items) {
+      zfeItems = Array.isArray(items) ? items.filter((z) => Array.isArray(z?.polygons) && z.polygons.length) : [];
+      if (map?.isStyleLoaded()) addZfeLayers();
     },
     /** Appelé avec l'identifiant de l'aire touchée sur la carte. */
     onAreaPick(cb) {
