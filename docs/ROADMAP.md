@@ -22,6 +22,21 @@
   toucher un tracé ou sa fiche le sélectionne. Choix à l'arrêt uniquement : pendant le guidage rien ne change,
   le recalcul automatique garde les réglages de la variante choisie.
 
+- [ ] **Phase 7 — Vue satellite + partage** (deux petites fonctions regroupées, faites en premier)
+  **Vue satellite :**
+  Bouton de couche « Plan / Satellite », hors guidage et pendant la préparation du trajet (repérer l'entrée camion d'un
+  client ou d'un dépôt). France : photos aériennes de l'IGN (Géoplateforme `data.geopf.fr`, gratuites, sans clé,
+  attribution IGN). Hors de France : seulement une source gratuite dont les conditions d'utilisation le permettent,
+  vérifiées et citées ; sinon garder le plan.
+  **Partage avec des amis :**
+  Avec le partage Android (Web Share API), sans serveur :
+  - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
+  - un lieu ou une position ponctuelle (lien carte) ;
+  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) — seulement une fois la
+    phase 3 faite ;
+  - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
+  Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
+
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
   `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
@@ -50,21 +65,6 @@
 - [ ] **Phase 6 — Parkings et POI**
   Aires et parkings PL via Overpass (OpenStreetMap), prochain parking pendant la navigation ; historique des trajets,
   statistiques, relevé PDF via impression.
-
-- [ ] **Phase 7 — Vue satellite**
-  Bouton de couche « Plan / Satellite », hors guidage et pendant la préparation du trajet (repérer l'entrée camion d'un
-  client ou d'un dépôt). France : photos aériennes de l'IGN (Géoplateforme `data.geopf.fr`, gratuites, sans clé,
-  attribution IGN). Hors de France : seulement une source gratuite dont les conditions d'utilisation le permettent,
-  vérifiées et citées ; sinon garder le plan. Petite phase, faisable plus tôt.
-
-- [ ] **Phase 8 — Partager avec des amis**
-  Avec le partage Android (Web Share API), sans serveur :
-  - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
-  - un lieu ou une position ponctuelle (lien carte) ;
-  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) — seulement une fois la
-    phase 3 faite ;
-  - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
-  Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
 
 - [ ] **Phase 3 — Mes signalements + Ma journée** (reportée : à faire en dernier)
   Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
