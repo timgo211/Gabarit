@@ -2,7 +2,7 @@
 // Stockage injectable (localStorage dans le navigateur, objet en mémoire dans les tests).
 // La clé ORS est rangée à part et n'est JAMAIS exportée.
 
-import { normalizeVehicle, validateVehicle, defaultVehicle } from './vehicle.js';
+import { normalizeVehicle, validateVehicle, defaultVehicle, parseNumber } from './vehicle.js';
 import { THEME_MODES } from './theme.js';
 import { isSimSpeed, SIM_DEFAULT_SPEED } from './nav-sim.js';
 
@@ -10,6 +10,25 @@ export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
 export const SCHEMA_VERSION = 1;
 export const MAX_TRIPS = 50;
+
+/** Prix du gazole saisi dans Réglages (€/L) : bornes larges, qui écartent surtout les fautes de frappe. */
+export const DIESEL_PRICE = Object.freeze({ min: 0.5, max: 5 });
+
+export function isDieselPrice(x) {
+  return typeof x === 'number' && Number.isFinite(x) && x >= DIESEL_PRICE.min && x <= DIESEL_PRICE.max;
+}
+
+/**
+ * Lit le prix saisi (« 1,85 » ou « 1.85 »). Vide → pas de prix (null), sans erreur.
+ * @returns {{ value:number|null, error:string|null }}
+ */
+export function parseDieselPrice(text) {
+  const n = parseNumber(text);
+  if (n === null) return { value: null, error: null };
+  if (Number.isNaN(n)) return { value: null, error: 'Prix du gazole : nombre attendu (ex. 1,85).' };
+  if (!isDieselPrice(n)) return { value: null, error: 'Prix du gazole : entre 0,50 et 5 €/L.' };
+  return { value: Math.round(n * 1000) / 1000, error: null };
+}
 
 export function emptyData() {
   const v = defaultVehicle();
@@ -20,7 +39,9 @@ export function emptyData() {
     places: [],
     reports: [],
     trips: [],
-    settings: { theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED },
+    settings: {
+      theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
+    },
   };
 }
 
@@ -60,6 +81,7 @@ export function sanitizeData(raw) {
       avoidFerries: s.avoidFerries === true,
       voice: s.voice !== false, // guidage vocal activé par défaut
       simSpeed: isSimSpeed(s.simSpeed) ? s.simSpeed : SIM_DEFAULT_SPEED,
+      dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut (vrais prix : phase 4)
     },
   };
 }

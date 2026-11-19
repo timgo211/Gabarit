@@ -13,12 +13,14 @@
   de la destination, demi-tour annoncé prudemment une fois, simulation de trajet (Réglages › Test),
   403 « Quota du jour atteint » / « Clé refusée ou quota du jour atteint ».
 
-- [ ] **Phase 2b — Itinéraires alternatifs**
+- [x] **Phase 2b — Itinéraires alternatifs**
   Au calcul, jusqu'à 3 itinéraires camion (profil véhicule actif et ses restrictions) : option `alternative_routes`
-  d'ORS pour un trajet de 100 km ou moins, sinon variantes calculées à part (plus rapide, plus court, sans péage),
-  doublons supprimés, 3 requêtes maximum par calcul. Tous les tracés sur la carte (choisi en couleur, autres en gris),
-  une fiche par itinéraire (nom, durée, distance, arrivée, km à péage, coût gazole, écart avec le premier) ; toucher
-  un tracé ou sa fiche le sélectionne. Choix à l'arrêt uniquement : pendant le guidage rien ne change, recalcul automatique.
+  d'ORS pour un trajet de 100 km ou moins à vol d'oiseau (mesure d'ORS), sinon variantes calculées à part (Recommandé,
+  Plus court, Sans péage — Plus rapide si les péages sont déjà évités ou absents), doublons supprimés, 3 requêtes
+  maximum par calcul. Tous les tracés sur la carte (choisi en couleur, autres en gris), une fiche par itinéraire (nom,
+  durée, distance, arrivée, km à péage, gazole et coût selon le prix saisi dans Réglages, écart avec le Recommandé) ;
+  toucher un tracé ou sa fiche le sélectionne. Choix à l'arrêt uniquement : pendant le guidage rien ne change,
+  le recalcul automatique garde les réglages de la variante choisie.
 
 - [ ] **Phase 3 — Mes signalements + Ma journée**
   Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune

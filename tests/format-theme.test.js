@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDistance, formatDuration, formatArrival, formatLiters, formatNavDistance, formatSpeed } from '../src/lib/format.js';
+import {
+  formatDistance, formatDuration, formatArrival, formatLiters, formatNavDistance, formatSpeed,
+  formatDurationDelta, formatDistanceDelta, formatEuros, formatPricePerLiter,
+} from '../src/lib/format.js';
 import { resolveTheme } from '../src/lib/theme.js';
 
 test('distances', () => {
@@ -42,4 +45,26 @@ test('distance du guidage et vitesse', () => {
   assert.equal(formatNavDistance(-1), '—');
   assert.equal(formatSpeed(87.6), '88 km/h');
   assert.equal(formatSpeed(null), '—');
+});
+
+test('écarts signés avec le premier itinéraire', () => {
+  assert.equal(formatDurationDelta(360), '+6 min');
+  assert.equal(formatDurationDelta(-3900), '\u22121 h 05');
+  assert.equal(formatDurationDelta(20), '±0 min');
+  assert.equal(formatDurationDelta(null), '—');
+  assert.equal(formatDistanceDelta(-12345), '\u221212 km');
+  assert.equal(formatDistanceDelta(2400), '+2,4 km');
+  assert.equal(formatDistanceDelta(-430), '\u2212430 m');
+  assert.equal(formatDistanceDelta(30), '±0 km');
+  assert.equal(formatDistanceDelta(9960), '+10 km');
+});
+
+test('euros et prix au litre', () => {
+  assert.equal(formatEuros(91.6), '92 €');
+  assert.equal(formatEuros(2.66), '2,7 €');
+  assert.equal(formatEuros(-1), '—');
+  assert.equal(formatPricePerLiter(1.85), '1,85');
+  assert.equal(formatPricePerLiter(1.859), '1,859');
+  assert.equal(formatPricePerLiter(2), '2,00');
+  assert.equal(formatPricePerLiter(null), '');
 });

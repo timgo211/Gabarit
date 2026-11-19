@@ -147,9 +147,11 @@ export function createNavigation(ctx) {
     const session = s;
     renderAlert(s.view);
     try {
+      // Mêmes réglages que l'itinéraire choisi à l'arrêt (plus court, sans péage…) : rien à choisir en roulant.
       const route = await fetchRoute({
         apiKey: ctx.getApiKey(), vehicle: session.vehicle, start: from, end: session.params.end,
         avoidTolls: session.params.avoidTolls, avoidFerries: session.params.avoidFerries,
+        preference: session.params.preference ?? null,
       });
       if (s !== session) return; // guidage arrêté entre-temps
       const done = rerouteDone(s.state, route);
@@ -205,8 +207,8 @@ export function createNavigation(ctx) {
 
   /**
    * Démarre le guidage. À appeler dans le geste de l'utilisateur (première phrase autorisée par Chrome).
-   * @param {{ route:object, params:{ end:number[], avoidTolls:boolean, avoidFerries:boolean }, vehicle:object,
-   *   simulate?:{ speedKmh:number }|null }} p
+   * @param {{ route:object, params:{ end:number[], avoidTolls:boolean, avoidFerries:boolean, preference?:string|null },
+   *   vehicle:object, simulate?:{ speedKmh:number }|null }} p
    */
   function start({ route, params, vehicle, simulate = null }) {
     if (s) stop();
