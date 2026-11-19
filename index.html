@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="fr" data-theme="day">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Gabarit</title>
+  <meta name="description" content="GPS poids lourd : itinéraires selon le gabarit du véhicule.">
+  <meta name="theme-color" content="#0f1720">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="src/styles.css">
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+  <script type="module" src="src/app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <h1 class="brand">Gabarit</h1>
+      <button type="button" id="btn-vehicles" class="btn btn-chip" aria-label="Choisir le véhicule">
+        <span aria-hidden="true">🚚</span> <span id="active-vehicle-name">—</span>
+      </button>
+      <button type="button" id="btn-settings" class="btn btn-icon" aria-label="Réglages">⚙</button>
+    </header>
+
+    <main class="map-wrap">
+      <div id="map" class="map" role="application" aria-label="Carte"></div>
+      <p id="map-fallback" class="map-fallback" hidden>Carte indisponible (hors ligne ?). Le calcul d'itinéraire reste possible avec le réseau.</p>
+    </main>
+
+    <section class="panel" aria-label="Itinéraire">
+      <form id="route-form" class="route-form" autocomplete="off">
+        <div class="field">
+          <label for="from-input">Départ</label>
+          <div class="combo">
+            <input id="from-input" type="search" placeholder="Ma position (GPS)" enterkeyhint="next"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="from-list">
+            <button type="button" id="btn-gps" class="btn btn-icon" aria-label="Utiliser ma position">📍</button>
+          </div>
+          <ul id="from-list" class="suggestions" role="listbox" hidden></ul>
+        </div>
+        <div class="field">
+          <label for="to-input">Arrivée</label>
+          <div class="combo">
+            <input id="to-input" type="search" placeholder="Ville, adresse, entreprise…" enterkeyhint="search"
+                   role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="to-list">
+          </div>
+          <ul id="to-list" class="suggestions" role="listbox" hidden></ul>
+        </div>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" id="avoid-tolls"> Éviter péages</label>
+          <label class="toggle"><input type="checkbox" id="avoid-ferries"> Éviter ferries</label>
+        </div>
+        <button type="submit" id="btn-route" class="btn btn-primary btn-big">Calculer l'itinéraire</button>
+      </form>
+
+      <div id="message" class="message" role="alert" hidden></div>
+      <div id="summary" class="summary" aria-live="polite" hidden></div>
+    </section>
+
+    <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>
+  </div>
+
+  <button type="button" id="update-banner" class="update-banner" hidden>Nouvelle version disponible, toucher pour recharger</button>
+
+  <dialog id="dlg-settings" class="dialog" aria-labelledby="settings-title">
+    <div class="dialog-head">
+      <h2 id="settings-title">Réglages</h2>
+      <button type="button" class="btn btn-icon" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dialog-body">
+      <section class="card">
+        <h3>Clé OpenRouteService</h3>
+        <p class="hint">Gratuite sur heigit.org. Elle reste uniquement sur cette tablette et n'est jamais exportée.</p>
+        <div class="combo">
+          <input id="key-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
+                 placeholder="Colle ta clé ici" aria-label="Clé OpenRouteService">
+          <button type="button" id="btn-key-show" class="btn btn-icon" aria-label="Afficher la clé" aria-pressed="false">👁</button>
+        </div>
+        <div class="row">
+          <button type="button" id="btn-key-save" class="btn btn-primary">Enregistrer</button>
+          <button type="button" id="btn-key-test" class="btn">Tester</button>
+          <button type="button" id="btn-key-clear" class="btn btn-danger">Effacer</button>
+        </div>
+        <p id="key-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h3>Mode nuit</h3>
+        <div class="segmented" role="radiogroup" aria-label="Mode nuit">
+          <label><input type="radio" name="theme" value="auto"> Auto (20 h – 7 h)</label>
+          <label><input type="radio" name="theme" value="day"> Jour</label>
+          <label><input type="radio" name="theme" value="night"> Nuit</label>
+        </div>
+      </section>
+
+      <section class="card">
+        <h3>Mes données</h3>
+        <p class="hint">Véhicules, lieux, signalements et trajets. Exporte régulièrement une sauvegarde.</p>
+        <div class="row">
+          <button type="button" id="btn-export" class="btn">Exporter (JSON)</button>
+          <label class="btn" for="import-file">Importer…</label>
+          <input id="import-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p id="data-status" class="status" role="status"></p>
+        <p id="persist-status" class="hint"></p>
+      </section>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-vehicles" class="dialog" aria-labelledby="vehicles-title">
+    <div class="dialog-head">
+      <h2 id="vehicles-title">Véhicules</h2>
+      <button type="button" class="btn btn-icon" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dialog-body" id="vehicles-body"></div>
+  </dialog>
+</body>
+</html>

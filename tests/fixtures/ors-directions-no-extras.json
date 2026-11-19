@@ -1,0 +1,16 @@
+{
+  "type": "FeatureCollection",
+  "bbox": [2.3, 48.8, 2.4, 48.9],
+  "features": [
+    {
+      "bbox": [2.3, 48.8, 2.4, 48.9],
+      "type": "Feature",
+      "properties": {
+        "segments": [{ "distance": 15000, "duration": 1500, "steps": [] }],
+        "summary": { "distance": 15000, "duration": 1500 },
+        "way_points": [0, 2]
+      },
+      "geometry": { "type": "LineString", "coordinates": [[2.3, 48.8], [2.35, 48.85], [2.4, 48.9]] }
+    }
+  ]
+}

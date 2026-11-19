@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "bbox": [4.8357, 45.7578, 4.8752, 45.7801],
+  "features": [
+    {
+      "bbox": [4.8357, 45.7578, 4.8752, 45.7801],
+      "type": "Feature",
+      "properties": {
+        "segments": [
+          {
+            "distance": 5230.4,
+            "duration": 512.7,
+            "steps": [
+              { "distance": 1200.0, "duration": 110.2, "type": 11, "instruction": "Prendre la direction est sur Rue de la République", "name": "Rue de la République", "way_points": [0, 2] },
+              { "distance": 3500.4, "duration": 360.5, "type": 1, "instruction": "Tourner à droite sur A7", "name": "A7", "way_points": [2, 5] },
+              { "distance": 530.0, "duration": 42.0, "type": 10, "instruction": "Arrivée à destination, sur la droite", "name": "-", "way_points": [5, 6] }
+            ]
+          }
+        ],
+        "extras": {
+          "tollways": {
+            "values": [[0, 2, 0], [2, 5, 1], [5, 6, 0]],
+            "summary": [
+              { "value": 0.0, "distance": 1730.0, "amount": 33.08 },
+              { "value": 1.0, "distance": 3500.4, "amount": 66.92 }
+            ]
+          }
+        },
+        "warnings": [
+          { "code": 1, "message": "There may be restrictions on some roads" }
+        ],
+        "summary": { "distance": 5230.4, "duration": 512.7 },
+        "way_points": [0, 6]
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [4.8357, 45.7640], [4.8420, 45.7650], [4.8500, 45.7660],
+          [4.8600, 45.7700], [4.8680, 45.7750], [4.8720, 45.7790], [4.8752, 45.7801]
+        ]
+      }
+    }
+  ],
+  "metadata": {
+    "attribution": "openrouteservice.org | OpenStreetMap contributors",
+    "service": "routing",
+    "timestamp": 1795075200000,
+    "query": {
+      "coordinates": [[4.8357, 45.764], [4.8752, 45.7801]],
+      "profile": "driving-hgv",
+      "format": "geojson",
+      "units": "m",
+      "language": "fr",
+      "extra_info": ["tollways"],
+      "maximum_speed": 90.0
+    },
+    "engine": { "version": "9.0.0" }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "summary": { "distance": 3000, "duration": 200 },
+        "extras": { "tollways": { "values": [[0, 1, 0], [1, 3, 1]] } }
+      },
+      "geometry": { "type": "LineString", "coordinates": [[0, 0], [0, 0.01], [0, 0.02], [0, 0.03]] }
+    }
+  ]
+}

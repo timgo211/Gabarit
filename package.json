@@ -1,0 +1,9 @@
+{
+  "name": "gabarit",
+  "private": true,
+  "description": "PWA de GPS poids lourd (usage personnel).",
+  "type": "module",
+  "scripts": {
+    "test": "node --test"
+  }
+}
