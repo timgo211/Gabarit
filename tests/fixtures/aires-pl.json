@@ -1,0 +1,17 @@
+{
+  "source": "Bison Futé — point d'accès national (aires de stationnement PL)",
+  "licence": "Licence Ouverte Etalab v2.0",
+  "updated": "2026-11-16T04:20:00.000Z",
+  "files": [],
+  "areas": [
+    { "id": "off:SCA-A43_12", "name": "Aire PL de Test-Est", "lon": 4.9622, "lat": 45.7294, "hgvPlaces": 40,
+      "fee": false, "price": null, "secure": true, "services": ["toilets", "shower"], "road": "A43", "direction": "Lyon vers Chambéry",
+      "operator": "Société d'autoroute", "network": "concédé" },
+    { "id": "off:ANC-RN7_3", "name": "Aire PL officielle du Sud", "lon": 4.9740, "lat": 45.7165, "hgvPlaces": 30,
+      "fee": true, "price": "15 € la nuit", "secure": null, "services": [], "road": "RN7", "direction": null,
+      "operator": null, "network": "non concédé" },
+    { "id": "off:ANC-loin", "name": "Aire PL hors trajet", "lon": 2.35, "lat": 48.85, "hgvPlaces": 10 },
+    { "id": "pas-officiel", "name": "Mauvais identifiant", "lon": 4.97, "lat": 45.72 },
+    { "id": "off:ANC-hors-france", "name": "Hors de France", "lon": 13.4, "lat": 52.5 }
+  ]
+}

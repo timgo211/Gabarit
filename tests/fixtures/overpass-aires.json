@@ -1,0 +1,24 @@
+{
+  "version": 0.6,
+  "generator": "Overpass API (réponse écrite d'après la doc : wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL, out center tags)",
+  "osm3s": { "timestamp_osm_base": "2026-11-18T10:00:00Z", "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL." },
+  "elements": [
+    { "type": "way", "id": 1001, "center": { "lat": 45.7296, "lon": 4.9625 },
+      "tags": { "highway": "rest_area", "name": "Aire de Test-Est", "toilets": "yes", "drinking_water": "yes" } },
+    { "type": "node", "id": 2001, "lat": 45.7297, "lon": 4.9628,
+      "tags": { "amenity": "parking", "hgv": "designated", "capacity:hgv": "25", "fee": "no" } },
+    { "type": "way", "id": 1002, "center": { "lat": 45.7304, "lon": 4.9700 },
+      "tags": { "highway": "services", "name": "Aire de l'Autre-Sens", "fuel": "yes", "restaurant": "yes", "shower": "yes" } },
+    { "type": "node", "id": 2002, "lat": 45.7180, "lon": 4.9785,
+      "tags": { "amenity": "parking", "hgv": "yes", "capacity:hgv": "12", "fee": "yes", "supervised": "yes", "name": "Parking PL de la Zone" } },
+    { "type": "way", "id": 1003, "center": { "lat": 45.7020, "lon": 4.9842 },
+      "tags": { "highway": "rest_area", "name": "Aire du Bout", "toilets": "yes" } },
+    { "type": "way", "id": 1004, "center": { "lat": 45.7700, "lon": 4.9900 },
+      "tags": { "highway": "rest_area", "name": "Aire trop loin" } },
+    { "type": "node", "id": 2003, "lat": 45.7250, "lon": 4.9760,
+      "tags": { "amenity": "parking", "hgv": "no", "name": "Parking interdit PL" } },
+    { "type": "node", "id": 2004, "lat": 45.7240, "lon": 4.9762,
+      "tags": { "amenity": "parking", "name": "Parking voitures" } },
+    { "type": "relation", "id": 3001, "tags": { "highway": "rest_area", "name": "Sans position" } }
+  ]
+}

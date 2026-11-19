@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
+<row r="1"><c r="A1" t="s"><v>0</v></c></row>
+<row r="2"><c r="A2" t="s"><v>1</v></c><c r="B2" t="s"><v>2</v></c><c r="C2" t="s"><v>3</v></c><c r="D2" t="s"><v>4</v></c><c r="E2" t="s"><v>5</v></c><c r="F2" t="s"><v>6</v></c><c r="G2" t="s"><v>7</v></c><c r="H2" t="s"><v>8</v></c><c r="I2" t="s"><v>9</v></c><c r="J2" t="s"><v>10</v></c></row>
+<row r="3"><c r="A3" t="inlineStr"><is><t>A43-12</t></is></c><c r="B3" t="s"><v>11</v></c><c r="C3" t="str"><v>A43</v></c><c r="D3" t="s"><v>12</v></c><c r="E3"><v>45.6135</v></c><c r="F3"><v>5.2241</v></c><c r="G3"><v>48</v></c><c r="H3" t="s"><v>13</v></c><c r="I3" t="s"><v>14</v></c><c r="J3" t="s"><v>15</v></c></row>
+<row r="4"><c r="A4" t="inlineStr"><is><t>A7-3</t></is></c><c r="B4" t="inlineStr"><is><t>Aire de Saint-Rambert</t></is></c><c r="C4" t="str"><v>A7</v></c><c r="E4" t="inlineStr"><is><t>45,2930</t></is></c><c r="F4" t="inlineStr"><is><t>4,8121</t></is></c><c r="G4"><v>60</v></c><c r="H4" t="inlineStr"><is><t>12 € / nuit</t></is></c><c r="J4" t="inlineStr"><is><t>Non</t></is></c></row>
+<row r="5"><c r="A5" t="inlineStr"><is><t>A7-4</t></is></c><c r="B5" t="inlineStr"><is><t>Aire sans position</t></is></c></row>
+<row r="6"/>
+</sheetData></worksheet>

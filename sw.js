@@ -1,11 +1,12 @@
 // Service worker de Gabarit (module ES). Chemins relatifs à l'emplacement de ce fichier.
 // Interface : network-first (la tablette reçoit toujours la dernière version, cache en secours hors ligne).
-// Requêtes vers d'autres domaines (itinéraires, géocodage, tuiles, styles de carte) : jamais mises en cache (voir src/lib/sw-routing.js).
+// Requêtes vers d'autres domaines (itinéraires, géocodage, aires, tuiles, styles de carte) : jamais mises en cache
+// (voir src/lib/sw-routing.js). Requêtes POST (aires OpenStreetMap) : jamais interceptées.
 // ⚠️ Incrémenter VERSION à chaque modification des fichiers listés ci-dessous.
 
 import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 
-const VERSION = 'v8';
+const VERSION = 'v9';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -17,6 +18,11 @@ const APP_FILES = [
   './icons/icon-512.png',
   './src/styles.css',
   './src/app.js',
+  './src/lib/areas-avis.js',
+  './src/lib/areas-cache.js',
+  './src/lib/areas-official.js',
+  './src/lib/areas-osm.js',
+  './src/lib/areas-route.js',
   './src/lib/config.js',
   './src/lib/coords.js',
   './src/lib/format.js',
@@ -37,6 +43,7 @@ const APP_FILES = [
   './src/lib/theme.js',
   './src/lib/vehicle.js',
   './src/ui/api.js',
+  './src/ui/areas.js',
   './src/ui/dom.js',
   './src/ui/layer-switch.js',
   './src/ui/map.js',

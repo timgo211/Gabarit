@@ -88,7 +88,7 @@
   - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
     (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
 
-- [ ] **Phase 9 — Aires et parkings PL** (priorité : à faire maintenant ; reprend la partie parkings de la phase 6)
+- [x] **Phase 9 — Aires et parkings PL** (priorité ; reprend la partie parkings de la phase 6)
   - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
     (`amenity=parking` + `hgv=yes/designated`, `capacity:hgv`, services) d'OpenStreetMap via Overpass ; jeu officiel
     des aires de stationnement PL du point d'accès national (Bison Futé, transféré sur transport.data.gouv.fr par
@@ -106,6 +106,16 @@
     dans la liste (« Plein il y a 2 j, 21h »).
   - Occupation en temps réel : vérifier s'il existe une source gratuite pour la France. **Pour plus tard (non codé) :**
     Allemagne, places libres des aires d'autoroute publiées par Toll Collect / SID sur Mobilithek (DATEX II).
+  Fait : une requête Overpass par calcul pour tous les itinéraires proposés (tracés mis bout à bout, simplifiés),
+  aires de repos / de service à 400 m, parkings PL à 800 m, serveur de secours (overpass.private.coffee) si le premier
+  échoue ou dépasse 30 s, résultat gardé 7 jours sur l'appareil (5 trajets) ; jeu officiel (xlsx du réseau concédé 2025,
+  ods du réseau non concédé 2018, Licence Ouverte) converti chaque lundi dans `data/aires-pl.json` par l'Action
+  « Aires PL officielles » (journal : en-têtes lus, colonnes retenues, nombre d'aires ; échec clair si le nom ou la
+  position manquent ; Lambert 93 accepté) ; doublons fusionnés à 300 m ; aire à gauche du tracé en gris « autre sens ? ».
+  Liste, repères, fiche, encart « Prochaines aires », annonce vocale (Réglages), « Mon avis » (sous 10 km/h en guidage).
+  **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
+  Strasbourg, Aix-Marseille…). Les colonnes du jeu officiel n'ont pas pu être vues depuis le conteneur : vérifier le
+  journal du premier passage de l'Action.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu

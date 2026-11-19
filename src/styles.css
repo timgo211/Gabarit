@@ -439,6 +439,75 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .app.navigating ~ .press-sheet { display: none; }
 .install-steps { margin: 6px 0 0; padding-left: 24px; display: grid; gap: 4px; }
 
+/* ───────── Aires et parkings PL (phase 9) ───────── */
+:root { --area: #0b57d0; --area-fg: #ffffff; --area-other: #8a949e; --avis-full: #b3261e; --avis-some: #9a4a00; --avis-ok: #146c2e; }
+:root[data-theme="night"] { --area: #4c8dff; --area-fg: #05080b; --area-other: #6b7785; --avis-full: #ff6b5e; --avis-some: #ffc56b; --avis-ok: #6fdc8c; }
+.areas { margin-top: 14px; min-width: 0; }
+.areas-title { margin: 0 0 4px; font-size: 1.15rem; }
+.areas-count { color: var(--muted); font-weight: 600; font-size: .95rem; }
+.areas-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.area-row {
+  width: 100%; min-width: 0; min-height: var(--tap); padding: 8px 12px; display: grid; gap: 2px; text-align: left;
+  font: inherit; color: var(--fg); background: var(--card); cursor: pointer;
+  border: 2px solid var(--border); border-left: 8px solid var(--area); border-radius: var(--radius);
+}
+.area-row:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.area-row.other-side { border-left-color: var(--area-other); color: var(--muted); }
+.area-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
+.area-row-name { font-weight: 800; min-width: 0; overflow-wrap: anywhere; }
+.area-row-other { flex: 0 0 auto; font-weight: 700; font-size: .85rem; padding: 0 8px; border-radius: 999px;
+  border: 1px solid var(--area-other); }
+.area-row-facts, .area-row-services, .area-row-avis { font-size: .92rem; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.area-row-services { color: var(--muted); }
+.area-row-avis { font-weight: 700; }
+.avis-full { color: var(--avis-full); }
+.avis-some { color: var(--avis-some); }
+.avis-ok { color: var(--avis-ok); }
+.areas-credit { font-size: .8rem; }
+
+.area-marker {
+  width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
+  display: grid; place-items: center; font: 800 18px/1 system-ui, sans-serif;
+  background: var(--area); color: var(--area-fg); border: 2px solid #ffffff; box-shadow: 0 1px 6px rgba(0,0,0,.45);
+}
+.area-marker.other-side { background: var(--area-other); opacity: .85; width: 24px; height: 24px; font-size: 14px; }
+
+.area-kind { margin: 0 0 6px; font-weight: 700; color: var(--muted); }
+.area-other { margin: 0 0 8px; padding: 8px; border-radius: var(--radius); border: 2px dashed var(--area-other); font-weight: 600; }
+.area-facts { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; }
+.area-facts dt { color: var(--muted); }
+.area-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.area-last { margin: 0 0 8px; font-weight: 700; }
+.area-avis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.area-avis .btn { min-height: 72px; padding: 0 6px; white-space: normal; line-height: 1.15; font-size: 1.05rem; }
+.area-avis .avis-full { border-color: var(--avis-full); }
+.area-avis .avis-some { border-color: var(--avis-some); }
+.area-avis .avis-ok { border-color: var(--avis-ok); }
+.area-avis .btn:disabled { opacity: .45; }
+
+/* Encart « Prochaines aires » du guidage : lisible d'un coup d'œil, chaque ligne ouvre la fiche. */
+.nav-areas {
+  width: 100%; max-width: 620px; align-self: flex-start; padding: 6px; border-radius: var(--radius);
+  background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 2px 12px rgba(0,0,0,.35);
+}
+.nav-areas-title { margin: 0 4px 4px; font-size: .85rem; font-weight: 700; opacity: .8; }
+.nav-areas-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.nav-area {
+  width: 100%; min-width: 0; min-height: 48px; padding: 4px 8px; display: grid; gap: 0; text-align: left; cursor: pointer;
+  font: inherit; color: inherit; background: transparent; border: 0; border-left: 6px solid var(--area); border-radius: 6px;
+}
+.nav-area-name { font-weight: 800; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nav-area-facts { display: flex; gap: 10px; min-width: 0; font-size: .95rem; font-variant-numeric: tabular-nums; }
+.nav-area-facts > span { white-space: nowrap; }
+.nav-area-dist { font-weight: 800; }
+.nav-area-places { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.nav-areas-empty { margin: 0 4px; font-weight: 600; }
+@media (max-width: 600px) {
+  .nav-area-name { font-size: 1rem; }
+  .nav-area-facts { gap: 8px; font-size: .9rem; }
+  .area-avis .btn { font-size: .95rem; }
+}
+
 /* Téléphone en portrait (≈ 360 à 412 px) : tout tient en largeur ; la tablette garde les règles ci-dessus. */
 @media (max-width: 600px) {
   .topbar { gap: 6px; padding-left: 8px; padding-right: 8px; }

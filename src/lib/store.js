@@ -1,4 +1,4 @@
-// Données locales (véhicules, lieux, signalements, trajets, réglages) + export/import JSON.
+// Données locales (véhicules, lieux, signalements, trajets, avis sur les aires, réglages) + export/import JSON.
 // Stockage injectable (localStorage dans le navigateur, objet en mémoire dans les tests).
 // La clé ORS est rangée à part et n'est JAMAIS exportée.
 
@@ -9,6 +9,7 @@ import { sanitizeMapLayer, DEFAULT_MAP_LAYER } from './map-layers.js';
 import {
   sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
+import { sanitizeAreaReports } from './areas-avis.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -43,10 +44,12 @@ export function emptyData() {
     places: [],
     reports: [],
     trips: [],
+    areaReports: [],
     settings: {
       theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
       arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
+      areaVoice: false,
     },
   };
 }
@@ -81,6 +84,7 @@ export function sanitizeData(raw) {
     places: arr(raw.places),
     reports: arr(raw.reports),
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
+    areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       avoidTolls: s.avoidTolls === true,
@@ -93,6 +97,7 @@ export function sanitizeData(raw) {
       voiceName: sanitizeVoiceName(s.voiceName),
       voiceRate: sanitizeVoiceRate(s.voiceRate),
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
+      areaVoice: s.areaVoice === true, // annonce vocale des aires PL (phase 9), désactivée par défaut
     },
   };
 }

@@ -21,6 +21,7 @@ import {
 import { arrowColors } from './lib/prefs.js';
 import { coordsLabel } from './lib/coords.js';
 import { canDuckMedia } from './ui/voice.js';
+import { createAreas } from './ui/areas.js';
 
 function pickStorage() {
   try {
@@ -33,7 +34,8 @@ function pickStorage() {
   }
 }
 
-const store = createStore(pickStorage());
+const storage = pickStorage();
+const store = createStore(storage);
 let data = store.load();
 const messageNode = $('#message');
 const summaryNode = $('#summary');
@@ -110,12 +112,26 @@ navigation = createNavigation({
       start: route.coordinates[0], startIsMyPosition: true, // recalcul depuis la position GPS
     };
     renderChoice();
+    areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
   },
+  onAreaOpen: (id) => areas.openSheet(id),
+  onView: () => areas.refreshDrive(),
   onEnd: (message) => {
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
     if (message) showMessage(messageNode, message);
   },
+});
+
+// Aires et parkings PL du trajet (phase 9).
+const areas = createAreas({
+  map,
+  storage,
+  getData: () => data,
+  update,
+  getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
+  getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
+  onPool: (pool) => navigation.setAreas(pool),
 });
 
 function renderChoice() {
@@ -129,6 +145,7 @@ function selectRoute(index) {
   choice = { ...choice, selected: index };
   map.selectRoute(index);
   renderChoice();
+  areas.select(choice.options[index].route);
   revealSelectedCard(summaryNode);
 }
 map.onRoutePick(selectRoute);
@@ -143,6 +160,8 @@ function startGuidance(simulate = null) {
     // Le recalcul en route garde les réglages de l'itinéraire choisi (plus court, sans péage…).
     params: guidanceParams(option, choice),
     simulate,
+    areas: areas.pool,
+    announceAreas: data.settings.areaVoice,
   });
   return null;
 }
@@ -178,6 +197,7 @@ const settings = createSettings({
     setSetting({ voiceName: o.name, voiceRate: o.rate, voiceVolume: o.volume });
   },
   onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
+  onAreaVoiceChange: (on) => setSetting({ areaVoice: on }),
 });
 createVehicles({ getData: () => data, update });
 
@@ -213,6 +233,7 @@ const form = createRouteForm({
       renderChoice();
       navStartBtn.hidden = false;
       map.showRoutes(options.map((o) => o.route), selected);
+      areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
@@ -223,6 +244,7 @@ const form = createRouteForm({
       notesNode.hidden = true;
       navStartBtn.hidden = true;
       choice = null;
+      areas.clear();
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {
       form.setBusy(false);

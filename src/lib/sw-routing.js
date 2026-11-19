@@ -24,6 +24,6 @@ export function cacheStrategy(method, url, appOrigin) {
   }
   if (MAPLIBRE_ASSETS.includes(u.href)) return 'cache-first';
   if (u.origin !== appOrigin) return 'bypass';
-  // Données dynamiques éventuelles servies par l'appli (data/*.json, phase 5) : réseau aussi.
+  // Données servies par l'appli (data/aires-pl.json, phase 9 ; ZFE, phase 5) : réseau d'abord, copie hors ligne.
   return 'network-first';
 }

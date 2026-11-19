@@ -1,6 +1,6 @@
 // Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracés des itinéraires (choisi en couleur, autres en gris),
 // position, suivi en guidage (flèche animée, phase 7c), vue satellite IGN (phase 7 ; en guidage aussi depuis la 7c),
-// appui long (phase 8).
+// appui long (phase 8), repères des aires et parkings PL (phase 9).
 // MapLibre est chargé par index.html (window.maplibregl, version épinglée).
 //
 // Phase 7b : au retour de l'arrière-plan, Android peut retirer le contexte WebGL (carte vide). On écoute
@@ -108,6 +108,13 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   const markers = { start: null, end: null, me: null, pin: null, pinTo: null, pinFrom: null };
   /** Dernières positions des marqueurs (pour recréer la carte). */
   const marks = { start: null, end: null, me: null, meBearing: null, pin: null, pinTo: null, pinFrom: null };
+  /**
+   * Aires du trajet (phase 9) : repères HTML (pas des couches du style : ils restent au changement de thème et se
+   * touchent facilement). [{ id, lonlat, label, otherSide }]
+   */
+  let areaItems = [];
+  let areaMarkers = [];
+  let onArea = null;
 
   function routesData() {
     return {
@@ -261,6 +268,39 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.pin) marker('pin', marks.pin, '#7b2fbf');
     if (marks.pinTo) marker('pinTo', marks.pinTo, '#7b2fbf');
     if (marks.pinFrom) marker('pinFrom', marks.pinFrom, '#7b2fbf');
+    drawAreas();
+  }
+
+  function areaElement(item) {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = `area-marker${item.otherSide ? ' other-side' : ''}`;
+    node.textContent = 'P';
+    node.setAttribute('aria-label', item.label);
+    node.title = item.label;
+    // Le toucher ouvre la fiche sans être pris par la carte (sélection d'un tracé, fermeture de l'appui long).
+    for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onArea?.(item.id);
+    });
+    return node;
+  }
+
+  function clearAreaMarkers() {
+    for (const m of areaMarkers) m.remove();
+    areaMarkers = [];
+  }
+
+  function drawAreas() {
+    clearAreaMarkers();
+    if (!map) return;
+    // Autre sens en dessous (ajoutés d'abord), sens de circulation par-dessus.
+    const items = [...areaItems].sort((a, b) => Number(b.otherSide) - Number(a.otherSide));
+    for (const item of items) {
+      areaMarkers.push(new lib.Marker({ element: areaElement(item), anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
+    }
   }
 
   // ───────── Appui long (phase 8) : « Aller ici » / « Partir d'ici », hors guidage ─────────
@@ -338,6 +378,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     }
     map = null;
     for (const k of Object.keys(markers)) markers[k] = null;
+    areaMarkers = [];
     lost = false;
     lastView = null;
     build(styleUrl, camera);
@@ -436,6 +477,15 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (!Number.isInteger(index) || index < 0 || index >= routes.length) return;
       selected = index;
       map?.getSource('route')?.setData(routesData());
+    },
+    /** Repères des aires du trajet (phase 9) : [{ id, lonlat, label, otherSide }] ; liste vide = aucun repère. */
+    showAreas(items) {
+      areaItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
+      drawAreas();
+    },
+    /** Appelé avec l'identifiant de l'aire touchée sur la carte. */
+    onAreaPick(cb) {
+      onArea = cb;
     },
     /** Appelé avec l'indice du tracé touché sur la carte (à l'arrêt). */
     onRoutePick(cb) {

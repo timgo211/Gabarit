@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.2">
+<office:body><office:spreadsheet>
+<table:table table:name="Aires PL ANC">
+<table:table-column table:number-columns-repeated="8"/>
+<table:table-row><table:table-cell office:value-type="string"><text:p>Code</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Libellé</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Route</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>X (Lambert 93)</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Y (Lambert 93)</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Capacité PL</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Équipements</text:p></table:table-cell><table:table-cell table:number-columns-repeated="1016"/></table:table-row>
+<table:table-row><table:table-cell office:value-type="string"><text:p>RN7-1</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Aire<text:s/>de la Nationale &amp; Co</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>RN7</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="700000"><text:p>700 000</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="6600000"><text:p>6 600 000</text:p></table:table-cell><table:table-cell office:value-type="float" office:value="20"><text:p>20</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>Sanitaires</text:p><text:p>Eau potable</text:p></table:table-cell><table:table-cell table:number-columns-repeated="1016"/></table:table-row>
+<table:table-row table:number-rows-repeated="1048570"><table:table-cell table:number-columns-repeated="1024"/></table:table-row>
+</table:table>
+</office:spreadsheet></office:body></office:document-content>

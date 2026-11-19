@@ -5,16 +5,19 @@
 // Code de la route, art. R412-6-2 (Légifrance) : un écran allumé dans le champ de vision du conducteur n'est permis
 // que s'il sert d'aide à la conduite ou à la navigation. Pendant le guidage, l'écran ne montre donc que la carte
 // et le guidage, sans aucune saisie : gros boutons d'un seul appui (voix, arrêter ; sur la carte : vue d'ensemble,
-// recentrer, plan / satellite, actifs à toutes les vitesses, sans menu ni confirmation) et, à l'arrêt hors du tracé
-// seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
+// recentrer, plan / satellite, aires, actifs à toutes les vitesses, sans menu ni confirmation) et, à l'arrêt hors du
+// tracé seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
+// Encart « Prochaines aires » (phase 9) : ouvert ou fermé d'un seul appui, rempli par le moteur à chaque position ;
+// toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  NAV,
+  setNavigationAreas, NAV,
 } from '../lib/navigation.js';
+import { describeNextArea } from '../lib/areas-route.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
 import {
@@ -31,7 +34,8 @@ const RELEASE_SCREEN_AFTER_ARRIVAL_MS = 120000;
 /**
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
  *   onVoiceToggle:(on:boolean)=>void, onSimSpeedChange:(kmh:number)=>void,
- *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void }} ctx
+ *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void, onAreaOpen?:(id:string)=>void,
+ *   onView?:(view:object)=>void }} ctx
  */
 export function createNavigation(ctx) {
   const app = $('.app');
@@ -59,11 +63,24 @@ export function createNavigation(ctx) {
     foot: $('.nav-foot'),
     stop: $('#btn-nav-stop'),
     bottom: $('.nav-bottom'),
+    areasBtn: $('#btn-nav-areas'),
+    areas: $('#nav-areas'),
+    areasList: $('#nav-areas-list'),
+    areasEmpty: $('#nav-areas-empty'),
   };
   let s = null; // session de guidage en cours
 
   function cameraPadding() {
     const h = root.clientHeight || window.innerHeight;
+    // Encart « Prochaines aires » ouvert devant le véhicule (téléphone : toute la largeur) : véhicule juste
+    // au-dessus de l'encart, sous le bandeau (phase 9). Tablette : l'encart est à gauche, rien ne change.
+    const box = s?.areasOpen && !ui.areas.hidden ? ui.areas.getBoundingClientRect() : null;
+    const mid = root.getBoundingClientRect().left + (root.clientWidth || window.innerWidth) / 2;
+    if (box && box.left < mid && box.right > mid) {
+      const above = box.top - root.getBoundingClientRect().top - 48;
+      const y = Math.round(Math.max(h * 0.3, Math.min(h * 0.75, above)));
+      return { top: Math.max(0, y - 1), bottom: Math.max(0, h - y - 1), left: 0, right: 0 };
+    }
     const bottom = ui.bottom?.offsetHeight ?? 0; // barre du bas seulement (les boutons de carte sont sur le côté)
     // Véhicule dans le bas de l'écran (au-dessus de la barre) : on voit loin devant.
     return { top: Math.round(h * 0.5), bottom: Math.min(bottom, Math.round(h * 0.3)), left: 0, right: 0 };
@@ -115,6 +132,40 @@ export function createNavigation(ctx) {
     ui.reroute.disabled = !view?.canRequestReroute;
   }
 
+  /** Encart « Prochaines aires » : 3 lignes (nom, distance, heure d'arrivée, places PL), une ligne = un bouton. */
+  function renderAreas(view) {
+    ui.areasBtn.setAttribute('aria-pressed', String(!!s?.areasOpen));
+    ui.areas.hidden = !s?.areasOpen;
+    if (!s?.areasOpen) return;
+    const next = view?.nextAreas ?? [];
+    const now = new Date();
+    const rows = next.map((n) => {
+      const d = describeNextArea(n, now);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'nav-area';
+      b.dataset.id = n.id;
+      const name = document.createElement('span');
+      name.className = 'nav-area-name';
+      name.textContent = d.name;
+      const facts = document.createElement('span');
+      facts.className = 'nav-area-facts';
+      for (const [cls, t] of [['nav-area-dist', d.distance], ['nav-area-eta', d.eta], ['nav-area-places', d.places]]) {
+        const x = document.createElement('span');
+        x.className = cls;
+        x.textContent = t;
+        facts.append(x);
+      }
+      b.append(name, facts);
+      const li = document.createElement('li');
+      li.append(b);
+      return li;
+    });
+    ui.areasList.replaceChildren(...rows);
+    ui.areasEmpty.hidden = rows.length > 0;
+    ui.areasEmpty.textContent = s.areasCount ? 'Plus d\'aire sur la suite du trajet.' : 'Aucune aire trouvée sur ce trajet (ou recherche en cours).';
+  }
+
   function render(view) {
     if (view.arrived) {
       setIcon({ kind: 'goal' });
@@ -147,6 +198,8 @@ export function createNavigation(ctx) {
 
     ui.road.textContent = view.roadName ?? '';
     ui.road.hidden = !view.roadName;
+    renderAreas(view);
+    ctx.onView?.(view);
 
     // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
     ctx.map.navigateTo({
@@ -298,11 +351,12 @@ export function createNavigation(ctx) {
    * @param {{ route:object, params:{ end:number[], avoidTolls:boolean, avoidFerries:boolean, preference?:string|null },
    *   vehicle:object, simulate?:{ speedKmh:number }|null }} p
    */
-  function start({ route, params, vehicle, simulate = null }) {
+  function start({ route, params, vehicle, simulate = null, areas = null, announceAreas = false }) {
     if (s) stop();
     const now = Date.now();
     s = {
-      state: startNavigation(route, { destination: params.end, now }),
+      state: startNavigation(route, { destination: params.end, now, areas, announceAreas }),
+      areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0,
       params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
       layer: GUIDANCE_START_LAYER, layerMessage: '',
       sim: simulate ? createSimulator(route.coordinates, { speedKmh: simulate.speedKmh }) : null,
@@ -313,6 +367,7 @@ export function createNavigation(ctx) {
     ui.sim.hidden = !s.sim;
     renderFollow();
     ui.road.hidden = true;
+    renderAreas(null);
     ctx.map.setLayer(s.layer);
     renderLayer();
     ui.stop.textContent = '■ Arrêter';
@@ -377,6 +432,16 @@ export function createNavigation(ctx) {
   ui.recenter.addEventListener('click', recenter);
   ui.overview.addEventListener('click', overview);
   ui.layer.addEventListener('click', toggleLayer);
+  ui.areasBtn.addEventListener('click', () => {
+    if (!s) return;
+    s.areasOpen = !s.areasOpen;
+    renderAreas(s.view);
+    if (s.view && s.follow) render(s.view); // caméra recadrée au-dessus de l'encart
+  });
+  ui.areasList.addEventListener('click', (e) => {
+    const b = e.target.closest('.nav-area');
+    if (b?.dataset.id) ctx.onAreaOpen?.(b.dataset.id);
+  });
   ui.voice.addEventListener('click', () => {
     const on = !ctx.voice.enabled;
     ctx.voice.setEnabled(on);
@@ -400,6 +465,16 @@ export function createNavigation(ctx) {
     stop,
     get active() {
       return !!s;
+    },
+    /** Vitesse du guidage (km/h), ou null (pas de position). */
+    get speedKmh() {
+      return s?.view ? s.view.speedKmh : null;
+    },
+    /** Aires arrivées après « Démarrer » (requête Overpass plus lente) : le moteur les place sur le tracé. */
+    setAreas(areas) {
+      if (!s) return;
+      s.state = setNavigationAreas(s.state, areas);
+      s.areasCount = Array.isArray(areas) ? areas.length : 0;
     },
     /** Vue satellite hors de France pendant le guidage (message de src/lib/map-layers.js). */
     setLayerView(view) {

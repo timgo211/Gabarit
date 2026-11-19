@@ -19,3 +19,10 @@ test('interface en network-first, MapLibre épinglé en cache-first', () => {
   assert.equal(cacheStrategy('GET', 'https://unpkg.com/autre@1.0.0/x.js', ORIGIN), 'bypass');
   assert.equal(cacheStrategy('GET', 'pas une url', ORIGIN), 'bypass');
 });
+
+test('aires (phase 9) : Overpass jamais mis en cache, jeu officiel copié servi réseau d\'abord', () => {
+  assert.equal(cacheStrategy('POST', 'https://overpass-api.de/api/interpreter', ORIGIN), 'bypass');
+  assert.equal(cacheStrategy('POST', 'https://overpass.private.coffee/api/interpreter', ORIGIN), 'bypass');
+  assert.equal(cacheStrategy('GET', 'https://overpass-api.de/api/interpreter?data=x', ORIGIN), 'bypass');
+  assert.equal(cacheStrategy('GET', `${ORIGIN}/gabarit/data/aires-pl.json`, ORIGIN), 'network-first');
+});

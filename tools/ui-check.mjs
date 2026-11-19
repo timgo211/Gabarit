@@ -5,7 +5,8 @@
 //
 // unpkg et les fonds de carte sont bloqués depuis le conteneur : MapLibre vient du paquet npm, les styles sont
 // minimaux (fond uni jour / nuit), les tuiles IGN sont une image rouge unie, ORS et Pelias répondent avec les
-// fixtures de tests/fixtures. Aucune vraie API n'est appelée (toute autre requête externe est refusée).
+// fixtures de tests/fixtures, Overpass avec tests/fixtures/overpass-aires.json (phase 9). Aucune vraie API n'est
+// appelée (toute autre requête externe est refusée).
 
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, mkdirSync } from 'node:fs';
@@ -79,16 +80,19 @@ function check(ok, label, detail = '') {
 const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 
 /**
- * Ouvre l'appli. opts.directions(body) → JSON ORS ; opts.theme : 'day' | 'night'.
- * Renvoie { page, ctx, tiles } (tiles : nombre de tuiles IGN demandées).
+ * Ouvre l'appli. opts.directions(body) → JSON ORS ; opts.theme : 'day' | 'night' ;
+ * opts.overpass(url) → JSON Overpass ou null (serveur en échec) ; opts.official : contenu de data/aires-pl.json.
+ * Renvoie { page, ctx, stats, errors } (stats.tiles : tuiles IGN demandées ; stats.overpass : serveurs appelés).
  */
-async function open(browser, base, { width, height, theme = 'day', layer = 'plan', directions = null } = {}) {
+async function open(browser, base, {
+  width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
+} = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
     geolocation: { latitude: START[1], longitude: START[0], accuracy: 8 }, permissions: ['geolocation'],
     serviceWorkers: 'block', locale: 'fr-FR',
   });
-  const stats = { tiles: 0, directions: 0, pelias: 0 };
+  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [] };
   await ctx.addInitScript(() => {
     window.__raf = 0;
     const raf = window.requestAnimationFrame.bind(window);
@@ -117,6 +121,11 @@ async function open(browser, base, { width, height, theme = 'day', layer = 'plan
       stats.tiles += 1;
       return route.fulfill({ body: RED_TILE, contentType: 'image/png' });
     }
+    if (url.includes('/api/interpreter')) {
+      stats.overpass.push(new URL(url).host);
+      const json = overpass ? overpass(url) : null;
+      return json ? route.fulfill({ json }) : route.abort();
+    }
     if (url.includes('/pelias/v1/autocomplete')) stats.pelias += 1;
     if (url.includes('/pelias/v1/autocomplete')) return route.fulfill({ json: fixture('pelias-autocomplete.json') });
     if (url.includes('/openrouteservice/v2/directions/')) {
@@ -128,6 +137,7 @@ async function open(browser, base, { width, height, theme = 'day', layer = 'plan
     }
     return route.abort();
   });
+  if (official) await ctx.route(/\/data\/aires-pl\.json$/, (route) => route.fulfill({ json: official }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -676,6 +686,114 @@ async function pressThenTypeCheck(browser, base) {
   await ctx.close();
 }
 
+// ───────── Phase 9 : aires et parkings PL ─────────
+
+/** Liste, repères, fiche + « Mon avis », secours Overpass, cache, encart en guidage avec un GPS émulé comme le vrai. */
+async function areasCheck(browser, base) {
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    const nav = fixture('ors-directions-nav.json');
+    const line = nav.features[0].geometry.coordinates;
+    const { page, ctx, stats, errors } = await open(browser, base, {
+      width, height, directions: () => nav, official: fixture('aires-pl.json'),
+      // Premier serveur en échec : le serveur de secours répond.
+      overpass: (url) => (url.includes('overpass-api.de') ? null : fixture('overpass-aires.json')),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('#areas-list li', { timeout: 10000 });
+    const rows = await page.$$eval('#areas-list .area-row', (n) => n.map((b) => ({ text: b.textContent, other: b.classList.contains('other-side') })));
+    check(rows.length === 5, `${width} px : liste des aires du trajet`, `${rows.length} aires`);
+    check(rows.filter((r) => r.other).length === 1 && rows.find((r) => r.other)?.text.includes('autre sens ?'),
+      `${width} px : aire de l'autre côté en gris « autre sens ? »`);
+    check(rows[0].text.includes('km 1') && rows[0].text.includes('40 places PL') && /\d\d:\d\d/.test(rows[0].text),
+      `${width} px : km, heure d'arrivée et places PL`, rows[0].text);
+    check(stats.overpass.length === 2 && stats.overpass[0] === 'overpass-api.de' && stats.overpass[1] !== 'overpass-api.de',
+      `${width} px : une requête Overpass, serveur de secours après un échec`, stats.overpass.join(' → '));
+    const markers = await page.$$eval('.area-marker', (n) => n.map((m) => m.classList.contains('other-side')));
+    check(markers.length === 5 && markers.filter(Boolean).length === 1, `${width} px : repères des aires sur la carte`,
+      `${markers.length} repères`);
+    await noHorizontalScroll(page, `${width} px liste des aires`);
+    await page.locator('#areas').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-aires-liste.png`) });
+
+    // Toucher un repère = sa fiche ; « Mon avis » hors guidage.
+    await page.locator('.area-marker:not(.other-side)').first().click();
+    await page.waitForSelector('#dlg-area[open]');
+    check((await page.textContent('#area-title')) === 'Aire PL de Test-Est', `${width} px : toucher un repère ouvre sa fiche`,
+      await page.textContent('#area-title'));
+    check(await page.isEnabled('[data-avis="full"]'), `${width} px : « Mon avis » possible à l'arrêt`);
+    await noHorizontalScroll(page, `${width} px fiche d'une aire`);
+    await page.screenshot({ path: join(SHOTS, `${width}-aire-fiche.png`) });
+    await page.click('[data-avis="full"]');
+    check((await page.textContent('#area-last')).includes('Plein à l\'instant'), `${width} px : avis affiché sur la fiche`);
+    await page.click('#dlg-area [data-close]');
+    check((await page.textContent('#areas-list')).includes('Plein à l\'instant'), `${width} px : avis affiché dans la liste`);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).areaReports?.length ?? 0);
+    check(saved === 1, `${width} px : avis gardé sur l'appareil (données exportées)`, `${saved}`);
+    check(await page.evaluate(() => !!localStorage.getItem('gabarit.areasCache')), `${width} px : aires gardées sur l'appareil`);
+
+    // Même trajet recalculé : aires reprises sur l'appareil, aucune requête Overpass.
+    await page.click('#btn-route');
+    await page.waitForTimeout(1500);
+    check(stats.overpass.length === 2 && (await page.$$('#areas-list li')).length === 5,
+      `${width} px : même trajet recalculé sans requête Overpass`, `${stats.overpass.length} requêtes`);
+
+    // Guidage avec le GPS émulé (une position par seconde, vitesse fournie).
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForTimeout(1500);
+    check(await page.isHidden('#nav-areas'), `${width} px : encart fermé au départ`);
+    await page.click('#btn-nav-areas');
+    const navRows = async () => page.$$eval('#nav-areas-list .nav-area', (n) => n.map((b) => ({
+      name: b.querySelector('.nav-area-name').textContent, dist: b.querySelector('.nav-area-dist').textContent,
+      eta: b.querySelector('.nav-area-eta').textContent, places: b.querySelector('.nav-area-places').textContent,
+    })));
+    await drive(ctx, page, line, 50, 4);
+    const r1 = await navRows();
+    check(r1.length === 3 && r1[0].name === 'Aire PL de Test-Est' && /\d\d:\d\d/.test(r1[0].eta) && r1[0].places === '40 places PL',
+      `${width} px : encart « Prochaines aires » (3 lignes : nom, distance, heure, places)`, JSON.stringify(r1[0]));
+    check(r1.every((r) => r.name !== 'Aire de l\'Autre-Sens'), `${width} px : aire de l'autre sens hors de l'encart`);
+    await noHorizontalScroll(page, `${width} px guidage, encart des aires`);
+    const over = await page.evaluate(() => [...document.querySelectorAll('#nav-areas *')]
+      .filter((n) => n.getClientRects().length && n.childElementCount === 0 && n.scrollWidth > n.clientWidth + 1)
+      .map((n) => n.textContent));
+    check(over.length === 0, `${width} px : textes de l'encart dans leurs cases`, over.join(' ; '));
+    const overNav = await overflowingNavText(page);
+    check(overNav.length === 0, `${width} px : guidage, textes dans leurs cases avec l'encart`, overNav.join(' ; '));
+    await page.screenshot({ path: join(SHOTS, `${width}-aires-guidage.png`) });
+    await drive(ctx, page, line, 50, 6);
+    const r2 = await navRows();
+    const km = (t) => (t === 'Ici' ? 0 : Number.parseFloat(t.replace(',', '.')) * (t.endsWith(' km') ? 1000 : 1));
+    check(km(r2[0].dist) < km(r1[0].dist), `${width} px : distance mise à jour à chaque position`, `${r1[0].dist} → ${r2[0].dist}`);
+    // Toucher une aire en roulant : fiche en lecture, « Mon avis » désactivé.
+    await page.locator('#nav-areas-list .nav-area').first().click();
+    await page.waitForSelector('#dlg-area[open]');
+    check(await page.isDisabled('[data-avis="ok"]'), `${width} px : « Mon avis » désactivé en roulant`);
+    await page.click('#dlg-area [data-close]');
+    // À l'arrêt : avis possible.
+    const here = r2.length ? line[6] : line[0];
+    for (let i = 0; i < 3; i += 1) {
+      await setGeo(page, { lon: here[0], lat: here[1], accuracy: 5, speed: 0 });
+      await page.waitForTimeout(1000);
+    }
+    await page.locator('#nav-areas-list .nav-area').first().click();
+    await page.waitForSelector('#dlg-area[open]');
+    check(await page.isEnabled('[data-avis="ok"]'), `${width} px : « Mon avis » possible à l'arrêt en guidage`);
+    await page.click('#dlg-area [data-close]');
+    await page.click('#btn-nav-areas');
+    check(await page.isHidden('#nav-areas'), `${width} px : encart fermé d'un appui`);
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Les deux serveurs Overpass en échec : « Aires indisponibles », itinéraire utilisable.
+  const nav = fixture('ors-directions-nav.json');
+  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav, overpass: () => null });
+  await computeRoute(page);
+  await page.waitForFunction(() => /indisponibles/.test(document.querySelector('#areas-status')?.textContent ?? ''), null, { timeout: 10000 });
+  check(stats.overpass.length === 2 && await page.isVisible('#btn-nav-start'),
+    'deux serveurs en échec : « Aires indisponibles », itinéraire utilisable', await page.textContent('#areas-status'));
+  await ctx.close();
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -683,7 +801,7 @@ const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
-    overview: overviewGpsCheck, press: pressThenTypeCheck };
+    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

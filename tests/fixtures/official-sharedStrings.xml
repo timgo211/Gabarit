@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="16" uniqueCount="16">
+<si><t>Aires de stationnement PL du réseau concédé — données statiques</t></si>
+<si><t>Identifiant</t></si>
+<si><t>Nom de l'aire</t></si>
+<si><t>Autoroute</t></si>
+<si><t>Sens</t></si>
+<si><t>Latitude</t></si>
+<si><t>Longitude</t></si>
+<si><t>Nombre de places PL</t></si>
+<si><t>Tarif</t></si>
+<si><t>Services</t></si>
+<si><t>Sécurisée</t></si>
+<si><r><t>Aire de </t></r><r><t>l'Isle-d'Abeau</t></r></si>
+<si><t>Lyon &gt; Chambéry</t></si>
+<si><t>Gratuit</t></si>
+<si><t>WC, douches, restaurant</t></si>
+<si><t>Oui</t></si>
+</sst>
