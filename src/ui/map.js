@@ -12,6 +12,7 @@ import { routesBbox, pickRouteAt } from '../lib/route-options.js';
 import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
 import { planMove, frameAt } from '../lib/nav-anim.js';
 import { haversine } from '../lib/nav-geo.js';
+import { overviewPadding } from '../lib/navigation.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -104,9 +105,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let styleUrl = null;
   let lost = false;
   let restoreTimer = null;
-  const markers = { start: null, end: null, me: null, pin: null };
+  const markers = { start: null, end: null, me: null, pin: null, pinTo: null, pinFrom: null };
   /** Dernières positions des marqueurs (pour recréer la carte). */
-  const marks = { start: null, end: null, me: null, meBearing: null, pin: null };
+  const marks = { start: null, end: null, me: null, meBearing: null, pin: null, pinTo: null, pinFrom: null };
 
   function routesData() {
     return {
@@ -258,6 +259,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.end) marker('end', marks.end, '#b3261e');
     if (marks.me) vehicle(marks.me, marks.meBearing);
     if (marks.pin) marker('pin', marks.pin, '#7b2fbf');
+    if (marks.pinTo) marker('pinTo', marks.pinTo, '#7b2fbf');
+    if (marks.pinFrom) marker('pinFrom', marks.pinFrom, '#7b2fbf');
   }
 
   // ───────── Appui long (phase 8) : « Aller ici » / « Partir d'ici », hors guidage ─────────
@@ -334,7 +337,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       // carte déjà inutilisable : on la remplace quand même
     }
     map = null;
-    markers.start = null; markers.end = null; markers.me = null; markers.pin = null;
+    for (const k of Object.keys(markers)) markers[k] = null;
     lost = false;
     lastView = null;
     build(styleUrl, camera);
@@ -462,12 +465,22 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       anim = { move, start: now, follow: !!follow, padding };
       if (animFrame === null) animFrame = requestAnimationFrame(tick);
     },
-    /** Vue d'ensemble : le cadre donné (trajet restant), à plat, nord en haut. La caméra ne suit plus. */
+    /**
+     * Vue d'ensemble : le cadre donné (trajet restant), à plat, nord en haut. La caméra ne suit plus (les positions
+     * suivantes ne déplacent que la flèche) jusqu'au prochain navigateTo avec follow.
+     * MapLibre ajoute la marge de la carte (celle du suivi : moitié haute de l'écran) à celle de fitBounds ; sur un
+     * téléphone, le cadre ne tenait plus et fitBounds était abandonné sans bouger. On remet donc la marge de la carte
+     * à zéro et on passe des marges qui laissent toujours de la place (overviewPadding).
+     */
     overview(bbox, padding) {
       if (anim) anim.follow = false;
       if (!map || !Array.isArray(bbox) || bbox.length < 4) return;
+      map.stop();
+      map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
+      const c = map.getContainer();
       map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], {
-        padding, bearing: 0, pitch: 0, duration: 600, maxZoom: 17, essential: true,
+        padding: overviewPadding({ width: c.clientWidth, height: c.clientHeight }, padding),
+        bearing: 0, pitch: 0, duration: 600, maxZoom: 17, essential: true,
       });
     },
     /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
@@ -493,14 +506,14 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     onMapTap(cb) {
       onTap = cb;
     },
-    /** Repère du point choisi par appui long. */
-    showPin(lonlat) {
-      marker('pin', lonlat, '#7b2fbf');
+    /** Repère d'un point choisi par appui long : 'pin' (choix en cours), 'pinTo' (arrivée), 'pinFrom' (départ). */
+    showPin(lonlat, key = 'pin') {
+      marker(key, lonlat, '#7b2fbf');
     },
-    clearPin() {
-      markers.pin?.remove();
-      markers.pin = null;
-      marks.pin = null;
+    clearPin(key = 'pin') {
+      markers[key]?.remove();
+      markers[key] = null;
+      marks[key] = null;
     },
     /** Appelé quand l'utilisateur déplace la carte au doigt pendant le guidage. */
     onUserGesture(cb) {

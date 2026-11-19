@@ -317,6 +317,27 @@ export function overviewBbox(state) {
   return Number.isFinite(w) ? [w, so, e, n] : null;
 }
 
+/**
+ * Marges de la vue d'ensemble (px), réduites si besoin pour laisser au moins 30 % de l'écran au trajet : MapLibre
+ * renonce à cadrer (fitBounds sans effet) quand les marges ne laissent plus de place.
+ * @param {{ width:number, height:number }} size taille de la carte
+ * @param {{ top:number, bottom:number, left:number, right:number }} wanted marges souhaitées (bandeau, barre du bas…)
+ */
+export function overviewPadding(size, wanted, minFree = 0.3) {
+  const fit = (total, a, b) => {
+    if (!(total > 0)) return [0, 0];
+    const room = total * (1 - minFree);
+    const x = Math.max(0, a || 0);
+    const y = Math.max(0, b || 0);
+    if (x + y <= room) return [x, y];
+    const k = room / (x + y);
+    return [Math.floor(x * k), Math.floor(y * k)];
+  };
+  const [top, bottom] = fit(size?.height, wanted?.top, wanted?.bottom);
+  const [left, right] = fit(size?.width, wanted?.left, wanted?.right);
+  return { top, bottom, left, right };
+}
+
 function canReroute(state, now) {
   const cooled = state.lastRerouteAt === null || now - state.lastRerouteAt >= NAV.REROUTE_COOLDOWN_MS;
   return !state.rerouting && !state.rerouteBlocked && !state.arrived && cooled && !!state.lastFix;

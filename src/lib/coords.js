@@ -107,3 +107,19 @@ export function coordsLabel({ lat, lon }) {
   const f = (x) => x.toFixed(5).replace('.', ',');
   return `${f(lat)}, ${f(lon)}`;
 }
+
+/** Nombre de caractères avant de chercher une adresse (géocodage Pelias). */
+export const MIN_SEARCH_CHARS = 3;
+
+/**
+ * Ce que la liste de suggestions montre dès une frappe dans le champ départ / arrivée. La liste est toujours
+ * remplacée tout de suite : une ancienne suggestion (par exemple les coordonnées d'un point choisi par appui long)
+ * ne doit jamais rester à toucher pendant que la recherche de la nouvelle adresse est en cours.
+ * @returns {{ items:{label:string,lon:number,lat:number}[], search:string|null }} search : texte à chercher, ou null
+ */
+export function suggestionPlan(text) {
+  const t = typeof text === 'string' ? text.trim() : '';
+  const c = parseCoordinates(t);
+  if (c) return { items: [{ label: coordsLabel(c), lon: c.lon, lat: c.lat }], search: null };
+  return { items: [], search: t.length >= MIN_SEARCH_CHARS ? t : null };
+}

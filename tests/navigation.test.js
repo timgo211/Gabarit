@@ -413,3 +413,20 @@ test('nom de la route en cours : étape ORS où l\'on roule, rien hors du tracé
   assert.ok(b[0] <= me[0] && b[2] >= me[0] && b[1] <= me[1] && b[3] >= me[1], 'position comprise');
   assert.equal(overviewBbox(null), null);
 });
+
+test('vue d\'ensemble : marges réduites pour que le trajet tienne toujours à l\'écran', async () => {
+  const { overviewPadding } = await import('../src/lib/navigation.js');
+  // Téléphone 412 × 900 : bandeau ≈ 140 px, bas (boutons, nom de route, barre) ≈ 430 px.
+  const p = overviewPadding({ width: 412, height: 900 }, { top: 140, bottom: 430, left: 50, right: 90 });
+  assert.ok(900 - p.top - p.bottom >= 900 * 0.3, JSON.stringify(p));
+  assert.ok(412 - p.left - p.right >= 412 * 0.3, JSON.stringify(p));
+  // Assez de place : marges gardées telles quelles.
+  assert.deepEqual(overviewPadding({ width: 1280, height: 800 }, { top: 130, bottom: 250, left: 80, right: 120 }),
+    { top: 130, bottom: 250, left: 80, right: 120 });
+  // Proportions gardées quand on réduit ; jamais négatif.
+  const q = overviewPadding({ width: 300, height: 400 }, { top: 300, bottom: 300, left: 0, right: 0 });
+  assert.equal(q.top, q.bottom);
+  assert.ok(q.top >= 0 && 400 - q.top - q.bottom >= 120);
+  assert.deepEqual(overviewPadding({ width: 0, height: 0 }, { top: 10, bottom: 10, left: 10, right: 10 }),
+    { top: 0, bottom: 0, left: 0, right: 0 });
+});

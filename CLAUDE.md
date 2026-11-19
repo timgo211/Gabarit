@@ -44,10 +44,13 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
+                                   #   | overview | press
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
-coordonnées (phase 8). Captures dans `tools/ui-shots/` (ignoré).
+coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
+un appui long. Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+(`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
 - HTML/CSS/JS vanilla, modules ES, sans framework, sans build, sans dépendance npm.
@@ -80,7 +83,9 @@ coordonnées (phase 8). Captures dans `tools/ui-shots/` (ignoré).
   France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
 - Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite) : actifs à toutes les vitesses, un seul
-  appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. data.geopf.fr est bloqué
+  appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. Vue d'ensemble :
+  marge de la carte remise à zéro et `overviewPadding` (MapLibre additionne la marge du suivi à celle de fitBounds et
+  abandonne le cadrage s'il ne tient pas). data.geopf.fr est bloqué
   depuis le conteneur : GetCapabilities lu via xyzservices / iTowns / osmlab editor-layer-index sur GitHub.
 - Partage : liste blanche des champs (jamais clé ni véhicule) ; départ « Ma position » exclu sauf case cochée (GPX : tracé
   dès le premier carrefour après 500 m) ; lien reçu validé par `decodeRouteLink` (ne lève jamais), affiché en textContent,
@@ -89,7 +94,8 @@ coordonnées (phase 8). Captures dans `tools/ui-shots/` (ignoré).
   `voiceRate`, `voiceVolume`. Musique : `navigator.audioSession` absent de Chrome (Safari seulement, MDN
   browser-compat-data) → phrase dans Réglages.
 - Coordonnées saisies (départ / arrivée) : proposées sans appel Pelias ; appui long et coordonnées ne lancent jamais
-  de calcul.
+  de calcul. Toute saisie dans un champ oublie le point choisi (et le repère de l'appui long) ; la liste de
+  suggestions est remplacée dès la frappe (`suggestionPlan`), jamais d'ancienne suggestion à toucher.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

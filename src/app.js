@@ -187,6 +187,8 @@ const form = createRouteForm({
   onOptionsChange: (o) => update((d) => ({ ...d, settings: { ...d.settings, ...o } })),
   onPosition: (lonlat) => { myPosition = lonlat; map.setMyPosition(lonlat); },
   onError: (err) => showMessage(messageNode, errorText(err)),
+  // Saisie dans un champ : le point choisi par appui long est oublié, son repère retiré.
+  onEdit: (which) => map.clearPin(which === 'to' ? 'pinTo' : 'pinFrom'),
   onSubmit: async (p) => {
     const vehicle = activeVehicle(data);
     showMessage(messageNode, '');
@@ -255,6 +257,7 @@ const usePress = (which) => () => {
   const place = pressPlace;
   closePress();
   form.setPlace(which, place);
+  map.showPin([place.lon, place.lat], which === 'to' ? 'pinTo' : 'pinFrom'); // repère gardé jusqu'à une saisie
   showMessage(messageNode, which === 'to'
     ? `Arrivée : ${place.label}. Touche « Calculer l'itinéraire ».`
     : `Départ : ${place.label}.`, 'info');

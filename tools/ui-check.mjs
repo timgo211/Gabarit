@@ -540,13 +540,150 @@ async function destinationsCheck(browser, base) {
   await ctx.close();
 }
 
+/** État de la caméra vu de l'écran : échelle (zoom) et position de la flèche du camion. */
+async function cameraView(page) {
+  return page.evaluate(() => {
+    const b = document.querySelector('.me-marker')?.getBoundingClientRect();
+    return {
+      scale: document.querySelector('.maplibregl-ctrl-scale')?.textContent ?? '',
+      me: b ? [Math.round(b.x + b.width / 2), Math.round(b.y + b.height / 2)] : null,
+    };
+  });
+}
+
+/**
+ * Vue d'ensemble avec des positions envoyées comme le vrai GPS (une par seconde, vitesse fournie), en plan puis en
+ * satellite : la caméra doit quitter le camion et y rester jusqu'à « Recentrer » (ou 15 s en roulant).
+ */
+async function overviewGpsCheck(browser, base) {
+  for (const layer of ['plan', 'satellite']) {
+    const nav = fixture('ors-directions-nav.json');
+    const { page, ctx, errors } = await open(browser, base, { width: 412, height: 900, directions: () => nav });
+    await page.fill('#to-input', 'Lyon');
+    await page.waitForSelector('#to-list li');
+    await page.dispatchEvent('#to-list li', 'pointerdown');
+    await page.click('#btn-route');
+    await page.waitForSelector('#btn-nav-start:not([hidden])');
+    const line = nav.features[0].geometry.coordinates;
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], speed: 0 });
+    await page.click('#btn-nav-start');
+    if (layer === 'satellite') await page.click('#btn-nav-layer');
+    // Positions GPS le long du tracé, une par seconde, à 50 km/h, sans s'arrêter pendant les vérifications.
+    const step = 50 / 3.6;
+    const cum = [0];
+    for (let i = 1; i < line.length; i += 1) {
+      const [a, b] = [line[i - 1], line[i]];
+      cum.push(cum[i - 1] + Math.hypot((b[0] - a[0]) * 111320 * Math.cos((a[1] * Math.PI) / 180), (b[1] - a[1]) * 110540));
+    }
+    let t = 0;
+    let driving = true;
+    const feeder = (async () => {
+      while (driving) {
+        t += step;
+        let i = cum.findIndex((c) => c > t);
+        if (i < 1) i = cum.length - 1;
+        const f = Math.min(1, (t - cum[i - 1]) / (cum[i] - cum[i - 1] || 1));
+        const [a, b] = [line[i - 1], line[i]];
+        await setGeo(page, { lon: a[0] + (b[0] - a[0]) * f, lat: a[1] + (b[1] - a[1]) * f, accuracy: 5, speed: step, heading: 90 });
+        await page.waitForTimeout(1000);
+      }
+    })();
+    await page.waitForTimeout(5000);
+    const followed = await cameraView(page);
+    await page.click('#btn-nav-overview');
+    await page.waitForTimeout(1500);
+    const ov1 = await cameraView(page);
+    check(ov1.scale !== followed.scale, `${layer} : vue d'ensemble, la carte dézoome (vrai GPS)`, `${followed.scale} → ${ov1.scale}`);
+    await page.waitForTimeout(5000);
+    const ov2 = await cameraView(page);
+    check(ov2.scale === ov1.scale, `${layer} : vue d'ensemble gardée pendant que les positions arrivent`, `${ov1.scale} → ${ov2.scale}`);
+    check(!!ov1.me && !!ov2.me && (ov1.me[0] !== ov2.me[0] || ov1.me[1] !== ov2.me[1]),
+      `${layer} : en vue d'ensemble, la carte ne suit plus le camion`, `${ov1.me} → ${ov2.me}`);
+    await page.screenshot({ path: join(SHOTS, `412-vue-ensemble-gps-${layer}.png`) });
+    await page.click('#btn-nav-recenter');
+    await page.waitForTimeout(2500);
+    const back = await cameraView(page);
+    check(back.scale === followed.scale, `${layer} : « Recentrer » revient sur le camion`, `${ov2.scale} → ${back.scale}`);
+    // 15 s en roulant : retour automatique au suivi.
+    await page.click('#btn-nav-overview');
+    await page.waitForTimeout(10000);
+    check((await cameraView(page)).scale !== followed.scale, `${layer} : vue d'ensemble encore là après 10 s`);
+    await page.waitForTimeout(6500);
+    const auto = await cameraView(page);
+    check(auto.scale === followed.scale && await page.getAttribute('#btn-nav-recenter', 'aria-pressed') === 'true',
+      `${layer} : retour au suivi après 15 s en roulant`, auto.scale);
+    driving = false;
+    await feeder;
+    check(errors.length === 0, `${layer} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+/**
+ * Appui long puis saisie : effacer le champ et taper une autre adresse doit oublier le point de la carte
+ * (arrivée et départ), comme une suggestion choisie puis effacée.
+ */
+async function pressThenTypeCheck(browser, base) {
+  const bodies = [];
+  const { page, ctx } = await open(browser, base, { width: 360, height: 760, directions: (body) => {
+    bodies.push(body);
+    return fixture('ors-directions-nav.json');
+  } });
+  const cdp = await ctx.newCDPSession(page);
+  const longPress = async (dx) => {
+    const box = await page.locator('#map').boundingBox();
+    const x = box.x + box.width * 0.3 + dx;
+    const y = box.y + box.height * 0.55;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    await page.waitForTimeout(800);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await page.waitForSelector('#press-sheet:not([hidden])', { timeout: 3000 });
+  };
+  const pins = () => page.evaluate(() => [...document.querySelectorAll('.maplibregl-marker')]
+    .filter((m) => m.querySelector('[fill="#7b2fbf"]')).length);
+  const typeAndPick = async (sel, list) => {
+    // Comme au doigt : toucher le milieu du texte, effacer touche par touche, taper, puis toucher la première
+    // suggestion affichée dès qu'il y en a une.
+    await page.click(sel);
+    const n = (await page.inputValue(sel)).length;
+    for (let i = 0; i < n; i += 1) await page.keyboard.press('Backspace', { delay: 15 });
+    await page.keyboard.type('Lyon', { delay: 30 });
+    await page.waitForSelector(`${list} li`);
+    await page.dispatchEvent(`${list} li`, 'pointerdown');
+  };
+  // Arrivée.
+  await longPress(0);
+  await page.click('#btn-press-to');
+  const pressed = await page.inputValue('#to-input');
+  check(await pins() === 1, '« Aller ici » : repère du point choisi sur la carte');
+  await typeAndPick('#to-input', '#to-list');
+  check(await pins() === 0, 'saisie après « Aller ici » : repère de la carte retiré');
+  // Départ.
+  await longPress(30);
+  await page.click('#btn-press-from');
+  check(await pins() === 1, '« Partir d\'ici » : repère du point choisi sur la carte');
+  await typeAndPick('#from-input', '#from-list');
+  check(await page.inputValue('#from-input') === 'Lyon, France', 'départ : suggestion de l\'adresse tapée choisie',
+    await page.inputValue('#from-input'));
+  check(await pins() === 0, 'saisie après « Partir d\'ici » : repère de la carte retiré');
+  await page.click('#btn-route');
+  await page.waitForSelector('.route-card', { timeout: 10000 });
+  const lyon = fixture('pelias-autocomplete.json').features[0].geometry.coordinates;
+  const [start, end] = bodies.at(-1).coordinates;
+  check(end[0] === lyon[0] && end[1] === lyon[1], 'arrivée = adresse tapée, pas le point de l\'appui long',
+    `${end} (appui long ${pressed})`);
+  check(start[0] === lyon[0] && start[1] === lyon[1], 'départ = adresse tapée, pas le point de l\'appui long', `${start}`);
+  await ctx.close();
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
-    parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck };
+    parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
+    overview: overviewGpsCheck, press: pressThenTypeCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);
