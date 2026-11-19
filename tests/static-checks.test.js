@@ -103,7 +103,10 @@ test('aucune clé API dans le dépôt, aucun log', () => {
     const name = rel(f);
     const text = readFileSync(f, 'utf8');
     // Les clés ORS/HeiGIT sont de longues chaînes alphanumériques (ou base64).
-    const suspects = (text.match(/[A-Za-z0-9+=_]{32,}/g) ?? []).filter((m) => /\d/.test(m) && /[A-Za-z]/.test(m));
+    let suspects = (text.match(/[A-Za-z0-9+=_]{32,}/g) ?? []).filter((m) => /\d/.test(m) && /[A-Za-z]/.test(m));
+    // data/ : données publiques converties par une Action (identifiants « aire_de_douane_…_a0027 », noms de fichiers
+    // « Donnees_statiques_… ») ; une clé (base64) n'a pas de « _ » entre des mots.
+    if (name.startsWith('data/')) suspects = suspects.filter((m) => !/^[A-Za-z0-9]+(?:_[A-Za-z0-9]+)+$/.test(m));
     assert.deepEqual(suspects, [], `${name} contient une longue chaîne suspecte (clé ?)`);
     assert.doesNotMatch(text, /api_key=[A-Za-z0-9]{8,}/, `${name} contient une clé en clair`);
   }
