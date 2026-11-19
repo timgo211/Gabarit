@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="35" uniqueCount="35">
+<si><t xml:space="preserve">Données mises à jour le 01/03/2025</t></si>
+<si><t xml:space="preserve">nombre total de places de stationnement gratuites pour camions</t></si>
+<si><t xml:space="preserve">Parking sécurisé oui/non</t></si>
+<si><t xml:space="preserve">nombre total de places de stationnement payantes pour camions</t></si>
+<si><t xml:space="preserve">prix et devise des places de stationnement</t></si>
+<si><t xml:space="preserve">Nom de l'opérateur du parking</t></si>
+<si><t xml:space="preserve">Numéro de téléphone de l'opérateur du parking</t></si>
+<si><t xml:space="preserve">Consentement de l'opérateur à rendre publiques ses coordonnées</t></si>
+<si><t xml:space="preserve">Fourniture en temps opportun de données dynamiques sur (aucune) disponibilité de places de stationnement</t></si>
+<si><t xml:space="preserve">Name, City</t></si>
+<si><t xml:space="preserve">Location</t></si>
+<si><t xml:space="preserve">primary road identifier 1/direction</t></si>
+<si><t xml:space="preserve">total number of free parking places for trucks</t></si>
+<si><t xml:space="preserve">secure parking Y/N</t></si>
+<si><t xml:space="preserve">total number of paid parking places for trucks</t></si>
+<si><t xml:space="preserve">price and currency of parking places</t></si>
+<si><t xml:space="preserve">Name of the parking operator</t></si>
+<si><t xml:space="preserve">Telephone number of the parking operator</t></si>
+<si><t xml:space="preserve">Consent of the operator to make his contact information public</t></si>
+<si><t xml:space="preserve">Timely provision of dynamic data on (none) availability of parking places</t></si>
+<si><t xml:space="preserve">La Ravoire :: 74350 :: CRUSEILLES</t></si>
+<si><t xml:space="preserve">46°01821, 6°11771</t></si>
+<si><t xml:space="preserve">A41 N / GENEVE</t></si>
+<si><t xml:space="preserve">ADELAC</t></si>
+<si><t xml:space="preserve">04.79.60.77.50</t></si>
+<si><t xml:space="preserve">N</t></si>
+<si><t xml:space="preserve">Ponts de La caille :: 74350 :: CRUSEILLES</t></si>
+<si><t xml:space="preserve">46°01589,6°11635</t></si>
+<si><t xml:space="preserve">A41 N / ANNECY</t></si>
+<si><t xml:space="preserve">La vallée d'Ecalles  76360 Villers-Écalles</t></si>
+<si><t xml:space="preserve">49.54632974929232, 0.9228255377065852</t></si>
+<si><t xml:space="preserve">A 150</t></si>
+<si><t xml:space="preserve">ALBEA</t></si>
+<si><t xml:space="preserve">02 32 80 94 30</t></si>
+<si><t xml:space="preserve">Y</t></si>
+</sst>

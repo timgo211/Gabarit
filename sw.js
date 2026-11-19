@@ -6,7 +6,7 @@
 
 import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 
-const VERSION = 'v10';
+const VERSION = 'v11';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [

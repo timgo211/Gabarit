@@ -114,8 +114,8 @@
   position manquent ; Lambert 93 accepté) ; doublons fusionnés à 300 m ; aire à gauche du tracé en gris « autre sens ? ».
   Liste, repères, fiche, encart « Prochaines aires », annonce vocale (Réglages), « Mon avis » (sous 10 km/h en guidage).
   **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
-  Strasbourg, Aix-Marseille…). Les colonnes du jeu officiel n'ont pas pu être vues depuis le conteneur : vérifier le
-  journal du premier passage de l'Action.
+  Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
+  ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu

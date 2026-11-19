@@ -8,7 +8,7 @@ import {
 } from '../src/lib/areas-osm.js';
 import {
   parseOfficialData, parseSharedStrings, parseXlsxSheet, parseOdsContent, rowsToAreas, mapColumns, missingFields,
-  lambert93ToWgs84, decodeXml, OFFICIAL,
+  lambert93ToWgs84, decodeXml, OFFICIAL, parseOfficialPosition, splitName, splitRoad, HEADER_ROWS,
 } from '../src/lib/areas-official.js';
 import {
   mergeAreas, placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, describeArea, describeNextArea, placesText,
@@ -135,6 +135,88 @@ test('tableur ods (réseau non concédé) : Lambert 93, cellules répétées, es
   assert.equal(a.hgvPlaces, 20);
   assert.deepEqual(a.services, ['toilets', 'water']);
   assert.ok(Math.abs(a.lon - 3) < 1e-6 && Math.abs(a.lat - 46.5) < 1e-6, `${a.lon} ${a.lat}`);
+});
+
+test('vrai fichier concédé 2025 : titres FR (ligne 1) + EN (ligne 2), cellules vides, « 46°01821 », « A41 N / GENEVE »', () => {
+  const shared = parseSharedStrings(text('official-sca-2025-sharedStrings.xml'));
+  const rows = parseXlsxSheet(text('official-sca-2025-sheet1.xml'), shared);
+  // Cellules vides (E, F, G) : chaque valeur à la place donnée par sa référence de cellule, pas par son rang.
+  assert.equal(rows[2][7], 'ADELAC');
+  assert.equal(rows[2][4], '');
+  const r = rowsToAreas(rows, { network: 'concédé', prefix: 'SCA' });
+  assert.equal(r.headerRow, 1, 'titres anglais en ligne 2');
+  assert.match(r.preamble[0], /^Données mises à jour le 01\/03\/2025/);
+  assert.deepEqual(r.map, {
+    operator: 7, coords: 1, name: 0, freePlaces: 3, paidPlaces: 5, secure: 4, price: 6, road: 2,
+  });
+  assert.equal(r.skipped, 0);
+  assert.equal(r.areas.length, 3);
+  const [ravoire, caille, ecalles] = r.areas;
+  assert.deepEqual(
+    [ravoire.name, ravoire.city, ravoire.lat, ravoire.lon, ravoire.road, ravoire.direction, ravoire.hgvPlaces, ravoire.operator],
+    ['La Ravoire', 'Cruseilles', 46.01821, 6.11771, 'A41', 'GENEVE', 7, 'ADELAC'],
+  );
+  assert.equal(ravoire.fee, false, 'places gratuites seulement');
+  assert.equal(ravoire.secure, null, 'cellule vide : inconnu');
+  assert.equal(ravoire.id, 'off:SCA-la_ravoire_a41', 'identifiant stable : nom + route');
+  assert.deepEqual([caille.name, caille.lat, caille.lon, caille.direction], ['Ponts de La caille', 46.01589, 6.11635, 'ANNECY']);
+  assert.deepEqual([ecalles.name, ecalles.city, ecalles.road, ecalles.direction, ecalles.hgvPlaces, ecalles.operator],
+    ['La vallée d\'Ecalles 76360 Villers-Écalles', null, 'A150', null, 10, 'ALBEA']);
+  assert.ok(Math.abs(ecalles.lat - 49.54633) < 1e-5 && Math.abs(ecalles.lon - 0.922826) < 1e-5);
+  // Le fichier converti est accepté par l'appli.
+  assert.equal(parseOfficialData({ areas: r.areas }).areas.length, 3);
+  assert.equal(parseOfficialData({ areas: r.areas }).areas[0].city, 'Cruseilles');
+});
+
+test('titres en français seulement, lignes ignorées comptées par raison', () => {
+  const rows = [
+    ['Aires PL'],
+    ['Nom, Ville', 'Localisation', 'identifiant de la route principale 1/direction',
+      'nombre total de places de stationnement gratuites pour camions', 'Parking sécurisé oui/non',
+      'nombre total de places de stationnement payantes pour camions', 'prix et devise des places de stationnement',
+      'Nom de l\'opérateur du parking', 'Numéro de téléphone de l\'opérateur du parking'],
+    ['Aire A :: 01000 :: BOURG', '46°20000, 5°22000', 'A40 E / MACON', '', 'Oui', '20', '15 EUR', 'APRR', '03 00'],
+    ['Aire B', '46,30 5,30', 'N7', '5', 'Non', '5', '', 'DIR', ''],
+    ['Aire hors France', '52°5, 13°4', 'A1', '3'],
+    ['Aire sans position', 'à préciser', 'A1', '3'],
+    ['', '46°1, 5°1', 'A1', '3'],
+  ];
+  const r = rowsToAreas(rows, { network: 'concédé', prefix: 'SCA' });
+  assert.equal(r.map.road, 2, '« identifiant de la route » n\'est pas l\'identifiant de l\'aire');
+  assert.equal(r.map.id, undefined);
+  assert.equal(r.map.operator, 7);
+  assert.deepEqual(r.areas.map((a) => [a.name, a.city, a.road, a.direction, a.hgvPlaces, a.fee, a.secure, a.price]), [
+    ['Aire A', 'Bourg', 'A40', 'MACON', 20, true, true, '15 EUR'],
+    ['Aire B', null, 'N7', null, 10, null, false, null],
+  ]);
+  assert.equal(r.skipped, 3);
+  assert.deepEqual(r.reasons, { 'position hors de France': 1, 'position illisible': 1, 'nom absent': 1 });
+  assert.equal(HEADER_ROWS, 5);
+  // Titres au-delà de la 5ᵉ ligne : non trouvés, erreur claire.
+  const late = [[], [], [], [], [], ['Nom', 'Latitude', 'Longitude']];
+  assert.throws(() => rowsToAreas(late, { network: 'x', prefix: 'X' }), (e) => e.code === 'MISSING_COLUMNS');
+});
+
+test('position en une cellule : ° comme virgule décimale, décimal (point ou virgule), DMS', () => {
+  assert.deepEqual(parseOfficialPosition('46°01821, 6°11771'), { lat: 46.01821, lon: 6.11771 });
+  assert.deepEqual(parseOfficialPosition('46°01589,6°11635'), { lat: 46.01589, lon: 6.11635 });
+  assert.deepEqual(parseOfficialPosition('49.54632974929232, 0.9228255377065852'), { lat: 49.54632974929232, lon: 0.9228255377065852 });
+  assert.deepEqual(parseOfficialPosition('45,2930 4,8121'), { lat: 45.293, lon: 4.8121 });
+  const dms = parseOfficialPosition('48°41\'31.6"N 6°11\'03.8"E');
+  assert.ok(Math.abs(dms.lat - 48.69211) < 1e-4 && Math.abs(dms.lon - 6.18439) < 1e-4);
+  assert.equal(parseOfficialPosition(''), null);
+  assert.equal(parseOfficialPosition('à préciser'), null);
+});
+
+test('nom « Nom :: CP :: Ville » et route « A41 N / GENEVE »', () => {
+  assert.deepEqual(splitName('La Ravoire :: 74350 :: CRUSEILLES'), { name: 'La Ravoire', city: 'Cruseilles' });
+  assert.deepEqual(splitName('Aire X :: 76360 VILLERS-ÉCALLES'), { name: 'Aire X', city: 'Villers-Écalles' });
+  assert.deepEqual(splitName('La vallée d\'Ecalles  76360 Villers-Écalles'), { name: 'La vallée d\'Ecalles 76360 Villers-Écalles', city: null });
+  assert.deepEqual(splitName(''), { name: null, city: null });
+  assert.deepEqual(splitRoad('A41 N / GENEVE'), { road: 'A41', direction: 'GENEVE' });
+  assert.deepEqual(splitRoad('A 150'), { road: 'A150', direction: null });
+  assert.deepEqual(splitRoad('RN 7 / Lyon'), { road: 'RN7', direction: 'Lyon' });
+  assert.deepEqual(splitRoad(''), { road: null, direction: null });
 });
 
 test('Lambert 93 : origine de la projection (700 000, 6 600 000) = 3° E, 46,5° N', () => {

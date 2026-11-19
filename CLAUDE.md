@@ -39,7 +39,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
-  (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods)
+  (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
+  réelles du xlsx concédé 2025)
 - `docs/ROADMAP.md` : feuille de route ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
@@ -123,6 +124,12 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
   (pas sous 2 km) si `settings.areaVoice` ; encart ouvert / fermé d'un appui, ligne = fiche ; « Mon avis » (Plein,
   Quelques places, OK) sous 10 km/h en guidage (`canReport`), `data.areaReports` exporté, retrouvé par identifiant
   ou à 150 m. Jeu officiel : Bison Futé, Licence Ouverte ; tableurs non lisibles par le navigateur → Action ;
+  titres cherchés dans les 5 premières lignes, en français ou en anglais (xlsx concédé 2025 : ligne 1 date + titres
+  FR, ligne 2 titres EN du règlement 885/2013) ; colonnes par références de cellule (cellules vides) ; nom
+  « Nom :: CP :: Ville » (`splitName`), position « 46°01821, 6°11771 » (° = virgule décimale, `parseOfficialPosition`),
+  route « A41 N / GENEVE » (`splitRoad`), places gratuites + payantes ; identifiant sans colonne d'id = nom + route.
+  xlsx et ods traités à part (l'un en échec : l'autre enregistré, ancienne copie gardée, avertissement) ; l'Action
+  n'échoue que si les deux échouent. Fixture `official-sca-2025-*.xml` = lignes réelles lues par l'Action ;
   bison-fute.gouv.fr, transport.data.gouv.fr et overpass-api.de sont bloqués depuis le conteneur. Pas d'occupation en
   temps réel gratuite en France (Allemagne : SID / Mobilithek, pour plus tard).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
