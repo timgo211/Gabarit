@@ -91,3 +91,29 @@ test('flèche fluide : durée = intervalle GPS borné ; saut ou premier point : 
   // Cap inconnu (à l'arrêt) : pas d'orientation inventée.
   assert.equal(frameAt(planMove(a, { lonlat: [6, 48] , bearing: null }, 1000, 0), 0.5).bearing, null);
 });
+
+test('flèche à l\'arrêt : sous 3 km/h ou sans changement, une seule image (pas d\'interpolation)', async () => {
+  const { unchanged } = await import('../src/lib/nav-anim.js');
+  const a = { lonlat: [6, 48], bearing: 90, zoom: 17, pitch: 50 };
+  const drift = { lonlat: [6.0002, 48.0001], bearing: 90, zoom: 17, pitch: 50 }; // GPS qui dérive (≈ 18 m)
+  for (const kmh of [0, 1.5, 2.99]) {
+    const m = planMove(a, drift, 1000, 18, { speedKmh: kmh });
+    assert.equal(m.duration, 0, `${kmh} km/h`);
+    assert.deepEqual(frameAt(m, 0).lonlat, drift.lonlat, 'posée directement à la nouvelle position');
+  }
+  assert.equal(planMove(a, drift, 1000, 18, { speedKmh: 3 }).duration, 1000, 'dès 3 km/h : animée');
+  assert.equal(planMove(a, drift, 1000, 18).duration, 1000, 'vitesse inconnue : animée');
+  // Rien n'a changé (même à 50 km/h annoncés) : pas d'animation.
+  const same = { ...a, lonlat: [6, 48.000001], bearing: 90.2, zoom: 17.005, pitch: 50.05 };
+  assert.equal(unchanged(a, same, 0.1), true);
+  assert.equal(planMove(a, same, 1000, 0.1, { speedKmh: 50 }).duration, 0);
+  assert.equal(unchanged({ lonlat: [6, 48], bearing: null }, { lonlat: [6, 48], bearing: null }, 0), true);
+  // Un seul élément qui change suffit à animer.
+  for (const [k, v] of [['bearing', 95], ['zoom', 16.5], ['pitch', 40]]) {
+    assert.equal(unchanged(a, { ...a, [k]: v }, 0), false, k);
+    assert.equal(planMove(a, { ...a, [k]: v }, 1000, 0, { speedKmh: 20 }).duration, 1000, k);
+  }
+  assert.equal(unchanged(a, { ...a, bearing: null }, 0), false, 'cap perdu');
+  assert.equal(unchanged(a, drift, 18), false, 'position changée');
+  assert.equal(unchanged({ ...a, bearing: 359.9 }, { ...a, bearing: 0.1 }, 0), true, 'cap autour du nord');
+});

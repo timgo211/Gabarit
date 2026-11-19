@@ -446,14 +446,17 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
      * Guidage : la flèche glisse et tourne de sa position actuelle vers la nouvelle pendant l'intervalle entre deux
      * positions GPS (1 s au plus). Si la caméra suit, elle est déplacée dans la même image (flèche et carte
      * ensemble, sans décalage) : centrée sur le véhicule (placé bas grâce au padding), inclinée, orientée route.
-     * @param {{ lonlat:number[], bearing:number|null, zoom?:number, pitch?:number, follow:boolean, padding?:object }} p
+     * @param {{ lonlat:number[], bearing:number|null, zoom?:number, pitch?:number, follow:boolean, padding?:object,
+     *   speedKmh?:number|null }} p
      */
-    navigateTo({ lonlat, bearing, zoom, pitch, follow, padding }) {
+    navigateTo({ lonlat, bearing, zoom, pitch, follow, padding, speedKmh = null }) {
       if (!lonlat) return;
       const now = performance.now();
       const cur = anim ? frameAt(anim.move, (now - anim.start) / (anim.move.duration || 1)) : lastNav;
       const target = { lonlat, bearing, zoom, pitch };
-      const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, lonlat) : NaN);
+      // À l'arrêt (< 3 km/h) ou sans changement : une seule image, puis plus aucun rendu jusqu'à la position suivante.
+      const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, lonlat) : NaN,
+        { speedKmh });
       lastNav = { ...target, at: now };
       if (follow && map) map.stop(); // fin d'une vue d'ensemble animée
       anim = { move, start: now, follow: !!follow, padding };

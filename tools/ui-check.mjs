@@ -376,12 +376,18 @@ async function parkedCheck(browser, base) {
   const before = stats.directions;
   // Aire à ≈ 150 m au nord du tracé, GPS qui dérive (jusqu'à 60 m), précision 15 m, camion arrêté.
   for (let i = 0; i < 14; i += 1) {
+    if (i === 6) Object.assign(stats, { rafAt6: await page.evaluate(() => window.__raf) });
     const r = 60 * Math.abs(Math.sin(i * 0.9));
     const a = (i * 137 * Math.PI) / 180;
     await setGeo(page, { lat: lat + (150 + r * Math.cos(a)) / 110540,
       lon: lon + (r * Math.sin(a)) / (111320 * Math.cos((lat * Math.PI) / 180)), accuracy: 15, speed: 0 });
     await page.waitForTimeout(1000);
   }
+  // Camion arrêté (vitesse GPS 0) : une image par position, pas d'interpolation d'1 s en continu. MapLibre ajoute
+  // quelques images après chaque déplacement de caméra (fondu) ; avec l'interpolation continue, Chromium sans écran
+  // en comptait plusieurs centaines par position (≈ 600 / position mesurées avant ce correctif).
+  const parkedRaf = (await page.evaluate(() => window.__raf)) - stats.rafAt6;
+  check(parkedRaf <= 8 * 15, 'camion arrêté, GPS qui dérive : pas de rendu continu', `${parkedRaf} rAF pour 8 positions`);
   check(stats.directions === before, 'arrêté sur une aire, GPS qui dérive : aucun recalcul', `${stats.directions - before} requête(s)`);
   check(await page.isVisible('#btn-nav-reroute'), 'bouton « Recalculer d\'ici » proposé');
   await noHorizontalScroll(page, '360 px guidage, proposition de recalcul');

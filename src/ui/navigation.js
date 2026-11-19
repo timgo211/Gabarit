@@ -151,7 +151,7 @@ export function createNavigation(ctx) {
     // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
     ctx.map.navigateTo({
       lonlat: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch,
-      follow: s.follow, padding: cameraPadding(),
+      follow: s.follow, padding: cameraPadding(), speedKmh: view.speedKmh,
     });
   }
 

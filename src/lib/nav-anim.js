@@ -4,8 +4,17 @@
 
 import { normalizeBearing } from './nav-geo.js';
 
-/** Durée d'une interpolation : intervalle mesuré entre deux positions, borné (pas de retard visible). */
-export const ANIM = Object.freeze({ MIN_MS: 200, MAX_MS: 1000, DEFAULT_MS: 1000, JUMP_M: 500 });
+/**
+ * Durée d'une interpolation : intervalle mesuré entre deux positions, borné (pas de retard visible).
+ * À l'arrêt (moins de 3 km/h) ou sans changement, pas d'animation : une seule image par position, pas de rendu
+ * continu sur une aire (batterie, chauffe).
+ */
+export const ANIM = Object.freeze({
+  MIN_MS: 200, MAX_MS: 1000, DEFAULT_MS: 1000, JUMP_M: 500,
+  STILL_KMH: 3,
+  /** En dessous de ces écarts, rien n'a changé. */
+  SAME_M: 0.5, SAME_DEG: 0.5, SAME_ZOOM: 0.01, SAME_PITCH: 0.1,
+});
 
 /** Différence d'angle la plus courte de a vers b (−180 à 180). */
 export function shortestTurn(a, b) {
@@ -18,16 +27,36 @@ export function shortestTurn(a, b) {
 /** Interpolation linéaire. */
 export const lerp = (a, b, t) => a + (b - a) * t;
 
+/** Même valeur (deux absentes comptent comme égales). */
+function same(a, b, eps, angle = false) {
+  const fa = Number.isFinite(a);
+  const fb = Number.isFinite(b);
+  if (!fa || !fb) return fa === fb;
+  return Math.abs(angle ? shortestTurn(a, b) : b - a) < eps;
+}
+
+/** Position, cap, zoom et inclinaison inchangés ? */
+export function unchanged(from, to, distanceM) {
+  return !!from?.lonlat && Number.isFinite(distanceM) && distanceM < ANIM.SAME_M
+    && same(from.bearing, to.bearing, ANIM.SAME_DEG, true) && same(from.zoom, to.zoom, ANIM.SAME_ZOOM)
+    && same(from.pitch, to.pitch, ANIM.SAME_PITCH);
+}
+
 /**
- * Prépare une interpolation de « from » vers « to » ({ lonlat:[lon,lat], bearing:number|null }).
- * Saut trop grand (> 500 m, recalcul, signal retrouvé) ou pas de point de départ : arrivée immédiate.
+ * Prépare une interpolation de « from » vers « to » ({ lonlat:[lon,lat], bearing:number|null, zoom?, pitch? }).
+ * Arrivée immédiate (duration 0, une seule image) : pas de point de départ, saut trop grand (> 500 m, recalcul,
+ * signal retrouvé), vitesse sous 3 km/h, ou rien n'a changé.
  * @param {number|null} intervalMs temps écoulé depuis la position précédente
+ * @param {number} distanceM distance entre from et to
+ * @param {{ speedKmh?:number|null }} [opts]
  */
-export function planMove(from, to, intervalMs, distanceM) {
+export function planMove(from, to, intervalMs, distanceM, { speedKmh = null } = {}) {
   const dur = Number.isFinite(intervalMs) && intervalMs > 0
     ? Math.min(ANIM.MAX_MS, Math.max(ANIM.MIN_MS, intervalMs)) : ANIM.DEFAULT_MS;
   const jump = !from?.lonlat || !Number.isFinite(distanceM) || distanceM > ANIM.JUMP_M;
-  return { from: jump ? to : from, to, duration: jump ? 0 : dur };
+  const still = Number.isFinite(speedKmh) && speedKmh < ANIM.STILL_KMH;
+  if (jump || still || unchanged(from, to, distanceM)) return { from: to, to, duration: 0 };
+  return { from, to, duration: dur };
 }
 
 /**
