@@ -1,0 +1,236 @@
+/* Gabarit — interface cabine : gros boutons, fort contraste, jour/nuit, portrait/paysage. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #0b0f14;
+  --muted: #3d4a57;
+  --panel: #f2f4f7;
+  --card: #ffffff;
+  --border: #9aa6b2;
+  --accent: #ffb000;
+  --accent-fg: #0b0f14;
+  --primary: #0b57d0;
+  --primary-fg: #ffffff;
+  --danger: #b3261e;
+  --danger-fg: #ffffff;
+  --ok: #146c2e;
+  --error-bg: #fde7e5;
+  --error-fg: #7a0d07;
+  --route: #0b57d0;
+  --route-casing: #ffffff;
+  --radius: 12px;
+  --tap: 56px;
+  color-scheme: light;
+}
+
+:root[data-theme="night"] {
+  --bg: #05080b;
+  --fg: #f2f4f7;
+  --muted: #b7c2cd;
+  --panel: #0f1720;
+  --card: #16212c;
+  --border: #4b5a69;
+  --primary: #ffb000;
+  --primary-fg: #0b0f14;
+  --danger: #ff6b5e;
+  --danger-fg: #0b0f14;
+  --ok: #6fdc8c;
+  --error-bg: #3b0d0a;
+  --error-fg: #ffd9d4;
+  --route: #ffb000;
+  --route-casing: #000000;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font: 18px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app {
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  grid-template-areas: "top" "map" "panel" "foot";
+}
+
+
+.topbar {
+  grid-area: top;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: #0f1720;
+  color: #fff;
+}
+.brand { margin: 0 auto 0 0; font-size: 1.4rem; color: var(--accent); letter-spacing: .02em; }
+
+.map-wrap { grid-area: map; position: relative; min-height: 200px; }
+.map { position: absolute; inset: 0; background: var(--panel); }
+.map-fallback {
+  position: absolute; inset: auto 12px 12px 12px; margin: 0; padding: 12px;
+  background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
+}
+
+.panel {
+  grid-area: panel;
+  background: var(--panel);
+  padding: 12px;
+  overflow-y: auto;
+  max-height: 52dvh;
+  border-top: 2px solid var(--border);
+}
+
+/* Paysage : panneau à gauche, carte à droite. */
+@media (orientation: landscape) and (min-width: 700px) {
+  .app {
+    grid-template-columns: minmax(340px, 34%) 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "top top" "panel map" "foot foot";
+  }
+  .panel { max-height: none; min-height: 0; border-top: 0; border-right: 2px solid var(--border); }
+}
+
+.disclaimer {
+  grid-area: foot;
+  font-size: .8rem;
+  text-align: center;
+  padding: 4px 8px;
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  background: #0f1720;
+  color: #d7dee5;
+}
+
+/* Boutons */
+.btn {
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 18px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.btn:active { transform: scale(.97); }
+.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn[disabled] { opacity: .5; }
+.btn-icon { padding: 0; font-size: 1.4rem; }
+.btn-primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.btn-danger { background: var(--danger); color: var(--danger-fg); border-color: var(--danger); }
+.btn-big { width: 100%; min-height: 64px; font-size: 1.2rem; }
+.topbar .btn { background: #1d2a37; color: #fff; border-color: #4b5a69; }
+.btn-chip { max-width: 55vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Formulaires */
+.route-form { display: grid; gap: 10px; }
+.field { position: relative; }
+label { font-weight: 600; }
+.field > label { display: block; margin-bottom: 4px; }
+.combo { display: flex; gap: 8px; }
+input[type="search"], input[type="text"], input[type="password"], input[inputmode], select {
+  flex: 1;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 14px;
+  font: inherit;
+  color: var(--fg);
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+}
+input.invalid { border-color: var(--danger); }
+
+.suggestions {
+  list-style: none; margin: 4px 0 0; padding: 0;
+  position: absolute; left: 0; right: 0; z-index: 20;
+  background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
+  max-height: 50vh; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.suggestions li {
+  min-height: var(--tap); padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer;
+}
+.suggestions li:last-child { border-bottom: 0; }
+.suggestions li[aria-selected="true"], .suggestions li:active { background: var(--accent); color: var(--accent-fg); }
+
+.toggles { display: flex; flex-wrap: wrap; gap: 8px; }
+.toggle {
+  flex: 1 1 140px; min-height: var(--tap); display: flex; align-items: center; gap: 10px;
+  padding: 0 12px; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
+}
+input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-color: var(--primary); }
+
+.message {
+  margin-top: 12px; padding: 14px; border-radius: var(--radius);
+  background: var(--error-bg); color: var(--error-fg); border: 2px solid var(--danger); font-weight: 600;
+}
+.message.info { background: var(--card); color: var(--fg); border-color: var(--border); }
+
+.summary { margin-top: 12px; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 0; }
+.summary-grid div { background: var(--panel); border-radius: 8px; padding: 8px 10px; }
+.summary-grid dt { font-size: .8rem; color: var(--muted); }
+.summary-grid dd { margin: 0; font-size: 1.5rem; font-weight: 700; }
+.summary-notes { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: .9rem; }
+
+/* Dialogues */
+.dialog {
+  width: min(680px, 100vw); max-width: 100vw; max-height: 100dvh; padding: 0;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--panel); color: var(--fg);
+}
+.dialog::backdrop { background: rgba(0,0,0,.6); }
+.dialog-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px; background: #0f1720; color: #fff;
+}
+.dialog-head h2 { margin: 0; font-size: 1.3rem; }
+.dialog-head .btn { background: #1d2a37; color: #fff; border-color: #4b5a69; }
+.dialog-body { padding: 12px; display: grid; gap: 12px; }
+.card { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px; }
+.card h3 { margin: 0 0 8px; font-size: 1.1rem; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.hint { color: var(--muted); font-size: .9rem; margin: 4px 0; }
+.status { min-height: 1.4em; font-weight: 600; margin: 8px 0 0; }
+.status.ok { color: var(--ok); }
+.status.err { color: var(--danger); }
+.segmented { display: grid; gap: 8px; }
+.segmented label {
+  min-height: var(--tap); display: flex; align-items: center; gap: 10px; padding: 0 12px;
+  border: 2px solid var(--border); border-radius: var(--radius); background: var(--panel);
+}
+
+/* Véhicules */
+.vehicle-card.active { border-color: var(--primary); border-width: 3px; }
+.vehicle-card .dims { color: var(--muted); font-size: .95rem; margin: 4px 0 0; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: var(--primary); color: var(--primary-fg); font-size: .8rem; margin-left: 6px; vertical-align: middle; }
+.vehicle-form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.vehicle-form .full { grid-column: 1 / -1; }
+.vehicle-form .err { color: var(--danger); font-size: .85rem; min-height: 1em; margin: 2px 0 0; }
+
+.update-banner {
+  position: fixed; left: 12px; right: 12px; bottom: 40px; z-index: 50;
+  min-height: 64px; border: 0; border-radius: var(--radius);
+  background: var(--accent); color: var(--accent-fg); font: inherit; font-weight: 700; font-size: 1.1rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
+[hidden] { display: none !important; }
+
+/* MapLibre : contrôles plus gros pour le doigt */
+.maplibregl-ctrl-group button { width: 44px; height: 44px; }
