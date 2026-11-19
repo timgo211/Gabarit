@@ -6,10 +6,10 @@
 // comme GeolocationPosition.coords (heading vaut null à l'arrêt, speed peut être null :
 // https://developer.mozilla.org/docs/Web/API/GeolocationCoordinates).
 
-import { prepareLine, locateOnLine, segmentBearing, bearing as bearingTo, haversine } from './nav-geo.js';
+import { prepareLine, locateOnLine, segmentBearing, bearing as bearingTo, haversine, pointAt } from './nav-geo.js';
 import {
   buildManeuvers, nextManeuver, stageToAnnounce, announcementText, arrivedText, maneuverText, maneuverIcon,
-  firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M,
+  firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName,
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
 
@@ -134,6 +134,7 @@ export function startNavigation(route, { destination = null, now = 0 } = {}) {
     route: prepareRoute(route),
     destination: Array.isArray(destination) && destination.every(isNum) ? destination : null,
     segIndex: null,
+    along: 0,
     lastFix: null,
     lastFixAt: null,
     startedAt: now,
@@ -181,6 +182,7 @@ export function updateNavigation(state, fix) {
 
   const loc = locateOnLine(line, p, s.segIndex);
   s.segIndex = loc.segIndex;
+  s.along = loc.along;
   const reliable = accuracy <= NAV.MAX_ACCURACY_M;
   const precise = isNum(fix.accuracy) && fix.accuracy <= NAV.OFF_ROUTE_MAX_ACCURACY_M;
   const threshold = NAV.OFF_ROUTE_BASE_M + Math.min(accuracy, NAV.OFF_ROUTE_ACCURACY_CAP_M);
@@ -273,6 +275,8 @@ export function updateNavigation(state, fix) {
     /** À l'arrêt hors du tracé : proposer « Recalculer d'ici » (bouton), sans rien changer tout seul. */
     offRouteStopped: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES,
     canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
+    /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
+    roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -291,6 +295,26 @@ export function updateNavigation(state, fix) {
     }
   }
   return { state: s, view, events };
+}
+
+/**
+ * Cadre de la « Vue d'ensemble » (phase 7c) : le trajet restant (depuis le point atteint sur le tracé) et la position.
+ * @returns {number[]|null} [ouest, sud, est, nord]
+ */
+export function overviewBbox(state) {
+  const line = state?.route?.line;
+  if (!line?.coords?.length) return null;
+  const along = isNum(state.along) ? state.along : 0;
+  const pts = [pointAt(line, along).point];
+  for (let i = 0; i < line.coords.length; i += 1) if (line.cum[i] > along) pts.push(line.coords[i]);
+  if (state.lastFix) pts.push(state.lastFix);
+  if (state.destination) pts.push(state.destination);
+  let [w, so, e, n] = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, y] of pts) {
+    if (!isNum(x) || !isNum(y)) continue;
+    w = Math.min(w, x); e = Math.max(e, x); so = Math.min(so, y); n = Math.max(n, y);
+  }
+  return Number.isFinite(w) ? [w, so, e, n] : null;
 }
 
 function canReroute(state, now) {
@@ -320,6 +344,7 @@ export function rerouteDone(state, route) {
     ...state,
     route: prepareRoute(route),
     segIndex: null,
+    along: 0,
     announced: {},
     started: true,
     offCount: 0,

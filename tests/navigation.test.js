@@ -386,3 +386,30 @@ test('saut de position (vitesse calculée > 150 km/h) : ignoré, pas de recalcul
   assert.equal(reroutes(r.events).length, 0);
   assert.ok(r.views.every((v) => v.speedKmh < 10));
 });
+
+// ───────── Phase 7c : nom de la route, vue d'ensemble ─────────
+
+test('nom de la route en cours : étape ORS où l\'on roule, rien hors du tracé', async () => {
+  const { overviewBbox } = await import('../src/lib/navigation.js');
+  const st = startNavigation(NAV_ROUTE, { now: T0 });
+  const r = runFixes(updateNavigation, st, simFixes(NAV_ROUTE, 50, 500));
+  assert.equal(r.state.arrived, true);
+  const names = [...new Set(r.views.map((v) => v.roadName))];
+  assert.equal(r.views[1].roadName, 'Route de Lyon');
+  assert.ok(names.includes('D 306'), names.join(' | '));
+  assert.equal(r.views.at(-1).roadName, null, 'arrivé');
+  const off = runFixes(updateNavigation, st, leaving(OFF_ORIGIN, 0, 120, T0, 3));
+  assert.equal(off.views.at(-1).roadName, null);
+
+  // Vue d'ensemble : trajet restant + position ; se resserre en avançant.
+  const full = overviewBbox(st);
+  const end = NAV_ROUTE.coordinates.at(-1);
+  assert.ok(full[0] <= end[0] && full[2] >= end[0] && full[1] <= end[1] && full[3] >= end[1]);
+  const half = runFixes(updateNavigation, st, simFixes(NAV_ROUTE, 90, 120));
+  const b = overviewBbox(half.state);
+  const area = (x) => (x[2] - x[0]) * (x[3] - x[1]);
+  assert.ok(area(b) < area(full), 'plus petit que le trajet entier');
+  const me = half.state.lastFix;
+  assert.ok(b[0] <= me[0] && b[2] >= me[0] && b[1] <= me[1] && b[3] >= me[1], 'position comprise');
+  assert.equal(overviewBbox(null), null);
+});

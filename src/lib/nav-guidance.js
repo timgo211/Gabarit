@@ -226,3 +226,44 @@ export function pickFrenchVoice(voices) {
   }
   return best;
 }
+
+/**
+ * Nom de la route où l'on roule (phase 7c) : nom de l'étape ORS en cours. Une étape ORS va d'une manœuvre à la
+ * suivante et porte le nom de la voie prise (« name », « - » ou vide si la voie n'a pas de nom).
+ * @param {object[]} maneuvers buildManeuvers()
+ * @param {number[]} cum distances cumulées du tracé
+ * @param {number} along distance parcourue sur le tracé (m)
+ * @returns {string|null}
+ */
+export function currentRoadName(maneuvers, cum, along) {
+  if (!Array.isArray(maneuvers) || !Array.isArray(cum) || !Number.isFinite(along)) return null;
+  let cur = null;
+  for (const m of maneuvers) {
+    if (m.type === STEP_TYPES.GOAL) continue;
+    if (cum[m.startIndex] <= along + 0.5) cur = m;
+    else break;
+  }
+  const name = typeof cur?.name === 'string' ? cur.name.trim() : '';
+  return name && name !== '-' ? name : null;
+}
+
+/** Voix françaises installées, triées (France d'abord, puis locales, puis par nom), sans doublon de nom. */
+export function frenchVoices(voices) {
+  const list = Array.isArray(voices) ? voices : [];
+  const seen = new Set();
+  const out = [];
+  for (const v of list) {
+    if (!v || typeof v.lang !== 'string' || typeof v.name !== 'string' || !v.name) continue;
+    if (!v.lang.replace('_', '-').toLowerCase().startsWith('fr') || seen.has(v.name)) continue;
+    seen.add(v.name);
+    out.push(v);
+  }
+  const rank = (v) => (v.lang.replace('_', '-').toLowerCase() === 'fr-fr' ? 0 : 2) + (v.localService ? 0 : 1);
+  return out.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name, 'fr'));
+}
+
+/** Voix choisie dans Réglages si elle est encore installée, sinon la meilleure voix française. */
+export function pickVoice(voices, name) {
+  const fr = frenchVoices(voices);
+  return (name && fr.find((v) => v.name === name)) || pickFrenchVoice(voices);
+}

@@ -146,3 +146,18 @@ test('étapes sans way_points ignorées', () => {
   assert.deepEqual(buildManeuvers([{ instruction: 'x', wayPoints: null }], [0, 10]), []);
   assert.equal(nextManeuver([], 0), null);
 });
+
+test('nom de la route en cours : « - » et vide ignorés, l\'arrivée ne compte pas', async () => {
+  const { currentRoadName } = await import('../src/lib/nav-guidance.js');
+  const cum = [0, 100, 200, 300, 400];
+  const m = [
+    { type: 11, name: 'Rue A', startIndex: 0 }, { type: 1, name: '-', startIndex: 1 },
+    { type: 0, name: ' D 306 ', startIndex: 2 }, { type: 10, name: 'Fin', startIndex: 4 },
+  ];
+  assert.equal(currentRoadName(m, cum, 50), 'Rue A');
+  assert.equal(currentRoadName(m, cum, 150), null);
+  assert.equal(currentRoadName(m, cum, 250), 'D 306');
+  assert.equal(currentRoadName(m, cum, 400), 'D 306');
+  assert.equal(currentRoadName([], cum, 10), null);
+  assert.equal(currentRoadName(m, cum, NaN), null);
+});

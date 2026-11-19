@@ -255,3 +255,15 @@ test('choix entre partage Android, copie, lien affiché et téléchargement', ()
   assert.equal(shareResultText('share', { cancelled: true }), '');
   assert.match(shareResultText('share', { failed: true }), /copie le lien/);
 });
+
+test('« Partager Gabarit » : guide d\'installation pas à pas (lien, Chrome, clé HeiGIT, Réglages)', async () => {
+  const { INSTALL_STEPS } = await import('../src/lib/share.js');
+  assert.equal(INSTALL_STEPS.length, 4);
+  assert.match(INSTALL_STEPS[0], /lien.*Chrome/);
+  assert.match(INSTALL_STEPS[1], /Installer/);
+  assert.match(INSTALL_STEPS[2], /heigit\.org/);
+  assert.match(INSTALL_STEPS[3], /Réglages.*colle/);
+  const text = appShareText();
+  for (const [i, step] of INSTALL_STEPS.entries()) assert.ok(text.includes(`${i + 1}. ${step}`));
+  assert.doesNotMatch(text, /cle-|key=|api_key/i, 'jamais de clé');
+});

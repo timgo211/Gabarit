@@ -63,25 +63,30 @@
   10 km/h ou plus avec une précision de 30 m ou mieux, sinon bouton « Recalculer d'ici » proposé à l'arrêt.
 
 - [ ] **Phase 7c — Confort du guidage**
-  - Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
-  - Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
+  - [x] Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
+  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
     phase 2b), choix en un toucher.
-  - Bouton Plan / Satellite aussi pendant le guidage (un toucher).
-  - Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
-  - Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
-  - Encart avec le nom de la route sur laquelle je roule (étape ORS en cours), en bas de la carte.
-  - Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
-  - Personnalisation : flèche (couleur, forme, icône camion) ; voix (choix parmi les voix françaises installées,
-    vitesse, volume, bouton « Tester »).
-  - Musique pendant les consignes : baisser ou couper le média en cours si le navigateur le permet (Audio Session API
-    ou autre moyen, à vérifier dans Chrome Android) ; sinon, l'expliquer dans Réglages.
-  - Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
+  - [x] Bouton Plan / Satellite aussi pendant le guidage (un toucher ; le guidage démarre en plan, choix non mémorisé).
+  - [x] Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
+  - [x] Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
+  - [x] Encart avec le nom de la route sur laquelle je roule (étape ORS en cours), en bas de la carte.
+  - [x] Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
+  - Personnalisation :
+    - [x] couleur de la flèche (auto, bleu, vert, orange, violet) ;
+    - [ ] forme de la flèche, icône camion ;
+    - [x] voix : choix parmi les voix françaises installées, vitesse, volume, bouton « Tester ».
+  - [x] Musique pendant les consignes : Chrome (Android compris) n'a pas l'Audio Session API (Safari seulement) ;
+    Réglages l'explique (réglage appliqué automatiquement si un navigateur la propose).
+  - [x] Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
     créer sa clé gratuite, la coller dans Réglages).
 
 - [ ] **Phase 8 — Destinations et étapes**
-  Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Destination par appui long sur la
-  carte ou par coordonnées GPS (décimal et degrés-minutes-secondes). Avec des étapes, `alternative_routes` n'est pas
-  possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la tournée multi-arrêts de la phase 3.)
+  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
+    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
+    tournée multi-arrêts de la phase 3.)
+  - [x] Destination (ou départ) par appui long sur la carte, hors guidage : « Aller ici » / « Partir d'ici ».
+  - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
+    (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu

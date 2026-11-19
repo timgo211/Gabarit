@@ -2,6 +2,7 @@
 
 import { $, el } from './dom.js';
 import { fetchSuggestions } from './api.js';
+import { parseCoordinates, coordsLabel } from '../lib/coords.js';
 
 const MIN_CHARS = 3;
 const DEBOUNCE_MS = 300;
@@ -40,6 +41,14 @@ function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError 
     clearTimeout(timer);
     ctrl?.abort();
     const text = input.value.trim();
+    // Coordonnées GPS (phase 8) : proposées directement, sans appel au géocodage.
+    const c = parseCoordinates(text);
+    if (c) {
+      items = [{ label: coordsLabel(c), lon: c.lon, lat: c.lat }];
+      render();
+      onError(null);
+      return;
+    }
     if (text.length < MIN_CHARS) { close(); return; }
     timer = setTimeout(async () => {
       ctrl = new AbortController();
@@ -156,6 +165,16 @@ export function createRouteForm(opts) {
       toInput.value = to.label;
       avoidTolls.checked = !!shared.avoidTolls;
       avoidFerries.checked = !!shared.avoidFerries;
+    },
+    /** Départ ou arrivée choisi sur la carte (appui long). Aucun calcul lancé. */
+    setPlace(which, place) {
+      if (which === 'from') {
+        from = { ...place };
+        fromInput.value = place.label;
+      } else {
+        to = { ...place };
+        toInput.value = place.label;
+      }
     },
     setBusy(busy) {
       const btn = $('#btn-route');

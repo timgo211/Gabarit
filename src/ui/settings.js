@@ -1,11 +1,20 @@
-// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal, prix du gazole, export/import des données,
-// simulation de trajet (rubrique Test).
+// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal (voix, vitesse, volume), couleur de la flèche,
+// prix du gazole, export/import des données, simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
 import { testKey } from './api.js';
 import { exportData, importData, parseDieselPrice } from '../lib/store.js';
 import { formatPricePerLiter } from '../lib/format.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
+import { sanitizeVoiceRate, sanitizeVoiceVolume } from '../lib/prefs.js';
+
+/** Phrase de Réglages sur la musique pendant les consignes (phase 7c). */
+const MUSIC_TEXT = {
+  duck: 'Musique : elle baisse pendant chaque consigne, puis reprend.',
+  none: 'Musique : Chrome ne permet pas à une page web de baisser ou couper la musique d\'une autre appli pendant '
+    + 'une consigne. Selon le moteur de voix d\'Android, le son peut baisser tout seul ; sinon, baisse la musique '
+    + 'ou monte le volume de la voix ci-dessus.',
+};
 
 function setStatus(node, text, ok) {
   node.textContent = text;
@@ -15,7 +24,9 @@ function setStatus(node, text, ok) {
 /**
  * @param {{ store, getData:()=>object, onDataReplaced:(data)=>void, onThemeChange:(mode)=>void,
  *   onVoiceChange:(on:boolean)=>void, onTestVoice:()=>string, onSimSpeedChange:(kmh:number)=>void,
- *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void }} ctx
+ *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void,
+ *   getVoices:()=>SpeechSynthesisVoice[], onVoicesChanged:(cb)=>void, canDuckMedia:boolean,
+ *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -28,12 +39,53 @@ export function createSettings(ctx) {
   const voiceEnabled = $('#voice-enabled');
   const dieselInput = $('#diesel-price');
   const dieselStatus = $('#diesel-status');
+  const voiceName = $('#voice-name');
+  const voiceRate = $('#voice-rate');
+  const voiceVolume = $('#voice-volume');
   wireDialog(dlg);
+  $('#voice-music').textContent = ctx.canDuckMedia ? MUSIC_TEXT.duck : MUSIC_TEXT.none;
+
+  const rateText = (r) => String(r).replace('.', ',');
+  const volumeText = (v) => `${Math.round(v * 100)} %`;
+
+  /** Liste des voix françaises installées (Chrome la charge parfois après l'ouverture). */
+  function fillVoices(selected) {
+    const keep = selected ?? voiceName.value;
+    const auto = voiceName.options[0];
+    const opts = ctx.getVoices().map((v) => {
+      const o = document.createElement('option');
+      o.value = v.name;
+      o.textContent = `${v.name} (${v.lang.replace('_', '-')})`;
+      return o;
+    });
+    voiceName.replaceChildren(auto, ...opts);
+    if (keep && !opts.some((o) => o.value === keep)) {
+      const o = document.createElement('option'); // voix enregistrée mais pas (encore) listée
+      o.value = keep;
+      o.textContent = `${keep} (non disponible)`;
+      voiceName.append(o);
+    }
+    voiceName.value = keep;
+  }
+  ctx.onVoicesChanged?.(() => fillVoices());
+
+  function voiceOptions() {
+    return { name: voiceName.value, rate: sanitizeVoiceRate(voiceRate.value), volume: sanitizeVoiceVolume(voiceVolume.value) };
+  }
+  function showVoiceValues() {
+    $('#voice-rate-out').textContent = rateText(sanitizeVoiceRate(voiceRate.value));
+    $('#voice-volume-out').textContent = volumeText(sanitizeVoiceVolume(voiceVolume.value));
+  }
 
   function syncChoices(settings) {
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
     voiceEnabled.checked = settings.voice;
+    fillVoices(settings.voiceName);
+    voiceRate.value = String(settings.voiceRate);
+    voiceVolume.value = String(settings.voiceVolume);
+    showVoiceValues();
+    for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) r.checked = r.value === settings.arrowColor;
     dieselInput.value = formatPricePerLiter(settings.dieselPrice);
   }
 
@@ -91,6 +143,14 @@ export function createSettings(ctx) {
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
   $('#btn-voice-test').addEventListener('click', () => setStatus(voiceStatus, ctx.onTestVoice()));
+  voiceName.addEventListener('change', () => ctx.onVoiceOptions(voiceOptions()));
+  for (const input of [voiceRate, voiceVolume]) {
+    input.addEventListener('input', showVoiceValues);
+    input.addEventListener('change', () => ctx.onVoiceOptions(voiceOptions()));
+  }
+  for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) {
+    r.addEventListener('change', () => { if (r.checked) ctx.onArrowColor(r.value); });
+  }
 
   $('#btn-diesel-save').addEventListener('click', () => {
     const { value, error } = parseDieselPrice(dieselInput.value);

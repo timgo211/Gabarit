@@ -1,11 +1,12 @@
-// Fenêtre « Partager » (phase 7) : itinéraire (lien ou GPX), lieu (lien OpenStreetMap), appli.
+// Fenêtre « Partager » (phase 7) : itinéraire (lien ou GPX), lieu (lien OpenStreetMap), appli (avec le guide
+// d'installation pas à pas, phase 7c).
 // Contenus et choix de la méthode : src/lib/share.js. Ici : Web Share API, presse-papiers, téléchargement.
 // Ouverte à l'arrêt seulement (le bouton est dans la barre du haut, masquée pendant le guidage).
 
 import { $, wireDialog } from './dom.js';
 import {
   encodeRouteLink, buildGpx, gpxFileName, osmLink, appShareText, appBaseUrl, pickShareMethod, shareResultText,
-  variantId, GPX_MIME,
+  variantId, GPX_MIME, INSTALL_STEPS,
 } from '../lib/share.js';
 
 const isAbort = (err) => err?.name === 'AbortError'; // partage annulé par l'utilisateur
@@ -33,6 +34,11 @@ export function createShare({ getChoice, getMyPosition }) {
   }
 
   const baseUrl = () => appBaseUrl(window.location.href);
+  $('#install-steps').replaceChildren(...INSTALL_STEPS.map((step) => {
+    const li = document.createElement('li');
+    li.textContent = step;
+    return li;
+  }));
 
   async function copy(text) {
     try {

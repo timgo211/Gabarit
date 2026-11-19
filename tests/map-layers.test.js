@@ -34,14 +34,18 @@ test('choix de couche mémorisé : plan par défaut', () => {
   for (const x of [undefined, null, '', 'SATELLITE', 'hybride', 3]) assert.equal(sanitizeMapLayer(x), 'plan');
 });
 
-test('satellite : photos en France, message hors de France, plan sans bouton en guidage', () => {
+test('satellite : photos en France, message hors de France ; en guidage aussi (phase 7c), sans les boutons de l\'arrêt', () => {
   assert.deepEqual(satelliteView({ layer: 'plan', center: IN.Paris }), { photos: false, message: '', button: true });
   assert.deepEqual(satelliteView({ layer: 'satellite', center: IN.Paris }), { photos: true, message: '', button: true });
   assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Bruxelles }),
     { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true });
   assert.equal(SATELLITE_OUTSIDE_TEXT, 'Vue satellite disponible en France uniquement');
   assert.deepEqual(satelliteView({ layer: 'satellite', center: IN.Paris, navigating: true }),
+    { photos: true, message: '', button: false });
+  assert.deepEqual(satelliteView({ layer: 'plan', center: IN.Paris, navigating: true }),
     { photos: false, message: '', button: false });
+  assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Bruxelles, navigating: true }),
+    { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: false });
   assert.equal(satelliteView({ layer: 'satellite', center: null }).photos, false);
 });
 
@@ -85,4 +89,12 @@ test('changement de thème : photos IGN et tracés recopiés dans le nouveau sty
   const noSym = carryOverlay(prev, { sources: {}, layers: [{ id: 'bg', type: 'background' }] }, { below: ['ign-ortho'], above: ['route-line'] });
   assert.deepEqual(noSym.layers.map((l) => l.id), ['bg', 'ign-ortho', 'route-line']);
   assert.deepEqual(carryOverlay(undefined, next, { below: ['ign-ortho'] }).layers.map((l) => l.id), ['bg', 'roads', 'labels']);
+});
+
+test('guidage : démarre en plan ; le bouton propose l\'autre couche', async () => {
+  const { GUIDANCE_START_LAYER, guidanceLayerButton } = await import('../src/lib/map-layers.js');
+  assert.equal(GUIDANCE_START_LAYER, 'plan');
+  assert.equal(guidanceLayerButton('plan').next, 'satellite');
+  assert.equal(guidanceLayerButton('satellite').next, 'plan');
+  assert.equal(guidanceLayerButton('n\'importe quoi').next, 'satellite');
 });

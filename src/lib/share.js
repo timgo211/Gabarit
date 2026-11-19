@@ -196,10 +196,22 @@ export function osmLink(lonlat, zoom = SHARE.OSM_ZOOM) {
   return `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=${zoom}/${lat}/${lon}`;
 }
 
-/** Texte de partage de l'appli. */
+/**
+ * Guide d'installation sur un autre téléphone (phase 7c), montré dans « Partager » et joint au partage de l'appli.
+ * Chrome Android : menu ⋮ › « Installer l'appli » (ou « Ajouter à l'écran d'accueil » selon la version).
+ */
+export const INSTALL_STEPS = Object.freeze([
+  'Ouvre le lien dans Chrome sur le téléphone.',
+  'Menu ⋮ de Chrome › « Installer l\'appli » (ou « Ajouter à l\'écran d\'accueil »), puis « Installer ».',
+  'Crée un compte gratuit sur heigit.org et génère ta clé (offre gratuite, sans carte bancaire).',
+  'Ouvre Gabarit › Réglages (⚙) › Clé OpenRouteService : colle la clé, « Enregistrer », puis « Tester ».',
+]);
+
+/** Texte de partage de l'appli, avec le guide pas à pas. */
 export function appShareText() {
   return 'Gabarit, GPS poids lourd gratuit (itinéraires selon le gabarit du camion). Pour calculer des itinéraires, '
-    + 'crée ta clé gratuite sur heigit.org et colle-la dans Réglages (⚙).';
+    + 'crée ta clé gratuite sur heigit.org et colle-la dans Réglages (⚙).\n'
+    + INSTALL_STEPS.map((step, i) => `${i + 1}. ${step}`).join('\n');
 }
 
 // ---------- GPX ----------
