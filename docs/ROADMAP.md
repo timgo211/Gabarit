@@ -1,5 +1,7 @@
 # Feuille de route Gabarit
 
+Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
+
 - [x] **Phase 1 — Base : réglages, véhicules, itinéraire camion**
   Réglages (clé ORS masquée + test, mode nuit auto/manuel, export/import JSON), profils véhicule multiples
   (hauteur, largeur, longueur, PTAC, essieu, ADR, vitesse max, conso, Crit'Air), départ GPS / arrivée avec
@@ -62,32 +64,6 @@
   changement de thème ; carte restaurée ou recréée après perte du contexte WebGL ; hors itinéraire seulement à
   10 km/h ou plus avec une précision de 30 m ou mieux, sinon bouton « Recalculer d'ici » proposé à l'arrêt.
 
-- [ ] **Phase 7c — Confort du guidage**
-  - [x] Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
-  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
-    phase 2b), choix en un toucher.
-  - [x] Bouton Plan / Satellite aussi pendant le guidage (un toucher ; le guidage démarre en plan, choix non mémorisé).
-  - [x] Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
-  - [x] Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
-  - [x] Encart avec le nom de la route sur laquelle je roule (étape ORS en cours), en bas de la carte.
-  - [x] Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
-  - Personnalisation :
-    - [x] couleur de la flèche (auto, bleu, vert, orange, violet) ;
-    - [ ] forme de la flèche, icône camion ;
-    - [x] voix : choix parmi les voix françaises installées, vitesse, volume, bouton « Tester ».
-  - [x] Musique pendant les consignes : Chrome (Android compris) n'a pas l'Audio Session API (Safari seulement) ;
-    Réglages l'explique (réglage appliqué automatiquement si un navigateur la propose).
-  - [x] Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
-    créer sa clé gratuite, la coller dans Réglages).
-
-- [ ] **Phase 8 — Destinations et étapes**
-  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
-    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
-    tournée multi-arrêts de la phase 3.)
-  - [x] Destination (ou départ) par appui long sur la carte, hors guidage : « Aller ici » / « Partir d'ici ».
-  - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
-    (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
-
 - [x] **Phase 9 — Aires et parkings PL** (priorité ; reprend la partie parkings de la phase 6)
   - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
     (`amenity=parking` + `hgv=yes/designated`, `capacity:hgv`, services) d'OpenStreetMap via Overpass ; jeu officiel
@@ -116,11 +92,6 @@
   **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
   Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
   ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
-
-- [ ] **Phase 4 — Carburant**
-  Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
-  `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
-  tri par prix du gazole, détour estimé, mes stations « OK camion », coût carburant du trajet.
 
 - [ ] **Phase 5 — Réglementation**
   ZFE (`aires.geojson` de la Base nationale BNZFE sur transport.data.gouv.fr, copié dans `data/` par une GitHub Action
@@ -156,14 +127,45 @@
   bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
   itinéraire pour ménager les quotas.
 
+- [ ] **Phase 7d — Satellite hors de France**
+  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
+  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
+
+- [ ] **Phase 7c — Confort du guidage**
+  - [x] Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
+  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
+    phase 2b), choix en un toucher.
+  - [x] Bouton Plan / Satellite aussi pendant le guidage (un toucher ; le guidage démarre en plan, choix non mémorisé).
+  - [x] Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
+  - [x] Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
+  - [x] Encart avec le nom de la route sur laquelle je roule (étape ORS en cours), en bas de la carte.
+  - [x] Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
+  - Personnalisation :
+    - [x] couleur de la flèche (auto, bleu, vert, orange, violet) ;
+    - [ ] forme de la flèche, icône camion ;
+    - [x] voix : choix parmi les voix françaises installées, vitesse, volume, bouton « Tester ».
+  - [x] Musique pendant les consignes : Chrome (Android compris) n'a pas l'Audio Session API (Safari seulement) ;
+    Réglages l'explique (réglage appliqué automatiquement si un navigateur la propose).
+  - [x] Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
+    créer sa clé gratuite, la coller dans Réglages).
+
+- [ ] **Phase 8 — Destinations et étapes**
+  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
+    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
+    tournée multi-arrêts de la phase 3.)
+  - [x] Destination (ou départ) par appui long sur la carte, hors guidage : « Aller ici » / « Partir d'ici ».
+  - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
+    (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
+
+- [ ] **Phase 4 — Carburant**
+  Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
+  `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
+  tri par prix du gazole, détour estimé, mes stations « OK camion », coût carburant du trajet.
+
 - [ ] **Phase 6 — Historique et notes**
   Historique des trajets, statistiques, relevé PDF via impression. Notes perso détaillées sur les aires et parkings
   utilisés (sécurité, douches, propreté…), affichées au prochain passage, en plus de « Mon avis » de la phase 9.
   (Aires et parkings PL, prochain parking en guidage : phase 9.)
-
-- [ ] **Phase 7d — Satellite hors de France**
-  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
-  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
 
 - [ ] **Phase 10 — Trafic en temps réel (à étudier)**
   ORS ne tient pas compte du trafic. D'abord étudier les sources gratuites : données ouvertes du réseau routier
