@@ -2,13 +2,12 @@
 
 import { $, el } from './dom.js';
 import { fetchSuggestions } from './api.js';
-import { parseCoordinates, coordsLabel } from '../lib/coords.js';
+import { suggestionPlan } from '../lib/coords.js';
 
-const MIN_CHARS = 3;
 const DEBOUNCE_MS = 300;
 
 /** Liste déroulante de suggestions attachée à un champ. */
-function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError }) {
+function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
   let timer = null;
   let ctrl = null;
   let items = [];
@@ -37,19 +36,19 @@ function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError 
   }
 
   input.addEventListener('input', () => {
+    // Toute saisie oublie le point choisi (suggestion, lien reçu ou appui long sur la carte, avec son repère).
     onPick(null);
+    onEdit?.();
     clearTimeout(timer);
     ctrl?.abort();
-    const text = input.value.trim();
+    // Liste remplacée tout de suite : aucune ancienne suggestion à toucher pendant la recherche (src/lib/coords.js).
     // Coordonnées GPS (phase 8) : proposées directement, sans appel au géocodage.
-    const c = parseCoordinates(text);
-    if (c) {
-      items = [{ label: coordsLabel(c), lon: c.lon, lat: c.lat }];
-      render();
-      onError(null);
-      return;
-    }
-    if (text.length < MIN_CHARS) { close(); return; }
+    const plan = suggestionPlan(input.value);
+    items = plan.items;
+    render();
+    if (items.length) onError(null);
+    if (!plan.search) return;
+    const text = plan.search;
     timer = setTimeout(async () => {
       ctrl = new AbortController();
       try {
@@ -72,7 +71,8 @@ function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError 
 
 /**
  * @param {{ getApiKey:()=>string, onPosition:(lonlat)=>void, onSubmit:(p)=>void, onError:(err|null|string)=>void,
- *   initial:{avoidTolls:boolean, avoidFerries:boolean}, onOptionsChange:(o)=>void }} opts
+ *   initial:{avoidTolls:boolean, avoidFerries:boolean}, onOptionsChange:(o)=>void,
+ *   onEdit?:(which:'from'|'to')=>void }} opts  onEdit : le champ a été modifié (le point choisi est oublié)
  */
 export function createRouteForm(opts) {
   const form = $('#route-form');
@@ -91,8 +91,8 @@ export function createRouteForm(opts) {
   avoidFerries.addEventListener('change', optionsChanged);
 
   const common = { getApiKey: opts.getApiKey, getFocus: () => myPosition, onError: opts.onError };
-  attachAutocomplete(fromInput, $('#from-list'), { ...common, onPick: (s) => { from = s; } });
-  attachAutocomplete(toInput, $('#to-list'), { ...common, onPick: (s) => { to = s; } });
+  attachAutocomplete(fromInput, $('#from-list'), { ...common, onPick: (s) => { from = s; }, onEdit: () => opts.onEdit?.('from') });
+  attachAutocomplete(toInput, $('#to-list'), { ...common, onPick: (s) => { to = s; }, onEdit: () => opts.onEdit?.('to') });
 
   /** Demande la position GPS ; résout [lon, lat] ou rejette avec un message en français. */
   function locate() {
@@ -118,6 +118,7 @@ export function createRouteForm(opts) {
   $('#btn-gps').addEventListener('click', async () => {
     fromInput.value = '';
     from = null;
+    opts.onEdit?.('from');
     try {
       await locate();
       opts.onError(null);
