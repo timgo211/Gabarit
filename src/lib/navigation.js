@@ -362,6 +362,18 @@ export function overviewPadding(size, wanted, minFree = 0.3) {
   return { top, bottom, left, right };
 }
 
+/**
+ * Taille des boutons de carte du guidage (px) : la taille voulue (56 tablette, 48 téléphone) si la colonne tient dans
+ * la hauteur disponible entre le bandeau et la barre du bas, sinon plus petite, jamais sous `min` (44 px : cible
+ * tactile minimale des recommandations d'accessibilité WCAG 2.5.5 et Material Design 48 dp ramenée au plus serré).
+ * @param {{ available:number, count:number, gap:number, preferred:number, min?:number }} p
+ */
+export function mapButtonSize({ available, count, gap, preferred, min = 44 }) {
+  if (!isNum(available) || !(count > 0)) return preferred;
+  const fit = Math.floor((available - Math.max(0, gap) * (count - 1)) / count);
+  return Math.max(min, Math.min(preferred, fit));
+}
+
 function canReroute(state, now) {
   const cooled = state.lastRerouteAt === null || now - state.lastRerouteAt >= NAV.REROUTE_COOLDOWN_MS;
   return !state.rerouting && !state.rerouteBlocked && !state.arrived && cooled && !!state.lastFix;

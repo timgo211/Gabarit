@@ -430,3 +430,12 @@ test('vue d\'ensemble : marges réduites pour que le trajet tienne toujours à l
   assert.deepEqual(overviewPadding({ width: 0, height: 0 }, { top: 10, bottom: 10, left: 10, right: 10 }),
     { top: 0, bottom: 0, left: 0, right: 0 });
 });
+
+test('boutons de carte du guidage : taille voulue si la colonne tient, sinon réduite, jamais sous 44 px', async () => {
+  const { mapButtonSize } = await import('../src/lib/navigation.js');
+  assert.equal(mapButtonSize({ available: 400, count: 4, gap: 6, preferred: 48 }), 48);
+  assert.equal(mapButtonSize({ available: 200, count: 4, gap: 6, preferred: 48 }), 45);
+  assert.equal(mapButtonSize({ available: 120, count: 4, gap: 6, preferred: 48 }), 44, 'plancher tactile');
+  assert.equal(mapButtonSize({ available: 141, count: 2, gap: 8, preferred: 56 }), 56, 'grille 2 × 2 : 2 rangées');
+  assert.equal(mapButtonSize({ available: NaN, count: 4, gap: 6, preferred: 56 }), 56);
+});

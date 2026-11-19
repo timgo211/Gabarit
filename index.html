@@ -48,6 +48,12 @@
           <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
         </div>
         <div class="nav-foot">
+        <div class="nav-side">
+        <section id="nav-areas" class="nav-areas" aria-label="Prochaines aires" hidden>
+          <h2 class="nav-areas-title">Prochaines aires</h2>
+          <ol id="nav-areas-list" class="nav-areas-list"></ol>
+          <p id="nav-areas-empty" class="nav-areas-empty" hidden></p>
+        </section>
         <div class="nav-mapbtns" role="group" aria-label="Carte">
           <button type="button" id="btn-nav-overview" class="btn nav-mapbtn" aria-label="Vue d'ensemble du trajet restant">
             <span aria-hidden="true">⤢</span><span class="nav-mapbtn-text">Vue d'ensemble</span></button>
@@ -57,11 +63,7 @@
           <button type="button" id="btn-nav-areas" class="btn nav-mapbtn" aria-label="Prochaines aires" aria-pressed="false" aria-controls="nav-areas">
             <span aria-hidden="true">🅿</span><span class="nav-mapbtn-text">Aires</span></button>
         </div>
-        <section id="nav-areas" class="nav-areas" aria-label="Prochaines aires" hidden>
-          <h2 class="nav-areas-title">Prochaines aires</h2>
-          <ol id="nav-areas-list" class="nav-areas-list"></ol>
-          <p id="nav-areas-empty" class="nav-areas-empty" hidden></p>
-        </section>
+        </div>
         <div id="nav-road" class="nav-road" hidden></div>
         <div class="nav-bottom">
           <div id="nav-sim" class="nav-sim" hidden>

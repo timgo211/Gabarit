@@ -794,6 +794,73 @@ async function areasCheck(browser, base) {
   await ctx.close();
 }
 
+/** Recouvrements entre boutons de carte, bandeau, encart des aires, nom de la route et barre du bas du guidage. */
+async function footOverlaps(page) {
+  return page.evaluate(() => {
+    const vis = (n) => n && !n.hidden && n.getClientRects().length > 0;
+    const box = (n) => n.getBoundingClientRect();
+    const name = (n) => n.id || n.className.split(' ')[0];
+    const banner = [...document.querySelectorAll('#nav .nav-top > *')].filter(vis);
+    const buttons = [...document.querySelectorAll('#nav .nav-mapbtn')].filter(vis);
+    const areas = [document.querySelector('#nav-areas')].filter(vis);
+    const others = [document.querySelector('#nav-road'), document.querySelector('#nav .nav-bottom')].filter(vis);
+    const hit = (a, b) => {
+      const p = box(a); const q = box(b);
+      return p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5;
+    };
+    const out = [];
+    for (const a of [...buttons, ...areas]) {
+      for (const b of [...banner, ...others, ...(buttons.includes(a) ? areas : [])]) if (hit(a, b)) out.push(`${name(a)} × ${name(b)}`);
+      const r = box(a);
+      if (r.top < 0 || r.bottom > window.innerHeight + 0.5 || r.left < 0 || r.right > window.innerWidth + 0.5) {
+        out.push(`${name(a)} hors de l'écran (${Math.round(r.left)},${Math.round(r.top)} – ${Math.round(r.right)},${Math.round(r.bottom)})`);
+      }
+    }
+    const sizes = buttons.map((b) => Math.round(box(b).height));
+    return { out, sizes, areasHeight: areas.length ? Math.round(box(areas[0]).height) : 0 };
+  });
+}
+
+/**
+ * Boutons de carte (vue d'ensemble, recentrer, satellite, aires) et encart des aires : jamais sur le bandeau du haut
+ * (consigne longue) ni sur la barre du bas, encart ouvert ou fermé ; téléphone en portrait (360, 412 px), téléphone
+ * en paysage (760 × 360, 900 × 412) et tablette.
+ */
+async function footCheck(browser, base) {
+  const long = 'Prenez la sortie 34 en direction de Villefranche-sur-Saône, Bourg-en-Bresse, Mâcon-Centre, '
+    + 'Zone industrielle des Grandes Terres et Parc d’activités de la Plaine de l’Ain';
+  for (const [width, height] of [[360, 760], [412, 900], [760, 360], [900, 412], [1280, 800]]) {
+    const nav = fixture('ors-directions-nav.json');
+    const steps = nav.features[0].properties.segments[0].steps;
+    const first = steps.findIndex((st, i) => i > 0 && st.type !== 11);
+    steps[first] = { ...steps[first], instruction: long };
+    const line = nav.features[0].geometry.coordinates;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, directions: () => nav, overpass: () => fixture('overpass-aires.json'),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('#areas-list li', { timeout: 10000 });
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await drive(ctx, page, line, 40, 3);
+    const label = `${width}×${height}`;
+    const closed = await footOverlaps(page);
+    check(closed.out.length === 0, `${label} guidage, encart fermé : boutons hors du bandeau et de la barre du bas`, closed.out.join(' ; '));
+    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 44), `${label} : boutons de carte d'au moins 44 px`,
+      closed.sizes.join(', '));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-pied-ferme.png`) });
+    await page.click('#btn-nav-areas');
+    await drive(ctx, page, line, 40, 2);
+    const opened = await footOverlaps(page);
+    check(opened.out.length === 0, `${label} guidage, encart ouvert : aucun recouvrement bouton / bandeau / encart`, opened.out.join(' ; '));
+    check(opened.areasHeight >= 100, `${label} : encart des aires lisible`, `${opened.areasHeight} px`);
+    check((await page.textContent('#nav-instr')).includes('Villefranche'), `${label} : consigne longue affichée`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-pied-encart.png`) });
+    check(errors.length === 0, `${label} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -801,7 +868,7 @@ const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
-    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck };
+    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

@@ -52,7 +52,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas
+                                   #   | overview | press | areas | foot
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -91,7 +91,13 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
 - Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
   France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
-- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite) : actifs à toutes les vitesses, un seul
+- Pied du guidage (`layoutFoot`, `src/ui/navigation.js`) : boutons de carte et encart des aires ne recouvrent jamais
+  le bandeau ni la barre du bas. Le pied commence sous le bandeau quand ils se chevauchent en largeur (téléphone) ;
+  taille des boutons par `mapButtonSize` (56 tablette, 48 téléphone, plancher 44) ; encart à gauche de la colonne de
+  boutons, borné sous le bandeau, défilant ; paysage écran bas (≤ 500 px) : bandeau sur 52 % de la largeur, boutons
+  en grille 2 × 2 (icônes), encart à droite du bandeau. Vérifié par `node tools/ui-check.mjs foot` (360, 412 px,
+  760 × 360, 900 × 412, 1280 px, encart ouvert et fermé, consigne longue).
+- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite, Aires) : actifs à toutes les vitesses, un seul
   appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. Vue d'ensemble :
   marge de la carte remise à zéro et `overviewPadding` (MapLibre additionne la marge du suivi à celle de fitBounds et
   abandonne le cadrage s'il ne tient pas). data.geopf.fr est bloqué

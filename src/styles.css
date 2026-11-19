@@ -363,19 +363,27 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-reroute { justify-self: start; min-height: 64px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 
 /* Bas de l'écran : boutons de carte (à droite), nom de la route, barre du bas. */
+.nav { --mapbtn: 56px; }
+/* Le haut du pied (top) est posé par src/ui/navigation.js (layoutFoot) : sous le bandeau quand ils se chevauchent en
+   largeur (téléphone), sinon en haut de l'écran. Le contenu est calé en bas ; rien ne monte sur le bandeau. */
 .nav-foot {
-  position: absolute; left: 10px; right: 10px; bottom: 10px;
-  display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none;
+  position: absolute; left: 10px; right: 10px; bottom: 10px; top: 10px;
+  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; pointer-events: none;
   padding-bottom: env(safe-area-inset-bottom);
 }
-.nav-foot > * { pointer-events: auto; }
-.nav-mapbtns { align-self: flex-end; display: flex; flex-direction: column; gap: 8px; }
+.nav-foot > * { pointer-events: auto; flex-shrink: 0; }
+/* Encart des aires (à gauche) et boutons de carte (colonne à droite), côte à côte. */
+.nav-foot > .nav-side {
+  width: 100%; min-height: 0; flex: 0 1 auto; display: flex; align-items: flex-end; gap: 8px; pointer-events: none;
+}
+.nav-side > * { pointer-events: auto; }
+.nav-mapbtns { margin-left: auto; flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .nav-mapbtn {
-  min-height: 56px; min-width: 56px; padding: 0 14px; justify-content: flex-start;
+  height: var(--mapbtn); min-height: var(--mapbtn); min-width: var(--mapbtn); padding: 0 14px; justify-content: flex-start;
   background: var(--nav-card); color: var(--nav-card-fg); border-color: var(--nav-sep);
   box-shadow: 0 2px 10px rgba(0,0,0,.35);
 }
-.nav-mapbtn > span[aria-hidden] { font-size: 1.4rem; line-height: 1; }
+.nav-mapbtn > span[aria-hidden] { font-size: calc(var(--mapbtn) * .42); line-height: 1; }
 .nav-mapbtn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .nav-road {
   max-width: 100%; padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 1.1rem;
@@ -487,7 +495,8 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 
 /* Encart « Prochaines aires » du guidage : lisible d'un coup d'œil, chaque ligne ouvre la fiche. */
 .nav-areas {
-  width: 100%; max-width: 620px; align-self: flex-start; padding: 6px; border-radius: var(--radius);
+  flex: 1 1 auto; min-width: 0; max-width: 620px; align-self: flex-end; overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px; border-radius: var(--radius);
   background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 2px 12px rgba(0,0,0,.35);
 }
 .nav-areas-title { margin: 0 4px 4px; font-size: .85rem; font-weight: 700; opacity: .8; }
@@ -506,6 +515,16 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .nav-area-name { font-size: 1rem; }
   .nav-area-facts { gap: 8px; font-size: .9rem; }
   .area-avis .btn { font-size: .95rem; }
+}
+
+/* Téléphone en paysage (écran bas) : bandeau sur la moitié gauche, boutons de carte en grille 2 × 2 (icônes), encart
+   des aires à droite du bandeau (placé par layoutFoot) : rien ne se recouvre sur 360 px de haut. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .nav { --mapbtn: 48px; }
+  .nav-top { max-width: 52%; }
+  .nav-mapbtns { display: grid; grid-template-columns: repeat(2, var(--mapbtn)); }
+  .nav-mapbtn { padding: 0; justify-content: center; }
+  .nav-mapbtn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 
 /* Téléphone en portrait (≈ 360 à 412 px) : tout tient en largeur ; la tablette garde les règles ci-dessus. */
@@ -529,7 +548,9 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .nav-dist { font-size: 2rem; }
   .nav-instr { font-size: 1.1rem; }
   .nav-instr.long { font-size: .98rem; }
+  .nav { --mapbtn: 48px; }
   .nav-foot { left: 8px; right: 8px; bottom: 8px; gap: 6px; }
+  .nav-foot > .nav-side, .nav-mapbtns { gap: 6px; }
   .nav-bottom { padding: 6px; gap: 6px; }
   .nav-mapbtn { padding: 0; justify-content: center; }
   .nav-mapbtn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

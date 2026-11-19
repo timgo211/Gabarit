@@ -15,7 +15,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, NAV,
+  setNavigationAreas, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea } from '../lib/areas-route.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
@@ -30,6 +30,9 @@ const RECENTER_AFTER_MS = 15000;
 const RECENTER_MIN_KMH = NAV.OFF_ROUTE_MIN_SPEED * 3.6;
 const SIM_TICK_MS = 1000;
 const RELEASE_SCREEN_AFTER_ARRIVAL_MS = 120000;
+/** Encart des aires : hauteur sous laquelle on le met plutôt à droite du bandeau, et largeur minimale pour ça. */
+const AREAS_MIN_PX = 120;
+const AREAS_MIN_WIDTH_PX = 200;
 
 /**
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
@@ -67,6 +70,8 @@ export function createNavigation(ctx) {
     areas: $('#nav-areas'),
     areasList: $('#nav-areas-list'),
     areasEmpty: $('#nav-areas-empty'),
+    top: $('.nav-top'),
+    mapbtns: $('.nav-mapbtns'),
   };
   let s = null; // session de guidage en cours
 
@@ -130,6 +135,44 @@ export function createNavigation(ctx) {
     const offer = !!s && !s.gpsLost && !!view?.offRouteStopped && !view.rerouting && !view.rerouteBlocked;
     ui.reroute.hidden = !offer;
     ui.reroute.disabled = !view?.canRequestReroute;
+    layoutFoot(); // le bandeau a pu grandir (alerte, bouton)
+  }
+
+  /**
+   * Pied de l'écran de guidage : les boutons de carte et l'encart des aires ne recouvrent jamais le bandeau du haut
+   * ni la barre du bas. Le pied commence sous le bandeau quand ils se chevauchent en largeur (téléphone) ; la taille
+   * des boutons s'adapte à la hauteur restante (mapButtonSize) ; l'encart est borné sous le bandeau et défile s'il
+   * manque de place (paysage sur téléphone).
+   */
+  function layoutFoot() {
+    if (!s || root.hidden) return;
+    const r = root.getBoundingClientRect();
+    const t = ui.top.getBoundingClientRect();
+    const css = getComputedStyle(ui.foot);
+    const inset = parseFloat(css.right) || 0;
+    const gap = parseFloat(css.rowGap) || 0;
+    const preferred = parseFloat(getComputedStyle(root).getPropertyValue('--mapbtn')) || 56;
+    const btnWidth = Math.max(preferred, ui.mapbtns.offsetWidth);
+    const below = t.bottom - r.top + 8;
+    const colLeft = r.right - inset - btnWidth;
+    const top = t.right > colLeft - 4 ? below : inset;
+    ui.foot.style.top = `${Math.round(top)}px`;
+    const used = ui.bottom.offsetHeight + gap + (ui.road.hidden ? 0 : ui.road.offsetHeight + gap);
+    const side = ui.foot.clientHeight - (parseFloat(css.paddingBottom) || 0) - used;
+    const bcss = getComputedStyle(ui.mapbtns);
+    const columns = bcss.display === 'grid' ? bcss.gridTemplateColumns.split(' ').filter(Boolean).length : 1;
+    const rows = Math.ceil(ui.mapbtns.children.length / Math.max(1, columns));
+    const size = mapButtonSize({ available: side, count: rows, gap: parseFloat(bcss.rowGap) || 0, preferred });
+    ui.foot.style.setProperty('--mapbtn', `${size}px`);
+    // Encart : sous le bandeau ; si la place y manque (paysage, écran bas) et qu'il y en a à droite du bandeau, à
+    // droite du bandeau sur toute la hauteur.
+    const under = top === inset ? side - Math.max(0, below - inset) : side;
+    const colWidth = ui.mapbtns.offsetWidth;
+    const besideLeft = t.right - r.left - inset + 8;
+    const besideWidth = (r.width - 2 * inset) - colWidth - 8 - besideLeft;
+    const beside = under < AREAS_MIN_PX && besideWidth >= AREAS_MIN_WIDTH_PX;
+    ui.areas.style.marginLeft = beside ? `${Math.round(besideLeft)}px` : '';
+    ui.areas.style.maxHeight = `${Math.max(0, Math.floor(beside ? side : under))}px`;
   }
 
   /** Encart « Prochaines aires » : 3 lignes (nom, distance, heure d'arrivée, places PL), une ligne = un bouton. */
@@ -199,6 +242,7 @@ export function createNavigation(ctx) {
     ui.road.textContent = view.roadName ?? '';
     ui.road.hidden = !view.roadName;
     renderAreas(view);
+    layoutFoot();
     ctx.onView?.(view);
 
     // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
@@ -368,6 +412,7 @@ export function createNavigation(ctx) {
     renderFollow();
     ui.road.hidden = true;
     renderAreas(null);
+    requestAnimationFrame(layoutFoot);
     ctx.map.setLayer(s.layer);
     renderLayer();
     ui.stop.textContent = '■ Arrêter';
@@ -421,6 +466,7 @@ export function createNavigation(ctx) {
     ctx.onEnd?.(message);
   }
 
+  window.addEventListener('resize', () => layoutFoot());
   ui.stop.addEventListener('click', () => stop());
   ui.reroute.addEventListener('click', () => {
     if (!s) return;
@@ -436,6 +482,7 @@ export function createNavigation(ctx) {
     if (!s) return;
     s.areasOpen = !s.areasOpen;
     renderAreas(s.view);
+    layoutFoot();
     if (s.view && s.follow) render(s.view); // caméra recadrée au-dessus de l'encart
   });
   ui.areasList.addEventListener('click', (e) => {
