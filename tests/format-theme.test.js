@@ -68,3 +68,17 @@ test('euros et prix au litre', () => {
   assert.equal(formatPricePerLiter(2), '2,00');
   assert.equal(formatPricePerLiter(null), '');
 });
+
+test('valeur et unité séparées (unité écrite plus petite en guidage)', async () => {
+  const { splitUnit, isLongInstruction, LONG_INSTRUCTION_CHARS } = await import('../src/lib/format.js');
+  assert.deepEqual(splitUnit('110 km/h'), { value: '110', unit: 'km/h' });
+  assert.deepEqual(splitUnit('12,4 km'), { value: '12,4', unit: 'km' });
+  assert.deepEqual(splitUnit('850 m'), { value: '850', unit: 'm' });
+  assert.deepEqual(splitUnit('45 min'), { value: '45', unit: 'min' });
+  assert.deepEqual(splitUnit('2 h 05'), { value: '2 h 05', unit: '' });
+  assert.deepEqual(splitUnit('14:32'), { value: '14:32', unit: '' });
+  assert.deepEqual(splitUnit('—'), { value: '—', unit: '' });
+  assert.deepEqual(splitUnit(null), { value: '', unit: '' });
+  assert.equal(isLongInstruction('Tournez à droite'), false);
+  assert.equal(isLongInstruction('x'.repeat(LONG_INSTRUCTION_CHARS + 1)), true);
+});

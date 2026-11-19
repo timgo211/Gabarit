@@ -40,7 +40,7 @@
   **Reste pour après la phase 3 :** mes signalements en fichier à importer dans le Gabarit d'un ami (fusion sans doublons).
   **Satellite hors de France :** voir phase 7d.
 
-- [ ] **Phase 7b — Correctifs (retours du premier vrai trajet, sur téléphone)**
+- [x] **Phase 7b — Correctifs (retours du premier vrai trajet, sur téléphone)**
   Constatés sur un téléphone Android le 19/11 (captures d'écran) :
   1. **Format téléphone** : la page déborde en largeur (barre du haut, boutons Plan/Satellite, formulaire et fiches
      d'itinéraire coupés à gauche ou à droite). Tout doit tenir dans un téléphone en portrait (≈ 360 à 412 px de
@@ -57,6 +57,10 @@
      avec une position GPS imprécise ; hors d'une vraie sortie de route en roulant, l'itinéraire ne change jamais sans
      mon accord (proposition + bouton, à l'arrêt).
   Chaque correctif a son test (trace GPS simulée pour le 5).
+  Fait : mise en page téléphone sans débordement (vérifiée à 360, 412, 800 et 1280 px dans Chromium) ; valeurs du
+  guidage avec unité réduite et taille ajustée, consigne longue sur 5 lignes au plus ; photos IGN et tracés gardés au
+  changement de thème ; carte restaurée ou recréée après perte du contexte WebGL ; hors itinéraire seulement à
+  10 km/h ou plus avec une précision de 30 m ou mieux, sinon bouton « Recalculer d'ici » proposé à l'arrêt.
 
 - [ ] **Phase 7c — Confort du guidage**
   - Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».

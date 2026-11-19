@@ -97,3 +97,33 @@ export function satelliteView({ layer, center, navigating = false }) {
   if (!isInFrance(center)) return { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true };
   return { photos: true, message: '', button: true };
 }
+
+/**
+ * Changement de fond (thème jour / nuit) : MapLibre compare l'ancien et le nouveau style (setStyle en « diff ») et
+ * retire tout ce qui n'est pas dans le nouveau, sans émettre « style.load ». Cette fonction (option transformStyle de
+ * setStyle, MapLibre ≥ 3) recopie nos couches dans le nouveau style : `below` sous le premier libellé (photos IGN),
+ * `above` tout en haut (tracés), avec leurs sources et, si donnée, une nouvelle peinture (couleurs du thème).
+ * @param {{ sources?:object, layers?:object[] }|undefined} prev style sérialisé en cours
+ * @param {{ sources?:object, layers?:object[] }} next nouveau style
+ * @param {{ below?:string[], above?:string[], paint?:Object<string,object> }} opts
+ */
+export function carryOverlay(prev, next, { below = [], above = [], paint = {} } = {}) {
+  const prevLayers = Array.isArray(prev?.layers) ? prev.layers : [];
+  const ours = new Set([...below, ...above]);
+  const pick = (ids) => ids
+    .map((id) => prevLayers.find((l) => l.id === id))
+    .filter(Boolean)
+    .map((l) => (paint[l.id] ? { ...l, paint: { ...l.paint, ...paint[l.id] } } : l));
+  const lower = pick(below);
+  const upper = pick(above);
+  const layers = (Array.isArray(next?.layers) ? next.layers : []).filter((l) => !ours.has(l.id));
+  const sources = { ...(next?.sources ?? {}) };
+  for (const l of [...lower, ...upper]) {
+    if (l.source && !sources[l.source] && prev?.sources?.[l.source]) sources[l.source] = prev.sources[l.source];
+  }
+  let at = layers.findIndex((l) => l.type === 'symbol');
+  if (at < 0) at = layers.length;
+  layers.splice(at, 0, ...lower);
+  layers.push(...upper);
+  return { ...next, sources, layers };
+}

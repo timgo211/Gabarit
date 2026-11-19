@@ -88,3 +88,20 @@ export function formatPricePerLiter(price) {
   const s = frDecimal(price, 3);
   return s.endsWith('0') ? s.slice(0, -1) : s;
 }
+
+/**
+ * Sépare la valeur et l'unité d'un texte affiché (« 110 km/h » → { value: '110', unit: 'km/h' }), pour écrire l'unité
+ * plus petite. « 2 h 05 » et « 14:32 » restent entiers (unit vide).
+ */
+export function splitUnit(text) {
+  const s = String(text ?? '');
+  const m = /^(.*\d)\s(km\/h|km|m|min|L|€)$/.exec(s);
+  return m ? { value: m[1], unit: m[2] } : { value: s, unit: '' };
+}
+
+/** Au-delà (caractères), la consigne du bandeau de guidage est écrite plus petit (elle tient sur 3 lignes). */
+export const LONG_INSTRUCTION_CHARS = 48;
+
+export function isLongInstruction(text) {
+  return String(text ?? '').length > LONG_INSTRUCTION_CHARS;
+}
