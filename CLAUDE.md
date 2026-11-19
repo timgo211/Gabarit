@@ -3,6 +3,12 @@
 **But** : PWA perso de GPS poids lourd (inspirée de POIDZ), utilisée sur une tablette Android.
 Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages (racine de `main`). Budget 0 €.
 
+## Style des réponses (économie de tokens)
+- Messages du chat en mode caveman (skill `caveman` si disponible, sinon même style) : phrases courtes, pas de blabla,
+  pas de récapitulatif des étapes.
+- Ne changent pas : le code, les commentaires et sources citées, les textes de l'appli, les commits, les docs du dépôt.
+- Restent complets : le plan avant de coder et la liste « à vérifier sur la tablette » (phrases courtes, aucun point retiré).
+
 ## Structure
 - `index.html`, `manifest.webmanifest`, `sw.js` (service worker module), `icons/`
 - `src/lib/` : logique pure, sans DOM, testable sous Node (requêtes ORS, lecture des réponses, erreurs, profils, stockage)

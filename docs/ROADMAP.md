@@ -28,6 +28,34 @@
   conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
   (Open-Meteo). Vérifier chaque règle sur une source officielle avant de coder et la citer en commentaire.
 
+- [ ] **Phase 5b — ADR (matières dangereuses)**
+  Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D
+  ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul
+  si un tunnel est interdit à mon code et proposer un autre itinéraire. Rappel des interdictions de circulation propres
+  au transport ADR. ORS ne gère que `hazmat` oui/non : vérifier dans la doc ce qui est possible et l'écrire. Sources
+  officielles citées (accord ADR, arrêtés français).
+
+- [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
+  Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
+  pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
+  zones à faibles émissions ou vignettes, particularités ADR). Pendant le guidage : annonce vocale courte à l'approche
+  de la frontière, sans saisie. Fiches dans `data/pays/*.json`, avec la source officielle et la date de vérification
+  de chaque règle ; d'abord les pays voisins (BE, LU, DE, CH, IT, ES).
+
 - [ ] **Phase 6 — Parkings et POI**
   Aires et parkings PL via Overpass (OpenStreetMap), prochain parking pendant la navigation ; historique des trajets,
   statistiques, relevé PDF via impression.
+
+- [ ] **Phase 7 — Vue satellite**
+  Bouton de couche « Plan / Satellite », hors guidage et pendant la préparation du trajet (repérer l'entrée camion d'un
+  client ou d'un dépôt). France : photos aériennes de l'IGN (Géoplateforme `data.geopf.fr`, gratuites, sans clé,
+  attribution IGN). Hors de France : seulement une source gratuite dont les conditions d'utilisation le permettent,
+  vérifiées et citées ; sinon garder le plan. Petite phase, faisable plus tôt.
+
+- [ ] **Phase 8 — Partager avec des amis**
+  Avec le partage Android (Web Share API), sans serveur :
+  - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
+  - un lieu ou une position ponctuelle (lien carte) ;
+  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) ;
+  - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
+  Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
