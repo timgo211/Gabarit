@@ -70,3 +70,49 @@ export function classifyError({ status, body, offline = false, networkError = fa
 export function messageFor(kind) {
   return MESSAGES[kind] ?? MESSAGES.unknown;
 }
+
+/**
+ * Courte explication technique d'un échec, pour aider au diagnostic (jamais la clé).
+ * @param {{ kind?:string, status?:number, detail?:string }} err
+ * @param {string} [apiKey] masquée si le serveur la renvoyait dans son message
+ */
+export function formatDiagnostic(err, apiKey = '') {
+  let detail = String(err?.detail ?? '').replace(/\s+/g, ' ').trim();
+  if (apiKey && apiKey.length >= 8) detail = detail.split(apiKey).join('•••');
+  if (detail.length > 100) detail = `${detail.slice(0, 99)}…`;
+  if (typeof err?.status === 'number' && err.status > 0) return detail ? `HTTP ${err.status} : ${detail}` : `HTTP ${err.status}`;
+  if (err?.kind === ERROR_KINDS.NETWORK) return 'pas de réponse du serveur (réseau, ou requête bloquée par le navigateur)';
+  if (err?.kind === ERROR_KINDS.TIMEOUT) return 'délai dépassé';
+  if (err?.kind === ERROR_KINDS.OFFLINE) return 'appareil hors ligne';
+  return detail || 'raison inconnue';
+}
+
+/**
+ * Résultat du bouton « Tester » à partir des deux essais (itinéraire, recherche d'adresses).
+ * Chaque essai vaut { ok:true } ou { ok:false, kind, status?, detail? }.
+ * @returns {{ level:'ok'|'warn'|'err', saveKey:boolean, message:string }}
+ */
+export function summarizeKeyTest({ directions, geocode }, apiKey = '') {
+  const d = directions ?? { ok: false, kind: ERROR_KINDS.UNKNOWN };
+  const g = geocode ?? { ok: false, kind: ERROR_KINDS.UNKNOWN };
+  if (d.ok && g.ok) {
+    return { level: 'ok', saveKey: true, message: 'Clé valide ✔ : itinéraires et recherche d\'adresses fonctionnent.' };
+  }
+  if (d.ok) {
+    return { level: 'warn', saveKey: true, message: `Clé valide pour les itinéraires ✔. La recherche d'adresses a échoué (${formatDiagnostic(g, apiKey)}).` };
+  }
+  if (d.kind === ERROR_KINDS.QUOTA) {
+    return { level: 'warn', saveKey: true, message: 'Clé reconnue, mais quota dépassé pour aujourd\'hui.' };
+  }
+  if (g.ok) {
+    return { level: 'warn', saveKey: true, message: `Recherche d'adresses OK, mais les itinéraires ont échoué (${formatDiagnostic(d, apiKey)}).` };
+  }
+  if (d.kind === ERROR_KINDS.INVALID_KEY) {
+    return {
+      level: 'err',
+      saveKey: false,
+      message: `Clé refusée par HeiGIT (${formatDiagnostic(d, apiKey)}). Vérifie qu'elle est copiée en entier, sans espace, depuis account.heigit.org (Dashboard).`,
+    };
+  }
+  return { level: 'err', saveKey: false, message: `${messageFor(d.kind)} (${formatDiagnostic(d, apiKey)})` };
+}
