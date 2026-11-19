@@ -257,13 +257,26 @@ export function parseOfficialPosition(text) {
 function locate(row, map) {
   const p = position(row, map);
   if (p) return { pos: p };
-  return { reason: anyPosition(row, map) ? 'position hors de France' : 'position illisible' };
+  const text = positionText(row, map);
+  if (!text) return { reason: 'position absente', text };
+  return { reason: anyPosition(row, map) ? 'position hors de France' : 'position illisible', text };
+}
+
+/** Texte brut de la position d'une ligne (pour le journal) : cellule unique, ou « lat | lon », ou « X | Y ». */
+function positionText(row, map) {
+  const cells = (...ks) => ks.map((k) => String(row[k] ?? '').trim());
+  let parts = [];
+  if (map.coords !== undefined) parts = cells(map.coords);
+  if (map.lat !== undefined && map.lon !== undefined && parts.every((x) => !x)) parts = cells(map.lat, map.lon);
+  if (map.x !== undefined && map.y !== undefined && parts.every((x) => !x)) parts = cells(map.x, map.y);
+  return parts.some(Boolean) ? parts.join(' | ') : '';
 }
 
 /** Une position lisible, même hors de France ? (pour le journal) */
 function anyPosition(row, map) {
   if (map.coords !== undefined && parseOfficialPosition(row[map.coords])) return true;
-  if (map.lat !== undefined && map.lon !== undefined && number(row[map.lat]) !== null && number(row[map.lon]) !== null) return true;
+  if (map.lat !== undefined && map.lon !== undefined && ((number(row[map.lat]) !== null && number(row[map.lon]) !== null)
+    || parseOfficialPosition(`${String(row[map.lat] ?? '').trim()} ${String(row[map.lon] ?? '').trim()}`))) return true;
   return map.x !== undefined && map.y !== undefined && number(row[map.x]) !== null && number(row[map.y]) !== null;
 }
 
@@ -272,7 +285,8 @@ function position(row, map) {
     let lat = number(row[map.lat]);
     let lon = number(row[map.lon]);
     if (lat === null || lon === null) {
-      const p = parseCoordinates(`${row[map.lat]} ${row[map.lon]}`);
+      // Une colonne chacune, mais en DMS ou avec ° comme virgule décimale (« 46°01821 »).
+      const p = parseOfficialPosition(`${String(row[map.lat] ?? '').trim()} ${String(row[map.lon] ?? '').trim()}`);
       if (p) ({ lat, lon } = p);
     }
     if (lat !== null && lon !== null) {
@@ -323,10 +337,25 @@ export function splitRoad(text) {
   const raw = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!raw) return { road: null, direction: null };
   const [left, ...rest] = raw.split('/');
-  const direction = rest.join('/').trim() || null;
-  const m = /^(A|N|RN|RD|D|E|M)\s?(\d{1,4}[a-z]?)\b/i.exec(left.trim());
-  const road = m ? `${m[1].toUpperCase()}${m[2]}` : left.trim();
-  return { road: road ? road.slice(0, 30) : null, direction: direction ? direction.slice(0, 60) : null };
+  return { road: normalizeRoad(left), direction: cleanDirection(rest.join('/')) };
+}
+
+/** « A 150 » → « A150 », « A0016 » → « A16 », « N0058 » → « N58 » (numéros du réseau non concédé sur 4 chiffres). */
+export function normalizeRoad(text) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const m = /^(A|N|RN|RD|D|E|M)\s?0*(\d{1,4}[a-z]?)\b/i.exec(t);
+  return (m ? `${m[1].toUpperCase()}${m[2]}` : t).slice(0, 30);
+}
+
+/**
+ * Direction lisible, ou null : le réseau non concédé note le sens de circulation « + », « - » ou « + / - » (sens
+ * des points de repère, sans ville) ; ces signes ne disent rien au conducteur et ne sont pas affichés.
+ */
+export function cleanDirection(text) {
+  const t = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!t || /^[\s+\-−–/0-9.,]*$/.test(t)) return null;
+  return t.slice(0, 60);
 }
 
 /** Identifiant stable sans colonne d'identifiant : nom + route (les lignes peuvent changer d'ordre d'une année à l'autre). */
@@ -378,7 +407,8 @@ const count = (t) => {
  * @param {string[][]} rows
  * @param {{ network:string, prefix:string }} opts
  * @returns {{ headers:string[], headerRow:number, preamble:string[], map:object, areas:object[], skipped:number,
- *   reasons:Object<string,number> }}
+ *   reasons:Object<string,number>, unreadable:{ line:number, name:string, reason:string, text:string }[] }}
+ *   line : numéro de ligne du tableur (1 = première ligne)
  */
 export function rowsToAreas(rows, { network, prefix }) {
   const header = findHeader(rows);
@@ -392,13 +422,19 @@ export function rowsToAreas(rows, { network, prefix }) {
   const areas = [];
   const reasons = {};
   let skipped = 0;
+  const unreadable = [];
   const skip = (why) => { skipped += 1; reasons[why] = (reasons[why] ?? 0) + 1; };
   rows.slice(index + 1).forEach((row, k) => {
     if (!row.some(Boolean)) return;
     const { name, city } = splitName(row[map.name]);
     if (!name) { skip('nom absent'); return; }
-    const { pos, reason } = locate(row, map);
-    if (!pos) { skip(reason); return; }
+    const { pos, reason, text } = locate(row, map);
+    if (!pos) {
+      skip(reason);
+      // Texte brut gardé pour le journal de l'Action (format à reconnaître).
+      if (reason !== 'position absente') unreadable.push({ line: index + 2 + k, name, reason, text });
+      return;
+    }
     const free = map.freePlaces !== undefined ? count(row[map.freePlaces]) : null;
     const paid = map.paidPlaces !== undefined ? count(row[map.paidPlaces]) : null;
     const total = map.places !== undefined ? count(row[map.places]) : null;
@@ -425,13 +461,13 @@ export function rowsToAreas(rows, { network, prefix }) {
       secure: map.secure !== undefined ? yesNo(row[map.secure]) : null,
       services: map.services !== undefined ? servicesFromText(row[map.services]) : [],
       road: roadText.road,
-      direction: map.direction !== undefined ? clean(row[map.direction], 60) : roadText.direction,
+      direction: map.direction !== undefined ? cleanDirection(row[map.direction]) : roadText.direction,
       operator: map.operator !== undefined ? clean(row[map.operator], 60) : null,
       network,
     });
   });
   const preamble = rows.slice(0, index).map((r) => r.filter(Boolean).join(' | ')).filter(Boolean);
-  return { headers: rows[index], headerRow: index, preamble, map, areas, skipped, reasons };
+  return { headers: rows[index], headerRow: index, preamble, map, areas, skipped, reasons, unreadable };
 }
 
 // ───────── Fichier converti (data/aires-pl.json), lu par l'appli ─────────
@@ -462,7 +498,8 @@ export function parseOfficialData(json) {
       hgvOnly: true,
       fee: tri(a.fee), price: str(a.price, 60), secure: tri(a.secure), lit: null,
       services: Array.isArray(a.services) ? a.services.filter((s) => SERVICE_KEYS.has(s)) : [],
-      road: str(a.road, 30), direction: str(a.direction, 60), operator: str(a.operator, 60),
+      // Fichiers déjà convertis : « A0016 » et sens « + » / « - » corrigés aussi à la lecture.
+      road: normalizeRoad(str(a.road, 30)), direction: cleanDirection(str(a.direction, 60)), operator: str(a.operator, 60),
       network: str(a.network, 20),
     });
   }

@@ -128,6 +128,10 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
   FR, ligne 2 titres EN du règlement 885/2013) ; colonnes par références de cellule (cellules vides) ; nom
   « Nom :: CP :: Ville » (`splitName`), position « 46°01821, 6°11771 » (° = virgule décimale, `parseOfficialPosition`),
   route « A41 N / GENEVE » (`splitRoad`), places gratuites + payantes ; identifiant sans colonne d'id = nom + route.
+  Réseau non concédé (ods 2018) : sens « + » / « - » / « + / - » jamais affiché (`cleanDirection`), routes « A0016 »
+  → « A16 » (`normalizeRoad`), appliqués aussi à la lecture de `data/aires-pl.json` ; positions non lues listées
+  avec leur texte brut dans le journal de l'Action (`unreadable`), vides comptées à part (« position absente »).
+  `data/` : exclu de l'heuristique « longue chaîne » du test statique pour les identifiants « mot_mot_… ».
   xlsx et ods traités à part (l'un en échec : l'autre enregistré, ancienne copie gardée, avertissement) ; l'Action
   n'échoue que si les deux échouent. Fixture `official-sca-2025-*.xml` = lignes réelles lues par l'Action ;
   bison-fute.gouv.fr, transport.data.gouv.fr et overpass-api.de sont bloqués depuis le conteneur. Pas d'occupation en

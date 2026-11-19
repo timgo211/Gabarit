@@ -82,6 +82,11 @@ function convert(file, source) {
       console.log(`  aires lues : ${r.areas.length} ; lignes ignorées : ${r.skipped}`
         + `${r.skipped ? ` (${Object.entries(r.reasons).map(([why, n]) => `${why} : ${n}`).join(', ')})` : ''}`);
       for (const a of r.areas.slice(0, 3)) console.log(`  exemple : ${sample(a)}`);
+      // Positions non lues : texte brut, pour reconnaître leur format (40 au plus).
+      for (const u of r.unreadable.slice(0, 40)) {
+        console.log(`  ${u.reason}, ligne ${u.line} « ${u.name} » : « ${u.text} »`);
+      }
+      if (r.unreadable.length > 40) console.log(`  … et ${r.unreadable.length - 40} autres.`);
       areas.push(...r.areas);
     } catch (err) {
       errors.push(`feuille « ${sheet.name} » : ${err.message}`);

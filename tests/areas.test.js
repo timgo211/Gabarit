@@ -8,7 +8,7 @@ import {
 } from '../src/lib/areas-osm.js';
 import {
   parseOfficialData, parseSharedStrings, parseXlsxSheet, parseOdsContent, rowsToAreas, mapColumns, missingFields,
-  lambert93ToWgs84, decodeXml, OFFICIAL, parseOfficialPosition, splitName, splitRoad, HEADER_ROWS,
+  lambert93ToWgs84, decodeXml, OFFICIAL, parseOfficialPosition, splitName, splitRoad, HEADER_ROWS, cleanDirection, normalizeRoad,
 } from '../src/lib/areas-official.js';
 import {
   mergeAreas, placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, describeArea, describeNextArea, placesText,
@@ -191,6 +191,11 @@ test('titres en français seulement, lignes ignorées comptées par raison', () 
   ]);
   assert.equal(r.skipped, 3);
   assert.deepEqual(r.reasons, { 'position hors de France': 1, 'position illisible': 1, 'nom absent': 1 });
+  // Texte brut des positions non lues, pour le journal de l'Action.
+  assert.deepEqual(r.unreadable, [
+    { line: 5, name: 'Aire hors France', reason: 'position hors de France', text: '52°5, 13°4' },
+    { line: 6, name: 'Aire sans position', reason: 'position illisible', text: 'à préciser' },
+  ]);
   assert.equal(HEADER_ROWS, 5);
   // Titres au-delà de la 5ᵉ ligne : non trouvés, erreur claire.
   const late = [[], [], [], [], [], ['Nom', 'Latitude', 'Longitude']];
@@ -217,6 +222,33 @@ test('nom « Nom :: CP :: Ville » et route « A41 N / GENEVE »', () => {
   assert.deepEqual(splitRoad('A 150'), { road: 'A150', direction: null });
   assert.deepEqual(splitRoad('RN 7 / Lyon'), { road: 'RN7', direction: 'Lyon' });
   assert.deepEqual(splitRoad(''), { road: null, direction: null });
+});
+
+test('réseau non concédé : sens « + » / « - » non affiché, routes « A0016 » → « A16 »', () => {
+  for (const t of ['+', '-', '+ / -', ' - ', '5', '', null]) assert.equal(cleanDirection(t), null, String(t));
+  assert.equal(cleanDirection('GENEVE'), 'GENEVE');
+  assert.equal(cleanDirection('Lyon vers Chambéry'), 'Lyon vers Chambéry');
+  assert.equal(normalizeRoad('A0016'), 'A16');
+  assert.equal(normalizeRoad('N0058'), 'N58');
+  assert.equal(normalizeRoad('A 150'), 'A150');
+  assert.equal(normalizeRoad('RN 7'), 'RN7');
+  assert.equal(normalizeRoad('sens A4-RD30'), 'sens A4-RD30');
+  assert.deepEqual(splitRoad('A0016 / +'), { road: 'A16', direction: null });
+  const rows = [['Nom', 'Latitude', 'Longitude', 'Route', 'Sens'],
+    ['AIRE D\'OFFEKERQUE, Offekerque', '50.93234', '2.00319', 'A0016', '+'],
+    ['Aire de Badaroux', '44°537303', '3°538682', 'N0088', '-'],
+    ['Aire vide', '', '', 'N1', '+ / -'],
+    ['Aire texte', 'PR 12+300', 'côté droit', 'N2', '+']];
+  const r = rowsToAreas(rows, { network: 'non concédé', prefix: 'ANC' });
+  assert.deepEqual(r.areas.map((a) => [a.name, a.road, a.direction, a.lat, a.lon]), [
+    ['AIRE D\'OFFEKERQUE, Offekerque', 'A16', null, 50.93234, 2.00319],
+    ['Aire de Badaroux', 'N88', null, 44.537303, 3.538682],
+  ]);
+  assert.deepEqual(r.reasons, { 'position absente': 1, 'position illisible': 1 });
+  assert.deepEqual(r.unreadable, [{ line: 5, name: 'Aire texte', reason: 'position illisible', text: 'PR 12+300 | côté droit' }]);
+  // Données déjà converties (data/aires-pl.json sur main) : nettoyées à la lecture par l'appli.
+  const old = parseOfficialData({ areas: [{ id: 'off:ANC-x', name: 'Aire', lon: 2, lat: 50, road: 'A0016', direction: '+' }] });
+  assert.deepEqual([old.areas[0].road, old.areas[0].direction], ['A16', null]);
 });
 
 test('Lambert 93 : origine de la projection (700 000, 6 600 000) = 3° E, 46,5° N', () => {
