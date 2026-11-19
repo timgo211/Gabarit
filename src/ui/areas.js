@@ -227,7 +227,8 @@ export function createAreas(ctx) {
       ...fact('Places PL', placesText(a.hgvPlaces) ?? 'non renseigné'),
       ...fact('Services', servicesText(a.services) || 'non renseignés'),
       ...fact('Accès', [...statusBadges(a), a.price].filter(Boolean).join(' · ') || 'non renseigné'),
-      ...fact('Route', [a.road, a.direction].filter(Boolean).join(' · ')),
+      ...fact('Commune', a.city),
+      ...fact('Route', [a.road, a.direction ? `direction ${a.direction}` : null].filter(Boolean).join(' · ')),
       ...fact('Exploitant', a.operator),
     ]);
     $('#area-sources').textContent = `Sources : ${sourcesText(a)}.`;

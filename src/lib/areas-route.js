@@ -63,7 +63,9 @@ export function mergeAreas(osm = [], official = []) {
     if (o.price) host.price = o.price;
     if (o.secure !== null) host.secure = o.secure;
     for (const s of o.services) if (!host.services.includes(s)) host.services.push(s);
-    for (const k of ['road', 'direction', 'operator', 'network']) if (o[k] && !host[k]) host[k] = o[k];
+    for (const k of ['road', 'direction', 'operator', 'network', 'city', 'freePlaces', 'paidPlaces']) {
+      if (o[k] !== null && o[k] !== undefined && (host[k] === null || host[k] === undefined)) host[k] = o[k];
+    }
   }
   return out;
 }
@@ -209,6 +211,7 @@ export function statusBadges(a) {
   if (a.secure === true) out.push('Sécurisé');
   if (a.fee === true) out.push('Payant');
   else if (a.fee === false) out.push('Gratuit');
+  else if (a.freePlaces > 0 && a.paidPlaces > 0) out.push(`${a.freePlaces} gratuites, ${a.paidPlaces} payantes`);
   return out;
 }
 
