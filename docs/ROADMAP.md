@@ -22,12 +22,6 @@
   toucher un tracé ou sa fiche le sélectionne. Choix à l'arrêt uniquement : pendant le guidage rien ne change,
   le recalcul automatique garde les réglages de la variante choisie.
 
-- [ ] **Phase 3 — Mes signalements + Ma journée**
-  Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
-  saisie pendant le guidage, comme en phase 2 – R412-6-2) ; le type (pont bas, accès difficile, contrôle, parking,
-  danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients), tournée multi-arrêts,
-  arrêt ajouté en route.
-
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
   `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
@@ -67,6 +61,13 @@
   Avec le partage Android (Web Share API), sans serveur :
   - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
   - un lieu ou une position ponctuelle (lien carte) ;
-  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) ;
+  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) — seulement une fois la
+    phase 3 faite ;
   - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
   Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
+
+- [ ] **Phase 3 — Mes signalements + Ma journée** (reportée : à faire en dernier)
+  Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
+  saisie pendant le guidage, comme en phase 2 – R412-6-2) ; le type (pont bas, accès difficile, contrôle, parking,
+  danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients), tournée multi-arrêts,
+  arrêt ajouté en route.
