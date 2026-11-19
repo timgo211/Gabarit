@@ -79,6 +79,16 @@ export function isInFrance(lonlat) {
   return inPolygon([lon, lat], METROPOLE);
 }
 
+/** Vrai si le point [lon, lat] est en France métropolitaine (continent et Corse, même contour approximatif). */
+export function isInMetropole(lonlat) {
+  if (!Array.isArray(lonlat) || lonlat.length < 2) return false;
+  const [lon, lat] = lonlat;
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return false;
+  const [w, s, e, n] = BOXES[0];
+  if (lon >= w && lon <= e && lat >= s && lat <= n) return true;
+  return inPolygon([lon, lat], METROPOLE);
+}
+
 /** Couche mémorisée lisible, sinon le plan. */
 export function sanitizeMapLayer(x) {
   return MAP_LAYERS.includes(x) ? x : DEFAULT_MAP_LAYER;

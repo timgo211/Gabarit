@@ -47,6 +47,11 @@ Téléchargements. **Importer…** les restaure (par exemple sur une nouvelle ta
 - **Arrivée** : tape au moins 3 lettres, puis choisis une suggestion.
 - **Éviter péages / ferries**, puis **Calculer l'itinéraire** : la carte et le résumé s'affichent (distance, durée,
   heure d'arrivée, km à péage, gazole estimé).
+- **Réglementation** : chaque fiche d'itinéraire signale les ZFE interdites à ta vignette Crit'Air (Base nationale
+  des ZFE, mise à jour chaque lundi par l'onglet Actions) et les interdictions PL des week-ends et jours fériés
+  (plus de 7,5 t) ; **Éviter la ZFE** propose un itinéraire qui la contourne. En guidage : bandeau et voix, sans rien
+  à toucher. Situation du camion (concerné, article 4, véhicule spécialisé) dans le profil 🚚. La signalisation et
+  les arrêtés font foi.
 - **Mode nuit** : automatique de 20 h à 7 h, ou forcé dans Réglages.
 
 ## Pour le développement

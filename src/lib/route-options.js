@@ -262,6 +262,18 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
 export function guidanceParams(option, { start, end, avoidFerries = false }) {
   return {
     start, end, avoidFerries, avoidTolls: option.request.avoidTolls, preference: option.request.preference ?? null,
+    avoidPolygons: option.request.avoidPolygons ?? null, // « Sans ZFE » (phase 5)
+  };
+}
+
+/**
+ * Itinéraire « Sans ZFE » (phase 5) : mêmes réglages que l'itinéraire choisi, ZFE interdites évitées
+ * (options.avoid_polygons).
+ */
+export function noZfeOption(option, route, avoidPolygons, names) {
+  return {
+    key: 'nozfe', label: 'Sans ZFE', note: `Évite : ${names.join(', ')}.`, also: [], route,
+    request: { ...option.request, avoidPolygons },
   };
 }
 

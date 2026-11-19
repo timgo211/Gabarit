@@ -108,3 +108,11 @@ test('prix du gazole saisi : virgule ou point, vide = pas de prix', () => {
   assert.match(parseDieselPrice('abc').error, /nombre attendu/);
   assert.match(parseDieselPrice('18,5').error, /entre 0,50 et 5/);
 });
+
+test('phase 5 : alertes vocales réglementation activées par défaut, coupables', async () => {
+  const { emptyData, sanitizeData } = await import('../src/lib/store.js');
+  assert.equal(emptyData().settings.ruleVoice, true);
+  const d = emptyData();
+  assert.equal(sanitizeData({ ...d, settings: { ...d.settings, ruleVoice: false } }).settings.ruleVoice, false);
+  assert.equal(sanitizeData({ ...d, settings: {} }).settings.ruleVoice, true);
+});

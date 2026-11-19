@@ -14,7 +14,7 @@ function restrictionsText(v) {
   return parts.join(' · ');
 }
 
-function card(d, { checked, onSelect }) {
+function card(d, { checked, onSelect, rules }) {
   const facts = [d.distance, d.arrival, d.toll, d.fuel].filter(Boolean);
   return el('button', {
     type: 'button', class: 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
@@ -29,20 +29,45 @@ function card(d, { checked, onSelect }) {
     el('span', { class: 'route-card-facts', text: facts.join(' · ') }),
     d.delta ? el('span', { class: 'route-card-delta', text: d.delta }) : null,
     d.note ? el('span', { class: 'route-card-note', text: d.note }) : null,
+    rules?.short?.length ? el('span', { class: 'route-card-rules', text: `⚠ ${rules.short.join(' · ')}` }) : null,
   ]);
+}
+
+/**
+ * Réglementation de l'itinéraire choisi (phase 5) : une ligne par ZFE et par interdiction, lien vers l'arrêté (texte
+ * et adresse venant de data/zfe.json : textContent, adresse http(s) vérifiée par safeUrl), bouton « Éviter la ZFE ».
+ */
+function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid }) {
+  if (!rules) return [];
+  const items = rules.lines.map((l) => el('li', { class: l.level }, [
+    l.text,
+    l.url ? el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer', text: 'Arrêté' }) : null,
+  ]));
+  return [
+    items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,
+    canAvoid && rules.banned.length ? el('button', {
+      type: 'button', class: 'btn btn-avoid-zfe', disabled: !!avoidBusy, onclick: onAvoidZfe,
+      text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',
+    }) : null,
+    source ? el('p', { class: 'rules-source', text: source }) : null,
+  ].filter(Boolean);
 }
 
 /**
  * @param {HTMLElement} node bloc des fiches
  * @param {HTMLElement} notesNode bloc des notes (véhicule, avertissements), placé sous le bouton « Démarrer »
  * @param {{ choice:{ options:object[], failures:object[], selected:number, vehicle:object, toLabel?:string,
- *   avoidTolls?:boolean, avoidFerries?:boolean }, dieselPrice:number|null, now?:Date, onSelect:(i:number)=>void }} p
+ *   avoidTolls?:boolean, avoidFerries?:boolean }, dieselPrice:number|null, now?:Date, onSelect:(i:number)=>void,
+ *   rules?:object[]|null, rulesSource?:string, onAvoidZfe?:()=>void, avoidBusy?:boolean }} p
+ *   rules : réglementation de chaque itinéraire (routeRules, phase 5), dans l'ordre des options
  */
-export function renderRouteChoice(node, notesNode, { choice, dieselPrice, now = new Date(), onSelect }) {
+export function renderRouteChoice(node, notesNode, {
+  choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
+}) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
   const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now }), {
-    checked: i === selected, onSelect: () => onSelect(i),
+    checked: i === selected, onSelect: () => onSelect(i), rules: rules?.[i],
   }));
 
   const current = options[selected];
@@ -67,7 +92,10 @@ export function renderRouteChoice(node, notesNode, { choice, dieselPrice, now = 
     failures.length ? el('p', { class: 'route-failures', text: failures.map(failureText).join(' ') }) : null,
   ].filter(Boolean));
   node.hidden = false;
-  notesNode.replaceChildren(el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))));
+  notesNode.replaceChildren(
+    ...rulesBlock(rules?.[selected], { source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe }),
+    el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
+  );
   notesNode.hidden = false;
 }
 

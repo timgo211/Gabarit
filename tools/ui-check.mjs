@@ -5,7 +5,8 @@
 //
 // unpkg et les fonds de carte sont bloqués depuis le conteneur : MapLibre vient du paquet npm, les styles sont
 // minimaux (fond uni jour / nuit), les tuiles IGN sont une image rouge unie, ORS et Pelias répondent avec les
-// fixtures de tests/fixtures, Overpass avec tests/fixtures/overpass-aires.json (phase 9). Aucune vraie API n'est
+// fixtures de tests/fixtures, Overpass avec tests/fixtures/overpass-aires.json (phase 9), data/zfe.json avec une
+// ZFE de test (phase 5). Aucune vraie API n'est
 // appelée (toute autre requête externe est refusée).
 
 import { createServer } from 'node:http';
@@ -81,17 +82,32 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 
 /**
  * Ouvre l'appli. opts.directions(body) → JSON ORS ; opts.theme : 'day' | 'night' ;
- * opts.overpass(url) → JSON Overpass ou null (serveur en échec) ; opts.official : contenu de data/aires-pl.json.
+ * opts.overpass(url) → JSON Overpass ou null (serveur en échec) ; opts.official : contenu de data/aires-pl.json ;
+ * opts.zfe : contenu de data/zfe.json (aucune ZFE par défaut : les couleurs de la carte mesurées restent celles du
+ * fond) ; opts.now : heure de la tablette (ms).
  * Renvoie { page, ctx, stats, errors } (stats.tiles : tuiles IGN demandées ; stats.overpass : serveurs appelés).
  */
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
+  zfe = { zones: [], voies: [] }, now = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
     geolocation: { latitude: START[1], longitude: START[0], accuracy: 8 }, permissions: ['geolocation'],
-    serviceWorkers: 'block', locale: 'fr-FR',
+    serviceWorkers: 'block', locale: 'fr-FR', timezoneId: 'Europe/Paris',
   });
+  // Heure de la tablette (phase 5 : interdictions PL) : Date décalée, les minuteries restent réelles.
+  if (now) {
+    await ctx.addInitScript((target) => {
+      const Real = Date;
+      const off = target - Real.now();
+      class Shifted extends Real {
+        constructor(...a) { if (a.length) super(...a); else super(Real.now() + off); }
+        static now() { return Real.now() + off; }
+      }
+      window.Date = Shifted;
+    }, now);
+  }
   const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [] };
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -138,6 +154,7 @@ async function open(browser, base, {
     return route.abort();
   });
   if (official) await ctx.route(/\/data\/aires-pl\.json$/, (route) => route.fulfill({ json: official }));
+  if (zfe) await ctx.route(/\/data\/zfe\.json$/, (route) => route.fulfill({ json: zfe }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -861,6 +878,82 @@ async function footCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 5 : réglementation. Une ZFE de test (Crit'Air 3 et plus interdits) posée sur le milieu du trajet des fixtures,
+ * tablette réglée un samedi à 21 h 57 (interdiction PL à 22 h pendant le trajet) ; profil sans vignette (non classé).
+ * Fiches, notes, « Éviter la ZFE » (requête ORS avec avoid_polygons), puis guidage avec le GPS émulé : bandeau de
+ * réglementation dans sa case, sans recouvrir les boutons de carte ; 360, 412, 800 et 1280 px.
+ */
+async function rulesCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const [cx, cy] = line[Math.floor(line.length / 2)];
+  const d = 0.006;
+  const zfe = {
+    updated: '2026-03-26',
+    zones: [{
+      id: 'TEST-ZFE-001', name: 'Testville', start: '2025-01-01', end: null,
+      pl: { critair: 'V3', hours: '24/7' }, vul: { critair: 'V3', hours: '24/7' },
+      url: 'https://example.org/arrete-zfe.pdf',
+      polygons: [[[[cx - d, cy - d], [cx + d, cy - d], [cx + d, cy + d], [cx - d, cy + d], [cx - d, cy - d]]]],
+    }],
+    voies: [],
+  };
+  const now = new Date('2026-11-21T21:57:00+01:00').getTime(); // samedi 21 h 57 à Paris
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const avoid = [];
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, zfe, now, overpass: () => fixture('overpass-aires.json'),
+      directions: (body) => {
+        if (body.options?.avoid_polygons) avoid.push(body.options.avoid_polygons);
+        return nav;
+      },
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.route-card-rules', { timeout: 10000 });
+    const cardRules = await page.textContent('.route-card[aria-checked="true"] .route-card-rules');
+    check(/ZFE Testville interdite/.test(cardRules) && /Interdiction PL samedi 22 h/.test(cardRules),
+      `${width} px : fiche, ZFE interdite et interdiction PL`, cardRules);
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent, link: li.querySelector('a')?.href ?? '' })));
+    check(notes.some((n) => n.cls === 'warn' && /^ZFE Testville interdite : Crit'Air 3, 4, 5 et non classés interdits/.test(n.text)
+      && n.link === 'https://example.org/arrete-zfe.pdf'), `${width} px : note ZFE avec lien vers l'arrêté`, notes.map((n) => n.text).join(' | '));
+    check(notes.some((n) => n.cls === 'warn' && /Interdiction PL samedi 22 h → dimanche 22 h/.test(n.text)),
+      `${width} px : note interdiction samedi 22 h → dimanche 22 h`);
+    check(/Base nationale des ZFE.*ODbL.*copie du 26\/03\/2026/.test(await page.textContent('.rules-source')),
+      `${width} px : source et date des données ZFE`);
+    check(await page.isVisible('.btn-avoid-zfe'), `${width} px : bouton « Éviter la ZFE » à l'arrêt`);
+    await noHorizontalScroll(page, `${width} px fiches et réglementation`);
+    await page.locator('#route-notes').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-reglementation.png`) });
+
+    await page.click('.btn-avoid-zfe');
+    await page.waitForSelector('.route-card:has-text("Sans ZFE")', { timeout: 10000 });
+    check(avoid.length === 1 && avoid[0].type === 'MultiPolygon' && avoid[0].coordinates.length === 1,
+      `${width} px : « Éviter la ZFE » = une requête ORS avec avoid_polygons`, JSON.stringify(avoid[0] ?? null).slice(0, 80));
+    check((await page.textContent('.route-card[aria-checked="true"]')).includes('Sans ZFE'), `${width} px : itinéraire « Sans ZFE » choisi`);
+    check(/passe encore par : Testville/.test(await page.textContent('#message')),
+      `${width} px : prévient si l'itinéraire sans ZFE y passe encore`);
+    await noHorizontalScroll(page, `${width} px après « Éviter la ZFE »`);
+
+    // Guidage avec le GPS émulé (une position par seconde, vitesse fournie) : bandeau, aucune saisie.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await drive(ctx, page, line, 50, 4);
+    const rule = await page.textContent('#nav-rule');
+    check(await page.isVisible('#nav-rule') && /ZFE Testville dans [\d,]+ (km|m) : interdite à ce véhicule/.test(rule)
+      && /Interdiction PL dans \d+ min \(samedi 22 h\)/.test(rule), `${width} px : bandeau ZFE et interdiction en guidage`, rule);
+    check((await page.$$('#nav-rule button, #nav-rule input')).length === 0, `${width} px : bandeau sans bouton ni saisie`);
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${width} px : boutons de carte hors du bandeau de réglementation`, foot.out.join(' ; '));
+    await noHorizontalScroll(page, `${width} px guidage, réglementation`);
+    await page.screenshot({ path: join(SHOTS, `${width}-reglementation-guidage.png`) });
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -868,7 +961,7 @@ const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
-    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck };
+    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

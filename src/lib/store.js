@@ -50,6 +50,7 @@ export function emptyData() {
       mapLayer: DEFAULT_MAP_LAYER,
       arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
+      ruleVoice: true,
     },
   };
 }
@@ -98,6 +99,7 @@ export function sanitizeData(raw) {
       voiceRate: sanitizeVoiceRate(s.voiceRate),
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
       areaVoice: s.areaVoice === true, // annonce vocale des aires PL (phase 9), désactivée par défaut
+      ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE et interdictions PL (phase 5), activées par défaut
     },
   };
 }

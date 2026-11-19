@@ -37,6 +37,16 @@ test('éviter péages et ferries', () => {
   assert.deepEqual(req.body.options.avoid_features, ['tollways', 'ferries']);
 });
 
+test('zones à éviter (phase 5) : options.avoid_polygons en GeoJSON, rien si absent ou illisible', () => {
+  const zones = { type: 'MultiPolygon', coordinates: [[[[4.8, 45.7], [4.9, 45.7], [4.9, 45.8], [4.8, 45.7]]]], extra: 1 };
+  const req = buildDirectionsRequest({ start, end, vehicle: defaultVehicle(), avoidPolygons: zones });
+  assert.deepEqual(req.body.options.avoid_polygons, { type: 'MultiPolygon', coordinates: zones.coordinates });
+  assert.equal(req.body.options.vehicle_type, 'hgv');
+  assert.equal(buildDirectionsRequest({ start, end, vehicle: defaultVehicle() }).body.options.avoid_polygons, undefined);
+  assert.equal(buildDirectionsRequest({ start, end, vehicle: defaultVehicle(), avoidPolygons: { type: 'Point', coordinates: [1, 2] } })
+    .body.options.avoid_polygons, undefined);
+});
+
 test('restrictions vides ou absentes non envoyées, hazmat false omis', () => {
   const v = { ...defaultVehicle(), axleload: null, hazmat: false };
   const r = buildDirectionsRequest({ start, end, vehicle: v }).body.options.profile_params.restrictions;

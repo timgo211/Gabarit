@@ -28,7 +28,7 @@ function setStatus(node, text, ok) {
  *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void,
  *   getVoices:()=>SpeechSynthesisVoice[], onVoicesChanged:(cb)=>void, canDuckMedia:boolean,
  *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
- *   onAreaVoiceChange?:(on:boolean)=>void }} ctx
+ *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -40,6 +40,7 @@ export function createSettings(ctx) {
   const simStatus = $('#sim-status');
   const voiceEnabled = $('#voice-enabled');
   const areaVoice = $('#area-voice');
+  const ruleVoice = $('#rule-voice');
   const dieselInput = $('#diesel-price');
   const dieselStatus = $('#diesel-status');
   const voiceName = $('#voice-name');
@@ -85,6 +86,7 @@ export function createSettings(ctx) {
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
     voiceEnabled.checked = settings.voice;
     areaVoice.checked = settings.areaVoice;
+    ruleVoice.checked = settings.ruleVoice;
     fillVoices(settings.voiceName);
     voiceRate.value = String(settings.voiceRate);
     voiceVolume.value = String(settings.voiceVolume);
@@ -147,6 +149,7 @@ export function createSettings(ctx) {
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
   areaVoice.addEventListener('change', () => ctx.onAreaVoiceChange?.(areaVoice.checked));
+  ruleVoice.addEventListener('change', () => ctx.onRuleVoiceChange?.(ruleVoice.checked));
   $('#btn-voice-test').addEventListener('click', () => setStatus(voiceStatus, ctx.onTestVoice()));
   voiceName.addEventListener('change', () => ctx.onVoiceOptions(voiceOptions()));
   for (const input of [voiceRate, voiceVolume]) {
