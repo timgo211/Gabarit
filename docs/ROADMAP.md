@@ -88,6 +88,25 @@
   - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
     (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
 
+- [ ] **Phase 9 — Aires et parkings PL** (priorité : à faire maintenant ; reprend la partie parkings de la phase 6)
+  - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
+    (`amenity=parking` + `hgv=yes/designated`, `capacity:hgv`, services) d'OpenStreetMap via Overpass ; jeu officiel
+    des aires de stationnement PL du point d'accès national (Bison Futé, transféré sur transport.data.gouv.fr par
+    l'arrêté du 24 mars 2026), copié dans `data/` par une GitHub Action hebdomadaire s'il n'est pas lisible depuis le
+    navigateur. Doublons entre sources fusionnés.
+  - Au calcul : aires le long de l'itinéraire choisi, dans le bon sens de circulation quand c'est connu ; une seule
+    requête Overpass par calcul, résultat gardé sur l'appareil (jamais dans le cache du service worker).
+  - Avant de partir : liste des aires du trajet (km depuis le départ, heure d'arrivée estimée, places PL, services,
+    sécurisé / payant), repères sur la carte, toucher une aire = sa fiche.
+  - En guidage : encart « Prochaines aires » (les 3 suivantes : nom, distance, heure d'arrivée, places PL), mis à jour
+    à chaque position, ouvert ou fermé d'un seul appui, aucune saisie. Annonce vocale optionnelle (Réglages) vers
+    10 km avant une aire PL.
+  - Mon avis : à l'arrêt seulement (sous 10 km/h), sur la fiche d'une aire, 3 gros boutons « Plein »,
+    « Quelques places », « OK » + heure, gardés sur l'appareil, inclus dans l'export / import, affichés sur la fiche et
+    dans la liste (« Plein il y a 2 j, 21h »).
+  - Occupation en temps réel : vérifier s'il existe une source gratuite pour la France. **Pour plus tard (non codé) :**
+    Allemagne, places libres des aires d'autoroute publiées par Toll Collect / SID sur Mobilithek (DATEX II).
+
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
   `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
@@ -120,17 +139,17 @@
   livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
   `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
 
-- [ ] **Phase 9 — Infos route : limitations de vitesse et directions**
+- [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
   Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
   via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
   alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
   bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
   itinéraire pour ménager les quotas.
 
-- [ ] **Phase 6 — Parkings et POI**
-  Aires et parkings PL via Overpass (OpenStreetMap), prochain parking pendant la navigation ; historique des trajets,
-  statistiques, relevé PDF via impression. Notes perso sur les aires et parkings utilisés (sécurité, places, douches,
-  propreté…), affichées au prochain passage.
+- [ ] **Phase 6 — Historique et notes**
+  Historique des trajets, statistiques, relevé PDF via impression. Notes perso détaillées sur les aires et parkings
+  utilisés (sécurité, douches, propreté…), affichées au prochain passage, en plus de « Mon avis » de la phase 9.
+  (Aires et parkings PL, prochain parking en guidage : phase 9.)
 
 - [ ] **Phase 7d — Satellite hors de France**
   Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
