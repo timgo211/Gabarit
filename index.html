@@ -27,6 +27,39 @@
     <main class="map-wrap">
       <div id="map" class="map" role="application" aria-label="Carte"></div>
       <p id="map-fallback" class="map-fallback" hidden>Carte indisponible (hors ligne ?). Le calcul d'itinéraire reste possible avec le réseau.</p>
+
+      <div id="nav" class="nav" hidden>
+        <div class="nav-top">
+          <div class="nav-maneuver" aria-live="polite">
+            <div id="nav-icon" class="nav-icon"></div>
+            <div class="nav-maneuver-text">
+              <div id="nav-dist" class="nav-dist"></div>
+              <div id="nav-instr" class="nav-instr">Recherche du signal GPS…</div>
+            </div>
+          </div>
+          <div id="nav-then" class="nav-then" hidden></div>
+          <div id="nav-alert" class="nav-alert" role="status" hidden></div>
+        </div>
+        <div class="nav-bottom">
+          <div id="nav-sim" class="nav-sim" hidden>
+            <span class="nav-sim-badge">SIMULATION</span>
+            <button type="button" id="btn-sim-offroad" class="btn">↗ Sortir de la route</button>
+            <button type="button" id="btn-sim-speed" class="btn" aria-label="Vitesse simulée">50 km/h</button>
+          </div>
+          <dl class="nav-stats">
+            <div><dt>Reste</dt><dd id="nav-remaining">—</dd></div>
+            <div><dt>Temps</dt><dd id="nav-time">—</dd></div>
+            <div><dt>Arrivée</dt><dd id="nav-eta">—</dd></div>
+            <div><dt>Vitesse GPS</dt><dd id="nav-speed">—</dd></div>
+          </dl>
+          <p id="nav-screen" class="nav-screen" hidden>⚠ Écran non maintenu allumé (économie d'énergie ?)</p>
+          <div class="nav-buttons">
+            <button type="button" id="btn-nav-voice" class="btn" aria-pressed="true">🔊 Voix</button>
+            <button type="button" id="btn-nav-recenter" class="btn" hidden>◎ Recentrer</button>
+            <button type="button" id="btn-nav-stop" class="btn btn-danger">■ Arrêter</button>
+          </div>
+        </div>
+      </div>
     </main>
 
     <section class="panel" aria-label="Itinéraire">
@@ -57,6 +90,7 @@
 
       <div id="message" class="message" role="alert" hidden></div>
       <div id="summary" class="summary" aria-live="polite" hidden></div>
+      <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
     </section>
 
     <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>
@@ -96,6 +130,15 @@
       </section>
 
       <section class="card">
+        <h3>Guidage vocal</h3>
+        <label class="toggle"><input type="checkbox" id="voice-enabled"> Annonces vocales en français</label>
+        <div class="row">
+          <button type="button" id="btn-voice-test" class="btn">Tester la voix</button>
+        </div>
+        <p id="voice-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card">
         <h3>Mes données</h3>
         <p class="hint">Véhicules, lieux, signalements et trajets. Exporte régulièrement une sauvegarde.</p>
         <div class="row">
@@ -105,6 +148,22 @@
         </div>
         <p id="data-status" class="status" role="status"></p>
         <p id="persist-status" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h3>Test</h3>
+        <p class="hint">Fait avancer une fausse position GPS sur l'itinéraire calculé, avec le même guidage (voix, flèches,
+          zoom, recalcul, arrivée). À utiliser véhicule à l'arrêt. « Sortir de la route » lance un vrai recalcul, qui compte
+          dans le quota OpenRouteService.</p>
+        <div class="segmented segmented-row" role="radiogroup" aria-label="Vitesse simulée">
+          <label><input type="radio" name="sim-speed" value="30"> 30 km/h</label>
+          <label><input type="radio" name="sim-speed" value="50"> 50 km/h</label>
+          <label><input type="radio" name="sim-speed" value="90"> 90 km/h</label>
+        </div>
+        <div class="row">
+          <button type="button" id="btn-simulate" class="btn btn-primary btn-big">▶ Simuler le trajet</button>
+        </div>
+        <p id="sim-status" class="status" role="status"></p>
       </section>
     </div>
   </dialog>

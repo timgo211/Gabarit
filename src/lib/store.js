@@ -4,6 +4,7 @@
 
 import { normalizeVehicle, validateVehicle, defaultVehicle } from './vehicle.js';
 import { THEME_MODES } from './theme.js';
+import { isSimSpeed, SIM_DEFAULT_SPEED } from './nav-sim.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -19,7 +20,7 @@ export function emptyData() {
     places: [],
     reports: [],
     trips: [],
-    settings: { theme: 'auto', avoidTolls: false, avoidFerries: false },
+    settings: { theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED },
   };
 }
 
@@ -57,6 +58,8 @@ export function sanitizeData(raw) {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       avoidTolls: s.avoidTolls === true,
       avoidFerries: s.avoidFerries === true,
+      voice: s.voice !== false, // guidage vocal activé par défaut
+      simSpeed: isSimSpeed(s.simSpeed) ? s.simSpeed : SIM_DEFAULT_SPEED,
     },
   };
 }

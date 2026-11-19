@@ -1,11 +1,15 @@
 // Traduction des échecs ORS / Pelias / réseau en messages clairs pour la cabine. Logique pure.
 // Codes d'erreur ORS directions : 2003 paramètre invalide, 2004 distance trop grande,
 // 2009 itinéraire introuvable, 2010 point introuvable, 2099 inconnue.
+// Limites du service gratuit (https://openrouteservice.org/plans/ , FAQ HeiGIT) : quota du jour dépassé → HTTP 403,
+// limite par minute dépassée → HTTP 429. Un 403 peut donc venir d'une clé refusée OU du quota du jour.
 
 export const ERROR_KINDS = {
   NO_KEY: 'no-key',
   INVALID_KEY: 'invalid-key',
-  QUOTA: 'quota',
+  QUOTA: 'quota', // 429 : limite par minute
+  DAILY_QUOTA: 'daily-quota', // 403 dont le message parle de quota ou de limite
+  KEY_OR_QUOTA: 'key-or-quota', // 403 au message ambigu
   NO_ROUTE: 'no-route',
   POINT_NOT_FOUND: 'point-not-found',
   TOO_FAR: 'too-far',
@@ -20,7 +24,9 @@ export const ERROR_KINDS = {
 const MESSAGES = {
   'no-key': 'Aucune clé OpenRouteService. Ouvre Réglages pour la saisir.',
   'invalid-key': 'Clé OpenRouteService refusée. Vérifie-la dans Réglages (bouton « Tester »).',
-  quota: 'Quota OpenRouteService dépassé. Réessaie plus tard (le quota gratuit se renouvelle chaque jour).',
+  quota: 'Trop de demandes en une minute (limite OpenRouteService). Réessaie dans une minute.',
+  'daily-quota': 'Quota du jour atteint. Le quota gratuit OpenRouteService se renouvelle 24 h après la première demande : réessaie plus tard.',
+  'key-or-quota': 'Clé refusée ou quota du jour atteint. Vérifie la clé dans Réglages (bouton « Tester »), ou réessaie plus tard.',
   'no-route': "Aucun itinéraire autorisé pour ce gabarit. Essaie d'autoriser péages/ferries ou vérifie le profil véhicule.",
   'point-not-found': 'Départ ou arrivée trop loin d\'une route accessible. Choisis un point plus proche d\'une route.',
   'too-far': 'Trajet trop long pour le service gratuit. Découpe-le en étapes.',
@@ -43,6 +49,16 @@ function readBody(body) {
   return { code: null, text: String(body.message ?? '') };
 }
 
+/** Quota/limite cités → quota du jour ; clé clairement mise en cause → clé refusée ; sinon ambigu. */
+export function classify403(text) {
+  const t = String(text ?? '');
+  if (/quota|limit/i.test(t)) return ERROR_KINDS.DAILY_QUOTA;
+  if (/\b(invalid|unknown|wrong|incorrect)\b.{0,12}\b(api[\s_-]?)?key\b|\bkey\b.{0,12}\b(invalid|unknown)\b/i.test(t)) {
+    return ERROR_KINDS.INVALID_KEY;
+  }
+  return ERROR_KINDS.KEY_OR_QUOTA;
+}
+
 /**
  * @param {{ status?:number, body?:any, offline?:boolean, networkError?:boolean, timeout?:boolean, noKey?:boolean }} p
  * @returns {{ kind:string, message:string, detail:string }}
@@ -59,7 +75,8 @@ export function classifyError({ status, body, offline = false, networkError = fa
   if (code === 2010) return make(ERROR_KINDS.POINT_NOT_FOUND, text);
   if (code === 2004) return make(ERROR_KINDS.TOO_FAR, text);
 
-  if (status === 401 || status === 403) return make(ERROR_KINDS.INVALID_KEY, text);
+  if (status === 401) return make(ERROR_KINDS.INVALID_KEY, text);
+  if (status === 403) return make(classify403(text), text);
   if (status === 429) return make(ERROR_KINDS.QUOTA, text);
   if (status === 404) return make(ERROR_KINDS.NO_ROUTE, text);
   if (status === 400 || code === 2003) return make(ERROR_KINDS.BAD_REQUEST, text);
@@ -101,11 +118,21 @@ export function summarizeKeyTest({ directions, geocode }, apiKey = '') {
   if (d.ok) {
     return { level: 'warn', saveKey: true, message: `Clé valide pour les itinéraires ✔. La recherche d'adresses a échoué (${formatDiagnostic(g, apiKey)}).` };
   }
+  if (d.kind === ERROR_KINDS.DAILY_QUOTA) {
+    return { level: 'warn', saveKey: true, message: 'Clé reconnue, mais quota du jour atteint : réessaie plus tard.' };
+  }
   if (d.kind === ERROR_KINDS.QUOTA) {
-    return { level: 'warn', saveKey: true, message: 'Clé reconnue, mais quota dépassé pour aujourd\'hui.' };
+    return { level: 'warn', saveKey: true, message: 'Clé reconnue, mais trop de demandes en une minute : réessaie dans une minute.' };
   }
   if (g.ok) {
     return { level: 'warn', saveKey: true, message: `Recherche d'adresses OK, mais les itinéraires ont échoué (${formatDiagnostic(d, apiKey)}).` };
+  }
+  if (d.kind === ERROR_KINDS.KEY_OR_QUOTA) {
+    return {
+      level: 'err',
+      saveKey: false,
+      message: `Clé refusée ou quota du jour atteint (${formatDiagnostic(d, apiKey)}). Vérifie la clé (copiée en entier, sans espace, depuis account.heigit.org), ou réessaie plus tard.`,
+    };
   }
   if (d.kind === ERROR_KINDS.INVALID_KEY) {
     return {

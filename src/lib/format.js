@@ -13,6 +13,19 @@ export function formatDistance(meters) {
   return `${Math.round(km)} km`;
 }
 
+/** Distance du guidage : arrondie à 10 m sous 1 km (affichage moins agité), sinon comme formatDistance. */
+export function formatNavDistance(meters) {
+  if (typeof meters !== 'number' || !Number.isFinite(meters) || meters < 0) return '—';
+  if (meters < 995) return `${Math.round(meters / 10) * 10} m`;
+  return formatDistance(Math.max(1000, meters));
+}
+
+/** Vitesse « 87 km/h » depuis des km/h. */
+export function formatSpeed(kmh) {
+  if (typeof kmh !== 'number' || !Number.isFinite(kmh) || kmh < 0) return '—';
+  return `${Math.round(kmh)} km/h`;
+}
+
 /** 2700 → « 45 min » ; 7500 → « 2 h 05 ». */
 export function formatDuration(seconds) {
   if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) return '—';

@@ -13,15 +13,35 @@ test('point introuvable (2010)', () => {
   assert.equal(classifyError({ status: 404, body: fixture('ors-error-2010.json') }).kind, 'point-not-found');
 });
 
-test('clé invalide (401 / 403)', () => {
-  assert.equal(classifyError({ status: 403, body: fixture('ors-error-key.json') }).kind, 'invalid-key');
+test('clé invalide (401, ou 403 qui met clairement la clé en cause)', () => {
   assert.equal(classifyError({ status: 401, body: '' }).kind, 'invalid-key');
+  const e = classifyError({ status: 403, body: { error: 'Invalid API key' } });
+  assert.equal(e.kind, 'invalid-key');
+  assert.match(e.message, /^Clé OpenRouteService refusée/);
 });
 
-test('quota dépassé (429)', () => {
+test('403 dont le message parle du quota ou de la limite → « Quota du jour atteint »', () => {
+  const e = classifyError({ status: 403, body: fixture('ors-error-403-quota.json') });
+  assert.equal(e.kind, 'daily-quota');
+  assert.match(e.message, /^Quota du jour atteint/);
+  for (const text of ['Daily quota reached', 'Rate limit exceeded', 'Limit exceeded for this key']) {
+    assert.equal(classifyError({ status: 403, body: { error: text } }).kind, 'daily-quota', text);
+  }
+  assert.equal(classifyError({ status: 403, body: { error: { code: 0, message: 'Quota exceeded' } } }).kind, 'daily-quota');
+});
+
+test('403 au message ambigu → « Clé refusée ou quota du jour atteint »', () => {
+  const e = classifyError({ status: 403, body: fixture('ors-error-key.json') }); // « Access to this API has been disallowed »
+  assert.equal(e.kind, 'key-or-quota');
+  assert.match(e.message, /^Clé refusée ou quota du jour atteint/);
+  assert.equal(classifyError({ status: 403, body: '' }).kind, 'key-or-quota');
+  assert.equal(classifyError({ status: 403 }).kind, 'key-or-quota');
+});
+
+test('limite par minute (429)', () => {
   const e = classifyError({ status: 429, body: fixture('ors-error-quota.json') });
   assert.equal(e.kind, 'quota');
-  assert.match(e.message, /Quota/);
+  assert.match(e.message, /une minute/);
 });
 
 test('hors ligne, réseau, délai, clé absente, serveur', () => {
@@ -62,12 +82,28 @@ test('bouton Tester : itinéraires OK, recherche en échec → clé gardée, ave
   assert.match(r.message, /HTTP 500/);
 });
 
-test('bouton Tester : clé refusée → non enregistrée, code HTTP affiché', () => {
-  const bad = { ok: false, kind: 'invalid-key', status: 403, detail: 'Access to this API has been disallowed' };
+test('bouton Tester : 403 ambigu → non enregistrée, « Clé refusée ou quota du jour atteint »', () => {
+  const bad = { ok: false, kind: 'key-or-quota', status: 403, detail: 'Access to this API has been disallowed' };
   const r = summarizeKeyTest({ directions: bad, geocode: bad }, 'CLE-FACTICE');
   assert.equal(r.level, 'err');
   assert.equal(r.saveKey, false);
-  assert.match(r.message, /HTTP 403/);
+  assert.match(r.message, /^Clé refusée ou quota du jour atteint \(HTTP 403/);
+});
+
+test('bouton Tester : quota du jour atteint → clé gardée', () => {
+  const q = { ok: false, kind: 'daily-quota', status: 403, detail: 'Quota exceeded' };
+  const r = summarizeKeyTest({ directions: q, geocode: q });
+  assert.equal(r.level, 'warn');
+  assert.equal(r.saveKey, true);
+  assert.match(r.message, /quota du jour atteint/);
+});
+
+test('bouton Tester : clé refusée → non enregistrée, code HTTP affiché', () => {
+  const bad = { ok: false, kind: 'invalid-key', status: 401, detail: 'Access to this API has been disallowed' };
+  const r = summarizeKeyTest({ directions: bad, geocode: bad }, 'CLE-FACTICE');
+  assert.equal(r.level, 'err');
+  assert.equal(r.saveKey, false);
+  assert.match(r.message, /HTTP 401/);
   assert.doesNotMatch(r.message, /CLE-FACTICE/);
 });
 

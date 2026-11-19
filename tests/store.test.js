@@ -62,3 +62,15 @@ test('clé vide → supprimée', () => {
   s.setApiKey('');
   assert.equal(s.getApiKey(), '');
 });
+
+test('réglages du guidage : voix activée et vitesse de simulation 50 km/h par défaut', () => {
+  const d = emptyData();
+  assert.equal(d.settings.voice, true);
+  assert.equal(d.settings.simSpeed, 50);
+  const back = importData(exportData({ ...d, settings: { ...d.settings, voice: false, simSpeed: 90 } }));
+  assert.equal(back.settings.voice, false);
+  assert.equal(back.settings.simSpeed, 90);
+  const odd = importData(JSON.stringify({ vehicles: d.vehicles, settings: { voice: 'non', simSpeed: 70 } }));
+  assert.equal(odd.settings.voice, true, 'seul false coupe la voix');
+  assert.equal(odd.settings.simSpeed, 50, 'vitesse hors liste ignorée');
+});

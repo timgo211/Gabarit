@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDistance, formatDuration, formatArrival, formatLiters } from '../src/lib/format.js';
+import { formatDistance, formatDuration, formatArrival, formatLiters, formatNavDistance, formatSpeed } from '../src/lib/format.js';
 import { resolveTheme } from '../src/lib/theme.js';
 
 test('distances', () => {
@@ -32,4 +32,14 @@ test('thème auto : nuit de 20 h à 7 h', () => {
   assert.equal(resolveTheme('auto', new Date(2026, 0, 1, 7)), 'day');
   assert.equal(resolveTheme('night', new Date(2026, 0, 1, 12)), 'night');
   assert.equal(resolveTheme('day', new Date(2026, 0, 1, 23)), 'day');
+});
+
+test('distance du guidage et vitesse', () => {
+  assert.equal(formatNavDistance(487), '490 m');
+  assert.equal(formatNavDistance(3), '0 m');
+  assert.equal(formatNavDistance(996), '1,0 km');
+  assert.equal(formatNavDistance(1480), '1,5 km');
+  assert.equal(formatNavDistance(-1), '—');
+  assert.equal(formatSpeed(87.6), '88 km/h');
+  assert.equal(formatSpeed(null), '—');
 });

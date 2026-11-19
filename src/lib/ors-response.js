@@ -59,7 +59,8 @@ export class NoRouteError extends Error {
 
 /**
  * @returns {{ distance:number, duration:number, coordinates:number[][], bbox:number[]|null,
- *   tollDistance:number|null, steps:{instruction:string,distance:number,duration:number}[], warnings:string[] }}
+ *   tollDistance:number|null, warnings:string[],
+ *   steps:{instruction:string,distance:number,duration:number,type:number|null,name:string,exitNumber:number|null,wayPoints:number[]|null}[] }}
  *   distance en m, duration en s.
  */
 export function parseDirections(json) {
@@ -72,10 +73,17 @@ export function parseDirections(json) {
   const steps = [];
   for (const seg of props.segments ?? []) {
     for (const st of seg.steps ?? []) {
+      const wp = st.way_points;
       steps.push({
         instruction: st.instruction ?? '',
         distance: st.distance ?? 0,
         duration: st.duration ?? 0,
+        // Type de manœuvre ORS (0 à 13, voir nav-guidance.js), rue suivante, numéro de sortie de rond-point,
+        // indices [début, fin] dans la géométrie (way_points, globaux sur tout l'itinéraire).
+        type: Number.isInteger(st.type) ? st.type : null,
+        name: typeof st.name === 'string' && st.name !== '-' ? st.name : '',
+        exitNumber: Number.isInteger(st.exit_number) ? st.exit_number : null,
+        wayPoints: Array.isArray(wp) && wp.length === 2 && wp.every(Number.isInteger) ? [wp[0], wp[1]] : null,
       });
     }
   }

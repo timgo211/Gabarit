@@ -6,8 +6,13 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 ## Structure
 - `index.html`, `manifest.webmanifest`, `sw.js` (service worker module), `icons/`
 - `src/lib/` : logique pure, sans DOM, testable sous Node (requêtes ORS, lecture des réponses, erreurs, profils, stockage)
+  - guidage : `nav-geo.js` (cap, projection sur le tracé), `nav-guidance.js` (manœuvres, paliers d'annonce, phrases,
+    pictos, voix fr), `navigation.js` (moteur : `updateNavigation(state, fix)` → `{ state, view, events }`, seuils dans `NAV`),
+    `nav-sim.js` (fausse position GPS pour la simulation)
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
-- `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc)
+  - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
+- `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
+  `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources`)
 - `docs/ROADMAP.md` : phases 1 à 6 ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
@@ -25,6 +30,15 @@ node --test
 - Interface et messages en français, pensés pour la cabine (gros boutons, contraste, mode nuit).
 - Toute modif de fichier mis en cache → incrémenter `VERSION` dans `sw.js` et ajouter le fichier à `APP_FILES`.
 - Nouvelle logique → dans `src/lib/` avec ses tests ; règles réglementaires citées en commentaire avec la source officielle.
+- Guidage : toute position (GPS réel ou simulation) passe par `updateNavigation` ; l'UI ne prend aucune décision.
+  Tester un comportement de guidage = une trace de positions simulées dans `tests/navigation.test.js` ou `nav-sim.test.js`.
+- Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
+- ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
+  Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.
+- Chrome n'autorise la voix qu'après une action de l'utilisateur : première phrase dans le geste « Démarrer ».
+- Doc à jour : giscience.github.io et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ; lire la doc ORS
+  sur raw.githubusercontent.com (GIScience/openrouteservice, dossier `docs/`), MDN sur raw.githubusercontent.com/mdn/content,
+  MapLibre dans le paquet npm (`registry.npmjs.org`).
 
 ## Interdits
 - Jamais de clé API dans le code, les tests, les fixtures, les commits ou les logs (clé saisie dans Réglages, localStorage).

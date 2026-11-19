@@ -237,3 +237,102 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 
 /* MapLibre : contrôles plus gros pour le doigt */
 .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+
+/* ───────── Guidage ───────── */
+:root {
+  --nav-bg: #0f1720;
+  --nav-fg: #ffffff;
+  --nav-accent: #ffb000;
+  --nav-card: rgba(255, 255, 255, .96);
+  --nav-card-fg: #0b0f14;
+  --nav-alert-bg: #b3261e;
+  --nav-alert-fg: #ffffff;
+}
+:root[data-theme="night"] {
+  --nav-bg: #05080b;
+  --nav-card: rgba(15, 23, 32, .96);
+  --nav-card-fg: #f2f4f7;
+  --nav-alert-bg: #ff6b5e;
+  --nav-alert-fg: #0b0f14;
+}
+
+.btn-start { margin-top: 12px; }
+
+/* Plein écran carte : plus de formulaire ni de menus pendant le guidage (aucune saisie en roulant). */
+.app.navigating {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr auto;
+  grid-template-areas: "map" "foot";
+}
+.app.navigating .topbar, .app.navigating .panel { display: none; }
+.app.navigating .maplibregl-ctrl-top-right { display: none; }
+.app.navigating ~ .update-banner { display: none; }
+
+.nav { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+.nav > * { pointer-events: auto; }
+.nav-top {
+  position: absolute; top: 10px; left: 10px; right: 10px; max-width: 620px;
+  display: grid; gap: 6px;
+  padding-top: env(safe-area-inset-top);
+}
+.nav-maneuver {
+  display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 10px;
+  background: var(--nav-bg); color: var(--nav-fg); border-radius: var(--radius);
+  box-shadow: 0 6px 20px rgba(0,0,0,.45);
+}
+.nav-icon { flex: 0 0 auto; width: 92px; height: 92px; color: var(--nav-accent); }
+.nav-icon svg { width: 100%; height: 100%; display: block; }
+.ico-stroke { fill: none; stroke: currentColor; stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
+.ico-fill { fill: currentColor; }
+.ico-text { fill: currentColor; font: 800 30px system-ui, sans-serif; }
+.nav-maneuver-text { min-width: 0; }
+.nav-dist { font-size: 2.6rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.nav-instr { font-size: 1.3rem; font-weight: 600; line-height: 1.25; }
+.nav-then {
+  justify-self: start; padding: 8px 14px; border-radius: var(--radius);
+  background: var(--nav-card); color: var(--nav-card-fg); font-weight: 700; font-size: 1.05rem;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.nav-alert {
+  padding: 10px 14px; border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;
+  background: var(--nav-alert-bg); color: var(--nav-alert-fg); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+
+.nav-bottom {
+  position: absolute; left: 10px; right: 10px; bottom: 10px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding: 8px; border-radius: var(--radius);
+  background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 -2px 16px rgba(0,0,0,.35);
+}
+.nav-stats { display: flex; flex: 1 1 380px; gap: 6px; margin: 0; }
+.nav-stats div { flex: 1 1 0; min-width: 0; padding: 2px 6px; }
+.nav-stats dt { font-size: .75rem; opacity: .8; white-space: nowrap; }
+.nav-stats dd { margin: 0; font-size: 1.35rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nav-buttons { display: flex; gap: 8px; flex: 0 1 auto; margin-left: auto; }
+.nav-buttons .btn { min-height: 64px; font-size: 1.1rem; }
+.nav-screen { order: 3; flex: 1 1 100%; margin: 0; font-weight: 700; color: var(--warn); }
+.nav-sim { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nav-sim-badge {
+  padding: 4px 10px; border-radius: 999px; font-weight: 800; letter-spacing: .05em;
+  background: var(--accent); color: var(--accent-fg);
+}
+
+/* Repère du véhicule */
+.me-marker { width: 48px; height: 48px; }
+.me-marker svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.me-halo { fill: rgba(11, 87, 208, .18); stroke: #ffffff; stroke-width: 2; }
+.me-arrow { fill: #0b57d0; stroke: #ffffff; stroke-width: 3; stroke-linejoin: round; }
+.me-dot { fill: #0b57d0; stroke: #ffffff; stroke-width: 3; display: none; }
+.me-marker.no-heading .me-arrow { display: none; }
+.me-marker.no-heading .me-dot { display: inline; }
+:root[data-theme="night"] .me-arrow, :root[data-theme="night"] .me-dot { fill: #ffb000; stroke: #000000; }
+
+.segmented-row { grid-template-columns: repeat(3, 1fr); }
+
+@media (max-width: 600px) {
+  .nav-icon { width: 72px; height: 72px; }
+  .nav-dist { font-size: 2.1rem; }
+  .nav-instr { font-size: 1.1rem; }
+  .nav-buttons { flex: 1 1 100%; }
+  .nav-buttons .btn { flex: 1 1 0; padding: 0 8px; }
+}

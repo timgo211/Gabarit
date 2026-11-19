@@ -11,7 +11,26 @@ test('lecture d\'une réponse ORS complète', () => {
   assert.deepEqual(r.bbox, [4.8357, 45.7578, 4.8752, 45.7801]);
   assert.equal(r.steps.length, 3);
   assert.match(r.steps[1].instruction, /A7/);
+  assert.deepEqual(r.steps[1], {
+    instruction: 'Tourner à droite sur A7', distance: 3500.4, duration: 360.5,
+    type: 1, name: 'A7', exitNumber: null, wayPoints: [2, 5],
+  });
+  assert.equal(r.steps[2].name, '', 'nom « - » d\'ORS ignoré');
   assert.deepEqual(r.warnings, ['There may be restrictions on some roads']);
+});
+
+test('étapes de guidage : type, rond-point, way_points', () => {
+  const r = parseDirections(fixture('ors-directions-nav.json'));
+  assert.deepEqual(r.steps.map((s) => s.type), [11, 1, 7, 0, 1, 10]);
+  assert.equal(r.steps[2].exitNumber, 2);
+  assert.equal(r.steps[2].name, 'Avenue des Frères Lumière');
+  assert.deepEqual(r.steps[5].wayPoints, [33, 33]);
+  const bad = fixture('ors-directions-nav.json');
+  bad.features[0].properties.segments[0].steps[1].way_points = [1];
+  bad.features[0].properties.segments[0].steps[1].type = 'x';
+  const p = parseDirections(bad);
+  assert.equal(p.steps[1].wayPoints, null);
+  assert.equal(p.steps[1].type, null);
 });
 
 test('km à péage depuis summary (value = 1)', () => {

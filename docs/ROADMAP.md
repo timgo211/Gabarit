@@ -6,9 +6,12 @@
   autocomplétion, itinéraire `driving-hgv` avec éviter péages/ferries, résumé (distance, durée, arrivée, km à péage),
   messages d'erreur clairs, bandeau « la signalisation fait foi », PWA installable.
 
-- [ ] **Phase 2 — Navigation guidée**
+- [x] **Phase 2 — Navigation guidée**
   Suivi GPS, carte inclinée orientée route, zoom selon la vitesse, voix en français (Web Speech API),
   recalcul hors itinéraire, écran maintenu allumé (Wake Lock).
+  En plus : annonces camion (≈ 1,5 km / 500 m / 120 m à 90 km/h), arrivée à 50 m, pas de recalcul à moins de 150 m
+  de la destination, demi-tour annoncé prudemment une fois, simulation de trajet (Réglages › Test),
+  403 « Quota du jour atteint » / « Clé refusée ou quota du jour atteint ».
 
 - [ ] **Phase 3 — Mes signalements + Ma journée**
   Signalement perso en 2 touches (pont bas, accès difficile, contrôle, parking, danger, note) avec alerte vocale
