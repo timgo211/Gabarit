@@ -48,12 +48,21 @@
           <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
         </div>
         <div class="nav-foot">
+        <div class="nav-side">
+        <section id="nav-areas" class="nav-areas" aria-label="Prochaines aires" hidden>
+          <h2 class="nav-areas-title">Prochaines aires</h2>
+          <ol id="nav-areas-list" class="nav-areas-list"></ol>
+          <p id="nav-areas-empty" class="nav-areas-empty" hidden></p>
+        </section>
         <div class="nav-mapbtns" role="group" aria-label="Carte">
           <button type="button" id="btn-nav-overview" class="btn nav-mapbtn" aria-label="Vue d'ensemble du trajet restant">
             <span aria-hidden="true">⤢</span><span class="nav-mapbtn-text">Vue d'ensemble</span></button>
           <button type="button" id="btn-nav-recenter" class="btn nav-mapbtn" aria-label="Recentrer sur le camion">
             <span aria-hidden="true">◎</span><span class="nav-mapbtn-text">Recentrer</span></button>
           <button type="button" id="btn-nav-layer" class="btn nav-mapbtn" aria-label="Passer en vue satellite"><span aria-hidden="true">🛰</span><span class="nav-mapbtn-text">Satellite</span></button>
+          <button type="button" id="btn-nav-areas" class="btn nav-mapbtn" aria-label="Prochaines aires" aria-pressed="false" aria-controls="nav-areas">
+            <span aria-hidden="true">🅿</span><span class="nav-mapbtn-text">Aires</span></button>
+        </div>
         </div>
         <div id="nav-road" class="nav-road" hidden></div>
         <div class="nav-bottom">
@@ -108,6 +117,13 @@
       <div id="summary" class="summary" aria-live="polite" hidden></div>
       <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
       <div id="route-notes" class="route-notes" hidden></div>
+      <section id="areas" class="areas" aria-label="Aires du trajet" hidden>
+        <h2 class="areas-title">Aires du trajet <span id="areas-count" class="areas-count"></span></h2>
+        <p id="areas-status" class="hint" role="status"></p>
+        <ol id="areas-list" class="areas-list"></ol>
+        <p class="hint areas-credit">Aires : © contributeurs OpenStreetMap (ODbL) et Bison Futé (Licence Ouverte). La
+          signalisation et le règlement de l'aire font foi.</p>
+      </section>
     </section>
 
     <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>
@@ -167,6 +183,7 @@
         <div class="row">
           <button type="button" id="btn-voice-test" class="btn">Tester</button>
         </div>
+        <label class="toggle"><input type="checkbox" id="area-voice"> Annoncer les aires PL (vers 10 km avant)</label>
         <p id="voice-status" class="status" role="status"></p>
         <p id="voice-music" class="hint"></p>
       </section>
@@ -196,7 +213,7 @@
 
       <section class="card">
         <h3>Mes données</h3>
-        <p class="hint">Véhicules, lieux, signalements et trajets. Exporte régulièrement une sauvegarde.</p>
+        <p class="hint">Véhicules, lieux, signalements, avis sur les aires et trajets. Exporte régulièrement une sauvegarde.</p>
         <div class="row">
           <button type="button" id="btn-export" class="btn">Exporter (JSON)</button>
           <label class="btn" for="import-file">Importer…</label>
@@ -261,6 +278,32 @@
       </section>
       <p id="share-status" class="status" role="status"></p>
       <p id="share-link" class="share-link" hidden></p>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-area" class="dialog" aria-labelledby="area-title">
+    <div class="dialog-head">
+      <h2 id="area-title">Aire</h2>
+      <button type="button" class="btn btn-icon" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dialog-body">
+      <section class="card">
+        <p id="area-kind" class="area-kind"></p>
+        <p id="area-other" class="area-other" hidden>Autre sens ? Cette aire est de l'autre côté de la route : vérifie
+          sur place qu'elle est accessible dans ton sens.</p>
+        <dl id="area-facts" class="area-facts"></dl>
+        <p id="area-sources" class="hint"></p>
+      </section>
+      <section class="card">
+        <h3>Mon avis</h3>
+        <p id="area-last" class="area-last"></p>
+        <div class="area-avis" role="group" aria-label="Mon avis sur les places PL">
+          <button type="button" class="btn btn-big avis-full" data-avis="full">Plein</button>
+          <button type="button" class="btn btn-big avis-some" data-avis="some">Quelques places</button>
+          <button type="button" class="btn btn-big avis-ok" data-avis="ok">OK</button>
+        </div>
+        <p id="area-avis-hint" class="hint"></p>
+      </section>
     </div>
   </dialog>
 

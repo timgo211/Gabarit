@@ -12,6 +12,7 @@ import {
   firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName,
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
+import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -124,14 +125,26 @@ function uturnCheck(prepared) {
   return i >= 0 && prepared.maneuvers[i].type === STEP_TYPES.UTURN ? i : -1;
 }
 
+/** Aires (phase 9) placées sur l'itinéraire du guidage ; aucune si la liste n'est pas encore arrivée. */
+function placeAreas(pool, route) {
+  return Array.isArray(pool) && pool.length ? placeAlongRoute(pool, route) : [];
+}
+
 /**
  * Démarre le guidage.
  * @param {object} route itinéraire lu par parseDirections
- * @param {{ destination?:number[]|null, now?:number }} opts destination choisie [lon, lat] (peut être hors route)
+ * @param {{ destination?:number[]|null, now?:number, areas?:object[]|null, announceAreas?:boolean }} opts
+ *   destination choisie [lon, lat] (peut être hors route) ; areas : aires trouvées au calcul (phase 9, mergeAreas) ;
+ *   announceAreas : annonce vocale vers 10 km avant une aire (réglage, désactivé par défaut)
  */
-export function startNavigation(route, { destination = null, now = 0 } = {}) {
+export function startNavigation(route, { destination = null, now = 0, areas = null, announceAreas = false } = {}) {
   return {
     route: prepareRoute(route),
+    source: route,
+    areaPool: Array.isArray(areas) ? areas : [],
+    areas: placeAreas(areas, route),
+    areasAnnounced: {},
+    announceAreas: announceAreas === true,
     destination: Array.isArray(destination) && destination.every(isNum) ? destination : null,
     segIndex: null,
     along: 0,
@@ -160,7 +173,7 @@ export function startNavigation(route, { destination = null, now = 0 } = {}) {
  */
 export function updateNavigation(state, fix) {
   if (!fix || !isNum(fix.lon) || !isNum(fix.lat)) return { state, view: null, events: [] };
-  const s = { ...state, announced: { ...state.announced } };
+  const s = { ...state, announced: { ...state.announced }, areasAnnounced: { ...(state.areasAnnounced ?? {}) } };
   const events = [];
   const { line, maneuvers } = s.route;
   const p = [fix.lon, fix.lat];
@@ -255,6 +268,15 @@ export function updateNavigation(state, fix) {
     }
   }
 
+  // Aires (phase 9) : annonce optionnelle vers 10 km, une fois par aire, dans le sens de circulation seulement.
+  if (s.announceAreas && !s.arrived && onRoute && !s.rerouting) {
+    const a = areaToAnnounce(s.areas, loc.along, s.areasAnnounced);
+    if (a) {
+      s.areasAnnounced[a.area.id] = true;
+      events.push({ type: 'speak', text: announceAreaText(a.area, a.distance) });
+    }
+  }
+
   const view = {
     position: onRoute ? loc.point : p,
     rawPosition: p,
@@ -277,6 +299,8 @@ export function updateNavigation(state, fix) {
     canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
+    /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
+    nextAreas: s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al)),
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -338,6 +362,18 @@ export function overviewPadding(size, wanted, minFree = 0.3) {
   return { top, bottom, left, right };
 }
 
+/**
+ * Taille des boutons de carte du guidage (px) : la taille voulue (56 tablette, 48 téléphone) si la colonne tient dans
+ * la hauteur disponible entre le bandeau et la barre du bas, sinon plus petite, jamais sous `min` (44 px : cible
+ * tactile minimale des recommandations d'accessibilité WCAG 2.5.5 et Material Design 48 dp ramenée au plus serré).
+ * @param {{ available:number, count:number, gap:number, preferred:number, min?:number }} p
+ */
+export function mapButtonSize({ available, count, gap, preferred, min = 44 }) {
+  if (!isNum(available) || !(count > 0)) return preferred;
+  const fit = Math.floor((available - Math.max(0, gap) * (count - 1)) / count);
+  return Math.max(min, Math.min(preferred, fit));
+}
+
 function canReroute(state, now) {
   const cooled = state.lastRerouteAt === null || now - state.lastRerouteAt >= NAV.REROUTE_COOLDOWN_MS;
   return !state.rerouting && !state.rerouteBlocked && !state.arrived && cooled && !!state.lastFix;
@@ -359,11 +395,23 @@ export function gpsLost(state, now) {
   return isNum(now) && isNum(ref) && now - ref > NAV.GPS_LOST_MS;
 }
 
-/** Nouvel itinéraire reçu après un recalcul. */
+/**
+ * Aires arrivées après le début du guidage (requête Overpass plus lente que « Démarrer »), ou mises à jour.
+ * Les aires déjà annoncées ne le sont pas une seconde fois.
+ */
+export function setNavigationAreas(state, areas) {
+  if (!state) return state;
+  const pool = Array.isArray(areas) ? areas : [];
+  return { ...state, areaPool: pool, areas: placeAreas(pool, state.source) };
+}
+
+/** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
 export function rerouteDone(state, route) {
   const s = {
     ...state,
     route: prepareRoute(route),
+    source: route,
+    areas: placeAreas(state.areaPool, route),
     segIndex: null,
     along: 0,
     announced: {},

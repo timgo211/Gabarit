@@ -1,4 +1,5 @@
-// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal (voix, vitesse, volume), couleur de la flèche,
+// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal (voix, vitesse, volume, annonce des aires PL),
+// couleur de la flèche,
 // prix du gazole, export/import des données, simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
@@ -26,7 +27,8 @@ function setStatus(node, text, ok) {
  *   onVoiceChange:(on:boolean)=>void, onTestVoice:()=>string, onSimSpeedChange:(kmh:number)=>void,
  *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void,
  *   getVoices:()=>SpeechSynthesisVoice[], onVoicesChanged:(cb)=>void, canDuckMedia:boolean,
- *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void }} ctx
+ *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
+ *   onAreaVoiceChange?:(on:boolean)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -37,6 +39,7 @@ export function createSettings(ctx) {
   const voiceStatus = $('#voice-status');
   const simStatus = $('#sim-status');
   const voiceEnabled = $('#voice-enabled');
+  const areaVoice = $('#area-voice');
   const dieselInput = $('#diesel-price');
   const dieselStatus = $('#diesel-status');
   const voiceName = $('#voice-name');
@@ -81,6 +84,7 @@ export function createSettings(ctx) {
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
     voiceEnabled.checked = settings.voice;
+    areaVoice.checked = settings.areaVoice;
     fillVoices(settings.voiceName);
     voiceRate.value = String(settings.voiceRate);
     voiceVolume.value = String(settings.voiceVolume);
@@ -142,6 +146,7 @@ export function createSettings(ctx) {
   }
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
+  areaVoice.addEventListener('change', () => ctx.onAreaVoiceChange?.(areaVoice.checked));
   $('#btn-voice-test').addEventListener('click', () => setStatus(voiceStatus, ctx.onTestVoice()));
   voiceName.addEventListener('change', () => ctx.onVoiceOptions(voiceOptions()));
   for (const input of [voiceRate, voiceVolume]) {

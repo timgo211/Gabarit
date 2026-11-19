@@ -23,15 +23,23 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
+  - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
+    officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
+    placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
+  - `areas.js` (aires du trajet : requête Overpass, liste, repères HTML sur la carte, fiche et « Mon avis »)
   - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
     vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
   `ors-directions-alternatives.json` = 3 itinéraires, `ors-variant-*.json` = variantes, Recommandé et Plus court identiques)
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
+- `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
+  dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
+- fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
+  (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods)
 - `docs/ROADMAP.md` : feuille de route ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
@@ -44,12 +52,13 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press
+                                   #   | overview | press | areas | foot
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
-un appui long. Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
+émulé). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -82,7 +91,13 @@ un appui long. Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
 - Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
   France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
-- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite) : actifs à toutes les vitesses, un seul
+- Pied du guidage (`layoutFoot`, `src/ui/navigation.js`) : boutons de carte et encart des aires ne recouvrent jamais
+  le bandeau ni la barre du bas. Le pied commence sous le bandeau quand ils se chevauchent en largeur (téléphone) ;
+  taille des boutons par `mapButtonSize` (56 tablette, 48 téléphone, plancher 44) ; encart à gauche de la colonne de
+  boutons, borné sous le bandeau, défilant ; paysage écran bas (≤ 500 px) : bandeau sur 52 % de la largeur, boutons
+  en grille 2 × 2 (icônes), encart à droite du bandeau. Vérifié par `node tools/ui-check.mjs foot` (360, 412 px,
+  760 × 360, 900 × 412, 1280 px, encart ouvert et fermé, consigne longue).
+- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite, Aires) : actifs à toutes les vitesses, un seul
   appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. Vue d'ensemble :
   marge de la carte remise à zéro et `overviewPadding` (MapLibre additionne la marge du suivi à celle de fitBounds et
   abandonne le cadrage s'il ne tient pas). data.geopf.fr est bloqué
@@ -96,6 +111,20 @@ un appui long. Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
 - Coordonnées saisies (départ / arrivée) : proposées sans appel Pelias ; appui long et coordonnées ne lancent jamais
   de calcul. Toute saisie dans un champ oublie le point choisi (et le repère de l'appui long) ; la liste de
   suggestions est remplacée dès la frappe (`suggestionPlan`), jamais d'ancienne suggestion à toucher.
+- Aires PL (phase 9) : une seule requête Overpass par calcul, pour tous les itinéraires proposés (`combineRoutes` :
+  A, B à l'envers, C ; tracé simplifié ≤ 400 points, écart ajouté au rayon) ; rayons 400 m (aires de repos / de
+  service) et 800 m (parkings `hgv=yes/designated` ou `capacity:hgv`) ; `OVERPASS_ENDPOINTS` : overpass-api.de puis
+  overpass.private.coffee (échec ou 30 s) avant « Aires indisponibles » ; résultat dans `localStorage`
+  (`gabarit.areasCache`, 5 trajets, 7 jours), jamais dans le cache du service worker (POST ignoré). Changer
+  d'itinéraire ou recalculer en route : aires replacées sans requête. Aire de repos / service / officielle à plus de
+  25 m à gauche du tracé : gardée en gris « autre sens ? », hors des « Prochaines aires » et sans annonce (on roule à
+  droite, R412-9) ; parking PL : des deux sens. Doublons OSM / officiel fusionnés à 300 m (places, prix, sécurité
+  officiels). Guidage : `view.nextAreas` (3, une aire dépassée de moins de 500 m reste), annonce une fois sous 10 km
+  (pas sous 2 km) si `settings.areaVoice` ; encart ouvert / fermé d'un appui, ligne = fiche ; « Mon avis » (Plein,
+  Quelques places, OK) sous 10 km/h en guidage (`canReport`), `data.areaReports` exporté, retrouvé par identifiant
+  ou à 150 m. Jeu officiel : Bison Futé, Licence Ouverte ; tableurs non lisibles par le navigateur → Action ;
+  bison-fute.gouv.fr, transport.data.gouv.fr et overpass-api.de sont bloqués depuis le conteneur. Pas d'occupation en
+  temps réel gratuite en France (Allemagne : SID / Mobilithek, pour plus tard).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
