@@ -38,8 +38,46 @@
   Le profil véhicule et la clé ne sont jamais partagés ; un lien reçu est validé et affiché en texte brut.
   Pas de position en direct (il faudrait un serveur).
   **Reste pour après la phase 3 :** mes signalements en fichier à importer dans le Gabarit d'un ami (fusion sans doublons).
-  **Idée pour plus tard :** vue satellite hors de France avec les orthophotos ouvertes nationales — Belgique (NGI /
-  régions), Espagne (PNOA, IGN España), Suisse (swisstopo SWISSIMAGE) — après vérification de leurs conditions.
+  **Satellite hors de France :** voir phase 7d.
+
+- [ ] **Phase 7b — Correctifs (retours du premier vrai trajet, sur téléphone)**
+  Constatés sur un téléphone Android le 19/11 (captures d'écran) :
+  1. **Format téléphone** : la page déborde en largeur (barre du haut, boutons Plan/Satellite, formulaire et fiches
+     d'itinéraire coupés à gauche ou à droite). Tout doit tenir dans un téléphone en portrait (≈ 360 à 412 px de
+     large), sans défilement horizontal ; l'affichage tablette reste le même.
+  2. **Texte qui sort des cases pendant le guidage** (« 89 km/ » coupé dans la barre du bas, longues consignes dans le
+     bandeau du haut) : tailles adaptées, retour à la ligne ou réduction automatique.
+  3. **Satellite en mode nuit** : bouton « Satellite » actif mais carte plan sombre affichée (en France, vers Metz).
+     Les photos doivent s'afficher quel que soit le thème.
+  4. **Carte vide au retour de l'arrière-plan** pendant le guidage (fond uni, plus de routes). Restaurer la carte au
+     retour sans perdre le guidage (probable perte du contexte WebGL : `webglcontextlost` / `webglcontextrestored`,
+     `visibilitychange`, sinon recréer la carte).
+  5. **Itinéraire changé sans bouger** : à l'arrêt sur une aire (0 km/h), le guidage est passé de 138 km à 159 km
+     (autre itinéraire, autre consigne). Règles : aucun recalcul « hors itinéraire » en dessous d'environ 10 km/h ni
+     avec une position GPS imprécise ; hors d'une vraie sortie de route en roulant, l'itinéraire ne change jamais sans
+     mon accord (proposition + bouton, à l'arrêt).
+  Chaque correctif a son test (trace GPS simulée pour le 5).
+
+- [ ] **Phase 7c — Confort du guidage**
+  - Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
+  - Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
+    phase 2b), choix en un toucher.
+  - Bouton Plan / Satellite aussi pendant le guidage (un toucher).
+  - Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
+  - Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
+  - Encart avec le nom de la route sur laquelle je roule (étape ORS en cours), en bas de la carte.
+  - Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
+  - Personnalisation : flèche (couleur, forme, icône camion) ; voix (choix parmi les voix françaises installées,
+    vitesse, volume, bouton « Tester »).
+  - Musique pendant les consignes : baisser ou couper le média en cours si le navigateur le permet (Audio Session API
+    ou autre moyen, à vérifier dans Chrome Android) ; sinon, l'expliquer dans Réglages.
+  - Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
+    créer sa clé gratuite, la coller dans Réglages).
+
+- [ ] **Phase 8 — Destinations et étapes**
+  Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Destination par appui long sur la
+  carte ou par coordonnées GPS (décimal et degrés-minutes-secondes). Avec des étapes, `alternative_routes` n'est pas
+  possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la tournée multi-arrêts de la phase 3.)
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
@@ -57,7 +95,8 @@
   ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul
   si un tunnel est interdit à mon code et proposer un autre itinéraire. Rappel des interdictions de circulation propres
   au transport ADR. ORS ne gère que `hazmat` oui/non : vérifier dans la doc ce qui est possible et l'écrire. Sources
-  officielles citées (accord ADR, arrêtés français).
+  officielles citées (accord ADR, arrêtés français). Classe ADR (1 à 9) et numéro ONU facultatif dans le profil,
+  pour distinguer les règles qui en dépendent.
 
 - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
   Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
@@ -66,12 +105,40 @@
   de la frontière, sans saisie. Fiches dans `data/pays/*.json`, avec la source officielle et la date de vérification
   de chaque règle ; d'abord les pays voisins (BE, LU, DE, CH, IT, ES).
 
+- [ ] **Phase 5d — Accès : tranches horaires et desserte locale**
+  Interdictions PL par tranches horaires (tags OpenStreetMap conditionnels, par exemple `hgv:conditional`) : vérifier
+  si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
+  livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
+  `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
+
+- [ ] **Phase 9 — Infos route : limitations de vitesse et directions**
+  Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
+  via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
+  alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
+  bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
+  itinéraire pour ménager les quotas.
+
 - [ ] **Phase 6 — Parkings et POI**
   Aires et parkings PL via Overpass (OpenStreetMap), prochain parking pendant la navigation ; historique des trajets,
-  statistiques, relevé PDF via impression.
+  statistiques, relevé PDF via impression. Notes perso sur les aires et parkings utilisés (sécurité, places, douches,
+  propreté…), affichées au prochain passage.
+
+- [ ] **Phase 7d — Satellite hors de France**
+  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
+  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
+
+- [ ] **Phase 10 — Trafic en temps réel (à étudier)**
+  ORS ne tient pas compte du trafic. D'abord étudier les sources gratuites : données ouvertes du réseau routier
+  national (Bison Futé / DIR, événements DATEX II sur transport.data.gouv.fr), offres gratuites avec clé (TomTom,
+  HERE…) et leurs quotas. Commencer par afficher bouchons et événements sur le trajet ; recalcul selon le trafic
+  seulement si une source le permet. Présenter les options avant de coder.
 
 - [ ] **Phase 3 — Mes signalements + Ma journée** (reportée : à faire en dernier)
   Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
   saisie pendant le guidage, comme en phase 2 – R412-6-2) ; le type (pont bas, accès difficile, contrôle, parking,
-  danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients), tournée multi-arrêts,
-  arrêt ajouté en route.
+  danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients) ; les étapes sont en
+  phase 8.
+
+## Hors de portée d'une appli web
+- **Android Auto / CarPlay** : réservés aux applis natives validées par Google ou Apple. Il faudrait réécrire Gabarit
+  en appli Android native ; ce n'est pas prévu.
