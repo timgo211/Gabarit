@@ -1,0 +1,181 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  4.962274,
+  45.702266,
+  4.97,
+  45.71036
+ ],
+ "features": [
+  {
+   "bbox": [
+    4.962274,
+    45.702266,
+    4.97,
+    45.71036
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 1540,
+      "duration": 112.8,
+      "steps": [
+       {
+        "distance": 40,
+        "duration": 4.8,
+        "type": 11,
+        "instruction": "Démarrez en direction du Nord sur D 306",
+        "name": "D 306",
+        "way_points": [
+         0,
+         1
+        ]
+       },
+       {
+        "distance": 900,
+        "duration": 64.8,
+        "type": 9,
+        "instruction": "Faites un demi-tour sur D 306",
+        "name": "D 306",
+        "way_points": [
+         1,
+         7
+        ]
+       },
+       {
+        "distance": 600,
+        "duration": 43.2,
+        "type": 1,
+        "instruction": "Tournez à droite sur Rue des Lilas",
+        "name": "Rue des Lilas",
+        "way_points": [
+         7,
+         11
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivé à votre destination, sur la gauche",
+        "name": "-",
+        "way_points": [
+         11,
+         11
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        11,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 1540,
+        "amount": 100
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 1540,
+     "duration": 112.8
+    },
+    "way_points": [
+     0,
+     11
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.97,
+      45.71
+     ],
+     [
+      4.97,
+      45.71036
+     ],
+     [
+      4.97,
+      45.709011
+     ],
+     [
+      4.97,
+      45.707662
+     ],
+     [
+      4.97,
+      45.706313
+     ],
+     [
+      4.97,
+      45.704964
+     ],
+     [
+      4.97,
+      45.703615
+     ],
+     [
+      4.97,
+      45.702266
+     ],
+     [
+      4.968068,
+      45.702266
+     ],
+     [
+      4.966137,
+      45.702266
+     ],
+     [
+      4.964205,
+      45.702266
+     ],
+     [
+      4.962274,
+      45.702266
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "timestamp": 1795075200000,
+  "query": {
+   "coordinates": [
+    [
+     4.97,
+     45.71
+    ],
+    [
+     4.962274,
+     45.702266
+    ]
+   ],
+   "profile": "driving-hgv",
+   "format": "geojson",
+   "units": "m",
+   "language": "fr",
+   "extra_info": [
+    "tollways"
+   ],
+   "maximum_speed": 90
+  },
+  "engine": {
+   "version": "9.0.0"
+  }
+ }
+}

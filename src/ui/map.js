@@ -1,9 +1,10 @@
-// Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracé de l'itinéraire, position.
+// Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracé de l'itinéraire, position, suivi en guidage.
 // MapLibre est chargé par index.html (window.maplibregl, version épinglée).
 
 import { MAP_STYLES } from '../lib/config.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
+const SVG_NS = 'http://www.w3.org/2000/svg';
 
 /** Premier style qui répond (fetch rapide), sinon null. */
 async function pickStyle(urls) {
@@ -24,11 +25,35 @@ async function pickStyle(urls) {
   return null;
 }
 
+/** Repère « ma position » : pastille, avec une flèche quand le cap est connu. */
+function vehicleElement() {
+  const node = document.createElement('div');
+  node.className = 'me-marker no-heading';
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 48 48');
+  svg.setAttribute('aria-hidden', 'true');
+  const halo = document.createElementNS(SVG_NS, 'circle');
+  halo.setAttribute('cx', '24'); halo.setAttribute('cy', '24'); halo.setAttribute('r', '20');
+  halo.setAttribute('class', 'me-halo');
+  const arrow = document.createElementNS(SVG_NS, 'path');
+  arrow.setAttribute('d', 'M24 6 L38 38 L24 30 L10 38 Z');
+  arrow.setAttribute('class', 'me-arrow');
+  const dot = document.createElementNS(SVG_NS, 'circle');
+  dot.setAttribute('cx', '24'); dot.setAttribute('cy', '24'); dot.setAttribute('r', '9');
+  dot.setAttribute('class', 'me-dot');
+  svg.append(halo, arrow, dot);
+  node.append(svg);
+  return node;
+}
+
 export function createMap(container, fallbackNode, initialTheme) {
   const lib = window.maplibregl;
   let map = null;
   let route = null; // GeoJSON LineString courant
+  let routeBbox = null;
   let theme = initialTheme;
+  let navigating = false;
+  let onGesture = null;
   const markers = { start: null, end: null, me: null };
 
   function addRouteLayers() {
@@ -53,6 +78,11 @@ export function createMap(container, fallbackNode, initialTheme) {
     if (map.getSource('route')) map.removeSource('route');
   }
 
+  function fitRoute(duration = 800) {
+    const b = routeBbox && routeBbox.length >= 4 ? [[routeBbox[0], routeBbox[1]], [routeBbox[2], routeBbox[3]]] : null;
+    if (map && b) map.fitBounds(b, { padding: { top: 64, right: 72, bottom: 48, left: 48 }, duration, bearing: 0, pitch: 0 });
+  }
+
   async function loadStyle() {
     const url = await pickStyle(MAP_STYLES[theme] ?? MAP_STYLES.day);
     if (!url) {
@@ -64,6 +94,10 @@ export function createMap(container, fallbackNode, initialTheme) {
       map = new lib.Map({ container, style: url, center: FRANCE_CENTER, zoom: 5, attributionControl: { compact: true } });
       map.addControl(new lib.NavigationControl({ showCompass: true }), 'top-right');
       map.addControl(new lib.ScaleControl({ unit: 'metric' }), 'bottom-left');
+      // Geste de l'utilisateur (doigt) : les mouvements lancés par le code n'ont pas d'originalEvent.
+      for (const ev of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
+        map.on(ev, (e) => { if (e.originalEvent && navigating) onGesture?.(); });
+      }
     } else {
       map.setStyle(url);
     }
@@ -82,26 +116,70 @@ export function createMap(container, fallbackNode, initialTheme) {
     else markers[key].setLngLat(lonlat);
   }
 
+  /** Repère du véhicule, orienté selon le cap (degrés) s'il est donné. */
+  function vehicle(lonlat, bearing = null) {
+    if (!map || !lonlat) return;
+    if (!markers.me) {
+      markers.me = new lib.Marker({ element: vehicleElement(), rotationAlignment: 'map', pitchAlignment: 'map' })
+        .setLngLat(lonlat).addTo(map);
+    } else {
+      markers.me.setLngLat(lonlat);
+    }
+    const hasHeading = typeof bearing === 'number' && Number.isFinite(bearing);
+    markers.me.getElement().classList.toggle('no-heading', !hasHeading);
+    markers.me.setRotation(hasHeading ? bearing : 0);
+  }
+
   return {
     setTheme(t) {
       if (t === theme) return;
       theme = t;
       if (lib) loadStyle();
     },
-    showRoute(coordinates, bbox) {
+    showRoute(coordinates, bbox, { fit = true } = {}) {
       route = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } };
+      routeBbox = bbox;
       if (!map) return;
       removeRouteLayers();
       if (map.isStyleLoaded()) addRouteLayers();
       else map.once('style.load', addRouteLayers);
       marker('start', coordinates[0], '#146c2e');
       marker('end', coordinates[coordinates.length - 1], '#b3261e');
-      const b = bbox && bbox.length >= 4 ? [[bbox[0], bbox[1]], [bbox[2], bbox[3]]] : null;
-      if (b) map.fitBounds(b, { padding: { top: 64, right: 72, bottom: 48, left: 48 }, duration: 800 });
+      if (fit) fitRoute();
     },
     setMyPosition(lonlat) {
-      marker('me', lonlat, '#0b57d0');
-      if (map && !route) map.easeTo({ center: lonlat, zoom: 11 });
+      vehicle(lonlat);
+      if (map && !route && !navigating) map.easeTo({ center: lonlat, zoom: 11 });
+    },
+    /** Position et cap du véhicule pendant le guidage (sans bouger la caméra). */
+    setVehicle(lonlat, bearing) {
+      vehicle(lonlat, bearing);
+    },
+    /** Caméra de guidage : centrée sur le véhicule (placé bas grâce au padding), inclinée, orientée route. */
+    follow({ center, bearing, zoom, pitch, padding, animate = true }) {
+      if (!map || !center) return;
+      map.easeTo({
+        center, bearing, zoom, pitch, padding,
+        duration: animate ? 1000 : 0,
+        easing: (t) => t,
+        essential: true, // guidage : non concerné par prefers-reduced-motion
+      });
+    },
+    /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
+    setNavigating(on) {
+      navigating = on;
+      if (!map) return;
+      map.resize();
+      if (!on) {
+        map.stop();
+        map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
+        if (markers.me) vehicle(markers.me.getLngLat().toArray());
+        fitRoute(600);
+      }
+    },
+    /** Appelé quand l'utilisateur déplace la carte au doigt pendant le guidage. */
+    onUserGesture(cb) {
+      onGesture = cb;
     },
     resize() {
       map?.resize();

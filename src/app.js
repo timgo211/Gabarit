@@ -9,6 +9,9 @@ import { renderSummary } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
 import { fetchRoute } from './ui/api.js';
+import { createVoice } from './ui/voice.js';
+import { createWakeLock } from './ui/wake-lock.js';
+import { createNavigation } from './ui/navigation.js';
 
 function pickStorage() {
   try {
@@ -25,6 +28,9 @@ const store = createStore(pickStorage());
 let data = store.load();
 const messageNode = $('#message');
 const summaryNode = $('#summary');
+const navStartBtn = $('#btn-nav-start');
+/** Dernier itinéraire calculé : { route, params, vehicle } (sert au guidage et à la simulation). */
+let lastRoute = null;
 
 function update(fn) {
   data = fn(data);
@@ -48,12 +54,46 @@ theme.setMode(data.settings.theme);
 map = createMap($('#map'), $('#map-fallback'), theme.theme);
 window.addEventListener('resize', () => map.resize());
 
+const setSetting = (patch) => update((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
+
+// Guidage : voix, écran allumé, navigation (GPS réel ou simulation)
+const voice = createVoice({ enabled: data.settings.voice });
+let navigation = null;
+const wakeLock = createWakeLock((active) => navigation?.setScreenStatus(active));
+navigation = createNavigation({
+  map,
+  voice,
+  wakeLock,
+  getApiKey: () => store.getApiKey(),
+  onVoiceToggle: (on) => setSetting({ voice: on }),
+  onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
+  onRouteChange: (route) => { if (lastRoute) lastRoute = { ...lastRoute, route }; },
+  onEnd: (message) => { if (message) showMessage(messageNode, message); },
+});
+
+function startGuidance(simulate = null) {
+  if (!lastRoute) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
+  showMessage(messageNode, '');
+  navigation.start({ ...lastRoute, simulate });
+  return null;
+}
+navStartBtn.addEventListener('click', () => startGuidance(null));
+
 // Écrans
 const settings = createSettings({
   store,
   getData: () => data,
-  onDataReplaced: (d) => { update(() => d); theme.setMode(d.settings.theme); },
-  onThemeChange: (mode) => { update((d) => ({ ...d, settings: { ...d.settings, theme: mode } })); theme.setMode(mode); },
+  onDataReplaced: (d) => { update(() => d); theme.setMode(d.settings.theme); voice.setEnabled(d.settings.voice); },
+  onThemeChange: (mode) => { setSetting({ theme: mode }); theme.setMode(mode); },
+  onVoiceChange: (on) => { setSetting({ voice: on }); voice.setEnabled(on); },
+  onTestVoice: () => {
+    if (!voice.supported) return 'Synthèse vocale indisponible sur ce navigateur (essaie Chrome).';
+    voice.speak('Dans 500 mètres, tournez à droite.', { interrupt: true, force: true });
+    const name = voice.voiceName ? ` (${voice.voiceName})` : '';
+    return `Tu dois entendre « Dans 500 mètres, tournez à droite »${name}.${voice.enabled ? '' : ' Annonces coupées pendant le guidage.'}`;
+  },
+  onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
+  onSimulate: () => startGuidance({ speedKmh: data.settings.simSpeed }),
 });
 createVehicles({ getData: () => data, update });
 
@@ -71,12 +111,16 @@ const form = createRouteForm({
       const route = await fetchRoute({ apiKey: store.getApiKey(), vehicle, ...p });
       map.showRoute(route.coordinates, route.bbox);
       renderSummary(summaryNode, { route, vehicle, toLabel: p.toLabel, avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries });
+      lastRoute = { route, vehicle, params: { start: p.start, end: p.end, avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries } };
+      navStartBtn.hidden = false;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
         distance: route.distance, duration: route.duration, tollDistance: route.tollDistance,
       }));
     } catch (err) {
       summaryNode.hidden = true;
+      navStartBtn.hidden = true;
+      lastRoute = null;
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {
       form.setBusy(false);
