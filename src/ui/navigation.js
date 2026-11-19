@@ -4,22 +4,27 @@
 //
 // Code de la route, art. R412-6-2 (Légifrance) : un écran allumé dans le champ de vision du conducteur n'est permis
 // que s'il sert d'aide à la conduite ou à la navigation. Pendant le guidage, l'écran ne montre donc que la carte
-// et le guidage, sans aucune saisie : trois gros boutons (voix, recentrer, arrêter) et, à l'arrêt hors du tracé
+// et le guidage, sans aucune saisie : gros boutons d'un seul appui (voix, arrêter ; sur la carte : vue d'ensemble,
+// recentrer, plan / satellite, actifs à toutes les vitesses, sans menu ni confirmation) et, à l'arrêt hors du tracé
 // seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
-  startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute,
+  startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
+  NAV,
 } from '../lib/navigation.js';
+import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
 import {
   formatNavDistance, formatDistance, formatDuration, formatArrival, formatSpeed, splitUnit, isLongInstruction,
 } from '../lib/format.js';
 import { ERROR_KINDS } from '../lib/ors-errors.js';
 
+/** Après un geste ou une vue d'ensemble, retour au suivi au bout de 15 s, seulement en roulant (≥ 10 km/h). */
 const RECENTER_AFTER_MS = 15000;
+const RECENTER_MIN_KMH = NAV.OFF_ROUTE_MIN_SPEED * 3.6;
 const SIM_TICK_MS = 1000;
 const RELEASE_SCREEN_AFTER_ARRIVAL_MS = 120000;
 
@@ -48,6 +53,10 @@ export function createNavigation(ctx) {
     simOffroad: $('#btn-sim-offroad'),
     voice: $('#btn-nav-voice'),
     recenter: $('#btn-nav-recenter'),
+    overview: $('#btn-nav-overview'),
+    layer: $('#btn-nav-layer'),
+    road: $('#nav-road'),
+    foot: $('.nav-foot'),
     stop: $('#btn-nav-stop'),
     bottom: $('.nav-bottom'),
   };
@@ -55,7 +64,7 @@ export function createNavigation(ctx) {
 
   function cameraPadding() {
     const h = root.clientHeight || window.innerHeight;
-    const bottom = ui.bottom?.offsetHeight ?? 0;
+    const bottom = ui.bottom?.offsetHeight ?? 0; // barre du bas seulement (les boutons de carte sont sur le côté)
     // Véhicule dans le bas de l'écran (au-dessus de la barre) : on voit loin devant.
     return { top: Math.round(h * 0.5), bottom: Math.min(bottom, Math.round(h * 0.3)), left: 0, right: 0 };
   }
@@ -136,10 +145,14 @@ export function createNavigation(ctx) {
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
     renderAlert(view);
 
-    ctx.map.setVehicle(view.position, view.bearing);
-    if (s.follow) {
-      ctx.map.follow({ center: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch, padding: cameraPadding() });
-    }
+    ui.road.textContent = view.roadName ?? '';
+    ui.road.hidden = !view.roadName;
+
+    // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
+    ctx.map.navigateTo({
+      lonlat: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch,
+      follow: s.follow, padding: cameraPadding(),
+    });
   }
 
   function handle(events) {
@@ -212,20 +225,72 @@ export function createNavigation(ctx) {
     }
   }
 
+  function renderFollow() {
+    ui.recenter.setAttribute('aria-pressed', String(!!s?.follow));
+    ui.overview.setAttribute('aria-pressed', String(!!s?.overview));
+  }
+
   function recenter() {
     if (!s) return;
     clearTimeout(s.recenterTimer);
     s.follow = true;
-    ui.recenter.hidden = true;
+    s.overview = false;
+    renderFollow();
     if (s.view) render(s.view);
+  }
+
+  /** Retour automatique au suivi : seulement en roulant ; à l'arrêt, la vue choisie reste. */
+  function scheduleRecenter() {
+    clearTimeout(s.recenterTimer);
+    s.recenterTimer = setTimeout(() => {
+      if (!s || s.follow) return;
+      if ((s.view?.speedKmh ?? 0) >= RECENTER_MIN_KMH) recenter();
+      else scheduleRecenter();
+    }, RECENTER_AFTER_MS);
+  }
+
+  /** Vue d'ensemble : tout le trajet restant, à plat, nord en haut. */
+  function overview() {
+    if (!s) return;
+    s.follow = false;
+    s.overview = true;
+    renderFollow();
+    const h = root.clientHeight || window.innerHeight;
+    const top = Math.min(Math.round(h * 0.35), ($('.nav-top')?.offsetHeight ?? 0) + 20);
+    const bottom = Math.min(Math.round(h * 0.45), (ui.foot?.offsetHeight ?? 0) + 20);
+    const side = Math.min(80, Math.round((root.clientWidth || window.innerWidth) * 0.12));
+    ctx.map.overview(overviewBbox(s.state), { top, bottom, left: side, right: side + 40 });
+    scheduleRecenter();
+  }
+
+  function renderLayer() {
+    const b = guidanceLayerButton(s?.layer);
+    const outside = s?.layer === 'satellite' && !!s.layerMessage;
+    const [icon, ...words] = (outside ? '🛰 France seulement' : b.text).split(' ');
+    const i = document.createElement('span');
+    i.setAttribute('aria-hidden', 'true');
+    i.textContent = icon;
+    const t = document.createElement('span');
+    t.className = 'nav-mapbtn-text';
+    t.textContent = words.join(' ');
+    ui.layer.replaceChildren(i, t);
+    ui.layer.setAttribute('aria-label', outside ? `${s.layerMessage}. Passer en plan` : b.label);
+  }
+
+  /** Plan ↔ satellite, pour ce guidage seulement (le guidage démarre toujours en plan). */
+  function toggleLayer() {
+    if (!s) return;
+    s.layer = guidanceLayerButton(s.layer).next;
+    ctx.map.setLayer(s.layer);
+    renderLayer();
   }
 
   ctx.map.onUserGesture(() => {
     if (!s) return;
     s.follow = false;
-    ui.recenter.hidden = false;
-    clearTimeout(s.recenterTimer);
-    s.recenterTimer = setTimeout(recenter, RECENTER_AFTER_MS);
+    s.overview = false;
+    renderFollow();
+    scheduleRecenter();
   });
 
   /**
@@ -238,14 +303,18 @@ export function createNavigation(ctx) {
     const now = Date.now();
     s = {
       state: startNavigation(route, { destination: params.end, now }),
-      params, vehicle, view: null, follow: true, error: '', gpsLost: false,
+      params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
+      layer: GUIDANCE_START_LAYER, layerMessage: '',
       sim: simulate ? createSimulator(route.coordinates, { speedKmh: simulate.speedKmh }) : null,
       watchId: null, simTimer: null, signalTimer: null, recenterTimer: null, releaseTimer: null,
     };
     app.classList.add('navigating');
     root.hidden = false;
     ui.sim.hidden = !s.sim;
-    ui.recenter.hidden = true;
+    renderFollow();
+    ui.road.hidden = true;
+    ctx.map.setLayer(s.layer);
+    renderLayer();
     ui.stop.textContent = '■ Arrêter';
     ui.then.hidden = true;
     ui.alert.hidden = true;
@@ -306,6 +375,8 @@ export function createNavigation(ctx) {
     handle(r.events);
   });
   ui.recenter.addEventListener('click', recenter);
+  ui.overview.addEventListener('click', overview);
+  ui.layer.addEventListener('click', toggleLayer);
   ui.voice.addEventListener('click', () => {
     const on = !ctx.voice.enabled;
     ctx.voice.setEnabled(on);
@@ -329,6 +400,12 @@ export function createNavigation(ctx) {
     stop,
     get active() {
       return !!s;
+    },
+    /** Vue satellite hors de France pendant le guidage (message de src/lib/map-layers.js). */
+    setLayerView(view) {
+      if (!s) return;
+      s.layerMessage = view?.message ?? '';
+      renderLayer();
     },
     /** État du verrou d'écran (appelé par wake-lock.js). */
     setScreenStatus(active) {

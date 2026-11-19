@@ -6,6 +6,9 @@ import { normalizeVehicle, validateVehicle, defaultVehicle, parseNumber } from '
 import { THEME_MODES } from './theme.js';
 import { isSimSpeed, SIM_DEFAULT_SPEED } from './nav-sim.js';
 import { sanitizeMapLayer, DEFAULT_MAP_LAYER } from './map-layers.js';
+import {
+  sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
+} from './prefs.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -43,6 +46,7 @@ export function emptyData() {
     settings: {
       theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
+      arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
     },
   };
 }
@@ -85,6 +89,10 @@ export function sanitizeData(raw) {
       simSpeed: isSimSpeed(s.simSpeed) ? s.simSpeed : SIM_DEFAULT_SPEED,
       dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut (vrais prix : phase 4)
       mapLayer: sanitizeMapLayer(s.mapLayer), // « plan » ou « satellite » (phase 7)
+      arrowColor: sanitizeArrowColor(s.arrowColor), // phase 7c
+      voiceName: sanitizeVoiceName(s.voiceName),
+      voiceRate: sanitizeVoiceRate(s.voiceRate),
+      voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
     },
   };
 }

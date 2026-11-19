@@ -47,6 +47,15 @@
           <div id="nav-alert" class="nav-alert" role="status" hidden></div>
           <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
         </div>
+        <div class="nav-foot">
+        <div class="nav-mapbtns" role="group" aria-label="Carte">
+          <button type="button" id="btn-nav-overview" class="btn nav-mapbtn" aria-label="Vue d'ensemble du trajet restant">
+            <span aria-hidden="true">⤢</span><span class="nav-mapbtn-text">Vue d'ensemble</span></button>
+          <button type="button" id="btn-nav-recenter" class="btn nav-mapbtn" aria-label="Recentrer sur le camion">
+            <span aria-hidden="true">◎</span><span class="nav-mapbtn-text">Recentrer</span></button>
+          <button type="button" id="btn-nav-layer" class="btn nav-mapbtn" aria-label="Passer en vue satellite"><span aria-hidden="true">🛰</span><span class="nav-mapbtn-text">Satellite</span></button>
+        </div>
+        <div id="nav-road" class="nav-road" hidden></div>
         <div class="nav-bottom">
           <div id="nav-sim" class="nav-sim" hidden>
             <span class="nav-sim-badge">SIMULATION</span>
@@ -62,9 +71,9 @@
           <p id="nav-screen" class="nav-screen" hidden>⚠ Écran non maintenu allumé (économie d'énergie ?)</p>
           <div class="nav-buttons">
             <button type="button" id="btn-nav-voice" class="btn" aria-pressed="true">🔊 Voix</button>
-            <button type="button" id="btn-nav-recenter" class="btn" hidden>◎ Recentrer</button>
             <button type="button" id="btn-nav-stop" class="btn btn-danger">■ Arrêter</button>
           </div>
+        </div>
         </div>
       </div>
     </main>
@@ -104,6 +113,15 @@
     <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>
   </div>
 
+  <div id="press-sheet" class="press-sheet" role="dialog" aria-label="Point choisi sur la carte" hidden>
+    <p id="press-coords" class="press-coords"></p>
+    <div class="press-actions">
+      <button type="button" id="btn-press-to" class="btn btn-primary">🏁 Aller ici</button>
+      <button type="button" id="btn-press-from" class="btn">🚩 Partir d'ici</button>
+      <button type="button" id="btn-press-close" class="btn btn-icon" aria-label="Fermer">✕</button>
+    </div>
+  </div>
+
   <button type="button" id="update-banner" class="update-banner" hidden>Nouvelle version disponible, toucher pour recharger</button>
 
   <dialog id="dlg-settings" class="dialog" aria-labelledby="settings-title">
@@ -140,10 +158,28 @@
       <section class="card">
         <h3>Guidage vocal</h3>
         <label class="toggle"><input type="checkbox" id="voice-enabled"> Annonces vocales en français</label>
+        <label for="voice-name" class="field-label">Voix</label>
+        <select id="voice-name"><option value="">Automatique (meilleure voix française)</option></select>
+        <label for="voice-rate" class="field-label">Vitesse : <output id="voice-rate-out" for="voice-rate">1</output></label>
+        <input type="range" id="voice-rate" min="0.7" max="1.5" step="0.1" value="1">
+        <label for="voice-volume" class="field-label">Volume : <output id="voice-volume-out" for="voice-volume">100 %</output></label>
+        <input type="range" id="voice-volume" min="0.2" max="1" step="0.1" value="1">
         <div class="row">
-          <button type="button" id="btn-voice-test" class="btn">Tester la voix</button>
+          <button type="button" id="btn-voice-test" class="btn">Tester</button>
         </div>
         <p id="voice-status" class="status" role="status"></p>
+        <p id="voice-music" class="hint"></p>
+      </section>
+
+      <section class="card">
+        <h3>Flèche du camion</h3>
+        <div class="segmented segmented-colors" role="radiogroup" aria-label="Couleur de la flèche">
+          <label><input type="radio" name="arrow-color" value="auto"> Auto (bleu le jour, orange la nuit)</label>
+          <label><input type="radio" name="arrow-color" value="bleu"> <span class="swatch" style="--swatch:#0b57d0"></span> Bleu</label>
+          <label><input type="radio" name="arrow-color" value="vert"> <span class="swatch" style="--swatch:#127a35"></span> Vert</label>
+          <label><input type="radio" name="arrow-color" value="orange"> <span class="swatch" style="--swatch:#f08a00"></span> Orange</label>
+          <label><input type="radio" name="arrow-color" value="violet"> <span class="swatch" style="--swatch:#7b2fbf"></span> Violet</label>
+        </div>
       </section>
 
       <section class="card">
@@ -216,7 +252,9 @@
       </section>
       <section class="card">
         <h3>L'appli</h3>
-        <p class="hint">Son adresse. Chacun crée sa propre clé HeiGIT gratuite.</p>
+        <p class="hint">Son adresse, avec ce guide pour l'installer sur un autre téléphone. Chacun crée sa propre clé
+          HeiGIT gratuite.</p>
+        <ol id="install-steps" class="install-steps"></ol>
         <div class="row">
           <button type="button" id="btn-share-app" class="btn">Partager Gabarit</button>
         </div>

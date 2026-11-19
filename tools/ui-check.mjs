@@ -88,7 +88,12 @@ async function open(browser, base, { width, height, theme = 'day', layer = 'plan
     geolocation: { latitude: START[1], longitude: START[0], accuracy: 8 }, permissions: ['geolocation'],
     serviceWorkers: 'block', locale: 'fr-FR',
   });
-  const stats = { tiles: 0, directions: 0 };
+  const stats = { tiles: 0, directions: 0, pelias: 0 };
+  await ctx.addInitScript(() => {
+    window.__raf = 0;
+    const raf = window.requestAnimationFrame.bind(window);
+    window.requestAnimationFrame = (cb) => { window.__raf += 1; return raf(cb); };
+  });
   await ctx.addInitScript(({ theme: t, layer: l }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
@@ -112,6 +117,7 @@ async function open(browser, base, { width, height, theme = 'day', layer = 'plan
       stats.tiles += 1;
       return route.fulfill({ body: RED_TILE, contentType: 'image/png' });
     }
+    if (url.includes('/pelias/v1/autocomplete')) stats.pelias += 1;
     if (url.includes('/pelias/v1/autocomplete')) return route.fulfill({ json: fixture('pelias-autocomplete.json') });
     if (url.includes('/openrouteservice/v2/directions/')) {
       stats.directions += 1;
@@ -147,7 +153,7 @@ async function noHorizontalScroll(page, label) {
       if (!n.getClientRects().length || n.closest('.maplibregl-canvas-container, dialog:not([open])')) return false;
       const b = n.getBoundingClientRect();
       return b.right > w + 0.5 || b.left < -0.5;
-    }).slice(0, 5).map((n) => `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ''}.${[...n.classList].join('.')}`);
+    }).slice(0, 5).map((n) => `${n.tagName.toLowerCase()}${n.id ? `#${n.id}` : ''}.${[...n.classList].join('.')} « ${n.textContent.trim().slice(0, 25)} »`);
     return { sw: document.documentElement.scrollWidth, w, wide };
   });
   // Téléphone : un contenu trop large agrandit la fenêtre de mise en page (innerWidth) et Chrome dézoome la page.
@@ -386,13 +392,155 @@ async function parkedCheck(browser, base) {
   await ctx.close();
 }
 
+/** Nombre d'appels à requestAnimationFrame pendant ms (compteur posé par open()). */
+async function rafCalls(page, ms) {
+  const a = await page.evaluate(() => window.__raf);
+  await page.waitForTimeout(ms);
+  return (await page.evaluate(() => window.__raf)) - a;
+}
+
+async function comfortCheck(browser, base) {
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    const nav = fixture('ors-directions-nav.json');
+    const { page, ctx, stats, errors } = await open(browser, base, { width, height, directions: () => nav });
+    // Réglages : couleur de la flèche, voix, musique.
+    await page.click('#btn-settings');
+    await page.check('input[name="arrow-color"][value="violet"]');
+    const fill = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--arrow-fill').trim());
+    check(fill === '#7b2fbf', `${width} px : couleur de la flèche appliquée`, fill);
+    check(await page.isVisible('#voice-name') && await page.isVisible('#voice-rate') && await page.isVisible('#voice-volume'),
+      `${width} px : réglages de la voix (liste, vitesse, volume)`);
+    const music = await page.textContent('#voice-music');
+    check(/Musique/.test(music ?? ''), `${width} px : phrase sur la musique`, music?.slice(0, 50));
+    await noHorizontalScroll(page, `${width} px Réglages`);
+    await page.screenshot({ path: join(SHOTS, `${width}-reglages.png`), fullPage: true });
+    await page.click('#dlg-settings [data-close]');
+    // Partager Gabarit : guide pas à pas.
+    await page.click('#btn-share');
+    const steps = await page.locator('#install-steps li').count();
+    check(steps === 4, `${width} px : guide d'installation (4 étapes)`, String(steps));
+    await noHorizontalScroll(page, `${width} px Partager`);
+    await page.click('#dlg-share [data-close]');
+
+    // Guidage réel (GPS émulé) : boutons de carte, nom de la route, satellite, jour plus clair.
+    await page.fill('#to-input', 'Lyon');
+    await page.waitForSelector('#to-list li');
+    await page.dispatchEvent('#to-list li', 'pointerdown');
+    await page.click('#btn-route');
+    await page.waitForSelector('#btn-nav-start:not([hidden])');
+    const line = nav.features[0].geometry.coordinates;
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], speed: 0 });
+    await page.click('#btn-nav-start');
+    await drive(ctx, page, line, 50, 6);
+    check(await page.isVisible('#btn-nav-overview') && await page.isVisible('#btn-nav-recenter') && await page.isVisible('#btn-nav-layer'),
+      `${width} px : boutons Vue d'ensemble, Recentrer, Satellite en guidage`);
+    const road = await page.textContent('#nav-road');
+    check(await page.isVisible('#nav-road') && /Route de Lyon|D 306/.test(road ?? ''), `${width} px : nom de la route en cours`, road);
+    const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nav-maneuver')).backgroundColor);
+    check(/rgb\(2[34]\d, 2[34]\d, 2[45]\d\)/.test(bg), `${width} px : bandeau clair en mode jour`, bg);
+    const sep = await page.evaluate(() => getComputedStyle(document.querySelectorAll('.nav-stats > div')[1]).borderLeftWidth);
+    check(sep === '1px', `${width} px : traits fins entre les valeurs`, sep);
+    await noHorizontalScroll(page, `${width} px guidage (boutons de carte)`);
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${width} px guidage : textes dans leurs cases`, over.join(' ; '));
+    await page.screenshot({ path: join(SHOTS, `${width}-guidage-7c.png`) });
+
+    await page.click('#btn-nav-overview');
+    await page.waitForTimeout(900);
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true'
+      && await page.getAttribute('#btn-nav-recenter', 'aria-pressed') === 'false', `${width} px : vue d'ensemble en un appui`);
+    await page.screenshot({ path: join(SHOTS, `${width}-vue-ensemble.png`) });
+    await page.click('#btn-nav-recenter');
+    check(await page.getAttribute('#btn-nav-recenter', 'aria-pressed') === 'true', `${width} px : recentrer en un appui`);
+
+    const tiles = stats.tiles;
+    await page.click('#btn-nav-layer');
+    await drive(ctx, page, line.slice(1), 50, 2);
+    await page.waitForTimeout(800);
+    check(stats.tiles > tiles && isRed(await mapColor(page)), `${width} px : satellite en guidage en un appui`, `${stats.tiles - tiles} tuiles`);
+    check(/Plan/.test(await page.textContent('#btn-nav-layer')), `${width} px : le bouton propose ensuite le plan`);
+    await page.screenshot({ path: join(SHOTS, `${width}-guidage-satellite.png`) });
+
+    // Flèche fluide : plus de requestAnimationFrame quand aucune position n'arrive.
+    await page.click('#btn-nav-layer'); // retour au plan (pas de tuiles qui se chargent)
+    await page.waitForTimeout(2000);
+    const calls = await rafCalls(page, 2000);
+    check(calls <= 2, `${width} px : aucun rendu continu sans nouvelle position`, `${calls} rAF en 2 s`);
+    const moving = page.evaluate(() => window.__raf);
+    await setGeo(page, { lon: line[2][0], lat: line[2][1], speed: 14, heading: 90 });
+    await page.waitForTimeout(500);
+    const during = (await page.evaluate(() => window.__raf)) - await moving;
+    check(during >= 10, `${width} px : flèche animée entre deux positions`, `${during} rAF en 0,5 s`);
+
+    await page.click('#btn-nav-stop');
+    await page.waitForTimeout(800);
+    check(isDay(await mapColor(page)), `${width} px : après le guidage, retour au plan mémorisé`);
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+async function destinationsCheck(browser, base) {
+  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760 });
+  // Coordonnées saisies : proposées sans appel Pelias.
+  const before = stats.pelias;
+  await page.fill('#to-input', '48°41\'31.6"N 6°11\'03.8"E');
+  await page.waitForSelector('#to-list li');
+  const label = await page.textContent('#to-list li');
+  check(label === '48,69211, 6,18439', 'coordonnées DMS reconnues', label);
+  await page.dispatchEvent('#to-list li', 'pointerdown');
+  check(stats.pelias === before, 'aucun appel au géocodage pour des coordonnées', String(stats.pelias - before));
+  await page.fill('#from-input', '48.6921, 6.1844');
+  await page.waitForSelector('#from-list li');
+  check(await page.textContent('#from-list li') === '48,69210, 6,18440', 'coordonnées décimales reconnues');
+  await page.dispatchEvent('#from-list li', 'pointerdown');
+  await page.click('#btn-route');
+  await page.waitForSelector('.route-card', { timeout: 10000 });
+  check(true, 'itinéraire calculé depuis des coordonnées');
+
+  // Appui long (doigt, 800 ms) sur la carte : « Aller ici ».
+  const box = await page.locator('#map').boundingBox();
+  const x = box.x + box.width * 0.3;
+  const y = box.y + box.height * 0.55;
+  const cdp = await ctx.newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await page.waitForTimeout(800);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForSelector('#press-sheet:not([hidden])', { timeout: 3000 });
+  await noHorizontalScroll(page, '360 px appui long');
+  check(await page.isVisible('#btn-press-to') && await page.isVisible('#btn-press-from'), 'appui long : « Aller ici » et « Partir d\'ici » visibles');
+  await page.screenshot({ path: join(SHOTS, '360-appui-long.png') });
+  const popupText = await page.textContent('#press-coords');
+  await page.click('#btn-press-to');
+  const to = await page.inputValue('#to-input');
+  check(/^\d+,\d{5}, \d+,\d{5}$/.test(to) && popupText.endsWith(to), '« Aller ici » remplit l\'arrivée', to);
+  check(!(await page.isVisible('#press-sheet')), 'choix fermé après l\'appui');
+  // Appui court : rien.
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await page.waitForTimeout(150);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.waitForTimeout(800);
+  check(!(await page.isVisible('#press-sheet')), 'appui court : rien');
+  // Clic droit (souris) : « Partir d'ici ».
+  await page.mouse.click(x + 20, y, { button: 'right' });
+  await page.waitForSelector('#press-sheet:not([hidden])');
+  await page.click('#btn-press-from');
+  check(/^\d+,\d{5}, \d+,\d{5}$/.test(await page.inputValue('#from-input')), '« Partir d\'ici » remplit le départ');
+  // Pendant le guidage : pas d'appui long.
+  await startSim(page);
+  await page.mouse.click(x, y, { button: 'right' });
+  await page.waitForTimeout(500);
+  check(!(await page.isVisible('#press-sheet')), 'guidage : pas d\'appui long');
+  await ctx.close();
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
-    parked: parkedCheck };
+    parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

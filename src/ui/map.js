@@ -1,5 +1,6 @@
 // Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracés des itinéraires (choisi en couleur, autres en gris),
-// position, suivi en guidage, vue satellite IGN (phase 7, à l'arrêt seulement).
+// position, suivi en guidage (flèche animée, phase 7c), vue satellite IGN (phase 7 ; en guidage aussi depuis la 7c),
+// appui long (phase 8).
 // MapLibre est chargé par index.html (window.maplibregl, version épinglée).
 //
 // Phase 7b : au retour de l'arrière-plan, Android peut retirer le contexte WebGL (carte vide). On écoute
@@ -9,6 +10,8 @@
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
 import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
+import { planMove, frameAt } from '../lib/nav-anim.js';
+import { haversine } from '../lib/nav-geo.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -20,6 +23,9 @@ const SAT_LAYER = 'ign-ortho';
 /** Contexte WebGL perdu : délai avant de recréer la carte s'il n'est pas rendu (retour au premier plan / page visible). */
 const RESTORE_WAIT_VISIBLE_MS = 1500;
 const RESTORE_WAIT_LOST_MS = 3000;
+/** Appui long sur la carte (phase 8) : durée et tolérance de mouvement du doigt. */
+const LONG_PRESS_MS = 600;
+const LONG_PRESS_MOVE_PX = 10;
 
 /** Le canevas de la carte a-t-il perdu son contexte WebGL ? (getContext renvoie le contexte existant.) */
 function contextLost(canvas) {
@@ -87,14 +93,20 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let navigating = false;
   let onGesture = null;
   let onPick = null;
+  let onLongPress = null;
+  let onTap = null;
+  /** Animation de la flèche (et de la caméra si elle suit) entre deux positions : une boucle qui s'arrête à la fin. */
+  let anim = null;
+  let animFrame = null;
+  let lastNav = null;
   let layer = sanitizeMapLayer(opts.layer);
   let lastView = null;
   let styleUrl = null;
   let lost = false;
   let restoreTimer = null;
-  const markers = { start: null, end: null, me: null };
+  const markers = { start: null, end: null, me: null, pin: null };
   /** Dernières positions des marqueurs (pour recréer la carte). */
-  const marks = { start: null, end: null, me: null, meBearing: null };
+  const marks = { start: null, end: null, me: null, meBearing: null, pin: null };
 
   function routesData() {
     return {
@@ -156,6 +168,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
 
   /** Toucher un tracé (à l'arrêt, plusieurs itinéraires) le sélectionne. */
   function onMapClick(e) {
+    // Choix de l'appui long : fermé par un toucher ailleurs, mais pas par le « clic » qui suit le doigt levé.
+    if (Date.now() - lastPressAt > 700) onTap?.();
     if (navigating || routes.length < 2 || !onPick || !map.getLayer('route-hit')) return;
     const { x, y } = e.point;
     const box = [[x - TAP_MARGIN_PX, y - TAP_MARGIN_PX], [x + TAP_MARGIN_PX, y + TAP_MARGIN_PX]];
@@ -216,9 +230,17 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     map.addControl(new lib.ScaleControl({ unit: 'metric' }), 'bottom-left');
     // Geste de l'utilisateur (doigt) : les mouvements lancés par le code n'ont pas d'originalEvent.
     for (const ev of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
-      map.on(ev, (e) => { if (e.originalEvent && navigating) onGesture?.(); });
+      map.on(ev, (e) => {
+        if (!e.originalEvent) return;
+        cancelPress();
+        if (navigating) {
+          if (anim) anim.follow = false; // la caméra ne reprend pas la main pendant le geste
+          onGesture?.();
+        }
+      });
     }
     map.on('click', onMapClick);
+    wireLongPress();
     map.on('style.load', addSatelliteLayer); // aussi après une reconstruction complète du style
     map.on('moveend', applyLayer);
     map.on('webglcontextlost', () => {
@@ -235,6 +257,68 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.start) marker('start', marks.start, '#146c2e');
     if (marks.end) marker('end', marks.end, '#b3261e');
     if (marks.me) vehicle(marks.me, marks.meBearing);
+    if (marks.pin) marker('pin', marks.pin, '#7b2fbf');
+  }
+
+  // ───────── Appui long (phase 8) : « Aller ici » / « Partir d'ici », hors guidage ─────────
+  let press = null;
+  let lastPressAt = 0;
+
+  function cancelPress() {
+    if (press) clearTimeout(press.timer);
+    press = null;
+  }
+
+  function firePress(lngLat) {
+    if (navigating || !onLongPress || !lngLat) return;
+    lastPressAt = Date.now();
+    onLongPress([lngLat.lng, lngLat.lat]);
+  }
+
+  function wireLongPress() {
+    map.on('touchstart', (e) => {
+      cancelPress();
+      if (navigating || e.originalEvent?.touches?.length !== 1) return;
+      const { point, lngLat } = e;
+      press = { point, timer: setTimeout(() => { press = null; firePress(lngLat); }, LONG_PRESS_MS) };
+    });
+    map.on('touchmove', (e) => {
+      if (!press) return;
+      if (e.originalEvent?.touches?.length !== 1
+        || Math.hypot(e.point.x - press.point.x, e.point.y - press.point.y) > LONG_PRESS_MOVE_PX) cancelPress();
+    });
+    map.on('touchend', cancelPress);
+    map.on('touchcancel', cancelPress);
+    // Souris (clic droit) ; Chrome Android émet aussi « contextmenu » après un appui long : pas de doublon.
+    map.on('contextmenu', (e) => {
+      e.originalEvent?.preventDefault?.();
+      if (Date.now() - lastPressAt > 1000) firePress(e.lngLat);
+    });
+  }
+
+  // ───────── Flèche fluide (phase 7c) ─────────
+
+  function tick(now) {
+    animFrame = null;
+    if (!anim) return;
+    const t = anim.move.duration > 0 ? (now - anim.start) / anim.move.duration : 1;
+    const f = frameAt(anim.move, t);
+    vehicle(f.lonlat, f.bearing);
+    if (anim.follow && map) {
+      const cam = { center: f.lonlat, padding: anim.padding };
+      if (Number.isFinite(f.bearing)) cam.bearing = f.bearing;
+      if (Number.isFinite(f.zoom)) cam.zoom = f.zoom;
+      if (Number.isFinite(f.pitch)) cam.pitch = f.pitch;
+      map.jumpTo(cam);
+    }
+    if (t < 1) animFrame = requestAnimationFrame(tick);
+    else anim = null; // fin de l'interpolation : plus aucun rendu tant que rien ne bouge
+  }
+
+  function stopAnim() {
+    if (animFrame !== null) cancelAnimationFrame(animFrame);
+    animFrame = null;
+    anim = null;
   }
 
   /** Recrée la carte à l'identique (même style, tracés, marqueurs, caméra). */
@@ -250,7 +334,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       // carte déjà inutilisable : on la remplace quand même
     }
     map = null;
-    markers.start = null; markers.end = null; markers.me = null;
+    markers.start = null; markers.end = null; markers.me = null; markers.pin = null;
     lost = false;
     lastView = null;
     build(styleUrl, camera);
@@ -358,32 +442,62 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       vehicle(lonlat);
       if (map && !routes.length && !navigating) map.easeTo({ center: lonlat, zoom: 11 });
     },
-    /** Position et cap du véhicule pendant le guidage (sans bouger la caméra). */
-    setVehicle(lonlat, bearing) {
-      vehicle(lonlat, bearing);
+    /**
+     * Guidage : la flèche glisse et tourne de sa position actuelle vers la nouvelle pendant l'intervalle entre deux
+     * positions GPS (1 s au plus). Si la caméra suit, elle est déplacée dans la même image (flèche et carte
+     * ensemble, sans décalage) : centrée sur le véhicule (placé bas grâce au padding), inclinée, orientée route.
+     * @param {{ lonlat:number[], bearing:number|null, zoom?:number, pitch?:number, follow:boolean, padding?:object }} p
+     */
+    navigateTo({ lonlat, bearing, zoom, pitch, follow, padding }) {
+      if (!lonlat) return;
+      const now = performance.now();
+      const cur = anim ? frameAt(anim.move, (now - anim.start) / (anim.move.duration || 1)) : lastNav;
+      const target = { lonlat, bearing, zoom, pitch };
+      const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, lonlat) : NaN);
+      lastNav = { ...target, at: now };
+      if (follow && map) map.stop(); // fin d'une vue d'ensemble animée
+      anim = { move, start: now, follow: !!follow, padding };
+      if (animFrame === null) animFrame = requestAnimationFrame(tick);
     },
-    /** Caméra de guidage : centrée sur le véhicule (placé bas grâce au padding), inclinée, orientée route. */
-    follow({ center, bearing, zoom, pitch, padding, animate = true }) {
-      if (!map || !center) return;
-      map.easeTo({
-        center, bearing, zoom, pitch, padding,
-        duration: animate ? 1000 : 0,
-        easing: (t) => t,
-        essential: true, // guidage : non concerné par prefers-reduced-motion
+    /** Vue d'ensemble : le cadre donné (trajet restant), à plat, nord en haut. La caméra ne suit plus. */
+    overview(bbox, padding) {
+      if (anim) anim.follow = false;
+      if (!map || !Array.isArray(bbox) || bbox.length < 4) return;
+      map.fitBounds([[bbox[0], bbox[1]], [bbox[2], bbox[3]]], {
+        padding, bearing: 0, pitch: 0, duration: 600, maxZoom: 17, essential: true,
       });
     },
     /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
     setNavigating(on) {
       navigating = on;
-      applyLayer(); // guidage : plan uniquement, sans bouton
+      applyLayer(); // boutons « Plan / Satellite » de l'arrêt masqués en guidage (le guidage a le sien)
       if (!map) return;
       map.resize();
       if (!on) {
+        stopAnim();
+        lastNav = null;
         map.stop();
         map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
         if (markers.me) vehicle(markers.me.getLngLat().toArray());
         fitRoute(600);
       }
+    },
+    /** Appui long sur la carte, hors guidage : cb([lon, lat]). */
+    onLongPress(cb) {
+      onLongPress = cb;
+    },
+    /** Toucher simple sur la carte (ferme le choix de l'appui long). */
+    onMapTap(cb) {
+      onTap = cb;
+    },
+    /** Repère du point choisi par appui long. */
+    showPin(lonlat) {
+      marker('pin', lonlat, '#7b2fbf');
+    },
+    clearPin() {
+      markers.pin?.remove();
+      markers.pin = null;
+      marks.pin = null;
     },
     /** Appelé quand l'utilisateur déplace la carte au doigt pendant le guidage. */
     onUserGesture(cb) {

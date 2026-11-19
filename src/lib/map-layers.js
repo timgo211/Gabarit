@@ -1,4 +1,4 @@
-// Couche de fond (phase 7) : « Plan » (fond vectoriel OpenFreeMap / VersaTiles) ou « Satellite » (photos aériennes IGN).
+// Couche de fond (phases 7 et 7c) : « Plan » (fond vectoriel OpenFreeMap / VersaTiles) ou « Satellite » (photos aériennes IGN).
 // Logique pure : choix mémorisé, zone couverte, message. L'affichage est dans src/ui/map.js.
 //
 // Photos aériennes : couche ORTHOIMAGERY.ORTHOPHOTOS de la Géoplateforme IGN (data.geopf.fr), gratuite et sans clé,
@@ -85,17 +85,33 @@ export function sanitizeMapLayer(x) {
 }
 
 /**
- * Ce que la carte doit montrer.
- * Guidage : toujours le plan (lisibilité), sans bouton. Satellite hors de France : plan + message ; le choix reste
- * mémorisé et les photos reviennent quand la carte revient au-dessus de la France.
+ * Phase 7c : le guidage démarre toujours en plan (lisibilité) ; un bouton passe en satellite pour ce guidage
+ * seulement (choix non mémorisé, le choix à l'arrêt `settings.mapLayer` ne change pas).
+ */
+export const GUIDANCE_START_LAYER = 'plan';
+
+/**
+ * Ce que la carte doit montrer. Satellite hors de France : plan + message ; le choix reste et les photos reviennent
+ * quand la carte revient au-dessus de la France. `button` : boutons « Plan / Satellite » de l'arrêt (en guidage,
+ * l'écran de guidage a son propre bouton).
  * @param {{ layer:string, center:number[]|null, navigating?:boolean }} p
  * @returns {{ photos:boolean, message:string, button:boolean }}
  */
 export function satelliteView({ layer, center, navigating = false }) {
-  if (navigating) return { photos: false, message: '', button: false };
-  if (sanitizeMapLayer(layer) !== 'satellite') return { photos: false, message: '', button: true };
-  if (!isInFrance(center)) return { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true };
-  return { photos: true, message: '', button: true };
+  const satellite = sanitizeMapLayer(layer) === 'satellite';
+  const inFrance = isInFrance(center);
+  return {
+    photos: satellite && inFrance,
+    message: satellite && !inFrance ? SATELLITE_OUTSIDE_TEXT : '',
+    button: !navigating,
+  };
+}
+
+/** Bouton du guidage : il propose l'autre couche. */
+export function guidanceLayerButton(layer) {
+  return sanitizeMapLayer(layer) === 'satellite'
+    ? { next: 'plan', text: '🗺 Plan', label: 'Passer en plan' }
+    : { next: 'satellite', text: '🛰 Satellite', label: 'Passer en vue satellite' };
 }
 
 /**

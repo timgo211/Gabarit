@@ -17,16 +17,22 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     `nav-sim.js` (fausse position GPS pour la simulation)
   - itinéraires proposés : `route-options.js` (Recommandé + `alternative_routes` ou variantes, budget de requêtes,
     doublons, noms, écarts, textes des fiches, tracé touché sur la carte)
-  - phase 7 : `map-layers.js` (Plan / Satellite IGN, zone France, plan forcé en guidage), `share.js` (lien
-    d'itinéraire dans le #, validation des liens reçus, GPX 1.1, lien OpenStreetMap, choix partage / copie / téléchargement)
+  - phase 7 : `map-layers.js` (Plan / Satellite IGN, zone France, guidage démarré en plan, `carryOverlay` au changement
+    de thème), `share.js` (lien d'itinéraire dans le #, validation des liens reçus, GPX 1.1, lien OpenStreetMap, choix
+    partage / copie / téléchargement, guide d'installation `INSTALL_STEPS`)
+  - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
+    flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
+  - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
-  - `layer-switch.js` (boutons Plan / Satellite), `share.js` (fenêtre « Partager »)
+  - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
+  - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
+    vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
   `ors-directions-alternatives.json` = 3 itinéraires, `ors-variant-*.json` = variantes, Recommandé et Plus court identiques)
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
-- `docs/ROADMAP.md` : phases 1 à 7 ; `tools/make-icons.mjs` : génère les PNG
+- `docs/ROADMAP.md` : feuille de route ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
 ```
@@ -37,10 +43,11 @@ node --test
 Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'interface) :
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
-node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked
+node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
-changement de thème, perte du contexte WebGL, camion arrêté hors du tracé. Captures dans `tools/ui-shots/` (ignoré).
+changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
+coordonnées (phase 8). Captures dans `tools/ui-shots/` (ignoré).
 
 ## Conventions
 - HTML/CSS/JS vanilla, modules ES, sans framework, sans build, sans dépendance npm.
@@ -70,11 +77,19 @@ changement de thème, perte du contexte WebGL, camion arrêté hors du tracé. C
   sinon, ou si ORS ne renvoie qu'un itinéraire : Plus court + Sans péage (Plus rapide si péages évités ou absents).
   Le choix se fait à l'arrêt ; le recalcul en guidage garde `preference`/péages de la variante choisie.
 - Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
-  France seulement (`isInFrance`), jamais pendant le guidage, choix dans `settings.mapLayer`. data.geopf.fr est bloqué
+  France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
+  bouton passe en satellite pour ce guidage seulement (non mémorisé).
+- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite) : actifs à toutes les vitesses, un seul
+  appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. data.geopf.fr est bloqué
   depuis le conteneur : GetCapabilities lu via xyzservices / iTowns / osmlab editor-layer-index sur GitHub.
 - Partage : liste blanche des champs (jamais clé ni véhicule) ; départ « Ma position » exclu sauf case cochée (GPX : tracé
   dès le premier carrefour après 500 m) ; lien reçu validé par `decodeRouteLink` (ne lève jamais), affiché en textContent,
   # effacé après lecture, jamais de calcul ni de guidage automatique.
+- Réglages 7c : `arrowColor` (auto, bleu, vert, orange, violet → `--arrow-fill` / `--arrow-stroke`), `voiceName`,
+  `voiceRate`, `voiceVolume`. Musique : `navigator.audioSession` absent de Chrome (Safari seulement, MDN
+  browser-compat-data) → phrase dans Réglages.
+- Coordonnées saisies (départ / arrivée) : proposées sans appel Pelias ; appui long et coordonnées ne lancent jamais
+  de calcul.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

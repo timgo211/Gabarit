@@ -18,6 +18,9 @@ import { createShare } from './ui/share.js';
 import {
   decodeRouteLink, findVariantIndex, SHARED_ROUTE_TEXT, SHARED_ROUTE_NO_KEY_TEXT, VARIANT_MISSING_TEXT,
 } from './lib/share.js';
+import { arrowColors } from './lib/prefs.js';
+import { coordsLabel } from './lib/coords.js';
+import { canDuckMedia } from './ui/voice.js';
 
 function pickStorage() {
   try {
@@ -63,7 +66,15 @@ function errorText(err) {
 
 // Thème + carte
 let map = null;
-const theme = createThemeController((t) => map?.setTheme(t));
+let navigation = null;
+/** Couleur de la flèche du camion (phase 7c) : choix de Réglages, « auto » selon le thème. */
+function applyArrowColor(t = theme?.theme) {
+  const c = arrowColors(data.settings.arrowColor, t);
+  document.documentElement.style.setProperty('--arrow-fill', c.fill);
+  document.documentElement.style.setProperty('--arrow-stroke', c.stroke);
+}
+const theme = createThemeController((t) => { map?.setTheme(t); applyArrowColor(t); });
+applyArrowColor();
 theme.setMode(data.settings.theme);
 const setSetting = (patch) => update((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
 // Fond « Plan / Satellite » (à l'arrêt) : choix mémorisé dans les réglages.
@@ -75,13 +86,14 @@ const layerSwitch = createLayerSwitch({
 });
 map = createMap($('#map'), $('#map-fallback'), theme.theme, {
   layer: data.settings.mapLayer,
-  onLayerView: (view) => layerSwitch.render(view),
+  onLayerView: (view) => { layerSwitch.render(view); navigation?.setLayerView(view); },
 });
 window.addEventListener('resize', () => map.resize());
 
 // Guidage : voix, écran allumé, navigation (GPS réel ou simulation)
-const voice = createVoice({ enabled: data.settings.voice });
-let navigation = null;
+const voice = createVoice({
+  enabled: data.settings.voice, name: data.settings.voiceName, rate: data.settings.voiceRate, volume: data.settings.voiceVolume,
+});
 const wakeLock = createWakeLock((active) => navigation?.setScreenStatus(active));
 navigation = createNavigation({
   map,
@@ -100,6 +112,7 @@ navigation = createNavigation({
     renderChoice();
   },
   onEnd: (message) => {
+    map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
     if (message) showMessage(messageNode, message);
   },
@@ -139,7 +152,13 @@ navStartBtn.addEventListener('click', () => startGuidance(null));
 const settings = createSettings({
   store,
   getData: () => data,
-  onDataReplaced: (d) => { update(() => d); theme.setMode(d.settings.theme); voice.setEnabled(d.settings.voice); },
+  onDataReplaced: (d) => {
+    update(() => d);
+    theme.setMode(d.settings.theme);
+    voice.setEnabled(d.settings.voice);
+    voice.setOptions({ name: d.settings.voiceName, rate: d.settings.voiceRate, volume: d.settings.voiceVolume });
+    applyArrowColor();
+  },
   onThemeChange: (mode) => { setSetting({ theme: mode }); theme.setMode(mode); },
   onVoiceChange: (on) => { setSetting({ voice: on }); voice.setEnabled(on); },
   onTestVoice: () => {
@@ -151,6 +170,14 @@ const settings = createSettings({
   onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
   onSimulate: () => startGuidance({ speedKmh: data.settings.simSpeed }),
   onDieselPriceChange: (price) => { setSetting({ dieselPrice: price }); renderChoice(); },
+  getVoices: () => voice.voices(),
+  onVoicesChanged: (cb) => voice.onVoicesChanged(cb),
+  canDuckMedia,
+  onVoiceOptions: (o) => {
+    voice.setOptions(o);
+    setSetting({ voiceName: o.name, voiceRate: o.rate, voiceVolume: o.volume });
+  },
+  onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
 });
 createVehicles({ getData: () => data, update });
 
@@ -202,6 +229,39 @@ const form = createRouteForm({
 });
 
 createShare({ getChoice: () => choice, getMyPosition: () => myPosition });
+
+/**
+ * Appui long sur la carte (phase 8, à l'arrêt) : « Aller ici » ou « Partir d'ici » remplit le champ, sans rien
+ * calculer (le conducteur touche ensuite « Calculer l'itinéraire »). Panneau fixe en bas de l'écran (toujours entier,
+ * même quand la carte est petite sur un téléphone) et repère sur la carte.
+ */
+const pressSheet = $('#press-sheet');
+let pressPlace = null;
+function closePress() {
+  pressSheet.hidden = true;
+  pressPlace = null;
+  map.clearPin();
+}
+map.onLongPress((lonlat) => {
+  if (navigation.active) return;
+  pressPlace = { lon: lonlat[0], lat: lonlat[1], label: coordsLabel({ lon: lonlat[0], lat: lonlat[1] }) };
+  $('#press-coords').textContent = `Point choisi : ${pressPlace.label}`;
+  pressSheet.hidden = false;
+  map.showPin(lonlat);
+});
+map.onMapTap(() => { if (!pressSheet.hidden) closePress(); });
+const usePress = (which) => () => {
+  if (!pressPlace) return;
+  const place = pressPlace;
+  closePress();
+  form.setPlace(which, place);
+  showMessage(messageNode, which === 'to'
+    ? `Arrivée : ${place.label}. Touche « Calculer l'itinéraire ».`
+    : `Départ : ${place.label}.`, 'info');
+};
+$('#btn-press-to').addEventListener('click', usePress('to'));
+$('#btn-press-from').addEventListener('click', usePress('from'));
+$('#btn-press-close').addEventListener('click', closePress);
 
 /**
  * Lien de partage reçu (# de l'URL) : formulaire pré-rempli, jamais de calcul ni de guidage automatique.
