@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseDirections, tollDistance, haversine, fuelEstimate, NoRouteError } from '../src/lib/ors-response.js';
+import {
+  parseDirections, parseAllDirections, tollDistance, haversine, fuelEstimate, fuelCost, bboxOf, NoRouteError,
+} from '../src/lib/ors-response.js';
 import { fixture } from './helpers.js';
 
 test('lecture d\'une réponse ORS complète', () => {
@@ -77,4 +79,38 @@ test('haversine : 1° de latitude ≈ 111,2 km', () => {
 test('estimation gazole', () => {
   assert.equal(fuelEstimate(100000, 32), 32);
   assert.equal(fuelEstimate(100000, null), null);
+});
+
+test('réponse à 3 alternatives : un itinéraire par Feature, chacun avec ses étapes et son emprise', () => {
+  const json = fixture('ors-directions-alternatives.json');
+  const routes = parseAllDirections(json);
+  assert.equal(routes.length, 3);
+  assert.deepEqual(routes.map((r) => r.distance), [33412.6, 31205, 36880.4]);
+  assert.deepEqual(routes.map((r) => r.duration), [1862.3, 2304.8, 2461]);
+  assert.deepEqual(routes.map((r) => r.tollDistance), [21450, 0, 0]);
+  assert.deepEqual(routes[1].bbox, json.features[1].bbox);
+  assert.equal(routes[2].steps[2].exitNumber, 2);
+  assert.equal(routes[0].steps.at(-1).type, 10);
+  assert.deepEqual(parseDirections(json), routes[0], 'parseDirections lit le premier (le recalcul en guidage)');
+});
+
+test('plusieurs itinéraires : Feature sans tracé ignorée, emprise recalculée si absente', () => {
+  const json = fixture('ors-directions-alternatives.json');
+  json.features[1].geometry.coordinates = [];
+  delete json.features[2].bbox;
+  const routes = parseAllDirections(json);
+  assert.equal(routes.length, 2);
+  assert.deepEqual(routes[1].bbox, bboxOf(json.features[2].geometry.coordinates));
+  assert.deepEqual(parseAllDirections(fixture('ors-directions.json')).map((r) => r.distance), [5230.4]);
+  assert.throws(() => parseAllDirections({ type: 'FeatureCollection', features: [] }), NoRouteError);
+  assert.throws(() => parseAllDirections(null), NoRouteError);
+  assert.deepEqual(bboxOf([[4, 45], [5, 44], [4.5, 46]]), [4, 44, 5, 46]);
+  assert.equal(bboxOf([]), null);
+});
+
+test('coût du gazole', () => {
+  assert.equal(fuelCost(50, 1.8), 90);
+  assert.equal(fuelCost(50, null), null);
+  assert.equal(fuelCost(null, 1.8), null);
+  assert.equal(fuelCost(50, 0), null);
 });

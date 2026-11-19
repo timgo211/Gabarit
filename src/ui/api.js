@@ -5,6 +5,7 @@ import {
 } from '../lib/ors-request.js';
 import { parseDirections, NoRouteError } from '../lib/ors-response.js';
 import { classifyError, ERROR_KINDS, messageFor } from '../lib/ors-errors.js';
+import { computeRouteOptions } from '../lib/route-options.js';
 
 /** Erreur portant un message déjà traduit pour l'utilisateur. */
 export class ApiError extends Error {
@@ -50,21 +51,43 @@ function requireKey(apiKey) {
   if (!apiKey) throw new ApiError(classifyError({ noKey: true }));
 }
 
-/** Calcule l'itinéraire camion. @returns route analysée (voir parseDirections). */
-export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries }) {
+function noRouteError() {
+  return new ApiError({ kind: ERROR_KINDS.NO_ROUTE, message: messageFor(ERROR_KINDS.NO_ROUTE) });
+}
+
+/** Envoie une requête d'itinéraire construite par ors-request.js ; renvoie le JSON d'ORS. */
+function postDirections(apiKey, req) {
+  return request(req.url, { method: req.method, headers: directionsHeaders(apiKey), body: JSON.stringify(req.body) }, 45000);
+}
+
+/**
+ * Calcule un itinéraire camion (recalcul en guidage). preference : celle de la variante choisie (null = recommandé).
+ * @returns route analysée (voir parseDirections).
+ */
+export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null }) {
   requireKey(apiKey);
-  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries });
-  const json = await request(req.url, {
-    method: req.method,
-    headers: directionsHeaders(apiKey),
-    body: JSON.stringify(req.body),
-  }, 45000);
+  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries, preference });
+  const json = await postDirections(apiKey, req);
   try {
     return parseDirections(json);
   } catch (err) {
-    if (err instanceof NoRouteError) {
-      throw new ApiError({ kind: ERROR_KINDS.NO_ROUTE, message: messageFor(ERROR_KINDS.NO_ROUTE) });
-    }
+    if (err instanceof NoRouteError) throw noRouteError();
+    throw err;
+  }
+}
+
+/**
+ * Itinéraires proposés au calcul (Recommandé + alternatives ou variantes, 3 requêtes au plus) : voir route-options.js.
+ * @returns {{ options:object[], failures:object[], requests:number }}
+ */
+export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries }) {
+  requireKey(apiKey);
+  try {
+    return await computeRouteOptions({
+      start, end, vehicle, avoidTolls, avoidFerries, send: (req) => postDirections(apiKey, req),
+    });
+  } catch (err) {
+    if (err instanceof NoRouteError) throw noRouteError();
     throw err;
   }
 }

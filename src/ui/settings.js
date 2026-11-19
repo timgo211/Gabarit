@@ -1,9 +1,10 @@
-// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal, export/import des données,
+// Écran Réglages : clé ORS (masquée + test), mode nuit, guidage vocal, prix du gazole, export/import des données,
 // simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
 import { testKey } from './api.js';
-import { exportData, importData } from '../lib/store.js';
+import { exportData, importData, parseDieselPrice } from '../lib/store.js';
+import { formatPricePerLiter } from '../lib/format.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
 
 function setStatus(node, text, ok) {
@@ -14,7 +15,7 @@ function setStatus(node, text, ok) {
 /**
  * @param {{ store, getData:()=>object, onDataReplaced:(data)=>void, onThemeChange:(mode)=>void,
  *   onVoiceChange:(on:boolean)=>void, onTestVoice:()=>string, onSimSpeedChange:(kmh:number)=>void,
- *   onSimulate:()=>string|null }} ctx
+ *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -25,12 +26,15 @@ export function createSettings(ctx) {
   const voiceStatus = $('#voice-status');
   const simStatus = $('#sim-status');
   const voiceEnabled = $('#voice-enabled');
+  const dieselInput = $('#diesel-price');
+  const dieselStatus = $('#diesel-status');
   wireDialog(dlg);
 
   function syncChoices(settings) {
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
     voiceEnabled.checked = settings.voice;
+    dieselInput.value = formatPricePerLiter(settings.dieselPrice);
   }
 
   function open() {
@@ -41,6 +45,7 @@ export function createSettings(ctx) {
     setStatus(dataStatus, '');
     setStatus(voiceStatus, '');
     setStatus(simStatus, '');
+    setStatus(dieselStatus, '');
     syncChoices(ctx.getData().settings);
     dlg.showModal();
   }
@@ -86,6 +91,19 @@ export function createSettings(ctx) {
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
   $('#btn-voice-test').addEventListener('click', () => setStatus(voiceStatus, ctx.onTestVoice()));
+
+  $('#btn-diesel-save').addEventListener('click', () => {
+    const { value, error } = parseDieselPrice(dieselInput.value);
+    if (error) {
+      setStatus(dieselStatus, error, false);
+      return;
+    }
+    ctx.onDieselPriceChange(value);
+    dieselInput.value = formatPricePerLiter(value);
+    setStatus(dieselStatus, value === null
+      ? 'Prix effacé : les fiches n\'affichent plus que les litres.'
+      : `Prix enregistré : ${formatPricePerLiter(value)} €/L.`, true);
+  });
 
   for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) {
     r.addEventListener('change', () => { if (r.checked) ctx.onSimSpeedChange(Number(r.value)); });

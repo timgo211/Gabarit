@@ -1,0 +1,463 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  4.718,
+  45.764,
+  4.845,
+  45.989
+ ],
+ "features": [
+  {
+   "bbox": [
+    4.718,
+    45.764,
+    4.8357,
+    45.989
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 33412.6,
+      "duration": 1862.3,
+      "steps": [
+       {
+        "distance": 2104.2,
+        "duration": 210.5,
+        "type": 11,
+        "instruction": "Prendre la direction nord sur Boulevard de la Croix-Rousse",
+        "name": "Boulevard de la Croix-Rousse",
+        "way_points": [
+         0,
+         2
+        ]
+       },
+       {
+        "distance": 26050.3,
+        "duration": 1350.1,
+        "type": 13,
+        "instruction": "Continuer à droite sur A6",
+        "name": "A6",
+        "way_points": [
+         2,
+         6
+        ]
+       },
+       {
+        "distance": 3858.1,
+        "duration": 230.4,
+        "type": 1,
+        "instruction": "Tourner à droite sur Avenue de l'Europe",
+        "name": "Avenue de l'Europe",
+        "way_points": [
+         6,
+         7
+        ]
+       },
+       {
+        "distance": 1400,
+        "duration": 71.3,
+        "type": 0,
+        "instruction": "Tourner à gauche sur Rue Nationale",
+        "name": "Rue Nationale",
+        "way_points": [
+         7,
+         8
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à Rue Nationale, sur la droite",
+        "name": "-",
+        "way_points": [
+         8,
+         8
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        2,
+        0
+       ],
+       [
+        2,
+        6,
+        1
+       ],
+       [
+        6,
+        8,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 11962.6,
+        "amount": 35.8
+       },
+       {
+        "value": 1,
+        "distance": 21450,
+        "amount": 64.2
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 33412.6,
+     "duration": 1862.3
+    },
+    "way_points": [
+     0,
+     8
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.8357,
+      45.764
+     ],
+     [
+      4.829,
+      45.779
+     ],
+     [
+      4.815,
+      45.803
+     ],
+     [
+      4.8,
+      45.835
+     ],
+     [
+      4.778,
+      45.87
+     ],
+     [
+      4.75,
+      45.92
+     ],
+     [
+      4.73,
+      45.96
+     ],
+     [
+      4.723,
+      45.98
+     ],
+     [
+      4.718,
+      45.989
+     ]
+    ]
+   }
+  },
+  {
+   "bbox": [
+    4.718,
+    45.764,
+    4.8357,
+    45.989
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 31205,
+      "duration": 2304.8,
+      "steps": [
+       {
+        "distance": 2104.2,
+        "duration": 210.5,
+        "type": 11,
+        "instruction": "Prendre la direction nord sur Boulevard de la Croix-Rousse",
+        "name": "Boulevard de la Croix-Rousse",
+        "way_points": [
+         0,
+         1
+        ]
+       },
+       {
+        "distance": 27700.8,
+        "duration": 2023,
+        "type": 6,
+        "instruction": "Continuer tout droit sur D306",
+        "name": "D306",
+        "way_points": [
+         1,
+         6
+        ]
+       },
+       {
+        "distance": 1400,
+        "duration": 71.3,
+        "type": 0,
+        "instruction": "Tourner à gauche sur Rue Nationale",
+        "name": "Rue Nationale",
+        "way_points": [
+         6,
+         7
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à Rue Nationale, sur la droite",
+        "name": "-",
+        "way_points": [
+         7,
+         7
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        7,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 31205,
+        "amount": 100
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 31205,
+     "duration": 2304.8
+    },
+    "way_points": [
+     0,
+     7
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.8357,
+      45.764
+     ],
+     [
+      4.829,
+      45.779
+     ],
+     [
+      4.805,
+      45.8
+     ],
+     [
+      4.78,
+      45.83
+     ],
+     [
+      4.76,
+      45.88
+     ],
+     [
+      4.74,
+      45.93
+     ],
+     [
+      4.723,
+      45.98
+     ],
+     [
+      4.718,
+      45.989
+     ]
+    ]
+   }
+  },
+  {
+   "bbox": [
+    4.718,
+    45.764,
+    4.845,
+    45.989
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 36880.4,
+      "duration": 2461,
+      "steps": [
+       {
+        "distance": 2104.2,
+        "duration": 210.5,
+        "type": 11,
+        "instruction": "Prendre la direction nord sur Boulevard de la Croix-Rousse",
+        "name": "Boulevard de la Croix-Rousse",
+        "way_points": [
+         0,
+         1
+        ]
+       },
+       {
+        "distance": 30120.2,
+        "duration": 1980.4,
+        "type": 2,
+        "instruction": "Tourner fortement à droite sur D433",
+        "name": "D433",
+        "way_points": [
+         1,
+         4
+        ]
+       },
+       {
+        "distance": 3256,
+        "duration": 198.8,
+        "type": 7,
+        "instruction": "Prendre la sortie 2 au rond-point sur D933",
+        "name": "D933",
+        "way_points": [
+         4,
+         6
+        ],
+        "exit_number": 2
+       },
+       {
+        "distance": 1400,
+        "duration": 71.3,
+        "type": 0,
+        "instruction": "Tourner à gauche sur Rue Nationale",
+        "name": "Rue Nationale",
+        "way_points": [
+         6,
+         7
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à Rue Nationale, sur la droite",
+        "name": "-",
+        "way_points": [
+         7,
+         7
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        7,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 36880.4,
+        "amount": 100
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 36880.4,
+     "duration": 2461
+    },
+    "way_points": [
+     0,
+     7
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.8357,
+      45.764
+     ],
+     [
+      4.829,
+      45.779
+     ],
+     [
+      4.845,
+      45.82
+     ],
+     [
+      4.83,
+      45.87
+     ],
+     [
+      4.79,
+      45.93
+     ],
+     [
+      4.76,
+      45.965
+     ],
+     [
+      4.723,
+      45.98
+     ],
+     [
+      4.718,
+      45.989
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "timestamp": 1795075200000,
+  "query": {
+   "coordinates": [
+    [
+     4.8357,
+     45.764
+    ],
+    [
+     4.718,
+     45.989
+    ]
+   ],
+   "profile": "driving-hgv",
+   "profileName": "driving-hgv",
+   "format": "geojson",
+   "units": "m",
+   "language": "fr",
+   "extra_info": [
+    "tollways"
+   ],
+   "maximum_speed": 90,
+   "alternative_routes": {
+    "target_count": 3
+   }
+  },
+  "engine": {
+   "version": "9.0.0"
+  }
+ }
+}

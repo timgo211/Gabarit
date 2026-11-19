@@ -1,0 +1,184 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  3.087,
+  45.7,
+  4.8357,
+  45.785
+ ],
+ "features": [
+  {
+   "bbox": [
+    3.087,
+    45.7,
+    4.8357,
+    45.785
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 171480.9,
+      "duration": 8952.6,
+      "steps": [
+       {
+        "distance": 2510.4,
+        "duration": 260.1,
+        "type": 11,
+        "instruction": "Prendre la direction ouest sur Quai Perrache",
+        "name": "Quai Perrache",
+        "way_points": [
+         0,
+         1
+        ]
+       },
+       {
+        "distance": 143410.4,
+        "duration": 7628.4,
+        "type": 4,
+        "instruction": "Tourner légèrement à gauche sur N89",
+        "name": "N89",
+        "way_points": [
+         1,
+         9
+        ]
+       },
+       {
+        "distance": 25560.1,
+        "duration": 1064.1,
+        "type": 1,
+        "instruction": "Tourner à droite sur Boulevard Gustave Flaubert",
+        "name": "Boulevard Gustave Flaubert",
+        "way_points": [
+         9,
+         10
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à Boulevard Gustave Flaubert, sur la gauche",
+        "name": "-",
+        "way_points": [
+         10,
+         10
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        10,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 171480.9,
+        "amount": 100
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 171480.9,
+     "duration": 8952.6
+    },
+    "way_points": [
+     0,
+     10
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.8357,
+      45.764
+     ],
+     [
+      4.81,
+      45.77
+     ],
+     [
+      4.66,
+      45.73
+     ],
+     [
+      4.45,
+      45.7
+     ],
+     [
+      4.25,
+      45.72
+     ],
+     [
+      4.05,
+      45.74
+     ],
+     [
+      3.8,
+      45.75
+     ],
+     [
+      3.55,
+      45.76
+     ],
+     [
+      3.3,
+      45.77
+     ],
+     [
+      3.15,
+      45.785
+     ],
+     [
+      3.087,
+      45.7772
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "timestamp": 1795075200000,
+  "query": {
+   "coordinates": [
+    [
+     4.8357,
+     45.764
+    ],
+    [
+     3.087,
+     45.7772
+    ]
+   ],
+   "profile": "driving-hgv",
+   "profileName": "driving-hgv",
+   "format": "geojson",
+   "units": "m",
+   "language": "fr",
+   "extra_info": [
+    "tollways"
+   ],
+   "maximum_speed": 90,
+   "options": {
+    "vehicle_type": "hgv",
+    "avoid_features": [
+     "tollways"
+    ]
+   }
+  },
+  "engine": {
+   "version": "9.0.0"
+  }
+ }
+}

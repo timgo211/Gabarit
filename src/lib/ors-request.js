@@ -2,7 +2,9 @@
 // Référence : https://giscience.github.io/openrouteservice/api-reference/endpoints/directions/
 // La clé n'est JAMAIS écrite ici : elle est passée par l'appelant au moment de l'envoi.
 
-import { ORS_BASE, PELIAS_BASE, ORS_MIN_MAX_SPEED, GEOCODE_COUNTRIES } from './config.js';
+import {
+  ORS_BASE, PELIAS_BASE, ORS_MIN_MAX_SPEED, GEOCODE_COUNTRIES, ORS_MAX_ALTERNATIVE_ROUTES, ORS_PREFERENCES,
+} from './config.js';
 
 /** Clés de restriction ORS (profile_params.restrictions) ← champs du profil. Unités : m et t. */
 const RESTRICTION_FIELDS = ['height', 'width', 'length', 'weight', 'axleload'];
@@ -31,14 +33,24 @@ export function buildRestrictions(vehicle) {
 
 /**
  * Requête d'itinéraire camion.
- * @param {{ start:[number,number], end:[number,number], vehicle:object, avoidTolls?:boolean, avoidFerries?:boolean }} p
- *   start/end en [longitude, latitude]
+ * @param {{ start:[number,number], end:[number,number], vehicle:object, avoidTolls?:boolean, avoidFerries?:boolean,
+ *   preference?:'recommended'|'fastest'|'shortest'|null, alternatives?:number }} p
+ *   start/end en [longitude, latitude] ; preference absente → défaut ORS (« recommended ») ;
+ *   alternatives = nombre d'itinéraires voulus (2 ou 3, itinéraire principal compris) → alternative_routes.target_count.
  * @returns {{ url:string, method:'POST', body:object }}
  */
-export function buildDirectionsRequest({ start, end, vehicle, avoidTolls = false, avoidFerries = false }) {
+export function buildDirectionsRequest({
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, alternatives = 0,
+}) {
   if (!isLonLat(start)) throw new TypeError('Point de départ invalide.');
   if (!isLonLat(end)) throw new TypeError("Point d'arrivée invalide.");
   if (!vehicle) throw new TypeError('Aucun profil véhicule actif.');
+  if (preference !== null && preference !== undefined && !ORS_PREFERENCES.includes(preference)) {
+    throw new TypeError("Préférence d'itinéraire inconnue.");
+  }
+  if (alternatives && !(Number.isInteger(alternatives) && alternatives >= 2 && alternatives <= ORS_MAX_ALTERNATIVE_ROUTES)) {
+    throw new TypeError(`Nombre d'itinéraires alternatifs : entre 2 et ${ORS_MAX_ALTERNATIVE_ROUTES}.`);
+  }
 
   const options = { vehicle_type: 'hgv' };
   const avoid = [];
@@ -58,6 +70,9 @@ export function buildDirectionsRequest({ start, end, vehicle, avoidTolls = false
   };
   const speed = clampMaxSpeed(vehicle.maxSpeed);
   if (speed !== null) body.maximum_speed = speed;
+  if (preference) body.preference = preference;
+  // weight_factor (1,4) et share_factor (0,6) : valeurs par défaut d'ORS.
+  if (alternatives) body.alternative_routes = { target_count: alternatives };
 
   return { url: `${ORS_BASE}/directions/driving-hgv/geojson`, method: 'POST', body };
 }

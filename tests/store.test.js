@@ -1,7 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createStore, memoryStorage, emptyData, exportData, importData, activeVehicle, addTrip, API_KEY_KEY, MAX_TRIPS }
-  from '../src/lib/store.js';
+import {
+  createStore, memoryStorage, emptyData, exportData, importData, activeVehicle, addTrip, API_KEY_KEY, MAX_TRIPS,
+  parseDieselPrice, sanitizeData,
+} from '../src/lib/store.js';
 
 test('données vides par défaut avec un véhicule actif', () => {
   const s = createStore(memoryStorage());
@@ -73,4 +75,23 @@ test('réglages du guidage : voix activée et vitesse de simulation 50 km/h par 
   const odd = importData(JSON.stringify({ vehicles: d.vehicles, settings: { voice: 'non', simSpeed: 70 } }));
   assert.equal(odd.settings.voice, true, 'seul false coupe la voix');
   assert.equal(odd.settings.simSpeed, 50, 'vitesse hors liste ignorée');
+});
+
+test('prix du gazole : vide par défaut, gardé s\'il est plausible, exporté', () => {
+  const d = emptyData();
+  assert.equal(d.settings.dieselPrice, null);
+  assert.equal(sanitizeData({ ...d, settings: { ...d.settings, dieselPrice: 1.859 } }).settings.dieselPrice, 1.859);
+  for (const bad of [0, -1, 12, '1,85', Number.NaN]) {
+    assert.equal(sanitizeData({ ...d, settings: { ...d.settings, dieselPrice: bad } }).settings.dieselPrice, null, String(bad));
+  }
+  const back = importData(exportData({ ...d, settings: { ...d.settings, dieselPrice: 1.7 } }));
+  assert.equal(back.settings.dieselPrice, 1.7);
+});
+
+test('prix du gazole saisi : virgule ou point, vide = pas de prix', () => {
+  assert.deepEqual(parseDieselPrice('1,85'), { value: 1.85, error: null });
+  assert.deepEqual(parseDieselPrice(' 1.8594 '), { value: 1.859, error: null });
+  assert.deepEqual(parseDieselPrice(''), { value: null, error: null });
+  assert.match(parseDieselPrice('abc').error, /nombre attendu/);
+  assert.match(parseDieselPrice('18,5').error, /entre 0,50 et 5/);
 });

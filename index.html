@@ -91,6 +91,7 @@
       <div id="message" class="message" role="alert" hidden></div>
       <div id="summary" class="summary" aria-live="polite" hidden></div>
       <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
+      <div id="route-notes" class="route-notes" hidden></div>
     </section>
 
     <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>
@@ -136,6 +137,18 @@
           <button type="button" id="btn-voice-test" class="btn">Tester la voix</button>
         </div>
         <p id="voice-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card">
+        <h3>Coût du gazole</h3>
+        <p class="hint">Sert à estimer le coût de chaque itinéraire (consommation du véhicule × prix). Laisse vide pour
+          n'afficher que les litres.</p>
+        <label for="diesel-price">Prix du gazole (€/L)</label>
+        <div class="combo">
+          <input id="diesel-price" type="text" inputmode="decimal" autocomplete="off" placeholder="ex. 1,85">
+          <button type="button" id="btn-diesel-save" class="btn btn-primary">Enregistrer</button>
+        </div>
+        <p id="diesel-status" class="status" role="status"></p>
       </section>
 
       <section class="card">

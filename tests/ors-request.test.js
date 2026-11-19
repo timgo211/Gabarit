@@ -99,3 +99,20 @@ test('requête de test de clé : petit itinéraire camion sans restriction', () 
   assert.equal(req.body.options.profile_params, undefined);
   assert.equal(req.body.maximum_speed, undefined);
 });
+
+test('préférence et alternative_routes (phase 2b)', () => {
+  const v = defaultVehicle();
+  const plain = buildDirectionsRequest({ start, end, vehicle: v }).body;
+  assert.equal(plain.preference, undefined, 'par défaut : « recommended » d\'ORS');
+  assert.equal(plain.alternative_routes, undefined);
+  const short = buildDirectionsRequest({ start, end, vehicle: v, preference: 'shortest' }).body;
+  assert.equal(short.preference, 'shortest');
+  assert.equal(short.options.vehicle_type, 'hgv');
+  const alt = buildDirectionsRequest({ start, end, vehicle: v, alternatives: 3 }).body;
+  assert.deepEqual(alt.alternative_routes, { target_count: 3 });
+  assert.deepEqual(alt.coordinates, [start, end]);
+  assert.ok(alt.options.profile_params.restrictions.height);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: v, preference: 'eco' }), /Préférence/);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: v, alternatives: 4 }), /alternatifs/);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: v, alternatives: 1 }), /alternatifs/);
+});

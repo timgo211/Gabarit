@@ -5,10 +5,11 @@ import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
 import { createRouteForm } from './ui/route-form.js';
-import { renderSummary } from './ui/summary.js';
+import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
-import { fetchRoute } from './ui/api.js';
+import { fetchRouteOptions } from './ui/api.js';
+import { guidanceParams, reroutedOption } from './lib/route-options.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
 import { createNavigation } from './ui/navigation.js';
@@ -28,9 +29,13 @@ const store = createStore(pickStorage());
 let data = store.load();
 const messageNode = $('#message');
 const summaryNode = $('#summary');
+const notesNode = $('#route-notes');
 const navStartBtn = $('#btn-nav-start');
-/** Dernier itinéraire calculé : { route, params, vehicle } (sert au guidage et à la simulation). */
-let lastRoute = null;
+/**
+ * Itinéraires proposés au dernier calcul (sert au guidage et à la simulation) :
+ * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, toLabel }.
+ */
+let choice = null;
 
 function update(fn) {
   data = fn(data);
@@ -67,14 +72,47 @@ navigation = createNavigation({
   getApiKey: () => store.getApiKey(),
   onVoiceToggle: (on) => setSetting({ voice: on }),
   onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
-  onRouteChange: (route) => { if (lastRoute) lastRoute = { ...lastRoute, route }; },
-  onEnd: (message) => { if (message) showMessage(messageNode, message); },
+  // Recalcul en route (GPS réel) : les autres itinéraires partaient de l'ancien départ, il ne reste que le nouveau.
+  onRouteChange: (route) => {
+    if (!choice) return;
+    choice = {
+      ...choice, options: [reroutedOption(choice.options[choice.selected], route)], failures: [], selected: 0,
+      start: route.coordinates[0],
+    };
+    renderChoice();
+  },
+  onEnd: (message) => {
+    if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
+    if (message) showMessage(messageNode, message);
+  },
 });
 
+function renderChoice() {
+  if (!choice) return;
+  renderRouteChoice(summaryNode, notesNode, { choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute });
+}
+
+/** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
+function selectRoute(index) {
+  if (!choice || navigation.active || index === choice.selected || !choice.options[index]) return;
+  choice = { ...choice, selected: index };
+  map.selectRoute(index);
+  renderChoice();
+  revealSelectedCard(summaryNode);
+}
+map.onRoutePick(selectRoute);
+
 function startGuidance(simulate = null) {
-  if (!lastRoute) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
+  if (!choice) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
+  const option = choice.options[choice.selected];
   showMessage(messageNode, '');
-  navigation.start({ ...lastRoute, simulate });
+  navigation.start({
+    route: option.route,
+    vehicle: choice.vehicle,
+    // Le recalcul en route garde les réglages de l'itinéraire choisi (plus court, sans péage…).
+    params: guidanceParams(option, choice),
+    simulate,
+  });
   return null;
 }
 navStartBtn.addEventListener('click', () => startGuidance(null));
@@ -94,6 +132,7 @@ const settings = createSettings({
   },
   onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
   onSimulate: () => startGuidance({ speedKmh: data.settings.simSpeed }),
+  onDieselPriceChange: (price) => { setSetting({ dieselPrice: price }); renderChoice(); },
 });
 createVehicles({ getData: () => data, update });
 
@@ -108,19 +147,25 @@ const form = createRouteForm({
     showMessage(messageNode, '');
     form.setBusy(true);
     try {
-      const route = await fetchRoute({ apiKey: store.getApiKey(), vehicle, ...p });
-      map.showRoute(route.coordinates, route.bbox);
-      renderSummary(summaryNode, { route, vehicle, toLabel: p.toLabel, avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries });
-      lastRoute = { route, vehicle, params: { start: p.start, end: p.end, avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries } };
+      const { options, failures } = await fetchRouteOptions({ apiKey: store.getApiKey(), vehicle, ...p });
+      choice = {
+        options, failures, selected: 0, vehicle, start: p.start, end: p.end,
+        avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, toLabel: p.toLabel,
+      };
+      // Fiches d'abord : le panneau grandit et la carte rétrécit ; le cadrage se fait ensuite sur la bonne taille.
+      renderChoice();
       navStartBtn.hidden = false;
+      map.showRoutes(options.map((o) => o.route), 0);
+      const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
         distance: route.distance, duration: route.duration, tollDistance: route.tollDistance,
       }));
     } catch (err) {
       summaryNode.hidden = true;
+      notesNode.hidden = true;
       navStartBtn.hidden = true;
-      lastRoute = null;
+      choice = null;
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {
       form.setBusy(false);
