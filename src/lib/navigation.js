@@ -25,6 +25,17 @@ export const NAV = Object.freeze({
   OFF_ROUTE_FIXES: 3,
   OFF_ROUTE_MS: 5000,
   MAX_ACCURACY_M: 100,
+  /**
+   * Phase 7b (retour terrain : à l'arrêt sur une aire, un GPS qui dérive a changé l'itinéraire, 138 → 159 km) :
+   * aucune détection « hors itinéraire » sous 10 km/h ni avec une précision moins bonne que 30 m. À l'arrêt hors du
+   * tracé (aire, parking), le recalcul est seulement proposé (bouton) : l'itinéraire ne change pas sans accord.
+   */
+  OFF_ROUTE_MIN_SPEED: 10 / 3.6,
+  OFF_ROUTE_MAX_ACCURACY_M: 30,
+  /** Vitesse calculée entre deux positions au-delà de 150 km/h : saut de position (bruit), ignorée. */
+  MAX_COMPUTED_SPEED: 150 / 3.6,
+  /** Proposition « Recalculer d'ici » après 3 positions hors tracé, à l'arrêt. */
+  STOPPED_OFF_FIXES: 3,
   /** Au plus un recalcul toutes les 30 s (quota gratuit HeiGIT : 2 000 itinéraires/jour, 40/min). */
   REROUTE_COOLDOWN_MS: 30000,
   /** Arrivée à 50 m de la destination ; aucun recalcul à moins de 150 m (entrée de dépôt souvent à côté du point). */
@@ -133,6 +144,7 @@ export function startNavigation(route, { destination = null, now = 0 } = {}) {
     uturnIndex: -1,
     offCount: 0,
     offSince: null,
+    stoppedOffCount: 0,
     rerouting: false,
     lastRerouteAt: null,
     rerouteBlocked: false,
@@ -153,17 +165,24 @@ export function updateNavigation(state, fix) {
   const p = [fix.lon, fix.lat];
   const t = isNum(fix.timestamp) ? fix.timestamp : (s.lastFixAt ?? s.startedAt) + 1000;
 
-  // Vitesse : celle du GPS, sinon calculée entre deux positions ; lissée.
+  const accuracy = isNum(fix.accuracy) && fix.accuracy >= 0 ? fix.accuracy : 0;
+
+  // Vitesse : celle du GPS, sinon calculée entre deux positions ; lissée. Un déplacement plus petit que la
+  // précision annoncée est du bruit (GPS qui dérive à l'arrêt) : vitesse nulle.
   let raw = isNum(fix.speed) && fix.speed >= 0 ? fix.speed : null;
   const dt = s.lastFixAt !== null ? (t - s.lastFixAt) / 1000 : 0;
-  if (raw === null && s.lastFix && dt > 0 && dt <= 10) raw = haversine(s.lastFix, p) / dt;
+  if (raw === null && s.lastFix && dt > 0 && dt <= 10) {
+    const moved = haversine(s.lastFix, p);
+    raw = moved > accuracy ? moved / dt : 0;
+    if (raw > NAV.MAX_COMPUTED_SPEED) raw = null;
+  }
   if (raw !== null) s.speed = s.speed === null ? raw : s.speed + NAV.SPEED_SMOOTHING * (raw - s.speed);
   const speed = s.speed ?? 0;
 
   const loc = locateOnLine(line, p, s.segIndex);
   s.segIndex = loc.segIndex;
-  const accuracy = isNum(fix.accuracy) && fix.accuracy >= 0 ? fix.accuracy : 0;
   const reliable = accuracy <= NAV.MAX_ACCURACY_M;
+  const precise = isNum(fix.accuracy) && fix.accuracy <= NAV.OFF_ROUTE_MAX_ACCURACY_M;
   const threshold = NAV.OFF_ROUTE_BASE_M + Math.min(accuracy, NAV.OFF_ROUTE_ACCURACY_CAP_M);
   const onRoute = loc.distance <= threshold;
   const remaining = Math.max(0, line.total - loc.along);
@@ -186,11 +205,15 @@ export function updateNavigation(state, fix) {
     events.push({ type: 'speak', text: arrivedText(goalOf(s.route)), interrupt: true }, { type: 'arrived' });
   }
 
-  // Hors itinéraire → recalcul (jamais près de la destination ni après l'arrivée).
-  if (s.arrived || toDest < NAV.NO_REROUTE_NEAR_DEST_M || onRoute) {
+  // Hors itinéraire → recalcul (jamais près de la destination ni après l'arrivée), seulement en roulant
+  // (≥ 10 km/h) avec une position précise (≤ 30 m). À l'arrêt hors du tracé : proposition seulement.
+  const rolling = speed >= NAV.OFF_ROUTE_MIN_SPEED;
+  const offCandidate = !s.arrived && toDest >= NAV.NO_REROUTE_NEAR_DEST_M && !onRoute;
+  s.stoppedOffCount = offCandidate && !rolling && reliable ? s.stoppedOffCount + 1 : 0;
+  if (!offCandidate || !rolling || !precise) {
     s.offCount = 0;
     s.offSince = null;
-  } else if (reliable) {
+  } else {
     s.offCount += 1;
     if (s.offSince === null) s.offSince = t;
     const cooled = s.lastRerouteAt === null || t - s.lastRerouteAt >= NAV.REROUTE_COOLDOWN_MS;
@@ -247,6 +270,9 @@ export function updateNavigation(state, fix) {
     arrived: s.arrived,
     rerouting: s.rerouting,
     rerouteBlocked: s.rerouteBlocked,
+    /** À l'arrêt hors du tracé : proposer « Recalculer d'ici » (bouton), sans rien changer tout seul. */
+    offRouteStopped: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES,
+    canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -267,6 +293,21 @@ export function updateNavigation(state, fix) {
   return { state: s, view, events };
 }
 
+function canReroute(state, now) {
+  const cooled = state.lastRerouteAt === null || now - state.lastRerouteAt >= NAV.REROUTE_COOLDOWN_MS;
+  return !state.rerouting && !state.rerouteBlocked && !state.arrived && cooled && !!state.lastFix;
+}
+
+/**
+ * Recalcul demandé par le conducteur (bouton « Recalculer d'ici », à l'arrêt hors du tracé). Même délai de 30 s
+ * entre deux recalculs (quota HeiGIT). Sans position, pendant un recalcul ou après un refus de clé : rien.
+ */
+export function requestReroute(state, now) {
+  if (!state || !canReroute(state, now)) return { state, events: [] };
+  const s = { ...state, rerouting: true, lastRerouteAt: now };
+  return { state: s, events: [{ type: 'reroute', from: state.lastFix, bearing: state.bearing, manual: true }] };
+}
+
 /** Le signal GPS est-il perdu (aucune position depuis GPS_LOST_MS) ? */
 export function gpsLost(state, now) {
   const ref = state.lastFixAt ?? state.startedAt;
@@ -283,6 +324,7 @@ export function rerouteDone(state, route) {
     started: true,
     offCount: 0,
     offSince: null,
+    stoppedOffCount: 0,
     rerouting: false,
     failNotified: false,
   };

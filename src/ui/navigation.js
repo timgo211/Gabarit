@@ -4,16 +4,19 @@
 //
 // Code de la route, art. R412-6-2 (Légifrance) : un écran allumé dans le champ de vision du conducteur n'est permis
 // que s'il sert d'aide à la conduite ou à la navigation. Pendant le guidage, l'écran ne montre donc que la carte
-// et le guidage, sans aucune saisie : trois gros boutons (voix, recentrer, arrêter).
+// et le guidage, sans aucune saisie : trois gros boutons (voix, recentrer, arrêter) et, à l'arrêt hors du tracé
+// seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
 
-import { $ } from './dom.js';
+import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
-  startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition,
+  startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute,
 } from '../lib/navigation.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
-import { formatNavDistance, formatDistance, formatDuration, formatArrival, formatSpeed } from '../lib/format.js';
+import {
+  formatNavDistance, formatDistance, formatDuration, formatArrival, formatSpeed, splitUnit, isLongInstruction,
+} from '../lib/format.js';
 import { ERROR_KINDS } from '../lib/ors-errors.js';
 
 const RECENTER_AFTER_MS = 15000;
@@ -34,6 +37,7 @@ export function createNavigation(ctx) {
     instr: $('#nav-instr'),
     then: $('#nav-then'),
     alert: $('#nav-alert'),
+    reroute: $('#btn-nav-reroute'),
     remaining: $('#nav-remaining'),
     time: $('#nav-time'),
     eta: $('#nav-eta'),
@@ -63,6 +67,19 @@ export function createNavigation(ctx) {
     ui.voice.disabled = !ctx.voice.supported;
   }
 
+  /** Valeur avec unité réduite, puis réduction de la taille si elle ne tient pas dans sa case. */
+  function setStat(node, text) {
+    const { value, unit } = splitUnit(text);
+    setValueUnit(node, value, unit);
+    fitText(node);
+  }
+
+  function setInstruction(text) {
+    ui.instr.textContent = text;
+    ui.instr.classList.toggle('long', isLongInstruction(text));
+    fitText(ui.instr, 0.7);
+  }
+
   function setIcon(icon) {
     ui.icon.replaceChildren(maneuverSvg(icon));
   }
@@ -74,6 +91,7 @@ export function createNavigation(ctx) {
     if (view?.rerouting) return 'Hors itinéraire : recalcul en cours…';
     if (s.error && view && !view.onRoute) return `Recalcul impossible : ${s.error}`;
     if (view?.rerouteBlocked && !view.onRoute) return 'Hors itinéraire. Recalcul indisponible : rejoins l\'itinéraire.';
+    if (view?.offRouteStopped) return 'Hors itinéraire, à l\'arrêt : l\'itinéraire ne change pas sans ton accord.';
     return '';
   }
 
@@ -81,19 +99,24 @@ export function createNavigation(ctx) {
     const text = alertText(view);
     ui.alert.textContent = text;
     ui.alert.hidden = !text;
+    ui.alert.classList.toggle('info', text !== '' && !!view?.offRouteStopped && !view.rerouting && !s?.error && !s?.gpsLost);
+    // Proposition à l'arrêt hors du tracé (aire, parking) : un seul bouton, jamais de recalcul tout seul.
+    const offer = !!s && !s.gpsLost && !!view?.offRouteStopped && !view.rerouting && !view.rerouteBlocked;
+    ui.reroute.hidden = !offer;
+    ui.reroute.disabled = !view?.canRequestReroute;
   }
 
   function render(view) {
     if (view.arrived) {
       setIcon({ kind: 'goal' });
       ui.dist.textContent = '';
-      ui.instr.textContent = 'Destination atteinte';
+      setInstruction('Destination atteinte');
       ui.then.hidden = true;
       ui.stop.textContent = '✔ Terminer';
     } else if (view.maneuver) {
       setIcon(view.maneuver.icon);
-      ui.dist.textContent = formatNavDistance(view.maneuver.distance);
-      ui.instr.textContent = view.maneuver.text;
+      setStat(ui.dist, formatNavDistance(view.maneuver.distance));
+      setInstruction(view.maneuver.text);
       if (view.then) {
         ui.then.textContent = `Puis : ${view.then.text}`;
         ui.then.hidden = false;
@@ -103,13 +126,13 @@ export function createNavigation(ctx) {
     } else {
       setIcon({ kind: 'arrow', angle: 0 });
       ui.dist.textContent = '';
-      ui.instr.textContent = 'Suivez l\'itinéraire';
+      setInstruction('Suivez l\'itinéraire');
       ui.then.hidden = true;
     }
-    ui.remaining.textContent = formatDistance(view.remainingDistance);
-    ui.time.textContent = formatDuration(view.remainingDuration);
-    ui.eta.textContent = formatArrival(new Date(), view.remainingDuration);
-    ui.speed.textContent = formatSpeed(view.speedKmh);
+    setStat(ui.remaining, formatDistance(view.remainingDistance));
+    setStat(ui.time, formatDuration(view.remainingDuration));
+    setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
+    setStat(ui.speed, formatSpeed(view.speedKmh));
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
     renderAlert(view);
 
@@ -226,9 +249,10 @@ export function createNavigation(ctx) {
     ui.stop.textContent = '■ Arrêter';
     ui.then.hidden = true;
     ui.alert.hidden = true;
+    ui.reroute.hidden = true;
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';
-    ui.instr.textContent = s.sim ? 'Simulation…' : 'Recherche du signal GPS…';
+    setInstruction(s.sim ? 'Simulation…' : 'Recherche du signal GPS…');
     for (const n of [ui.remaining, ui.time, ui.eta, ui.speed]) n.textContent = '—';
     renderVoice();
     ctx.map.setNavigating(true);
@@ -274,6 +298,13 @@ export function createNavigation(ctx) {
   }
 
   ui.stop.addEventListener('click', () => stop());
+  ui.reroute.addEventListener('click', () => {
+    if (!s) return;
+    const r = requestReroute(s.state, Date.now());
+    s.state = r.state;
+    if (r.events.length) ui.reroute.disabled = true;
+    handle(r.events);
+  });
   ui.recenter.addEventListener('click', recenter);
   ui.voice.addEventListener('click', () => {
     const on = !ctx.voice.enabled;

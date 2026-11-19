@@ -26,6 +26,14 @@ function simFixes(route, kmh, seconds, { from = 0, t0 = T0 } = {}) {
 /** Position immobile (feu rouge) : vitesse 0, cap absent. */
 const still = (p, t, accuracy = 5) => ({ lon: p[0], lat: p[1], accuracy, speed: 0, heading: null, timestamp: t });
 
+/** Camion qui s'éloigne du tracé en roulant (50 km/h, cap constant), une position par seconde. */
+const leaving = (origin, bearing, startM, t0, n, { from = 0 } = {}) => Array.from({ length: n }, (_, k) => {
+  const i = from + k;
+  const q = destinationPoint(origin, bearing, startM + i * 14);
+  return { lon: q[0], lat: q[1], accuracy: 5, speed: 14, heading: bearing, timestamp: t0 + i * 1000 };
+});
+const OFF_ORIGIN = NAV_ROUTE.coordinates[2];
+
 const speeches = (events) => events.filter((e) => e.type === 'speak');
 const reroutes = (events) => events.filter((e) => e.type === 'reroute');
 
@@ -126,31 +134,32 @@ test('position imprécise (> 100 m) : ignorée pour le hors-itinéraire', () => 
   assert.equal(reroutes(runFixes(updateNavigation, st, fixes).events).length, 0);
 });
 
-test('hors itinéraire : recalcul après 3 positions et 5 s, une seule demande à la fois', () => {
+test('hors itinéraire en roulant : recalcul après 3 positions et 5 s, une seule demande à la fois', () => {
   const st = startNavigation(NAV_ROUTE, { now: T0 });
-  const off = destinationPoint(NAV_ROUTE.coordinates[2], 0, 120);
-  const fixes = Array.from({ length: 4 }, (_, i) => still(off, T0 + i * 1000));
-  let r = runFixes(updateNavigation, st, fixes);
+  let r = runFixes(updateNavigation, st, leaving(OFF_ORIGIN, 0, 120, T0, 4));
   assert.equal(reroutes(r.events).length, 0, 'pas avant 5 s');
-  r = runFixes(updateNavigation, r.state, Array.from({ length: 20 }, (_, i) => still(off, T0 + (4 + i) * 1000)));
+  const more = leaving(OFF_ORIGIN, 0, 120, T0, 20, { from: 4 });
+  r = runFixes(updateNavigation, r.state, more);
   const rr = reroutes(r.events);
   assert.equal(rr.length, 1);
   assert.equal(rr[0].t, T0 + 5000);
-  assert.deepEqual(rr[0].from, off);
+  assert.deepEqual(rr[0].from, [more[1].lon, more[1].lat]);
+  assert.equal(rr[0].manual, undefined, 'recalcul automatique');
   assert.equal(r.state.rerouting, true);
   assert.equal(r.views.at(-1).rerouting, true);
   assert.equal(r.views.at(-1).onRoute, false);
-  assert.ok(haversine(r.views.at(-1).position, off) < 0.01, 'hors route : position brute affichée');
+  assert.equal(r.views.at(-1).offRouteStopped, false, 'en roulant : pas de proposition');
+  const last = more.at(-1);
+  assert.ok(haversine(r.views.at(-1).position, [last.lon, last.lat]) < 0.01, 'hors route : position brute affichée');
 });
 
 test('recalcul en échec (réseau) : nouvel essai 30 s après, message vocal une seule fois', () => {
-  const off = destinationPoint(NAV_ROUTE.coordinates[2], 0, 120);
-  let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), Array.from({ length: 6 }, (_, i) => still(off, T0 + i * 1000)));
+  let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), leaving(OFF_ORIGIN, 0, 120, T0, 6));
   assert.equal(reroutes(r.events).length, 1);
   let f = rerouteFailed(r.state, 'network');
   assert.equal(f.events.length, 1);
   assert.match(f.events[0].text, /Recalcul impossible/);
-  r = runFixes(updateNavigation, f.state, Array.from({ length: 40 }, (_, i) => still(off, T0 + (6 + i) * 1000)));
+  r = runFixes(updateNavigation, f.state, leaving(OFF_ORIGIN, 0, 120, T0, 40, { from: 6 }));
   const rr = reroutes(r.events);
   assert.equal(rr.length, 1);
   assert.equal(rr[0].t, T0 + 5000 + NAV.REROUTE_COOLDOWN_MS);
@@ -160,18 +169,17 @@ test('recalcul en échec (réseau) : nouvel essai 30 s après, message vocal une
 
 test('recalcul refusé (quota du jour, clé) : plus de nouvelle demande', () => {
   for (const kind of ['daily-quota', 'key-or-quota', 'invalid-key', 'no-key']) {
-    const off = destinationPoint(NAV_ROUTE.coordinates[2], 0, 120);
-    let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), Array.from({ length: 6 }, (_, i) => still(off, T0 + i * 1000)));
+    let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), leaving(OFF_ORIGIN, 0, 120, T0, 6));
+    assert.equal(reroutes(r.events).length, 1, kind);
     const f = rerouteFailed(r.state, kind);
-    r = runFixes(updateNavigation, f.state, Array.from({ length: 90 }, (_, i) => still(off, T0 + (6 + i) * 1000)));
+    r = runFixes(updateNavigation, f.state, leaving(OFF_ORIGIN, 0, 120, T0, 90, { from: 6 }));
     assert.equal(reroutes(r.events).length, 0, kind);
     assert.equal(r.views.at(-1).rerouteBlocked, true);
   }
 });
 
 test('après un recalcul qui commence par un demi-tour : phrase prudente une seule fois', () => {
-  const off = destinationPoint(NAV_ROUTE.coordinates[2], 0, 120);
-  let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), Array.from({ length: 6 }, (_, i) => still(off, T0 + i * 1000)));
+  let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), leaving(OFF_ORIGIN, 0, 120, T0, 6));
   const done = rerouteDone(r.state, UTURN_ROUTE);
   assert.deepEqual(done.events.map((e) => e.text), [`Itinéraire recalculé. ${UTURN_SAFE_TEXT}.`]);
   assert.equal(done.state.rerouting, false);
@@ -225,8 +233,12 @@ test('près de la destination (< 150 m) : jamais de recalcul ; arrivée à 50 m'
 
 test('à 151 m de la destination et hors tracé : le recalcul reste possible', () => {
   const end = NAV_ROUTE.coordinates.at(-1);
-  const p = destinationPoint(end, 60, 160);
-  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), Array.from({ length: 8 }, (_, i) => still(p, T0 + i * 1000)));
+  // En roulant sur un cercle de 160 m autour de la fin (5° par seconde ≈ 14 m/s).
+  const fixes = Array.from({ length: 8 }, (_, i) => {
+    const q = destinationPoint(end, 60 + i * 5, 160);
+    return { lon: q[0], lat: q[1], accuracy: 5, speed: 14, heading: 150 + i * 5, timestamp: T0 + i * 1000 };
+  });
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
   assert.equal(reroutes(r.events).length, 1);
 });
 
@@ -286,4 +298,91 @@ test('position illisible : état inchangé', () => {
   const r = updateNavigation(st, { lon: Number.NaN, lat: 45 });
   assert.equal(r.state, st);
   assert.equal(r.view, null);
+});
+
+// ───────── Phase 7b : pas de recalcul à l'arrêt ni avec un GPS imprécis ─────────
+
+/** Camion arrêté sur une aire à 120 m du tracé, GPS qui dérive jusqu'à 60 m autour (n positions, 1 par seconde). */
+function parkedDrift(n, { speed = 0, accuracy = 15 } = {}) {
+  const aire = destinationPoint(NAV_ROUTE.coordinates[3], 0, 120);
+  return Array.from({ length: n }, (_, i) => {
+    const q = destinationPoint(aire, (i * 137) % 360, 60 * Math.abs(Math.sin(i * 0.9)));
+    return { lon: q[0], lat: q[1], accuracy, speed, heading: speed ? (i * 53) % 360 : null, timestamp: T0 + i * 1000 };
+  });
+}
+
+test('camion arrêté (0 km/h) hors du tracé, GPS qui dérive de 60 m : aucun recalcul, recalcul seulement proposé', () => {
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), parkedDrift(600));
+  assert.equal(reroutes(r.events).length, 0);
+  assert.equal(r.state.rerouting, false);
+  const v = r.views.at(-1);
+  assert.equal(v.onRoute, false);
+  assert.equal(v.offRouteStopped, true, 'proposition « Recalculer d\'ici »');
+  assert.equal(v.canRequestReroute, true);
+  assert.equal(r.views[1].offRouteStopped, false, 'pas dès la première position');
+});
+
+test('arrêté, GPS qui dérive sans donner la vitesse : la dérive ne fait pas une vitesse, aucun recalcul', () => {
+  // Dérive lente (≈ 10 m d'une position à l'autre) sur un cercle de 60 m, précision annoncée 40 m.
+  const aire = destinationPoint(NAV_ROUTE.coordinates[3], 0, 120);
+  const fixes = Array.from({ length: 600 }, (_, i) => {
+    const q = destinationPoint(aire, i * 10, 60);
+    return { lon: q[0], lat: q[1], accuracy: 40, speed: null, heading: null, timestamp: T0 + i * 1000 };
+  });
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+  assert.equal(reroutes(r.events).length, 0);
+  assert.ok(r.views.every((v) => v.speedKmh < 10), `vitesse max ${Math.max(...r.views.map((v) => v.speedKmh))}`);
+});
+
+test('GPS imprécis (40 m) en roulant hors du tracé : pas de recalcul ; sous 10 km/h non plus', () => {
+  const imprecise = leaving(OFF_ORIGIN, 0, 120, T0, 120).map((f) => ({ ...f, accuracy: 40 }));
+  assert.equal(reroutes(runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), imprecise).events).length, 0);
+  const slow = leaving(OFF_ORIGIN, 0, 120, T0, 120).map((f, i) => {
+    const q = destinationPoint(OFF_ORIGIN, 0, 120 + i * 2.2);
+    return { ...f, lon: q[0], lat: q[1], speed: 2.2 }; // 8 km/h
+  });
+  assert.equal(reroutes(runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), slow).events).length, 0);
+  // Pile 10 km/h, précision 30 m : vraie sortie de route, recalcul.
+  const limit = leaving(OFF_ORIGIN, 0, 120, T0, 20).map((f, i) => {
+    const q = destinationPoint(OFF_ORIGIN, 0, 120 + (i * 10) / 3.6);
+    return { ...f, lon: q[0], lat: q[1], speed: 10 / 3.6, accuracy: 30 };
+  });
+  assert.equal(reroutes(runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), limit).events).length, 1);
+});
+
+test('« Recalculer d\'ici » (à l\'arrêt) : une demande, puis attente du délai de 30 s', async () => {
+  const { requestReroute } = await import('../src/lib/navigation.js');
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), parkedDrift(10));
+  const now = T0 + 10_000;
+  const a = requestReroute(r.state, now);
+  assert.equal(a.events.length, 1);
+  assert.equal(a.events[0].type, 'reroute');
+  assert.equal(a.events[0].manual, true);
+  assert.deepEqual(a.events[0].from, r.state.lastFix);
+  assert.equal(a.state.rerouting, true);
+  assert.equal(requestReroute(a.state, now + 1000).events.length, 0, 'déjà en cours');
+  const failed = rerouteFailed(a.state, 'network').state;
+  assert.equal(requestReroute(failed, now + 5000).events.length, 0, 'moins de 30 s');
+  assert.equal(requestReroute(failed, now + NAV.REROUTE_COOLDOWN_MS).events.length, 1);
+  assert.equal(requestReroute(rerouteFailed(a.state, 'daily-quota').state, now + 60_000).events.length, 0, 'quota');
+  assert.equal(requestReroute(startNavigation(NAV_ROUTE, { now: T0 }), T0).events.length, 0, 'sans position');
+});
+
+test('de retour sur le tracé après l\'arrêt : plus de proposition', () => {
+  let r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), parkedDrift(10));
+  assert.equal(r.views.at(-1).offRouteStopped, true);
+  r = runFixes(updateNavigation, r.state, simFixes(NAV_ROUTE, 50, 5, { from: 11 }));
+  assert.equal(r.views.at(-1).offRouteStopped, false);
+  assert.equal(reroutes(r.events).length, 0);
+});
+
+test('saut de position (vitesse calculée > 150 km/h) : ignoré, pas de recalcul', () => {
+  const aire = destinationPoint(NAV_ROUTE.coordinates[3], 0, 150);
+  const fixes = Array.from({ length: 120 }, (_, i) => {
+    const q = destinationPoint(aire, 0, i % 2 ? 60 : 0); // sauts de 60 m toutes les 0,4 s (540 km/h)
+    return { lon: q[0], lat: q[1], accuracy: 10, speed: null, heading: null, timestamp: T0 + i * 400 };
+  });
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+  assert.equal(reroutes(r.events).length, 0);
+  assert.ok(r.views.every((v) => v.speedKmh < 10));
 });

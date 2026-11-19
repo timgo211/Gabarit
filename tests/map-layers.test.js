@@ -57,3 +57,32 @@ test('tuiles IGN : WMTS Géoplateforme sans clé, jamais mises en cache par le s
   const tile = url.replace('{z}', '17').replace('{y}', '45000').replace('{x}', '66000');
   assert.equal(cacheStrategy('GET', tile, 'https://exemple.github.io'), 'bypass');
 });
+
+test('changement de thème : photos IGN et tracés recopiés dans le nouveau style (carryOverlay)', async () => {
+  const { carryOverlay } = await import('../src/lib/map-layers.js');
+  const prev = {
+    sources: { base: { type: 'vector' }, 'ign-ortho': { type: 'raster', tiles: ['t'] }, route: { type: 'geojson', data: { a: 1 } } },
+    layers: [
+      { id: 'bg', type: 'background' }, { id: 'ign-ortho', type: 'raster', source: 'ign-ortho', layout: { visibility: 'visible' } },
+      { id: 'labels', type: 'symbol', source: 'base' }, { id: 'route-line', type: 'line', source: 'route', paint: { 'line-color': '#00f', 'line-width': 7 } },
+    ],
+  };
+  const next = {
+    sources: { base: { type: 'vector', url: 'nuit' } },
+    layers: [{ id: 'bg', type: 'background' }, { id: 'roads', type: 'line', source: 'base' }, { id: 'labels', type: 'symbol', source: 'base' }],
+  };
+  const out = carryOverlay(prev, next, {
+    below: ['ign-ortho'], above: ['route-line', 'route-absent'], paint: { 'route-line': { 'line-color': '#fb0' } },
+  });
+  assert.deepEqual(out.layers.map((l) => l.id), ['bg', 'roads', 'ign-ortho', 'labels', 'route-line']);
+  assert.equal(out.layers[2].layout.visibility, 'visible');
+  assert.deepEqual(out.layers[4].paint, { 'line-color': '#fb0', 'line-width': 7 });
+  assert.deepEqual(Object.keys(out.sources).sort(), ['base', 'ign-ortho', 'route']);
+  assert.equal(out.sources.base.url, 'nuit');
+  assert.deepEqual(out.sources.route.data, { a: 1 });
+  assert.equal(next.layers.length, 3, 'nouveau style non modifié');
+  // Sans libellés : photos tout en haut du fond, sous les tracés. Pas de style précédent : rien à recopier.
+  const noSym = carryOverlay(prev, { sources: {}, layers: [{ id: 'bg', type: 'background' }] }, { below: ['ign-ortho'], above: ['route-line'] });
+  assert.deepEqual(noSym.layers.map((l) => l.id), ['bg', 'ign-ortho', 'route-line']);
+  assert.deepEqual(carryOverlay(undefined, next, { below: ['ign-ortho'] }).layers.map((l) => l.id), ['bg', 'roads', 'labels']);
+});

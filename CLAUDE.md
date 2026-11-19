@@ -25,6 +25,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
   `ors-directions-alternatives.json` = 3 itinéraires, `ors-variant-*.json` = variantes, Recommandé et Plus court identiques)
+- `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
 - `docs/ROADMAP.md` : phases 1 à 7 ; `tools/make-icons.mjs` : génère les PNG
 
 ## Tester
@@ -32,6 +33,14 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 node --test
 ```
 (lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert.
+
+Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'interface) :
+```
+npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
+node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked
+```
+Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
+changement de thème, perte du contexte WebGL, camion arrêté hors du tracé. Captures dans `tools/ui-shots/` (ignoré).
 
 ## Conventions
 - HTML/CSS/JS vanilla, modules ES, sans framework, sans build, sans dépendance npm.
@@ -43,6 +52,13 @@ node --test
 - Toute modif de fichier mis en cache → incrémenter `VERSION` dans `sw.js` et ajouter le fichier à `APP_FILES`.
 - Nouvelle logique → dans `src/lib/` avec ses tests ; règles réglementaires citées en commentaire avec la source officielle.
 - Guidage : toute position (GPS réel ou simulation) passe par `updateNavigation` ; l'UI ne prend aucune décision.
+  Hors itinéraire (`NAV`) : détection seulement à ≥ 10 km/h avec une précision ≤ 30 m ; à l'arrêt hors du tracé,
+  recalcul seulement proposé (bouton « Recalculer d'ici », `requestReroute`) : l'itinéraire ne change jamais sans
+  accord hors d'une vraie sortie de route en roulant.
+- Carte : changement de thème par `setStyle(url, { transformStyle })` (`carryOverlay` recopie photos IGN et tracés) ;
+  contexte WebGL perdu et non rendu → carte recréée à l'identique (`src/ui/map.js`), le guidage continue.
+- Téléphone (≤ 600 px) : rien ne dépasse en largeur (`min-width: 0` sur les éléments flexibles, champs compris) ;
+  tablette inchangée.
   Tester un comportement de guidage = une trace de positions simulées dans `tests/navigation.test.js` ou `nav-sim.test.js`.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).

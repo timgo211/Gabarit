@@ -21,7 +21,7 @@
       <button type="button" id="btn-vehicles" class="btn btn-chip" aria-label="Choisir le véhicule">
         <span aria-hidden="true">🚚</span> <span id="active-vehicle-name">—</span>
       </button>
-      <button type="button" id="btn-share" class="btn" aria-label="Partager">⤴ Partager</button>
+      <button type="button" id="btn-share" class="btn" aria-label="Partager"><span aria-hidden="true">⤴</span><span class="btn-label"> Partager</span></button>
       <button type="button" id="btn-settings" class="btn btn-icon" aria-label="Réglages">⚙</button>
     </header>
 
@@ -45,6 +45,7 @@
           </div>
           <div id="nav-then" class="nav-then" hidden></div>
           <div id="nav-alert" class="nav-alert" role="status" hidden></div>
+          <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
         </div>
         <div class="nav-bottom">
           <div id="nav-sim" class="nav-sim" hidden>
@@ -56,7 +57,7 @@
             <div><dt>Reste</dt><dd id="nav-remaining">—</dd></div>
             <div><dt>Temps</dt><dd id="nav-time">—</dd></div>
             <div><dt>Arrivée</dt><dd id="nav-eta">—</dd></div>
-            <div><dt>Vitesse GPS</dt><dd id="nav-speed">—</dd></div>
+            <div><dt>Vitesse</dt><dd id="nav-speed">—</dd></div>
           </dl>
           <p id="nav-screen" class="nav-screen" hidden>⚠ Écran non maintenu allumé (économie d'énergie ?)</p>
           <div class="nav-buttons">

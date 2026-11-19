@@ -63,6 +63,7 @@ html, body {
   height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr auto auto;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-areas: "top" "map" "panel" "foot";
 }
 
@@ -77,7 +78,7 @@ html, body {
   background: #0f1720;
   color: #fff;
 }
-.brand { margin: 0 auto 0 0; font-size: 1.4rem; color: var(--accent); letter-spacing: .02em; }
+.brand { flex: 0 0 auto; margin: 0 auto 0 0; font-size: 1.4rem; color: var(--accent); letter-spacing: .02em; }
 
 .map-wrap { grid-area: map; position: relative; min-height: 200px; }
 .map { position: absolute; inset: 0; background: var(--panel); }
@@ -158,7 +159,10 @@ html, body {
 .btn-danger { background: var(--danger); color: var(--danger-fg); border-color: var(--danger); }
 .btn-big { width: 100%; min-height: 64px; font-size: 1.2rem; }
 .topbar .btn { background: #1d2a37; color: #fff; border-color: #4b5a69; }
-.btn-chip { max-width: 55vw; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.btn-chip { flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; white-space: nowrap; padding: 0 12px; }
+.btn-chip #active-vehicle-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.topbar .btn { flex: 0 0 auto; }
+.topbar .btn-chip { flex: 0 1 auto; }
 
 /* Formulaires */
 .route-form { display: grid; gap: 10px; }
@@ -178,6 +182,9 @@ input[type="search"], input[type="text"], input[type="password"], input[inputmod
   border-radius: var(--radius);
 }
 input.invalid { border-color: var(--danger); }
+/* Un champ a une largeur minimale implicite (≈ 20 caractères) : sans min-width 0, il fait déborder un téléphone. */
+input, select, textarea { min-width: 0; }
+.field, .combo, .route-form, .panel > *, .card { min-width: 0; }
 
 .suggestions {
   list-style: none; margin: 4px 0 0; padding: 0;
@@ -193,7 +200,7 @@ input.invalid { border-color: var(--danger); }
 
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
 .toggle {
-  flex: 1 1 140px; min-height: var(--tap); display: flex; align-items: center; gap: 10px;
+  flex: 1 1 140px; min-width: 0; min-height: var(--tap); display: flex; align-items: center; gap: 10px;
   padding: 0 12px; background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
 }
 input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-color: var(--primary); }
@@ -219,7 +226,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .route-card[aria-checked="true"] { border-color: var(--route); border-left-color: var(--route); box-shadow: inset 0 0 0 1px var(--route); }
 .route-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.route-card-title { min-width: 0; }
+.route-card-title { min-width: 0; overflow-wrap: anywhere; }
+.route-card-facts, .route-card-note, .route-to, .summary-notes, .route-failures { overflow-wrap: anywhere; }
 .route-card-name { font-weight: 800; font-size: 1.15rem; }
 .route-card-also { color: var(--muted); font-weight: 600; font-size: .9rem; }
 .route-card-time { font-size: 1.6rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -323,9 +331,17 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .ico-stroke { fill: none; stroke: currentColor; stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
 .ico-fill { fill: currentColor; }
 .ico-text { fill: currentColor; font: 800 30px system-ui, sans-serif; }
-.nav-maneuver-text { min-width: 0; }
-.nav-dist { font-size: 2.6rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
-.nav-instr { font-size: 1.3rem; font-weight: 600; line-height: 1.25; }
+.nav-maneuver-text { min-width: 0; flex: 1 1 auto; }
+.nav-dist { font-size: 2.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nav-dist .unit { font-size: .6em; margin-left: .12em; }
+/* Consigne : 3 lignes au plus, coupée entre les mots (ou dans un mot très long), plus petite si elle est longue. */
+.nav-instr {
+  font-size: 1.3rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.nav-instr.long { font-size: 1.1rem; -webkit-line-clamp: 5; line-clamp: 5; }
+.nav-then { overflow-wrap: anywhere; max-width: 100%; }
+.nav-alert { overflow-wrap: anywhere; }
 .nav-then {
   justify-self: start; padding: 8px 14px; border-radius: var(--radius);
   background: var(--nav-card); color: var(--nav-card-fg); font-weight: 700; font-size: 1.05rem;
@@ -336,16 +352,27 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   background: var(--nav-alert-bg); color: var(--nav-alert-fg); box-shadow: 0 4px 14px rgba(0,0,0,.35);
 }
 
+.nav-alert.info { background: var(--nav-card); color: var(--nav-card-fg); border: 2px solid var(--nav-accent); }
+.nav-reroute { justify-self: start; min-height: 64px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
+
 .nav-bottom {
   position: absolute; left: 10px; right: 10px; bottom: 10px;
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
   padding: 8px; border-radius: var(--radius);
   background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 -2px 16px rgba(0,0,0,.35);
 }
-.nav-stats { display: flex; flex: 1 1 380px; gap: 6px; margin: 0; }
-.nav-stats div { flex: 1 1 0; min-width: 0; padding: 2px 6px; }
-.nav-stats dt { font-size: .75rem; opacity: .8; white-space: nowrap; }
-.nav-stats dd { margin: 0; font-size: 1.35rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nav-stats {
+  flex: 1 1 380px; min-width: 0; margin: 0;
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+}
+.nav-stats div { min-width: 0; padding: 2px 6px; }
+.nav-stats dt { font-size: .75rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Valeur + unité plus petite ; réduite encore par fitText() (src/ui/dom.js) si elle ne tient pas. */
+.nav-stats dd {
+  margin: 0; font-size: clamp(1.05rem, 5.4vw, 1.35rem); font-weight: 800; white-space: nowrap; overflow: hidden;
+  font-variant-numeric: tabular-nums; line-height: 1.2;
+}
+.nav-stats dd .unit { font-size: .68em; font-weight: 700; margin-left: .12em; }
 .nav-buttons { display: flex; gap: 8px; flex: 0 1 auto; margin-left: auto; }
 .nav-buttons .btn { min-height: 64px; font-size: 1.1rem; }
 .nav-screen { order: 3; flex: 1 1 100%; margin: 0; font-weight: 700; color: var(--warn); }
@@ -367,10 +394,29 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 
 .segmented-row { grid-template-columns: repeat(3, 1fr); }
 
+/* Téléphone en portrait (≈ 360 à 412 px) : tout tient en largeur ; la tablette garde les règles ci-dessus. */
 @media (max-width: 600px) {
-  .nav-icon { width: 72px; height: 72px; }
-  .nav-dist { font-size: 2.1rem; }
+  .topbar { gap: 6px; padding-left: 8px; padding-right: 8px; }
+  .brand { font-size: 1.2rem; }
+  .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .topbar .btn { padding: 0 10px; }
+  .layer-switch .btn { min-height: 44px; padding: 0 10px; font-size: .95rem; }
+  .panel { padding: 10px; }
+  .row .btn { flex: 1 1 auto; }
+  .disclaimer { font-size: .72rem; }
+  .route-card-time { font-size: 1.35rem; }
+}
+@media (max-width: 600px) {
+  .nav-top { left: 8px; right: 8px; top: 8px; }
+  .nav-maneuver { gap: 10px; padding: 8px 10px 8px 6px; }
+  .nav-icon { width: 64px; height: 64px; }
+  .nav-dist { font-size: 2rem; }
   .nav-instr { font-size: 1.1rem; }
+  .nav-instr.long { font-size: .98rem; }
+  .nav-bottom { left: 8px; right: 8px; bottom: 8px; padding: 6px; gap: 6px; }
+  .nav-stats { flex: 1 1 100%; }
+  .nav-stats div { padding: 2px 3px; }
+  .nav-sim .btn { flex: 1 1 auto; min-height: 48px; padding: 0 10px; }
   .nav-buttons { flex: 1 1 100%; }
   .nav-buttons .btn { flex: 1 1 0; padding: 0 8px; }
 }

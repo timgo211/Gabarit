@@ -1,10 +1,14 @@
 // Carte MapLibre : fond OpenFreeMap avec repli VersaTiles, tracés des itinéraires (choisi en couleur, autres en gris),
 // position, suivi en guidage, vue satellite IGN (phase 7, à l'arrêt seulement).
 // MapLibre est chargé par index.html (window.maplibregl, version épinglée).
+//
+// Phase 7b : au retour de l'arrière-plan, Android peut retirer le contexte WebGL (carte vide). On écoute
+// webglcontextlost / webglcontextrestored ; si le contexte n'est pas rendu, la carte est recréée à l'identique
+// (style, tracés, marqueurs, caméra). Le guidage, lui, ne dépend pas de la carte et continue sans interruption.
 
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
-import { IGN_ORTHO, satelliteView, sanitizeMapLayer } from '../lib/map-layers.js';
+import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -13,6 +17,19 @@ const ROUTE_LAYERS = ['route-hit', 'route-line', 'route-casing', 'route-alt-line
 const TAP_MARGIN_PX = 10;
 const SAT_SOURCE = 'ign-ortho';
 const SAT_LAYER = 'ign-ortho';
+/** Contexte WebGL perdu : délai avant de recréer la carte s'il n'est pas rendu (retour au premier plan / page visible). */
+const RESTORE_WAIT_VISIBLE_MS = 1500;
+const RESTORE_WAIT_LOST_MS = 3000;
+
+/** Le canevas de la carte a-t-il perdu son contexte WebGL ? (getContext renvoie le contexte existant.) */
+function contextLost(canvas) {
+  try {
+    const gl = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+    return !gl || gl.isContextLost();
+  } catch {
+    return true;
+  }
+}
 
 /** Premier style qui répond (fetch rapide), sinon null. */
 async function pickStyle(urls) {
@@ -72,7 +89,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let onPick = null;
   let layer = sanitizeMapLayer(opts.layer);
   let lastView = null;
+  let styleUrl = null;
+  let lost = false;
+  let restoreTimer = null;
   const markers = { start: null, end: null, me: null };
+  /** Dernières positions des marqueurs (pour recréer la carte). */
+  const marks = { start: null, end: null, me: null, meBearing: null };
 
   function routesData() {
     return {
@@ -85,29 +107,40 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     };
   }
 
-  function addRouteLayers() {
-    if (!map || !routes.length || map.getSource('route')) return;
+  /** Couleurs des tracés selon le thème en cours (variables CSS). */
+  function routeColors() {
     const css = getComputedStyle(document.documentElement);
     const color = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    return {
+      'route-alt-casing': color('--route-alt-casing', '#fff'),
+      'route-alt-line': color('--route-alt', '#7d8894'),
+      'route-casing': color('--route-casing', '#fff'),
+      'route-line': color('--route', '#0b57d0'),
+    };
+  }
+
+  function addRouteLayers() {
+    if (!map || !routes.length || map.getSource('route')) return;
+    const c = routeColors();
     const isSelected = ['==', ['get', 'selected'], true];
     const layout = { 'line-join': 'round', 'line-cap': 'round' };
     map.addSource('route', { type: 'geojson', data: routesData() });
     // Ordre d'empilement : autres itinéraires (gris) dessous, itinéraire choisi dessus, zone de toucher invisible au-dessus.
     map.addLayer({
       id: 'route-alt-casing', type: 'line', source: 'route', filter: ['!', isSelected], layout,
-      paint: { 'line-color': color('--route-alt-casing', '#fff'), 'line-width': 9 },
+      paint: { 'line-color': c['route-alt-casing'], 'line-width': 9 },
     });
     map.addLayer({
       id: 'route-alt-line', type: 'line', source: 'route', filter: ['!', isSelected], layout,
-      paint: { 'line-color': color('--route-alt', '#7d8894'), 'line-width': 5 },
+      paint: { 'line-color': c['route-alt-line'], 'line-width': 5 },
     });
     map.addLayer({
       id: 'route-casing', type: 'line', source: 'route', filter: isSelected, layout,
-      paint: { 'line-color': color('--route-casing', '#fff'), 'line-width': 11 },
+      paint: { 'line-color': c['route-casing'], 'line-width': 11 },
     });
     map.addLayer({
       id: 'route-line', type: 'line', source: 'route', filter: isSelected, layout,
-      paint: { 'line-color': color('--route', '#0b57d0'), 'line-width': 7 },
+      paint: { 'line-color': c['route-line'], 'line-width': 7 },
     });
     map.addLayer({
       id: 'route-hit', type: 'line', source: 'route', layout,
@@ -166,6 +199,74 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (map && b) map.fitBounds(b, { padding: { top: 64, right: 72, bottom: 48, left: 48 }, duration, bearing: 0, pitch: 0 });
   }
 
+  /**
+   * Nouveau style (thème) : setStyle compare les deux styles et retirerait nos couches sans émettre « style.load » ;
+   * carryOverlay les recopie (photos sous les libellés, tracés au-dessus, aux couleurs du nouveau thème).
+   */
+  function transformStyle(prev, next) {
+    const c = routeColors();
+    const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
+    return carryOverlay(prev, next, { below: [SAT_LAYER], above: [...ROUTE_LAYERS].reverse(), paint });
+  }
+
+  /** Crée la carte MapLibre (au démarrage, ou pour remplacer une carte dont le contexte WebGL est perdu). */
+  function build(url, camera = { center: FRANCE_CENTER, zoom: 5 }) {
+    map = new lib.Map({ container, style: url, ...camera, attributionControl: { compact: true } });
+    map.addControl(new lib.NavigationControl({ showCompass: true }), 'top-right');
+    map.addControl(new lib.ScaleControl({ unit: 'metric' }), 'bottom-left');
+    // Geste de l'utilisateur (doigt) : les mouvements lancés par le code n'ont pas d'originalEvent.
+    for (const ev of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
+      map.on(ev, (e) => { if (e.originalEvent && navigating) onGesture?.(); });
+    }
+    map.on('click', onMapClick);
+    map.on('style.load', addSatelliteLayer); // aussi après une reconstruction complète du style
+    map.on('moveend', applyLayer);
+    map.on('webglcontextlost', () => {
+      lost = true;
+      scheduleRestoreCheck(RESTORE_WAIT_LOST_MS);
+    });
+    map.on('webglcontextrestored', () => {
+      lost = false;
+      clearTimeout(restoreTimer);
+      map.resize();
+      map.triggerRepaint();
+    });
+    map.once('style.load', addRouteLayers);
+    if (marks.start) marker('start', marks.start, '#146c2e');
+    if (marks.end) marker('end', marks.end, '#b3261e');
+    if (marks.me) vehicle(marks.me, marks.meBearing);
+  }
+
+  /** Recrée la carte à l'identique (même style, tracés, marqueurs, caméra). */
+  function recreate() {
+    if (!map || !styleUrl) return;
+    const camera = {
+      center: map.getCenter().toArray(), zoom: map.getZoom(), bearing: map.getBearing(), pitch: map.getPitch(),
+    };
+    const padding = map.getPadding();
+    try {
+      map.remove();
+    } catch {
+      // carte déjà inutilisable : on la remplace quand même
+    }
+    map = null;
+    markers.start = null; markers.end = null; markers.me = null;
+    lost = false;
+    lastView = null;
+    build(styleUrl, camera);
+    map.setPadding(padding);
+    applyLayer();
+  }
+
+  /** Contexte encore perdu après le délai (page visible) : la carte est recréée. */
+  function scheduleRestoreCheck(ms) {
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(() => {
+      if (!map || document.visibilityState === 'hidden') return; // on vérifiera au retour au premier plan
+      if (lost || contextLost(map.getCanvas())) recreate();
+    }, ms);
+  }
+
   async function loadStyle() {
     const url = await pickStyle(MAP_STYLES[theme] ?? MAP_STYLES.day);
     if (!url) {
@@ -173,21 +274,13 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       return;
     }
     fallbackNode.hidden = true;
+    styleUrl = url;
     if (!map) {
-      map = new lib.Map({ container, style: url, center: FRANCE_CENTER, zoom: 5, attributionControl: { compact: true } });
-      map.addControl(new lib.NavigationControl({ showCompass: true }), 'top-right');
-      map.addControl(new lib.ScaleControl({ unit: 'metric' }), 'bottom-left');
-      // Geste de l'utilisateur (doigt) : les mouvements lancés par le code n'ont pas d'originalEvent.
-      for (const ev of ['dragstart', 'zoomstart', 'rotatestart', 'pitchstart']) {
-        map.on(ev, (e) => { if (e.originalEvent && navigating) onGesture?.(); });
-      }
-      map.on('click', onMapClick);
-      map.on('style.load', addSatelliteLayer); // aussi après un changement de style (thème jour / nuit)
-      map.on('moveend', applyLayer);
+      build(url);
     } else {
-      map.setStyle(url);
+      map.setStyle(url, { transformStyle });
+      map.once('styledata', applyLayer);
     }
-    map.once('style.load', addRouteLayers);
   }
 
   if (!lib) {
@@ -195,9 +288,13 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     applyLayer();
   } else {
     loadStyle();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && map) scheduleRestoreCheck(RESTORE_WAIT_VISIBLE_MS);
+    });
   }
 
   function marker(key, lonlat, color) {
+    if (lonlat) marks[key] = lonlat;
     if (!map || !lonlat) return;
     if (!markers[key]) markers[key] = new lib.Marker({ color }).setLngLat(lonlat).addTo(map);
     else markers[key].setLngLat(lonlat);
@@ -205,6 +302,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
 
   /** Repère du véhicule, orienté selon le cap (degrés) s'il est donné. */
   function vehicle(lonlat, bearing = null) {
+    if (lonlat) { marks.me = lonlat; marks.meBearing = bearing; }
     if (!map || !lonlat) return;
     if (!markers.me) {
       markers.me = new lib.Marker({ element: vehicleElement(), rotationAlignment: 'map', pitchAlignment: 'map' })
