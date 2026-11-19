@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyError } from '../src/lib/ors-errors.js';
+import { classifyError, formatDiagnostic, summarizeKeyTest } from '../src/lib/ors-errors.js';
 import { fixture } from './helpers.js';
 
 test('aucun itinéraire autorisé (2009)', () => {
@@ -39,4 +39,39 @@ test('chaque message est en français et non vide', () => {
   for (const p of [{ offline: true }, { status: 429 }, { status: 403 }, { status: 404 }, { noKey: true }]) {
     assert.ok(classifyError(p).message.length > 10);
   }
+});
+
+test('diagnostic : code HTTP + message serveur, clé masquée, texte tronqué', () => {
+  assert.equal(formatDiagnostic({ status: 403, detail: 'Access to this API has been disallowed' }),
+    'HTTP 403 : Access to this API has been disallowed');
+  assert.equal(formatDiagnostic({ status: 401, detail: 'bad key CLE-FACTICE-123' }, 'CLE-FACTICE-123'), 'HTTP 401 : bad key •••');
+  assert.ok(formatDiagnostic({ status: 500, detail: 'x'.repeat(300) }).length < 120);
+  assert.match(formatDiagnostic({ kind: 'network' }), /pas de réponse/);
+});
+
+test('bouton Tester : les deux services OK', () => {
+  const r = summarizeKeyTest({ directions: { ok: true }, geocode: { ok: true } });
+  assert.equal(r.level, 'ok');
+  assert.equal(r.saveKey, true);
+});
+
+test('bouton Tester : itinéraires OK, recherche en échec → clé gardée, avertissement', () => {
+  const r = summarizeKeyTest({ directions: { ok: true }, geocode: { ok: false, kind: 'server', status: 500, detail: 'oops' } });
+  assert.equal(r.level, 'warn');
+  assert.equal(r.saveKey, true);
+  assert.match(r.message, /HTTP 500/);
+});
+
+test('bouton Tester : clé refusée → non enregistrée, code HTTP affiché', () => {
+  const bad = { ok: false, kind: 'invalid-key', status: 403, detail: 'Access to this API has been disallowed' };
+  const r = summarizeKeyTest({ directions: bad, geocode: bad }, 'CLE-FACTICE');
+  assert.equal(r.level, 'err');
+  assert.equal(r.saveKey, false);
+  assert.match(r.message, /HTTP 403/);
+  assert.doesNotMatch(r.message, /CLE-FACTICE/);
+});
+
+test('bouton Tester : quota dépassé → clé gardée', () => {
+  const r = summarizeKeyTest({ directions: { ok: false, kind: 'quota', status: 429 }, geocode: { ok: true } });
+  assert.equal(r.saveKey, true);
 });

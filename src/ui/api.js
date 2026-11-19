@@ -1,16 +1,19 @@
 // Appels réseau vers ORS / Pelias. Ne journalise jamais la clé ni les URL qui la contiennent.
 
-import { buildDirectionsRequest, directionsHeaders, buildAutocompleteUrl, parseAutocomplete } from '../lib/ors-request.js';
+import {
+  buildDirectionsRequest, directionsHeaders, buildAutocompleteUrl, peliasHeaders, parseAutocomplete, buildKeyTestRequest,
+} from '../lib/ors-request.js';
 import { parseDirections, NoRouteError } from '../lib/ors-response.js';
 import { classifyError, ERROR_KINDS, messageFor } from '../lib/ors-errors.js';
 
 /** Erreur portant un message déjà traduit pour l'utilisateur. */
 export class ApiError extends Error {
-  constructor({ kind, message, detail }) {
+  constructor({ kind, message, detail, status }) {
     super(message);
     this.name = 'ApiError';
     this.kind = kind;
     this.detail = detail ?? '';
+    this.status = status ?? null;
   }
 }
 
@@ -39,7 +42,7 @@ async function request(url, init, timeoutMs) {
     clearTimeout(timer);
   }
   const body = await readJson(res);
-  if (!res.ok) throw new ApiError(classifyError({ status: res.status, body }));
+  if (!res.ok) throw new ApiError({ ...classifyError({ status: res.status, body }), status: res.status });
   return body;
 }
 
@@ -66,16 +69,48 @@ export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoi
   }
 }
 
+// Pelias : clé dans l'en-tête Authorization. Si le navigateur bloque cet en-tête (erreur réseau,
+// typiquement CORS), on retente une fois avec la clé dans l'URL et on retient la méthode qui marche.
+let peliasKeyInQuery = false;
+
+async function pelias({ apiKey, text, focus, size, signal }) {
+  const send = (keyInQuery) => request(
+    buildAutocompleteUrl({ apiKey, keyInQuery, text, focus, size }),
+    { method: 'GET', headers: keyInQuery ? { Accept: 'application/json' } : peliasHeaders(apiKey), signal },
+    15000,
+  );
+  try {
+    return await send(peliasKeyInQuery);
+  } catch (err) {
+    if (peliasKeyInQuery || !(err instanceof ApiError) || err.kind !== ERROR_KINDS.NETWORK) throw err;
+    const json = await send(true);
+    peliasKeyInQuery = true;
+    return json;
+  }
+}
+
 /** Suggestions d'adresses. */
 export async function fetchSuggestions({ apiKey, text, focus, signal }) {
   requireKey(apiKey);
-  const json = await request(buildAutocompleteUrl({ apiKey, text, focus }), { method: 'GET', signal }, 15000);
-  return parseAutocomplete(json);
+  return parseAutocomplete(await pelias({ apiKey, text, focus, signal }));
 }
 
-/** Teste la clé avec une petite requête de géocodage. */
+function outcome(err) {
+  if (err instanceof ApiError) return { ok: false, kind: err.kind, status: err.status, detail: err.detail };
+  return { ok: false, kind: ERROR_KINDS.UNKNOWN, detail: String(err?.message ?? '') };
+}
+
+/**
+ * Teste la clé sur les deux services : un petit itinéraire (service principal) et une recherche d'adresse.
+ * @returns {{ directions:object, geocode:object }} voir summarizeKeyTest
+ */
 export async function testKey(apiKey) {
   requireKey(apiKey);
-  await request(buildAutocompleteUrl({ apiKey, text: 'Lyon', size: 1 }), { method: 'GET' }, 15000);
-  return true;
+  const req = buildKeyTestRequest();
+  const [directions, geocode] = await Promise.all([
+    request(req.url, { method: req.method, headers: directionsHeaders(apiKey), body: JSON.stringify(req.body) }, 20000)
+      .then(() => ({ ok: true }), outcome),
+    pelias({ apiKey, text: 'Lyon', size: 1 }).then(() => ({ ok: true }), outcome),
+  ]);
+  return { directions, geocode };
 }

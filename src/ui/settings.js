@@ -3,10 +3,11 @@
 import { $, wireDialog } from './dom.js';
 import { testKey } from './api.js';
 import { exportData, importData } from '../lib/store.js';
+import { summarizeKeyTest } from '../lib/ors-errors.js';
 
 function setStatus(node, text, ok) {
   node.textContent = text;
-  node.className = `status ${ok === true ? 'ok' : ok === false ? 'err' : ''}`;
+  node.className = `status ${ok === true ? 'ok' : ok === false ? 'err' : ok === 'warn' ? 'warn' : ''}`;
 }
 
 /**
@@ -55,12 +56,11 @@ export function createSettings(ctx) {
     btn.disabled = true;
     setStatus(keyStatus, 'Test en cours…');
     try {
-      await testKey(key);
-      ctx.store.setApiKey(key);
-      setStatus(keyStatus, 'Clé valide ✔ (enregistrée sur cet appareil).', true);
+      const res = summarizeKeyTest(await testKey(key), key);
+      if (res.saveKey) ctx.store.setApiKey(key);
+      setStatus(keyStatus, res.message, res.level === 'ok' ? true : res.level === 'warn' ? 'warn' : false);
     } catch (err) {
-      const msg = err.kind === 'quota' ? 'Clé reconnue, mais quota dépassé pour aujourd\'hui.' : err.message;
-      setStatus(keyStatus, msg, err.kind === 'quota' ? null : false);
+      setStatus(keyStatus, err.message, false);
     } finally {
       btn.disabled = false;
     }

@@ -14,6 +14,7 @@
   --danger: #b3261e;
   --danger-fg: #ffffff;
   --ok: #146c2e;
+  --warn: #9a4a00;
   --error-bg: #fde7e5;
   --error-fg: #7a0d07;
   --route: #0b57d0;
@@ -35,6 +36,7 @@
   --danger: #ff6b5e;
   --danger-fg: #0b0f14;
   --ok: #6fdc8c;
+  --warn: #ffc56b;
   --error-bg: #3b0d0a;
   --error-fg: #ffd9d4;
   --route: #ffb000;
@@ -209,6 +211,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .status { min-height: 1.4em; font-weight: 600; margin: 8px 0 0; }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--danger); }
+.status.warn { color: var(--warn); }
 .segmented { display: grid; gap: 8px; }
 .segmented label {
   min-height: var(--tap); display: flex; align-items: center; gap: 10px; padding: 0 12px;

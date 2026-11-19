@@ -4,7 +4,7 @@
 /** Itinéraires ORS (clé dans l'en-tête Authorization). */
 export const ORS_BASE = 'https://api.heigit.org/openrouteservice/v2';
 
-/** Géocodage Pelias (clé en paramètre api_key : GET simple, sans preflight). */
+/** Géocodage Pelias (clé dans l'en-tête Authorization ; api_key en URL seulement en repli). */
 export const PELIAS_BASE = 'https://api.heigit.org/pelias/v1';
 
 /** ORS refuse maximum_speed < 80 km/h. */

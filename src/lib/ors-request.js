@@ -72,12 +72,14 @@ export function directionsHeaders(apiKey) {
 }
 
 /**
- * URL d'autocomplétion Pelias (GET, clé en api_key).
- * @param {{ text:string, apiKey:string, focus?:[number,number], countries?:string[], size?:number }} p
+ * URL d'autocomplétion Pelias (GET). Par défaut la clé part dans l'en-tête Authorization
+ * (voir peliasHeaders), comme pour les itinéraires : api.heigit.org refuse la clé en api_key
+ * dans certains cas. keyInQuery=true n'est qu'un repli si le navigateur bloque l'en-tête (CORS).
+ * @param {{ text:string, apiKey?:string, keyInQuery?:boolean, focus?:[number,number], countries?:string[], size?:number }} p
  */
-export function buildAutocompleteUrl({ text, apiKey, focus, countries = GEOCODE_COUNTRIES, size = 6 }) {
+export function buildAutocompleteUrl({ text, apiKey, keyInQuery = false, focus, countries = GEOCODE_COUNTRIES, size = 6 }) {
   const params = new URLSearchParams();
-  params.set('api_key', apiKey ?? '');
+  if (keyInQuery) params.set('api_key', apiKey ?? '');
   params.set('text', String(text ?? '').trim());
   params.set('size', String(size));
   params.set('lang', 'fr');
@@ -87,6 +89,16 @@ export function buildAutocompleteUrl({ text, apiKey, focus, countries = GEOCODE_
     params.set('focus.point.lat', focus[1].toFixed(5));
   }
   return `${PELIAS_BASE}/autocomplete?${params.toString()}`;
+}
+
+/** En-têtes de l'autocomplétion Pelias (clé dans Authorization). */
+export function peliasHeaders(apiKey) {
+  return { Authorization: apiKey, Accept: 'application/json, application/geo+json' };
+}
+
+/** Petit itinéraire fixe (centre de Lyon, ~1 km) pour tester la clé sur le service principal. */
+export function buildKeyTestRequest() {
+  return buildDirectionsRequest({ start: [4.8357, 45.7640], end: [4.8467, 45.7597], vehicle: {} });
 }
 
 /** Lit une réponse Pelias (GeoJSON) en suggestions simples. */
