@@ -61,7 +61,8 @@
   Avec le partage Android (Web Share API), sans serveur :
   - un itinéraire : lien qui ouvre Gabarit avec départ, arrivée et options pré-remplis, ou fichier GPX ;
   - un lieu ou une position ponctuelle (lien carte) ;
-  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) ;
+  - mes signalements : fichier à importer dans le Gabarit d'un ami (fusion sans doublons) — seulement une fois la
+    phase 3 faite ;
   - l'appli elle-même : son adresse, chacun avec sa propre clé HeiGIT gratuite.
   Le profil véhicule et la clé ne sont jamais partagés. Pas de position en direct (il faudrait un serveur).
 
