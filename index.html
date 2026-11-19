@@ -21,12 +21,18 @@
       <button type="button" id="btn-vehicles" class="btn btn-chip" aria-label="Choisir le véhicule">
         <span aria-hidden="true">🚚</span> <span id="active-vehicle-name">—</span>
       </button>
+      <button type="button" id="btn-share" class="btn" aria-label="Partager">⤴ Partager</button>
       <button type="button" id="btn-settings" class="btn btn-icon" aria-label="Réglages">⚙</button>
     </header>
 
     <main class="map-wrap">
       <div id="map" class="map" role="application" aria-label="Carte"></div>
       <p id="map-fallback" class="map-fallback" hidden>Carte indisponible (hors ligne ?). Le calcul d'itinéraire reste possible avec le réseau.</p>
+      <div id="layer-switch" class="layer-switch" role="group" aria-label="Fond de carte" hidden>
+        <button type="button" class="btn" data-layer="plan" aria-pressed="true">Plan</button>
+        <button type="button" class="btn" data-layer="satellite" aria-pressed="false">Satellite</button>
+      </div>
+      <p id="layer-message" class="layer-message" role="status" hidden></p>
 
       <div id="nav" class="nav" hidden>
         <div class="nav-top">
@@ -178,6 +184,44 @@
         </div>
         <p id="sim-status" class="status" role="status"></p>
       </section>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-share" class="dialog" aria-labelledby="share-title">
+    <div class="dialog-head">
+      <h2 id="share-title">Partager</h2>
+      <button type="button" class="btn btn-icon" data-close aria-label="Fermer">✕</button>
+    </div>
+    <div class="dialog-body">
+      <p class="hint">Ta clé et ton profil véhicule ne sont jamais partagés.</p>
+      <section class="card">
+        <h3>Itinéraire</h3>
+        <p id="share-route-hint" class="hint"></p>
+        <label id="share-include-start-row" class="toggle" hidden><input type="checkbox" id="share-include-start"> Inclure mon point de départ</label>
+        <p id="share-include-start-hint" class="hint" hidden>Décoché : le lien ne contient que l'arrivée (ton ami part de sa
+          propre position) et le tracé GPX commence au premier carrefour après 500 m.</p>
+        <div class="row">
+          <button type="button" id="btn-share-route" class="btn btn-primary">🔗 Lien de l'itinéraire</button>
+          <button type="button" id="btn-share-gpx" class="btn">Fichier GPX</button>
+        </div>
+      </section>
+      <section class="card">
+        <h3>Un lieu (lien de carte OpenStreetMap)</h3>
+        <div class="row">
+          <button type="button" id="btn-share-me" class="btn">📍 Ma position</button>
+          <button type="button" id="btn-share-from" class="btn">Départ</button>
+          <button type="button" id="btn-share-to" class="btn">Arrivée</button>
+        </div>
+      </section>
+      <section class="card">
+        <h3>L'appli</h3>
+        <p class="hint">Son adresse. Chacun crée sa propre clé HeiGIT gratuite.</p>
+        <div class="row">
+          <button type="button" id="btn-share-app" class="btn">Partager Gabarit</button>
+        </div>
+      </section>
+      <p id="share-status" class="status" role="status"></p>
+      <p id="share-link" class="share-link" hidden></p>
     </div>
   </dialog>
 

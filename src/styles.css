@@ -86,6 +86,23 @@ html, body {
   background: var(--card); border: 2px solid var(--border); border-radius: var(--radius);
 }
 
+/* Fond de carte « Plan / Satellite » (phase 7) : en haut à gauche, masqué pendant le guidage. */
+.layer-switch {
+  position: absolute; top: 10px; left: 10px; z-index: 5; display: flex;
+  border-radius: var(--radius); box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+}
+.layer-switch .btn { min-height: 48px; padding: 0 14px; border-radius: 0; }
+.layer-switch .btn:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.layer-switch .btn:last-child { border-radius: 0 var(--radius) var(--radius) 0; border-left: 0; }
+.layer-switch .btn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.layer-message {
+  position: absolute; top: 66px; left: 10px; right: 60px; z-index: 5; margin: 0; padding: 8px 12px; max-width: 420px;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); border-radius: var(--radius); font-weight: 600;
+}
+.app.navigating .layer-switch, .app.navigating .layer-message { display: none; }
+.share-link { margin: 6px 0 0; padding: 8px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow-wrap: anywhere; user-select: all; font-family: monospace; }
+
 .panel {
   grid-area: panel;
   background: var(--panel);

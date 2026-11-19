@@ -88,6 +88,19 @@ test('prix du gazole : vide par défaut, gardé s\'il est plausible, exporté', 
   assert.equal(back.settings.dieselPrice, 1.7);
 });
 
+test('couche de carte (phase 7) : plan par défaut, satellite mémorisé et exporté', () => {
+  const d = emptyData();
+  assert.equal(d.settings.mapLayer, 'plan');
+  const back = importData(exportData({ ...d, settings: { ...d.settings, mapLayer: 'satellite' } }));
+  assert.equal(back.settings.mapLayer, 'satellite');
+  for (const bad of ['hybride', 1, null]) {
+    assert.equal(sanitizeData({ ...d, settings: { ...d.settings, mapLayer: bad } }).settings.mapLayer, 'plan');
+  }
+  const s = createStore(memoryStorage());
+  s.save({ ...d, settings: { ...d.settings, mapLayer: 'satellite' } });
+  assert.equal(s.load().settings.mapLayer, 'satellite');
+});
+
 test('prix du gazole saisi : virgule ou point, vide = pas de prix', () => {
   assert.deepEqual(parseDieselPrice('1,85'), { value: 1.85, error: null });
   assert.deepEqual(parseDieselPrice(' 1.8594 '), { value: 1.859, error: null });
