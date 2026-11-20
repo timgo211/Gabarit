@@ -1,0 +1,35 @@
+{
+  "code": "BE",
+  "name": "Belgique",
+  "orsIds": [17],
+  "verified": "2026-11-20",
+  "sources": {
+    "cdr": { "name": "Code de la route belge, arrêté royal du 1er décembre 1975, art. 11 (texte publié par l'institut Vias)", "url": "https://www.codedelaroute.be/fr/reglementation/1975120109~hra8v386pu#art-11", "kind": "national" },
+    "viapass": { "name": "Viapass (entité interrégionale du prélèvement kilométrique)", "url": "https://www.viapass.be/fr/", "kind": "national" },
+    "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
+  },
+  "holidays": { "list": "BE", "source": "bf", "verified": "2026-11-20" },
+  "speeds": {
+    "source": "cdr",
+    "verified": "2026-11-20",
+    "bands": [
+      { "over": 3.5, "upTo": 7.5, "motorway": 90, "road": null, "roadText": "70 km/h (Bruxelles, Flandre), 90 km/h (Wallonie)", "town": null, "townText": "30 km/h (Bruxelles), 50 km/h (Flandre, Wallonie)" },
+      { "over": 7.5, "upTo": null, "motorway": 90, "road": 60, "town": null, "townText": "30 km/h (Bruxelles), 50 km/h (Flandre, Wallonie)" }
+    ],
+    "notes": [
+      { "text": "Autoroutes et routes à 2 × 2 voies séparées autrement que par des marques : 90 km/h au-delà de 3,5 t (art. 11.2.1°).", "source": "cdr", "verified": "2026-11-20" }
+    ]
+  },
+  "bans": [
+    { "id": "none", "kind": "none", "text": "Pas d'interdiction de circuler pour les poids lourds les week-ends et les jours fériés.", "source": "bf", "verified": "2026-11-20" }
+  ],
+  "toll": [
+    { "text": "Prélèvement kilométrique des véhicules de plus de 3,5 t transportant des marchandises (boîtier embarqué OBU), géré par Viapass.", "source": "viapass", "verified": "2026-11-20" }
+  ],
+  "lez": [
+    { "text": "Zones de basses émissions (LEZ) de Bruxelles, Anvers et Gand : conditions pour les camions étrangers à vérifier.", "url": "https://lez.brussels/", "source": null, "verified": null }
+  ],
+  "adr": [
+    { "text": "Restrictions ADR propres à la Belgique (itinéraires, horaires) : à vérifier.", "source": null, "verified": null }
+  ]
+}

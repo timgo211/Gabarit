@@ -1,0 +1,45 @@
+{
+  "code": "ES",
+  "name": "Espagne",
+  "orsIds": [187],
+  "verified": "2026-11-20",
+  "sources": {
+    "rgc": { "name": "Reglamento General de Circulación (RD 1428/2003), art. 48 (BOE)", "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2003-23514#a48", "kind": "national" },
+    "dgt2026": { "name": "Résolution de la DGT du 14 janvier 2026, mesures spéciales de régulation du trafic (BOE-A-2026-1255)", "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2026-1255", "kind": "national" },
+    "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
+  },
+  "holidays": { "list": "ES", "source": "bf", "verified": "2026-11-20" },
+  "speeds": {
+    "source": "rgc",
+    "verified": "2026-11-20",
+    "bands": [
+      { "over": 3.5, "upTo": null, "motorway": 90, "road": 80, "town": null }
+    ],
+    "notes": [
+      { "text": "Camions, véhicules articulés et ensembles avec remorque : 90 km/h sur autoroute et voie express (autopista, autovía), 80 km/h sur route conventionnelle (art. 48).", "source": "rgc", "verified": "2026-11-20" }
+    ],
+    "adr": [
+      { "classes": null, "delta": -10, "text": "Matières dangereuses : vitesse maximale réduite de 10 km/h (80 km/h sur autoroute, 70 km/h sur route) (art. 48 b).", "voice": "matières dangereuses : 10 kilomètres heure de moins", "source": "rgc", "verified": "2026-11-20" }
+    ]
+  },
+  "bans": [
+    { "id": "sections", "kind": "info", "calendarYears": [2026], "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2026-1255",
+      "text": "Pas d'interdiction générale le week-end : plus de 7,5 t interdits sur certains tronçons, certains jours et à certaines heures (annexe II de la résolution annuelle de la DGT) ; Catalogne et Pays basque : résolutions propres. Tronçons à vérifier.",
+      "source": "dgt2026", "verified": "2026-11-20",
+      "missing": { "text": "Résolution espagnole {year} des restrictions PL absente de l'appli : lire la résolution annuelle de la DGT (BOE, janvier).", "url": "https://www.boe.es/" } },
+    { "id": "adr-sunday", "kind": "weekly", "over": 0, "adr": true, "days": [0], "holidays": "ES", "from": "08:00", "to": "24:00",
+      "eve": { "from": "16:00", "to": "24:00", "holidaysOnly": true, "dows": [3, 4] }, "calendarYears": [2026],
+      "label": "ADR dimanche et jours fériés", "text": "Véhicules ADR (panneaux orange), toutes routes surveillées par la DGT : interdiction les dimanches et jours fériés nationaux de 8 h à 24 h, et les mercredis ou jeudis veilles de jour férié national de 16 h à 24 h (annexe V). Fériés régionaux et jours fériés consécutifs : à vérifier.",
+      "voice": "matières dangereuses : interdiction le dimanche et les jours fériés de 8 heures à 24 heures", "source": "dgt2026", "verified": "2026-11-20",
+      "missing": { "text": "Résolution espagnole {year} des restrictions ADR absente de l'appli : lire la résolution annuelle de la DGT (BOE, janvier).", "url": "https://www.boe.es/" } }
+  ],
+  "toll": [
+    { "text": "Autoroutes à péage (autopistas AP) et télépéage : à vérifier.", "source": null, "verified": null }
+  ],
+  "lez": [
+    { "text": "Zones à faibles émissions (ZBE) des grandes villes : à vérifier.", "source": null, "verified": null }
+  ],
+  "adr": [
+    { "text": "Hors livraisons, itinéraires du réseau RIMP obligatoires pour les marchandises dangereuses (annexe IV de la résolution DGT).", "source": "dgt2026", "verified": "2026-11-20" }
+  ]
+}

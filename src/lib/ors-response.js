@@ -3,6 +3,8 @@
 // properties.{summary, segments, extras, way_points}, geometry LineString [lon, lat]. extras.tollways = { values:[[début,fin,valeur]], summary:[{value,distance,amount}] }
 // (valeur 1 = tronçon à péage, 0 = sans péage).
 
+import { parseCountryInfo } from './countries.js';
+
 const EARTH_RADIUS_M = 6371008.8;
 
 /** Distance orthodromique entre deux points [lon, lat], en mètres. */
@@ -103,6 +105,8 @@ function parseFeature(feature, fallbackBbox) {
     coordinates: coords,
     bbox: Array.isArray(feature.bbox) ? feature.bbox : (Array.isArray(fallbackBbox) ? fallbackBbox : null),
     tollDistance: tollDistance(props.extras, coords),
+    // Pays traversés (phase 5c, extra « countryinfo ») : [{ from, to, code }] ou null (→ « Pays traversés indisponibles »).
+    countries: parseCountryInfo(props.extras),
     steps,
     warnings,
   };

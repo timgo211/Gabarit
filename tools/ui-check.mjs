@@ -106,7 +106,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
-  slowTiles = false, osmCopy = 'fixture',
+  slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -132,16 +132,27 @@ async function open(browser, base, {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => { window.__raf += 1; return raf(cb); };
   });
-  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v }) => {
+  // Phase 5c : voix de l'appli captée (window.__spoken) au lieu d'être jouée.
+  if (voice) {
+    await ctx.addInitScript(() => {
+      window.__spoken = [];
+      const synth = window.speechSynthesis;
+      if (synth) {
+        synth.speak = (u) => { window.__spoken.push(u.text); };
+        synth.cancel = () => {};
+      }
+    });
+  }
+  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
     localStorage.setItem('gabarit.orsKey', 'cle-factice-de-test');
     localStorage.setItem('gabarit.data', JSON.stringify({
       version: 1, vehicles: [v ?? { id: 'v1', name: 'Semi-remorque frigorifique 44 t', height: 4, width: 2.55, length: 16.5,
         weight: 44, axleload: 11.5, maxSpeed: 90 }],
-      activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: false },
+      activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: on },
     }));
-  }, { theme, layer, vehicle });
+  }, { theme, layer, vehicle, voice });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async (route) => {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
@@ -201,6 +212,13 @@ async function open(browser, base, {
   // Phase 5b : data/tunnels-adr.json (null : fichier absent, réponse 404 ; undefined : fichier du dépôt).
   if (tunnels !== undefined) {
     await ctx.route(/\/data\/tunnels-adr\.json$/, (route) => (tunnels ? route.fulfill({ json: tunnels }) : route.fulfill({ status: 404, body: '' })));
+  }
+  // Phase 5c : data/pays/XX.json (code → null : fichier absent, réponse 404 ; sinon fichier du dépôt).
+  if (countryFiles) {
+    await ctx.route(/\/data\/pays\/[A-Z]{2}\.json(\?.*)?$/, (route) => {
+      const code = new URL(route.request().url()).pathname.split('/').pop().slice(0, 2);
+      return countryFiles[code] === null ? route.fulfill({ status: 404, body: '' }) : route.continue();
+    });
   }
   // Phase 9b : copie data/aires-osm/ (null : absente, 404). 'fixture' : aires de tests/fixtures/overpass-aires.json,
   // zone couverte autour du trajet ; 'uncovered' : mêmes cases, zone couverte loin du trajet (Overpass demandé).
@@ -1248,8 +1266,89 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v21', 'vrai service worker : « Gabarit v21 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v22', 'vrai service worker : « Gabarit v22 » en bas de Réglages', ver);
   await ctx.close();
+}
+
+/**
+ * Phase 5c : passage de frontière. Fiches des pays traversés (France → Suisse → Italie, mercredi 21 h 50 : nuit en
+ * Suisse), sources nommées, « à vérifier », « la signalisation fait foi » ; countryinfo absent ; fichier absent ;
+ * guidage avec le GPS émulé comme le vrai (une position par seconde, vitesse fournie) : bandeau et une annonce
+ * vers 3 km avec les seules règles confirmées, aucune saisie.
+ */
+async function borderCheck(browser, base) {
+  const frChIt = fixture('ors-directions-fr-ch-it.json');
+  const line = frChIt.features[0].geometry.coordinates;
+  const now = new Date('2026-11-18T21:50:00+01:00').getTime(); // mercredi 21 h 50 à Paris
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, now, voice: true, directions: () => frChIt, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.country-card', { timeout: 10000 });
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    check(notes.some((n) => /^Pays traversés : France → Suisse \(km 4, vers mercredi 21 h 5\d\) → Italie \(km 152, vers (mercredi|jeudi) \d+ h \d\d\)\./.test(n.text)),
+      `${width} px : pays traversés, km et heure de chaque frontière`, notes.map((n) => n.text).slice(0, 3).join(' | '));
+    const cards = await page.$$eval('.country-card', (n) => n.map((c) => ({
+      name: c.querySelector('summary strong').textContent, open: c.open, text: c.textContent,
+      footer: c.querySelector('.country-footer')?.textContent, links: c.querySelectorAll('a[href^="https://"]').length,
+      badges: [...c.querySelectorAll('.cbadge')].map((b) => b.textContent),
+      sections: [...c.querySelectorAll('h4')].map((h) => h.textContent),
+    })));
+    check(cards.length === 2 && cards[0].name === 'Suisse' && cards[1].name === 'Italie', `${width} px : une fiche par pays (Suisse, Italie)`, cards.map((c) => c.name).join(','));
+    check(cards.every((c) => c.footer === 'La signalisation fait foi.'), `${width} px : chaque fiche finit par « la signalisation fait foi »`);
+    const ch = cards[0];
+    check(/PL de 44 t : autoroute 80 km\/h/.test(ch.text) && /source officielle : Ordonnance sur les règles de la circulation routière/.test(ch.text),
+      `${width} px : vitesses selon le PTAC, source nationale nommée`);
+    check(ch.badges.includes('En vigueur') && ch.open && /Oui : mercredi 22 h → jeudi 5 h/.test(ch.text), `${width} px : nuit suisse « en vigueur à votre passage »`, ch.badges.join(','));
+    check(['Vitesses', 'Interdictions', 'Péage PL', 'ZFE et vignettes'].every((x) => ch.sections.includes(x)), `${width} px : rubriques vitesses, interdictions, péage, ZFE`, ch.sections.join(','));
+    check(/RPLP/.test(ch.text) && /Vignette autoroutière : pas due pour les véhicules soumis à la RPLP/.test(ch.text), `${width} px : RPLP et vignette suisse`);
+    check(/à vérifier/.test(ch.text) && ch.links >= 3, `${width} px : « à vérifier » et liens des sources`);
+    check(/source officielle : Codice della strada/.test(cards[1].text) && /Décret du ministère des infrastructures/.test(cards[1].text),
+      `${width} px : Italie, sources officielles nommées (vitesses, calendrier 2026)`);
+    check(notes.some((n) => n.cls === 'warn' && /^Suisse, interdiction PL \(Nuit\) mercredi 22 h → jeudi 5 h pendant votre passage.*La signalisation fait foi\.$/.test(n.text)),
+      `${width} px : alerte de la nuit suisse dans les notes`);
+    check(/Interdiction PL Suisse/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire, interdiction PL Suisse`);
+    await noHorizontalScroll(page, `${width} px fiches des pays`);
+    await page.locator('.country-card').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-pays.png`) });
+
+    // Guidage, GPS émulé : frontière à 3,8 km du départ, annonce vers 3 km.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await page.waitForTimeout(1500);
+    const first = await page.textContent('#nav-rule');
+    check(await page.isVisible('#nav-rule') && /^Suisse dans 4 km · PL 80 km\/h · Dimanche et jours fériés · Nuit \(en vigueur\)/.test(first),
+      `${width} px : bandeau de la frontière`, first);
+    check(await page.locator('#nav input, #nav textarea, #nav select').count() === 0, `${width} px : aucune saisie pendant le guidage`);
+    await drive(ctx, page, line, 90, 45);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    const border = spoken.filter((t) => /entrée en Suisse/.test(t));
+    check(border.length === 1 && /^Dans 3 kilomètres, entrée en Suisse\. Poids lourds : 80 kilomètres heure\..*La signalisation fait foi\.$/.test(border[0])
+      && !/vérifier|vignette|ZFE/i.test(border[0]), `${width} px : une annonce vers 3 km, règles confirmées seulement`, border.join(' | ') || spoken.join(' | '));
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${width} px : boutons de carte hors du bandeau`, foot.out.join(' ; '));
+    await noHorizontalScroll(page, `${width} px guidage frontière`);
+    await page.screenshot({ path: join(SHOTS, `${width}-frontiere.png`) });
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // countryinfo absent (réponse sans l'extra) : message, jamais un silence. Fichier suisse absent : « à vérifier ».
+  const noInfo = await open(browser, base, { width: 412, height: 900, now, overpass: () => ({ elements: [] }) });
+  await computeRoute(noInfo.page);
+  await noInfo.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  check(/Pays traversés indisponibles/.test(await noInfo.page.textContent('#route-notes')), 'countryinfo absent → « Pays traversés indisponibles »');
+  await noInfo.ctx.close();
+  const noFile = await open(browser, base, { width: 412, height: 900, now, directions: () => frChIt, countryFiles: { CH: null }, overpass: () => ({ elements: [] }) });
+  await computeRoute(noFile.page);
+  await noFile.page.waitForSelector('.country-card', { timeout: 10000 });
+  check(/Règles PL en Suisse non chargées : à vérifier\./.test(await noFile.page.textContent('.country-card')), 'fichier data/pays/CH.json absent → « à vérifier »');
+  check(noFile.errors.length === 0, 'fichier absent : aucune erreur JavaScript', noFile.errors.join(' | '));
+  await noFile.ctx.close();
 }
 
 /** Éléments visibles du bandeau du haut qui passent sous la barre du bas (ou sortent du bandeau borné). */
@@ -1467,7 +1566,7 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

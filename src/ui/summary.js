@@ -7,6 +7,47 @@ import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
+import { dayTime } from '../lib/hgv-bans.js';
+
+const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', text });
+
+/**
+ * Fiches des pays traversés (phase 5c) : une par pays hors France, règles groupées par rubrique, source nommée
+ * (nationale ou Bison Futé) avec son lien, « à vérifier » sinon, « en vigueur à votre passage ? » quand la règle est
+ * sûre. Textes venant de data/pays (textContent, liens https vérifiés par parseCountryData).
+ */
+function countryCards(countries) {
+  const cards = countries?.cards ?? [];
+  if (!cards.length) return null;
+  return el('div', { class: 'country-cards', 'aria-label': 'Pays traversés' }, cards.map((c) => {
+    const warn = c.items.some((i) => i.level === 'warn');
+    const sections = [];
+    for (const it of c.items) {
+      let sec = sections.find((x) => x.name === it.section);
+      if (!sec) sections.push(sec = { name: it.section, items: [] });
+      sec.items.push(it);
+    }
+    const when = `km ${Math.round(c.enter / 1000)} → km ${Math.round(c.exit / 1000)}, ${dayTime(c.enterTime)} → ${dayTime(c.exitTime)}`;
+    const body = sections.map((sec) => el('div', { class: 'country-section' }, [
+      el('h4', { text: sec.name }),
+      el('ul', { class: 'rules-notes' }, sec.items.map((it) => el('li', { class: `${it.level}${it.confirmed ? '' : ' check'}` }, [
+        it.inForce === 'yes' ? el('span', { class: 'cbadge cbadge-warn', text: 'En vigueur' }) : null,
+        it.inForce === 'no' ? el('span', { class: 'cbadge', text: 'Pas à votre passage' }) : null,
+        it.text,
+        it.source ? el('span', { class: 'country-source' }, [
+          ` — ${it.source.kind === 'bisonfute' ? 'Bison Futé' : 'source officielle'} : `,
+          it.source.url ? link(it.source.url, it.source.name) : it.source.name,
+        ]) : null,
+        it.url && it.url !== it.source?.url ? link(it.url, 'Texte à lire') : null,
+      ]))),
+    ]));
+    return el('details', { class: `country-card${warn ? ' warn' : ''}`, open: warn ? true : null }, [
+      el('summary', {}, [el('strong', { text: c.name }), ` (${when})${warn ? ' ⚠' : ''}`]),
+      ...body,
+      el('p', { class: 'country-footer', text: c.footer }),
+    ]);
+  }));
+}
 
 function restrictionsText(v) {
   const n = (x) => String(x).replace('.', ',');
@@ -50,6 +91,7 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
   ]));
   return [
     items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,
+    countryCards(rules.countries),
     canAvoid && rules.banned.length ? el('button', {
       type: 'button', class: 'btn btn-avoid-zfe', disabled: !!avoidBusy, onclick: onAvoidZfe,
       text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',

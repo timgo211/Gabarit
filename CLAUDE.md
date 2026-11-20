@@ -28,6 +28,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     `hgv-bans.js` (interdictions PL week-ends / jours fériés, calendrier annuel, Île-de-France, guidage),
     `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches),
     `driving-time.js` (temps de conduite et pauses, CE 561/2006), `wind.js` (vent fort, Open-Meteo)
+  - phase 5c (frontières) : `countries.js` (extra `countryinfo` d'ORS → pays traversés, km et heure des frontières),
+    `country-rules.js` (lecture de `data/pays/*.json`, vitesses selon le PTAC, interdictions « en vigueur à votre
+    passage ? », fiches, bandeau et voix du guidage) ; jours fériés des pays voisins dans `holidays.js`
   - phase 5b (ADR) : `adr.js` (code tunnel du véhicule, catégorie OSM, ADR 8.6.4, tunnels en dur, passage du tracé,
     textes, guidage, « Éviter le tunnel »), `adr-settings.js` (réglage global `settings.adr` : classes en clair, code
     tunnel saisi, reprise des anciens profils, `withAdr`), `tunnels-convert.js` (extraits Geofabrik filtrés par osmium dans l'Action → `data/tunnels-adr.json`)
@@ -64,6 +67,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
 - fixture phase 5b : `overpass-tunnels.json` (voies au format « out tags geom » écrites d'après la doc : tunnels C, E, D double,
   hazmat=no à côté, catégorie A, hazmat:E=yes, le long de la ligne de test à 45,05° N)
+- fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
+  70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
@@ -80,7 +85,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot | rules | drive | adr | draw
+                                   #   | overview | press | areas | foot | rules | drive | adr | draw | border
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -88,10 +93,12 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v21 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v22 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
-rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
+« à vérifier », 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé : bandeau et une annonce vers 3 km captée,
+countryinfo absent, fichier pays absent). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -248,6 +255,23 @@ rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
   sous 20 km, voix vers 5 km (`settings.ruleVoice`). Nom affiché : `tunnel:name` d'abord (Fourvière : name =
   « Autoroute du Soleil ») ; `hazmat=E` (lettre en valeur) = catégorie E. Overpass, Geofabrik, api.openstreetmap.org
   et unece.org refusent le conteneur (Action GitHub pour mesurer / copier).
+- Frontières (phase 5c, `countries.js`, `country-rules.js`) : `extra_info: ['tollways', 'countryinfo']` dans toutes
+  les requêtes (variantes 2b et recalcul : aucune requête en plus) ; ids ORS (docs/technical-details/country-list.md :
+  FR 70, BE 17, LU 117, DE 74, CH 193, IT 97, ES 187 ; 75 et 141 zones partagées → pays voisin) ; extra absent →
+  « Pays traversés indisponibles », jamais un silence. `data/pays/{BE,LU,DE,CH,IT,ES}.json` dans `APP_FILES` (hors
+  ligne à l'étranger) : chaque règle a `source` (clé de `sources` : nom, lien, `national` ou `bisonfute`) et `verified`
+  (date) ; sans source lue → « à vérifier » sur la fiche, jamais dite. Vitesses : source nationale obligatoire ;
+  Bison Futé suffit pour les jours fériés et « BE : pas d'interdiction ». Fiche : source nommée (« source officielle »
+  ou « Bison Futé »), « en vigueur à votre passage ? » seulement pour une règle sûre qui concerne le véhicule (PTAC
+  strictement au-dessus du seuil, ADR / classe, transit LU selon le pays de sortie), heures recalées par `elapsed`,
+  fin « La signalisation fait foi. ». DE samedis d'été (FerReiseV) : `kind: 'info'`, jamais calculés ni dits. CH :
+  pas de vignette pour la RPLP (LVA art. 3 al. 2). Calendriers annuels IT (`calendar` par année) et ES
+  (`calendarYears`) : année absente (aujourd'hui, entrée ou sortie) → rappel avec le lien dès le 1er janvier, rien
+  de calculé ; à compléter chaque année. Fériés : `countryHolidays(code, année)` (BE, LU, DE, CH, IT, ES, LU_DE,
+  LU_FR), régionaux « à vérifier » (`REGIONAL_HOLIDAYS`). Guidage : `view.rules.border` (bandeau de 20 km avant à
+  1 km après, une ligne), voix une fois vers 3 km (`settings.ruleVoice`) : vitesse et interdictions confirmées
+  seulement, jamais une absence d'interdiction. mit.gov.it coupe la connexion depuis le conteneur : décret lu dans la
+  Gazzetta Ufficiale ; Fedlex et Legilux lus par leurs points SPARQL (fedlex.data.admin.ch, data.legilux.public.lu).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

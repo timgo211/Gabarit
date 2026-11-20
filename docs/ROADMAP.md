@@ -223,12 +223,28 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     requête Overpass. Tunnels inchangés (1 182 tubes). Mêmes identifiants qu'Overpass (« Mon avis » gardé), mêmes
     rayons et même sens de circulation, fusion Bison Futé à 300 m ; copie absente ou illisible : « Aires
     indisponibles sur ce trajet (données non chargées) » ; date de la copie dans la note de source et sur la fiche.
-  - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
+  - [x] **Phase 5c — Passage de frontière : réglementation PL du pays**
     Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
     pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
     zones à faibles émissions ou vignettes, particularités ADR). Pendant le guidage : annonce vocale courte à l'approche
     de la frontière, sans saisie. Fiches dans `data/pays/*.json`, avec la source officielle et la date de vérification
     de chaque règle ; d'abord les pays voisins (BE, LU, DE, CH, IT, ES).
+    Fait : `countryinfo` dans la même requête ORS (variantes et recalcul compris, aucune requête en plus ; doc et code
+    ORS : disponible pour driving-hgv, extras propres à chaque itinéraire alternatif) ; absent → « Pays traversés
+    indisponibles ». Fiches : km et heure de chaque frontière (recalées par les pauses conseillées), vitesses selon le
+    PTAC (source nationale obligatoire), interdictions avec « en vigueur à votre passage ? » quand la règle est sûre,
+    péage, ZFE / vignettes, ADR (tunnels repris de la copie de la phase 5b), source nommée (officielle nationale ou
+    Bison Futé), « à vérifier » sinon, « la signalisation fait foi » à la fin. Guidage : ligne du bandeau de 20 km
+    avant à 1 km après, voix une fois vers 3 km avec les seules contraintes confirmées (jamais une absence
+    d'interdiction), coupée avec la voix des règles. Sources lues le 20/11/2026 : BE code de la route art. 11 (Vias),
+    Viapass ; LU code de la route art. 139 (Legilux), police grand-ducale (transit vers FR / DE), Guichet.lu
+    (Eurovignette) ; DE StVO § 3, 18, 30, FerReiseV (samedis d'été affichés « possible sur certaines autoroutes »,
+    jamais calculés), BFStrMG ; CH OCR art. 5 et 91, OFROU, OFDF (RPLP), LVA art. 3 (pas de vignette pour la RPLP) ;
+    IT Codice della strada art. 142, décret MIT du 12/12/2025 (calendrier 2026, GU n. 302) ; ES Reglamento General
+    de Circulación art. 48, résolution DGT du 14/01/2026 (BOE). Restent « à vérifier » : LEZ / ZFE des six pays,
+    péages IT et ES, système Toll Collect, fêtes régionales, tronçons ES et samedis d'été DE. Calendriers IT et ES :
+    rappel avec le lien dès le 1er janvier d'une année absente (à ajouter chaque année dans `data/pays/IT.json`,
+    `ES.json`).
   - [ ] **Phase 5d — Accès : tranches horaires et desserte locale**
     Interdictions PL par tranches horaires (tags OpenStreetMap conditionnels, par exemple `hgv:conditional`) : vérifier
     si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
