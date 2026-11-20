@@ -6,9 +6,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DRIVING, emptyDriving, trackDriving, toggleStopWork, drivingView, drivingAnnouncements, drivingAt, planDriving,
-  sanitizeDriving, loadDriving, saveDriving, weekStart, applyStop,
+  sanitizeDriving, loadDriving, saveDriving, weekStart, applyStop, breakSchedule,
 } from '../src/lib/driving-time.js';
 import { memoryStorage } from '../src/lib/store.js';
+import { routeRules } from '../src/lib/route-rules.js';
+import { windAlongRoute } from '../src/lib/wind.js';
 
 const H = 3600;
 const MIN = 60;
@@ -46,7 +48,7 @@ test('fractionnement : 15 min PUIS 30 min remet à zéro ; 30 min puis 15 min ne
   [d, t] = run(d, t, 15 * MIN, 0);
   [d, t] = run(d, t, H, 90);
   assert.equal(d.split, true);
-  assert.match(drivingView(d, t, 90).main, /pause de 30 min dans 1 h 30/);
+  assert.match(drivingView(d, t, 90).main, /pause 30 min conseillée dans 1 h 30/);
   [d, t] = run(d, t, 30 * MIN, 0);
   [d, t] = run(d, t, 60, 90);
   assert.ok(d.sinceBreak < 70, 'remis à zéro après 15 + 30');
@@ -162,14 +164,14 @@ test('annonces : 30 min avant 4 h 30 (avec la prochaine aire), à 4 h 30, à l\'
   const area = { name: 'Aire de Saint-Rambert', distance: 12400 };
   let [d, t] = run(emptyDriving(), monday8h, 4.5 * H + 2 * MIN, 90, { announce: { out: said, opts: { nextArea: area } } });
   assert.deepEqual(said.map((x) => x.text), [
-    'Pause de 45 minutes à faire dans 30 minutes. Prochaine aire : Aire de Saint-Rambert, dans 12 kilomètres.',
-    '4 heures 30 de conduite : faites une pause de 45 minutes dès que possible.',
+    'Pause de 45 minutes conseillée dans 30 minutes. Prochaine aire : Aire de Saint-Rambert, dans 12 kilomètres.',
+    '4 heures 30 de conduite : pause de 45 minutes conseillée dès que possible.',
   ]);
   assert.ok(Math.abs((said[0].t - monday8h) / 1000 - 4 * H) < 40);
   said.length = 0;
   [d, t] = run(d, t, 50 * MIN, 0, { announce: { out: said } });
   assert.deepEqual(said.map((x) => x.text), [
-    '15 minutes de pause comptées. Il faudra encore 30 minutes, maintenant ou plus tard, avant 4 heures 30 de conduite.',
+    '15 minutes de pause comptées. Encore 30 minutes conseillées, maintenant ou plus tard, avant 4 heures 30 de conduite.',
     'Pause de 45 minutes faite.',
   ]);
   said.length = 0;
@@ -184,11 +186,76 @@ test('fiche avant le départ : pause et 9 h placées sur le trajet', () => {
   const route = { coordinates: coords, steps: [{ name: 'A 31', type: 11, wayPoints: [0, n], duration: 7 * H, distance: 450000 }], duration: 7 * H, distance: 450000 };
   const lines = planDriving(trackDriving(d, monday8h + 3 * H * 1000 + 1000, 90), route, monday8h + 3 * H * 1000 + 1000);
   assert.match(lines[0].text, /^Temps de conduite : 3 h 00 depuis la dernière pause, 3 h 00 aujourd'hui\. Aide seulement : le chronotachygraphe fait foi/);
-  assert.match(lines[1].text, /^Pause de 45 min à prévoir après 1 h 30 de route \(vers km \d+\)\.$/);
+  assert.match(lines[1].text, /^Pause de 45 min conseillée après 1 h 30 de route \(vers km \d+\)\.$/);
   const km = Number(lines[1].text.match(/km (\d+)/)[1]);
   assert.ok(Math.abs(km - 96) <= 3, `${km}`); // 1 h 30 sur 7 h de 456 km environ
   assert.match(lines[2].text, /^Conduite du jour : 9 h atteintes vers km \d+ \(10 h possibles 2 fois par semaine\)\.$/);
   assert.deepEqual(planDriving(emptyDriving(), { ...route, duration: 2 * H }, monday8h), []);
+});
+
+/** Trajet plein est à la latitude 47 : `km` kilomètres en `seconds` secondes. */
+function eastRoute(km, seconds, lon0 = 2) {
+  const n = Math.max(10, Math.round(km));
+  const dLon = km / (111.32 * Math.cos((47 * Math.PI) / 180));
+  const coords = Array.from({ length: n + 1 }, (_, i) => [lon0 + (dLon * i) / n, 47]);
+  return {
+    coordinates: coords, distance: km * 1000, duration: seconds,
+    steps: [{ name: 'A 71', type: 11, wayPoints: [0, n], duration: seconds, distance: km * 1000 }],
+  };
+}
+
+test('pause conseillée sur une aire du bon sens atteinte dans l\'heure avant 4 h 30 ; jamais « obligatoire »', () => {
+  const route = eastRoute(560, 7 * H);
+  const areas = [
+    { id: 'a', name: 'Aire de Test', kind: 'rest', along: 326667, otherSide: false }, // 4 h 05 : gardée
+    { id: 'b', name: 'Aire autre sens', kind: 'rest', along: 346667, otherSide: true }, // autre sens : ignorée
+    { id: 'c', name: 'Aire trop loin', kind: 'rest', along: 370000, otherSide: false }, // après 4 h 30 : ignorée
+    { id: 'd', name: 'Aire trop tôt', kind: 'rest', along: 200000, otherSide: false }, // 2 h 30 : trop tôt
+  ];
+  const plan = breakSchedule(emptyDriving(), route, monday8h, { areas });
+  assert.equal(plan.breaks.length, 1);
+  assert.equal(plan.breaks[0].area.id, 'a');
+  assert.equal(plan.rest, null);
+  const lines = planDriving(emptyDriving(), route, monday8h, { areas });
+  assert.match(lines[0].text, /^Pause de 45 min conseillée après 4 h 05 de route : Aire de Test \(km 327\)\.$/);
+  // Sans aire : à 4 h 30.
+  const bare = breakSchedule(emptyDriving(), route, monday8h);
+  assert.ok(Math.abs(bare.breaks[0].drive - DRIVING.CONTINUOUS_MAX_S) < 2);
+  // Temps écoulé : pause de 45 min après, repos de 11 h au-delà de 9 h.
+  assert.equal(bare.elapsed(H), H);
+  assert.ok(Math.abs(bare.elapsed(5 * H) - (5 * H + 45 * MIN)) < 1);
+  const long = breakSchedule(emptyDriving(), eastRoute(1000, 12 * H), monday8h);
+  assert.equal(long.breaks.length, 1); // la deuxième tomberait après la limite du jour
+  assert.ok(long.rest && long.rest.drive === 9 * H);
+  assert.ok(Math.abs(long.elapsed(10 * H) - (10 * H + 45 * MIN + 11 * H)) < 1);
+  // Aucun texte ne dit « obligatoire ».
+  let [d] = run(emptyDriving(), monday8h, 4 * H + 40 * MIN, 90);
+  assert.ok(!/obligatoire/i.test(drivingView(d, monday8h + (4 * H + 40 * MIN) * 1000, 90).main));
+  assert.match(drivingView(d, monday8h + (4 * H + 40 * MIN) * 1000, 90).main, /^Pause de 45 min conseillée : 4 h 30 de conduite dépassées/);
+});
+
+test('heures des règles recalées avec les pauses conseillées (interdiction PL samedi 22 h, vent)', () => {
+  // Nantes → Besançon (en France), départ samedi 15 h 30 : avec la pause, 22 h tombe à 5 h 45 de conduite (km 460) ;
+  // sans pause, ce serait 6 h 30 (km 520).
+  const route = eastRoute(560, 7 * H, -1.5);
+  const dep = new Date(2026, 10, 21, 15, 30);
+  const vehicle = { name: 'Semi', weight: 44, critair: '1', banStatus: 'concerned' };
+  const without = routeRules(route, { vehicle, departure: dep });
+  const withPauses = routeRules(route, { vehicle, departure: dep, driving: emptyDriving() });
+  assert.ok(Math.abs(without.bans.conflicts[0].along - 520000) < 1500, String(without.bans.conflicts[0].along));
+  assert.ok(Math.abs(withPauses.bans.conflicts[0].along - 460000) < 1500, String(withPauses.bans.conflicts[0].along));
+  assert.ok(withPauses.short.includes('Pause conseillée'));
+  // Vent : rafales fortes seulement de 19 h à 20 h (heure de Paris) ; point à 5 h de conduite = 20 h 30 sans pause,
+  // 21 h 15 avec : hors de la fenêtre dans les deux cas ; point à 3 h 45 = 19 h 15 : dans la fenêtre.
+  const t0 = Date.UTC(2026, 10, 21, 0) / 1000;
+  const time = Array.from({ length: 48 }, (_, i) => (t0 + i * 3600) * 1000);
+  const p = { lon: 0, lat: 47, time, gust: time.map((t) => (new Date(t).getHours() === 20 ? 100 : 30)), speed: time.map(() => null) };
+  const at = (h) => eastRoute(560, 7 * H, -1.5).coordinates[Math.round((560 * h) / 7)];
+  const forecast = { points: [{ ...p, lon: at(4.25)[0], lat: at(4.25)[1] }] };
+  const calm = windAlongRoute(route, forecast, { departure: dep, threshold: 70 });
+  const shifted = windAlongRoute(route, forecast, { departure: dep, threshold: 70, elapsed: (t) => (t > 3600 ? t + 45 * 60 : t) });
+  assert.equal(calm.zones.length, 1); // 4 h 15 de conduite → 19 h 45, heure de 20 h : rafales
+  assert.equal(shifted.zones.length, 0); // avec 45 min de pause → 20 h 30, heure de 21 h : calme
 });
 
 test('lecture et écriture sur l\'appareil : décompte nettoyé, illisible → vide', () => {

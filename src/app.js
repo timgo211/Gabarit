@@ -25,6 +25,7 @@ import { coordsLabel } from './lib/coords.js';
 import { canDuckMedia } from './ui/voice.js';
 import { createAreas } from './ui/areas.js';
 import { createWeather } from './ui/weather.js';
+import { placeAlongRoute } from './lib/areas-route.js';
 import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
 
 function pickStorage() {
@@ -137,7 +138,10 @@ const areas = createAreas({
   update,
   getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
   getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
-  onPool: (pool) => navigation.setAreas(pool),
+  onPool: (pool) => {
+    navigation.setAreas(pool);
+    renderChoice(); // pause conseillée replacée sur une aire du trajet
+  },
 });
 
 // Vent fort (phase 5) : une requête Open-Meteo par calcul ; prévisions placées sur l'itinéraire choisi.
@@ -180,10 +184,13 @@ function rulesOf(route, vehicle, departure) {
   const sig = `${w.status}:${w.threshold}`;
   const driving = loadDriving(storage);
   const dsig = JSON.stringify([driving.at, driving.sinceBreak, driving.day, driving.mode, driving.stopWork]);
+  const pool = areas.pool;
   if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
-    && hit.sig === sig && hit.dsig === dsig) return hit.rules;
-  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, rules });
+    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool) return hit.rules;
+  // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
+  const placed = pool.length ? placeAlongRoute(pool, route) : [];
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, rules });
   return rules;
 }
 

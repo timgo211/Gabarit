@@ -55,7 +55,9 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
     windCredit ? el('p', { class: 'rules-source wind-credit' }, [
       'Vent : ',
       el('a', { href: WIND.ATTRIBUTION_URL, target: '_blank', rel: 'noopener noreferrer', text: WIND.ATTRIBUTION }),
-      ' (CC BY 4.0).',
+      ' (',
+      el('a', { href: WIND.LICENSE_URL, target: '_blank', rel: 'noopener noreferrer', text: WIND.LICENSE }),
+      ').',
     ]) : null,
   ].filter(Boolean);
 }

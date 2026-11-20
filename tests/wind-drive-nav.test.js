@@ -32,8 +32,8 @@ function drive(route, t0, seconds, speedKmh = 90) {
   return Array.from({ length: seconds }, (_, i) => sim.next(t0 + i * 1000));
 }
 
-test('réglages : seuil de rafales par pas de 5, borné, 80 par défaut', () => {
-  assert.equal(sanitizeWindGust(undefined), 80);
+test('réglages : seuil de rafales par pas de 5, borné, 70 par défaut', () => {
+  assert.equal(sanitizeWindGust(undefined), 70);
   assert.equal(sanitizeWindGust('92'), 90);
   assert.equal(sanitizeWindGust(10), 40);
   assert.equal(sanitizeWindGust(400), 150);
@@ -96,8 +96,8 @@ test('guidage : bandeau sous 30 km, une seule annonce vers 15 km ; voix coupée 
   const said = events.filter((e) => /rafales/.test(e.text ?? ''));
   assert.equal(said.length, 1);
   assert.match(said[0].text, /^Attention, rafales de vent jusqu'à 10\d kilomètres heure dans 1[0-5] kilomètres\.$/);
-  assert.match(views[0].rules.wind.text, /^Rafales 10\d km\/h dans 1\d km$/);
-  assert.ok(views.some((v) => /sur cette partie du trajet$/.test(v.rules.wind?.text ?? '')));
+  assert.match(views[0].rules.wind.text, /^Rafales 10\d km\/h dans 1\d km \(Open-Meteo\)$/);
+  assert.ok(views.some((v) => /ici \(Open-Meteo\)$/.test(v.rules.wind?.text ?? '')));
   const muted = runFixes(updateNavigation, startNavigation(route, { now: t0, wind: forecast(), windGust: 80, windVoice: false }), drive(route, t0, 900));
   assert.ok(!muted.events.some((e) => /rafales/.test(e.text ?? '')));
   assert.ok(muted.views.some((v) => v.rules.wind));
@@ -133,7 +133,7 @@ test('moteur : temps de conduite à chaque position, annonce 30 min avant 4 h 30
   const { state, events, views } = runFixes(updateNavigation, s0, drive(route, t0, 300));
   const said = events.filter((e) => /^Pause de 45 minutes/.test(e.text ?? ''));
   assert.equal(said.length, 1);
-  assert.match(views[299].driving.main, /^Conduite 4 h 0\d · pause de 45 min dans 2\d min$/);
+  assert.match(views[299].driving.main, /^Conduite 4 h 0\d · pause 45 min conseillée dans 2\d min$/);
   assert.equal(views[299].driving.level, 'soon');
   assert.equal(views[299].driving.canMarkWork, false);
   assert.equal(markStopAsWork(state, t0 + 300000).driving, null, 'en roulant : rien');
