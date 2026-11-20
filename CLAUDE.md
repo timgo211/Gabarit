@@ -26,7 +26,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
     `hgv-bans.js` (interdictions PL week-ends / jours fériés, calendrier annuel, Île-de-France, guidage),
-    `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches)
+    `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches),
+    `driving-time.js` (pauses conseillées CE 561/2006, compteur du guidage, journal), `wind.js` (Open-Meteo : points,
+    requête, rafales sur le trajet, guidage, cache)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -34,6 +36,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
   - `areas.js` (aires du trajet : requête Overpass, liste, repères HTML sur la carte, fiche et « Mon avis »)
+  - `weather.js` (vent : une requête Open-Meteo par calcul, puis au plus une par heure en guidage)
   - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
     vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
@@ -45,6 +48,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
+  ; `open-meteo-wind.json` (5 points, rafales 88 km/h au 4e le 18/11 vers 10 h UTC) et `open-meteo-wind-single.json`
+  (format de la doc Open-Meteo)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
   réelles du xlsx concédé 2025)
@@ -60,14 +65,15 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot | rules
+                                   #   | overview | press | areas | foot | rules | drive
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
 un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
-21 h 57). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+21 h 57), pauses conseillées et vent (Open-Meteo émulé, saisie « depuis la dernière pause », bandeau du guidage,
+Open-Meteo en échec). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -159,6 +165,19 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
   des étapes ORS (« à vérifier ») ; `vehicle.banStatus`. Guidage : `view.rules` (bandeau `#nav-rule`, une ligne par
   alerte), voix si `settings.ruleVoice` (par défaut oui). legifrance.gouv.fr répond 403 depuis le conteneur : arrêtés
   lus en PDF du JO sur bison-fute.gouv.fr. Tests de dates : `process.env.TZ = 'Europe/Paris'` en tête du fichier.
+- Temps de conduite (phase 5 PR B, `driving-time.js`) : règlement (CE) 561/2006 cité une fois (résumé du ministère,
+  EUR-Lex illisible d'ici) ; véhicules de plus de 3,5 t ; toujours « Pause conseillée », jamais « obligatoire » (voix,
+  fiche, bandeau), le chronotachygraphe fait foi. Conduite déjà faite : saisie à l'arrêt sur les notes (facultatif),
+  sinon reprise du journal `gabarit.drive` (localStorage, écrit toutes les 30 s en guidage réel, jamais en simulation).
+  Compteur dans l'état du moteur (`stepDrive` à chaque position) ; `planBreaks().elapsed` recale les heures de passage
+  des ZFE, interdictions et vent (option `elapsed` de `zfeAlongRoute` / `bansAlongRoute` / `windAlongRoute`).
+- Vent (phase 5 PR B, `wind.js`) : Open-Meteo `api.open-meteo.com/v1/forecast` (sans clé, CORS, non commercial,
+  CC BY 4.0 → attribution « Météo : Open-Meteo.com (CC BY 4.0) » sur les notes, dans Réglages et « (Open-Meteo) » dans
+  le bandeau) ; une requête par calcul pour tous les itinéraires (≤ 100 points, 25 km, points proches fusionnés),
+  `timeformat=unixtime`, `timezone=GMT` ; cache `gabarit.windCache` 1 h ; recalcul / « Sans ZFE » : points déjà
+  demandés réutilisés à 15 km (`windPlanFromRoute`), pas de requête ; en guidage réel, une nouvelle requête au plus par
+  heure. Seuil `settings.windGust` (70 km/h, 40–130) ; aucun seuil officiel. Open-Meteo répond 429 depuis le conteneur
+  (IP partagée) : tests sur fixtures uniquement.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

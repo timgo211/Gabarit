@@ -6,7 +6,7 @@
 
 import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 
-const VERSION = 'v13';
+const VERSION = 'v14';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -25,6 +25,7 @@ const APP_FILES = [
   './src/lib/areas-route.js',
   './src/lib/config.js',
   './src/lib/coords.js',
+  './src/lib/driving-time.js',
   './src/lib/format.js',
   './src/lib/hgv-bans.js',
   './src/lib/holidays.js',
@@ -46,6 +47,7 @@ const APP_FILES = [
   './src/lib/sw-routing.js',
   './src/lib/theme.js',
   './src/lib/vehicle.js',
+  './src/lib/wind.js',
   './src/lib/zfe-convert.js',
   './src/lib/zfe.js',
   './src/ui/api.js',
@@ -63,6 +65,7 @@ const APP_FILES = [
   './src/ui/vehicles.js',
   './src/ui/voice.js',
   './src/ui/wake-lock.js',
+  './src/ui/weather.js',
 ].map((p) => new URL(p, self.location).href);
 
 self.addEventListener('install', (event) => {

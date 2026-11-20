@@ -242,6 +242,12 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .rules-notes .info { color: var(--muted); }
 .rules-notes a { margin-left: 6px; }
 .rules-source { color: var(--muted); font-size: .8rem; margin: 6px 0 0; overflow-wrap: anywhere; }
+.drive-block { margin: 10px 0 0; font-size: .9rem; }
+.drive-block summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+.drive-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.drive-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px; min-width: 0; font-weight: normal; }
+.drive-field input { min-width: 0; width: 100%; min-height: 44px; }
+.drive-error { color: var(--danger); font-size: .8rem; min-height: 1em; }
 .btn-avoid-zfe { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 

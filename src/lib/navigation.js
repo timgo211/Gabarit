@@ -15,6 +15,8 @@ import { ERROR_KINDS } from './ors-errors.js';
 import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
 import { zfeAlongRoute, guidanceZfe } from './zfe.js';
 import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
+import { startDrive, stepDrive, guidanceDrive, driveApplies, driveLog } from './driving-time.js';
+import { windPlanFromRoute, windAlongRoute, guidanceWind, WIND } from './wind.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -132,6 +134,18 @@ function placeAreas(pool, route) {
   return Array.isArray(pool) && pool.length ? placeAlongRoute(pool, route) : [];
 }
 
+/**
+ * Rafales au-dessus du seuil sur un itinéraire (phase 5), à partir des points déjà demandés à Open-Meteo (aucune
+ * requête), heures de passage depuis `now`.
+ */
+function placeWind(wind, route, now) {
+  if (!wind?.forecast || !Array.isArray(wind.points)) return [];
+  const plan = windPlanFromRoute(route, wind.points);
+  return windAlongRoute(plan, wind.forecast, {
+    departure: new Date(now || Date.now()), threshold: wind.threshold ?? WIND.THRESHOLD_KMH,
+  }).alerts;
+}
+
 /** ZFE interdites sur un itinéraire (phase 5), d'après l'heure de passage estimée depuis `now`. */
 function placeZfe(rules, route, now) {
   if (!rules?.zfe || !rules.vehicle) return [];
@@ -147,13 +161,21 @@ function placeZfe(rules, route, now) {
  *   destination choisie [lon, lat] (peut être hors route) ; areas : aires trouvées au calcul (phase 9, mergeAreas) ;
  *   announceAreas : annonce vocale vers 10 km avant une aire (réglage, désactivé par défaut) ;
  *   rules (phase 5) : profil véhicule et ZFE (parseZfeData) pour les alertes ZFE et interdictions PL, voice :
- *   alertes dites à voix haute (réglage, activé par défaut)
+ *   alertes dites à voix haute (réglage, activé par défaut) ; driven : conduite déjà faite aujourd'hui
+ *   ({ today, sinceBreak } en s) ; wind : { points, forecast, threshold } (wind.js) ou null
  */
 export function startNavigation(route, { destination = null, now = 0, areas = null, announceAreas = false, rules = null } = {}) {
+  const r = rules?.vehicle
+    ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false, wind: rules.wind ?? null }
+    : null;
   return {
-    rules: rules?.vehicle ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false } : null,
+    rules: r,
     zfe: placeZfe(rules, route, now),
     zfeAnnounced: {},
+    drive: r ? startDrive(rules.driven, now || Date.now()) : null,
+    driveApplies: r ? driveApplies(r.vehicle) : false,
+    wind: placeWind(r?.wind, route, now),
+    windAnnounced: {},
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     route: prepareRoute(route),
     source: route,
@@ -295,8 +317,20 @@ export function updateNavigation(state, fix) {
 
   // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
   // seulement, rien à toucher.
-  const rules = { zfe: null, ban: null };
+  const rules = { zfe: null, ban: null, wind: null, drive: null };
+  if (s.drive) {
+    s.drive = stepDrive(s.drive, { t, speed });
+    const na = nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al), 1)[0] ?? null;
+    const d = guidanceDrive(s.drive, { applies: s.driveApplies && !s.arrived, nextArea: na && na.distance > 0 ? na : null });
+    s.drive = { ...s.drive, announced: d.announced };
+    rules.drive = d.view;
+    if (d.speak && s.rules.voice) events.push({ type: 'speak', text: d.speak });
+  }
   if (s.rules && !s.arrived) {
+    const w = guidanceWind(s.wind, loc.along, s.windAnnounced);
+    s.windAnnounced = w.announced;
+    rules.wind = w.view;
+    if (w.speak && s.rules.voice && onRoute && !s.rerouting) events.push({ type: 'speak', text: w.speak });
     const z = guidanceZfe(s.zfe, loc.along, s.zfeAnnounced);
     s.zfeAnnounced = z.announced;
     rules.zfe = z.view;
@@ -333,8 +367,13 @@ export function updateNavigation(state, fix) {
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
     /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
     nextAreas: s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al)),
-    /** Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null }. */
+    /**
+     * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,
+     * wind:{ distance, gust, text }|null, drive:{ blockLeft, dayLeft, stopped, text|null }|null }.
+     */
     rules,
+    /** Compteur de conduite à garder sur l'appareil (driving-time.js, driveLog). */
+    driveLog: driveLog(s.drive),
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -439,6 +478,13 @@ export function setNavigationAreas(state, areas) {
   return { ...state, areaPool: pool, areas: placeAreas(pool, state.source) };
 }
 
+/** Nouvelle prévision du vent (au plus une fois par heure en guidage) : rafales replacées sur le tracé suivi. */
+export function setNavigationWind(state, wind) {
+  if (!state?.rules) return state;
+  const rules = { ...state.rules, wind: wind ?? null };
+  return { ...state, rules, wind: placeWind(rules.wind, state.source, state.lastFixAt ?? state.startedAt) };
+}
+
 /** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
 export function rerouteDone(state, route) {
   const s = {
@@ -447,6 +493,8 @@ export function rerouteDone(state, route) {
     source: route,
     areas: placeAreas(state.areaPool, route),
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
+    wind: placeWind(state.rules?.wind, route, state.lastFixAt ?? state.startedAt),
+    windAnnounced: {},
     segIndex: null,
     along: 0,
     announced: {},

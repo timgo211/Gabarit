@@ -8,6 +8,7 @@ import { exportData, importData, parseDieselPrice } from '../lib/store.js';
 import { formatPricePerLiter } from '../lib/format.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
 import { sanitizeVoiceRate, sanitizeVoiceVolume } from '../lib/prefs.js';
+import { sanitizeWindThreshold } from '../lib/wind.js';
 
 /** Phrase de Réglages sur la musique pendant les consignes (phase 7c). */
 const MUSIC_TEXT = {
@@ -28,7 +29,8 @@ function setStatus(node, text, ok) {
  *   onSimulate:()=>string|null, onDieselPriceChange:(price:number|null)=>void,
  *   getVoices:()=>SpeechSynthesisVoice[], onVoicesChanged:(cb)=>void, canDuckMedia:boolean,
  *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
- *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void }} ctx
+ *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void,
+ *   onWindGustChange?:(kmh:number)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -42,6 +44,8 @@ export function createSettings(ctx) {
   const areaVoice = $('#area-voice');
   const ruleVoice = $('#rule-voice');
   const dieselInput = $('#diesel-price');
+  const windInput = $('#wind-gust');
+  const windStatus = $('#wind-status');
   const dieselStatus = $('#diesel-status');
   const voiceName = $('#voice-name');
   const voiceRate = $('#voice-rate');
@@ -93,6 +97,7 @@ export function createSettings(ctx) {
     showVoiceValues();
     for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) r.checked = r.value === settings.arrowColor;
     dieselInput.value = formatPricePerLiter(settings.dieselPrice);
+    windInput.value = String(settings.windGust);
   }
 
   function open() {
@@ -150,6 +155,12 @@ export function createSettings(ctx) {
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
   areaVoice.addEventListener('change', () => ctx.onAreaVoiceChange?.(areaVoice.checked));
   ruleVoice.addEventListener('change', () => ctx.onRuleVoiceChange?.(ruleVoice.checked));
+  $('#btn-wind-save').addEventListener('click', () => {
+    const v = sanitizeWindThreshold(windInput.value);
+    windInput.value = String(v);
+    ctx.onWindGustChange?.(v);
+    setStatus(windStatus, `Alerte vent à partir de ${v} km/h de rafales.`);
+  });
   $('#btn-voice-test').addEventListener('click', () => setStatus(voiceStatus, ctx.onTestVoice()));
   voiceName.addEventListener('change', () => ctx.onVoiceOptions(voiceOptions()));
   for (const input of [voiceRate, voiceVolume]) {

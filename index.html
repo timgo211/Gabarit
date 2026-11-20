@@ -185,7 +185,7 @@
           <button type="button" id="btn-voice-test" class="btn">Tester</button>
         </div>
         <label class="toggle"><input type="checkbox" id="area-voice"> Annoncer les aires PL (vers 10 km avant)</label>
-        <label class="toggle"><input type="checkbox" id="rule-voice"> Annoncer les ZFE interdites (vers 5 km) et les interdictions PL (1 h et 15 min avant)</label>
+        <label class="toggle"><input type="checkbox" id="rule-voice"> Annoncer les ZFE interdites (vers 5 km), les interdictions PL (1 h et 15 min avant), le vent fort (vers 20 km) et les pauses conseillées (30 et 10 min avant 4 h 30 de conduite)</label>
         <p id="voice-status" class="status" role="status"></p>
         <p id="voice-music" class="hint"></p>
       </section>
@@ -199,6 +199,20 @@
           <label><input type="radio" name="arrow-color" value="orange"> <span class="swatch" style="--swatch:#f08a00"></span> Orange</label>
           <label><input type="radio" name="arrow-color" value="violet"> <span class="swatch" style="--swatch:#7b2fbf"></span> Violet</label>
         </div>
+      </section>
+
+      <section class="card">
+        <h3>Vent fort</h3>
+        <p class="hint">Alerte sur le trajet quand les rafales prévues (Open-Meteo) atteignent ce seuil. Aucun seuil
+          officiel : c'est une aide, la signalisation et les fermetures (ponts, viaducs) font foi.</p>
+        <label for="wind-gust">Alerte à partir de (km/h de rafales)</label>
+        <div class="combo">
+          <input id="wind-gust" type="number" inputmode="numeric" min="40" max="130" step="5" autocomplete="off">
+          <button type="button" id="btn-wind-save" class="btn btn-primary">Enregistrer</button>
+        </div>
+        <p id="wind-status" class="status" role="status"></p>
+        <p class="hint"><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Météo : Open-Meteo.com</a>
+          (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>)</p>
       </section>
 
       <section class="card">

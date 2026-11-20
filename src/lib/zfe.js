@@ -311,13 +311,13 @@ function ruleAt(p, date, data, grid, category) {
 /**
  * Passages de l'itinéraire dans les ZFE, d'après l'heure de passage estimée.
  * @param {object} route itinéraire (parseDirections)
- * @param {{ data:{zones,voies}, vehicle:object, departure?:Date }} ctx
+ * @param {{ data:{zones,voies}, vehicle:object, departure?:Date, elapsed?:(t:number)=>number }} ctx elapsed : pauses comprises
  * @returns {{ id, name, enter:number, exit:number, time:Date, banned:boolean, critair:string|null,
  *   hours:object|null, hoursRaw:string, onVoie:boolean, url:string|null, zone:object }[]}
  *   enter / exit : distances depuis le départ (m) ; banned : interdit au véhicule pendant au moins une partie du
  *   passage (hors tronçons sans restriction) ; destination : le passage finit à l'arrivée
  */
-export function zfeAlongRoute(route, { data, vehicle, departure = new Date() }) {
+export function zfeAlongRoute(route, { data, vehicle, departure = new Date(), elapsed = (t) => t }) {
   if (!data?.zones?.length) return [];
   data.grid ??= indexVoies(data.voies);
   const category = categoryOf(vehicle);
@@ -326,7 +326,7 @@ export function zfeAlongRoute(route, { data, vehicle, departure = new Date() }) 
   let cur = null;
   const total = samples.length ? samples[samples.length - 1].along : 0;
   for (const sm of samples) {
-    const date = new Date(departure.getTime() + sm.time * 1000);
+    const date = new Date(departure.getTime() + elapsed(sm.time) * 1000);
     const hit = ruleAt(sm.lonlat, date, data, data.grid, category);
     if (!hit) { cur = null; continue; }
     const banned = bannedBy(hit.rule.critair, vehicle?.critair) && hoursActive(hit.rule.hours, date);

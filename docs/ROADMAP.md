@@ -150,7 +150,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 - [ ] **Bloc 3 — Réglementation** (une seule conversation)
   Les phases 5, 5b, 5c et 5d partagent les mêmes données de restrictions : chercher et citer chaque règle officielle
   une seule fois, en commentaire, avant de coder.
-  - [ ] **Phase 5 — Réglementation**
+  - [x] **Phase 5 — Réglementation**
     ZFE (`aires.geojson` de la Base nationale BNZFE sur transport.data.gouv.fr, copié dans `data/` par une GitHub Action
     hebdomadaire) avec alerte selon ma vignette Crit'Air ; interdictions PL les week-ends et jours fériés ; temps de
     conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
@@ -169,8 +169,20 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       ou « Véhicule spécialisé / agricole ». Fiche : « Interdiction PL samedi 22 h → dimanche 22 h : vous y seriez vers
       km 412 » ; guidage : annonces 1 h et 15 min avant si l'arrivée est après le début, bandeau. Vérifié avec le
       calendrier 2026 de la brochure Bison Futé (écarts du 4 avril et du 9 mai en Île-de-France : l'appli suit l'arrêté).
-    - [ ] Temps de conduite et pauses (PR B).
-    - [ ] Alerte vent fort (PR B).
+    - [x] **Temps de conduite et pauses** (PR B) : règlement (CE) n° 561/2006 (résumé officiel du ministère de la
+      Transition écologique) ; aide seulement, « Pause conseillée », jamais « obligatoire », le chronotachygraphe fait
+      foi. Avant le départ : conduite déjà faite aujourd'hui (facultatif, reprise du dernier guidage de moins de 24 h),
+      pause de 45 min conseillée à 4 h 30 de conduite sur une aire du bon sens (phase 9) atteinte dans l'heure qui
+      précède, repos journalier à 9 h de conduite, arrivée estimée avec les pauses ; heures de passage des ZFE, des
+      interdictions et du vent recalées avec les pauses. En guidage : compteur (roulage ≥ 5 km/h ; arrêt de 45 min, ou
+      15 min puis 30 min, = pause ; 9 h d'arrêt = nouvelle journée), bandeau à moins d'une heure, voix 30 et 10 min
+      avant (« Pause conseillée dans 30 minutes. Prochaine aire : … »). Plus de 3,5 t seulement. Limites hebdomadaires
+      (56 h, 90 h) non suivies.
+    - [x] **Alerte vent fort** (PR B) : Open-Meteo (sans clé, CC BY 4.0, attribution affichée), une requête par calcul
+      pour tous les itinéraires proposés (100 points au plus), gardée 1 h sur l'appareil ; rafales à l'heure de passage,
+      seuil 70 km/h réglable (aucun seuil officiel) ; fiche « Vent fort : rafales jusqu'à 85 km/h vers km 230 » ; en
+      guidage, bandeau sous 30 km, annonce vers 20 km, nouvelle prévision au plus une fois par heure ; Open-Meteo
+      injoignable : « Prévision du vent indisponible ».
   - [ ] **Phase 5b — ADR (matières dangereuses)**
     Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D
     ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul

@@ -9,15 +9,15 @@
 // tracé seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
 // Encart « Prochaines aires » (phase 9) : ouvert ou fermé d'un seul appui, rempli par le moteur à chaque position ;
 // toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
-// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min » et voix,
-// lecture seule (aucun bouton).
+// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min », « Rafales
+// 85 km/h dans 12 km (Open-Meteo) », « Pause conseillée dans 25 min » et voix, lecture seule (aucun bouton).
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, mapButtonSize, NAV,
+  setNavigationAreas, setNavigationWind, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
@@ -41,7 +41,7 @@ const AREAS_MIN_WIDTH_PX = 200;
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
  *   onVoiceToggle:(on:boolean)=>void, onSimSpeedChange:(kmh:number)=>void,
  *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void, onAreaOpen?:(id:string)=>void,
- *   onView?:(view:object)=>void }} ctx
+ *   onView?:(view:object, info:{ simulated:boolean })=>void }} ctx
  */
 export function createNavigation(ctx) {
   const app = $('.app');
@@ -243,8 +243,10 @@ export function createNavigation(ctx) {
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
     renderAlert(view);
 
-    // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
-    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text].filter(Boolean);
+    // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche, vent fort, pause conseillée (textes du
+    // moteur).
+    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text, view.rules?.drive?.text]
+      .filter(Boolean);
     if (ui.rule.dataset.text !== rules.join('\n')) {
       ui.rule.dataset.text = rules.join('\n');
       ui.rule.replaceChildren(...rules.map((t) => {
@@ -259,7 +261,7 @@ export function createNavigation(ctx) {
     ui.road.hidden = !view.roadName;
     renderAreas(view);
     layoutFoot();
-    ctx.onView?.(view);
+    ctx.onView?.(view, { simulated: !!s.sim });
 
     // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
     ctx.map.navigateTo({
@@ -540,6 +542,11 @@ export function createNavigation(ctx) {
       if (!s) return;
       s.state = setNavigationAreas(s.state, areas);
       s.areasCount = Array.isArray(areas) ? areas.length : 0;
+    },
+    /** Nouvelle prévision du vent (au plus une par heure) : le moteur replace les rafales sur le tracé suivi. */
+    setWind(wind) {
+      if (!s) return;
+      s.state = setNavigationWind(s.state, wind);
     },
     /** Vue satellite hors de France pendant le guidage (message de src/lib/map-layers.js). */
     setLayerView(view) {

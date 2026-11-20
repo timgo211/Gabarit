@@ -84,12 +84,12 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
  * Ouvre l'appli. opts.directions(body) → JSON ORS ; opts.theme : 'day' | 'night' ;
  * opts.overpass(url) → JSON Overpass ou null (serveur en échec) ; opts.official : contenu de data/aires-pl.json ;
  * opts.zfe : contenu de data/zfe.json (aucune ZFE par défaut : les couleurs de la carte mesurées restent celles du
- * fond) ; opts.now : heure de la tablette (ms).
+ * fond) ; opts.now : heure de la tablette (ms) ; opts.weather(url) → JSON Open-Meteo ou null (échec, par défaut).
  * Renvoie { page, ctx, stats, errors } (stats.tiles : tuiles IGN demandées ; stats.overpass : serveurs appelés).
  */
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
-  zfe = { zones: [], voies: [] }, now = null,
+  zfe = { zones: [], voies: [] }, now = null, weather = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -108,7 +108,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [] };
+  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], weather: 0 };
   await ctx.addInitScript(() => {
     window.__raf = 0;
     const raf = window.requestAnimationFrame.bind(window);
@@ -140,6 +140,11 @@ async function open(browser, base, {
     if (url.includes('/api/interpreter')) {
       stats.overpass.push(new URL(url).host);
       const json = overpass ? overpass(url) : null;
+      return json ? route.fulfill({ json }) : route.abort();
+    }
+    if (url.startsWith('https://api.open-meteo.com/')) {
+      stats.weather += 1;
+      const json = weather ? weather(url) : null;
       return json ? route.fulfill({ json }) : route.abort();
     }
     if (url.includes('/pelias/v1/autocomplete')) stats.pelias += 1;
@@ -954,6 +959,90 @@ async function rulesCheck(browser, base) {
   }
 }
 
+/** Réponse Open-Meteo (format de la doc) : rafales `gust` km/h à toute heure, pour chaque point demandé. */
+function windResponse(url, gust) {
+  const q = new URL(url).searchParams;
+  const lats = q.get('latitude').split(',');
+  const lons = q.get('longitude').split(',');
+  const t0 = Math.floor(Date.now() / 3600e3) * 3600 - 6 * 3600;
+  const time = Array.from({ length: 96 }, (_, i) => t0 + i * 3600);
+  const one = (i) => ({
+    latitude: Number(lats[i]), longitude: Number(lons[i]), generationtime_ms: 0.2, utc_offset_seconds: 0, timezone: 'GMT',
+    timezone_abbreviation: 'GMT', elevation: 170, hourly_units: { time: 'unixtime', wind_gusts_10m: 'km/h', wind_speed_10m: 'km/h' },
+    hourly: { time, wind_gusts_10m: time.map(() => gust), wind_speed_10m: time.map(() => Math.round(gust / 2)) },
+  });
+  return lats.length === 1 ? one(0) : lats.map((_, i) => ({ ...one(i), location_id: i }));
+}
+
+/**
+ * Phase 5 (PR B) : temps de conduite et vent fort. Rafales de 90 km/h émulées (Open-Meteo), conduite déjà faite saisie à
+ * l'arrêt (« depuis la dernière pause » 4 h 25) : fiche « Pause conseillée », vent, attribution Open-Meteo ; guidage
+ * avec le GPS émulé (une position par seconde, vitesse fournie) : bandeau « Pause conseillée dans … » et rafales,
+ * jamais « obligatoire », dans sa case, sans recouvrir les boutons ; Open-Meteo en échec : message discret.
+ * 360, 412, 800 et 1280 px.
+ */
+async function driveCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, overpass: () => fixture('overpass-aires.json'), weather: (url) => windResponse(url, 90),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes li.warn', { timeout: 10000 });
+    check(stats.weather === 1, `${width} px : une seule requête Open-Meteo par calcul`, String(stats.weather));
+    let notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    check(notes.some((t) => /^Vent fort : rafales jusqu'à 90 km\/h/.test(t)), `${width} px : note vent fort`, notes.join(' | '));
+    check(/Vent 90 km\/h/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche, vent fort`);
+    const attr = await page.$$eval('.rules-source a', (a) => a.map((x) => `${x.textContent} ${x.href}`).join(' | '));
+    check(/Open-Meteo\.com https:\/\/open-meteo\.com\//.test(attr) && /CC BY 4\.0 https:\/\/creativecommons\.org\/licenses\/by\/4\.0\//.test(attr),
+      `${width} px : attribution Open-Meteo (CC BY 4.0)`, attr);
+    // Conduite déjà faite, saisie à l'arrêt.
+    await page.click('.drive-block summary');
+    await page.fill('#drive-since', '4 h 25');
+    await page.press('#drive-since', 'Tab');
+    await page.waitForTimeout(300);
+    notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    check(notes.some((t) => /^Pause conseillée \(45 min\)/.test(t)) && notes.some((t) => /chronotachygraphe fait foi/.test(t)),
+      `${width} px : pause conseillée sur la fiche`, notes.join(' | '));
+    check(/pause conseillée/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche, pause conseillée`);
+    check(await page.inputValue('#drive-since') === '4 h 25', `${width} px : saisie gardée`);
+    await noHorizontalScroll(page, `${width} px fiches, pauses et vent`);
+    await page.locator('#route-notes').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-pauses-vent.png`) });
+
+    // Guidage avec le GPS émulé.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await drive(ctx, page, line, 50, 4);
+    const rule = await page.textContent('#nav-rule');
+    check(await page.isVisible('#nav-rule') && /Pause conseillée dans \d+ min/.test(rule) && /Rafales 90 km\/h|Vent fort : rafales 90 km\/h \(Open-Meteo\)/.test(rule),
+      `${width} px : bandeau pause conseillée et vent en guidage`, rule);
+    check(!/obligatoire/i.test(await page.textContent('body')), `${width} px : jamais « obligatoire »`);
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${width} px : boutons de carte hors du bandeau`, foot.out.join(' ; '));
+    await noHorizontalScroll(page, `${width} px guidage, pause et vent`);
+    await page.screenshot({ path: join(SHOTS, `${width}-pauses-vent-guidage.png`) });
+    check(stats.weather === 1, `${width} px : pas de nouvelle requête Open-Meteo en début de guidage`, String(stats.weather));
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Open-Meteo en échec : message discret, itinéraire utilisable.
+  const { page, ctx, errors } = await open(browser, base, { width: 412, height: 900 });
+  await computeRoute(page);
+  await page.waitForFunction(() => /Prévision du vent indisponible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 25000 });
+  check(true, 'Open-Meteo injoignable : « Prévision du vent indisponible »');
+  check(await page.isVisible('#btn-nav-start'), 'Open-Meteo injoignable : guidage possible');
+  // Réglages : seuil et attribution.
+  await page.click('#btn-settings');
+  check(await page.inputValue('#wind-gust') === '70', 'Réglages : seuil de vent 70 km/h par défaut');
+  check(/Open-Meteo/.test(await page.textContent('#dlg-settings')), 'Réglages : attribution Open-Meteo');
+  check(errors.length === 0, 'Open-Meteo injoignable : aucune erreur JavaScript', errors.join(' | '));
+  await ctx.close();
+}
+
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
@@ -961,7 +1050,8 @@ const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
-    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck };
+    overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
+    drive: driveCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);
