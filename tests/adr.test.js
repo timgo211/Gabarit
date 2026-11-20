@@ -5,6 +5,7 @@ process.env.TZ = 'Europe/Paris';
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fixture, runFixes } from './helpers.js';
 import {
   ADR, KNOWN_TUNNELS, CATEGORY_ALL, categoryFromTags, isForbidden, effectiveCode, parseTunnelData, tunnelsAlongRoute,
@@ -268,6 +269,12 @@ test('tunnels gardés en dur (Bison Futé) : Fourvière E, Fréjus C, Mont-Blanc
     assert.equal(lines[0].text, ADR.UNAVAILABLE_TEXT);
     assert.match(lines[1].text, new RegExp(`^${t.name}`));
   }
+  // Fourvière et Mont-Blanc : interdits même sans code tunnel (Bison Futé) ; Fréjus (C) : autorisé sans code.
+  const none = (t) => tunnelsAlongRoute({ coordinates: t.tubes[0], steps: [], duration: 900 }, { data: null, vehicle: adr('E', { unNumber: '3373' }) })[0];
+  assert.equal(none(KNOWN_TUNNELS[0]).forbidden, true);
+  assert.match(describeForbidden(none(KNOWN_TUNNELS[0])), /^Tunnel de Fourvière \(catégorie E\) interdit à toutes les matières dangereuses, même sans code tunnel/);
+  assert.equal(none(KNOWN_TUNNELS[2]).forbidden, true);
+  assert.equal(none(KNOWN_TUNNELS[1]).forbidden, false);
   const frejus = KNOWN_TUNNELS[1];
   const route = { coordinates: frejus.tubes[0], steps: [], duration: 900 };
   assert.equal(tunnelsAlongRoute(route, { data: null, vehicle: adr('D') })[0].forbidden, false, 'Fréjus (C) autorisé au code D');
@@ -307,4 +314,19 @@ test('guidage (GPS émulé, 90 km/h) : bandeau sous 20 km, une annonce vers 5 km
   assert.equal(late.tunnels.length, 1);
   const back = { ...route, coordinates: route.coordinates.slice(0, 200) };
   assert.equal(rerouteDone(late, back).state.tunnels.length, 0, 'nouveau tracé sans le tunnel E');
+});
+
+test('vraie copie data/tunnels-adr.json : lisible, moins de 1 Mo, Fourvière réuni avec le tunnel en dur', () => {
+  const text = readFileSync(new URL('../data/tunnels-adr.json', import.meta.url), 'utf8');
+  assert.ok(Buffer.byteLength(text) < 1024 * 1024, `${Buffer.byteLength(text)} octets`);
+  const real = parseTunnelData(JSON.parse(text));
+  assert.equal(real.ok, true);
+  assert.ok(real.tunnels.length > 100);
+  assert.match(real.updated, /^\d{4}-\d{2}-\d{2}$/);
+  const tube = KNOWN_TUNNELS[0].tubes[0];
+  const p = tunnelsAlongRoute({ coordinates: tube, steps: [], duration: 120 }, { data: real, vehicle: adr('E') });
+  assert.equal(p.length, 1, 'un seul passage (OSM + Bison Futé)');
+  assert.equal(p[0].name, 'Tunnel de Fourvière');
+  assert.equal(p[0].cat, 'E');
+  assert.equal(p[0].forbidden, true);
 });

@@ -70,7 +70,8 @@ const isPoint = (p) => Array.isArray(p) && isNum(p[0]) && isNum(p[1]);
  */
 export const KNOWN_TUNNELS = Object.freeze([
   Object.freeze({
-    id: 'known:fourviere', name: 'Tunnel de Fourvière', cat: 'E', known: true,
+    // Bison Futé : « interdit […] aux véhicules de transport de matières dangereuses » (toutes, sans exception).
+    id: 'known:fourviere', name: 'Tunnel de Fourvière', cat: 'E', known: true, noCodeBanned: true,
     note: 'Interdit aussi aux PL de plus de 7,5 t et de plus de 4,50 m (arrêté DDT69/Métropole de Lyon du 2 avril 2019).',
     // OSM (API, 20/11/2026) : w1960216 « Tunnel de Fourvière » et w4243622 « Tunnel sous Fourvière » (tunnel:name ;
     // name = Autoroute du Soleil, M 6), hazmat=no ; Bison Futé : catégorie E, gardée.
@@ -84,7 +85,8 @@ export const KNOWN_TUNNELS = Object.freeze([
     tubes: Object.freeze([Object.freeze([[6.67746,45.19582],[6.67934,45.19549],[6.68212,45.19391],[6.68437,45.19052],[6.68494,45.17842],[6.68154,45.16095],[6.682,45.15391],[6.68756,45.14007],[6.69369,45.12416],[6.71297,45.0894],[6.71347,45.08801],[6.71337,45.08674]]), Object.freeze([[6.7138,45.08677],[6.71417,45.08785],[6.71372,45.0889],[6.69855,45.11551],[6.69385,45.12417],[6.688,45.14003],[6.68293,45.15412],[6.68221,45.15762],[6.68243,45.16088],[6.68545,45.17744],[6.68508,45.19058],[6.68479,45.19184],[6.68426,45.19294],[6.68333,45.19396],[6.68232,45.19472],[6.67992,45.19562],[6.67748,45.19593]])]),
   }),
   Object.freeze({
-    id: 'known:montblanc', name: 'Tunnel du Mont-Blanc', cat: 'E', known: true,
+    // Bison Futé : catégorie E, et les nos ONU 2919, 3291, 3331, 3359, 3373 (sans code) sont aussi interdits d'accès.
+    id: 'known:montblanc', name: 'Tunnel du Mont-Blanc', cat: 'E', known: true, noCodeBanned: true,
     note: 'PL de plus de 3,5 t : accréditation obligatoire avant le tunnel (Passy-Le Fayet ou Aoste).',
     // OSM (API, 20/11/2026) : w1212015047 + w4525912 « Tunnel du Mont Blanc » (côté français, hazmat=E) +
     // w205544546 « Traforo del Monte Bianco » (hazmat=no) ; Bison Futé : catégorie E, gardée.
@@ -126,10 +128,13 @@ export function categoryFromTags(tags) {
   return null;
 }
 
-/** ADR 8.6.4 : le tunnel de catégorie `cat` est-il interdit au code `code` ? */
-export function isForbidden(cat, code) {
+/**
+ * ADR 8.6.4 : le tunnel de catégorie `cat` est-il interdit au code `code` ? noCodeBanned : règlement du tunnel qui
+ * interdit aussi les chargements sans code (Fourvière, Mont-Blanc d'après Bison Futé).
+ */
+export function isForbidden(cat, code, { noCodeBanned = false } = {}) {
   if (!code) return false;
-  if (cat === CATEGORY_ALL) return true;
+  if (cat === CATEGORY_ALL || (noCodeBanned && code === 'none')) return true;
   if (code === 'none' || !RANK[cat] || !RANK[code]) return false;
   return RANK[code] <= RANK[cat];
 }
@@ -280,19 +285,24 @@ export function tunnelsAlongRoute(route, { data = null, vehicle = null, departur
     const prev = merged[merged.length - 1];
     if (prev && f.enter <= prev.exit + 50) {
       prev.exit = Math.max(prev.exit, f.exit);
-      if (f.t.known && !prev.known) Object.assign(prev, { id: f.t.id, name: f.t.name, cat: f.t.cat, known: true, note: f.t.note });
+      if (f.t.known && !prev.known) {
+        Object.assign(prev, { id: f.t.id, name: f.t.name, cat: f.t.cat, known: true, note: f.t.note, noCodeBanned: !!f.t.noCodeBanned });
+      }
       else if (!prev.known && rankAll(f.t.cat) < rankAll(prev.cat)) prev.cat = f.t.cat;
       if (!prev.name && f.t.name) prev.name = f.t.name;
       continue;
     }
     merged.push({
       id: f.t.id, name: f.t.name || (f.t.ref ? `Tunnel (${f.t.ref})` : ''), cat: f.t.cat, known: !!f.t.known,
+      noCodeBanned: !!f.t.noCodeBanned,
       note: f.t.note ?? null, enter: f.enter, exit: f.exit, mid: pointAt(line, (f.enter + f.exit) / 2).point,
     });
   }
   return merged.map((p) => {
     const time = elapsed(timeAt(route, line, p.enter));
-    return { ...p, time, at: new Date(departure.getTime() + time * 1000), forbidden: isForbidden(p.cat, code), code };
+    return {
+      ...p, time, at: new Date(departure.getTime() + time * 1000), forbidden: isForbidden(p.cat, code, p), code,
+    };
   });
 }
 
@@ -307,7 +317,9 @@ export const tunnelName = (p) => p.name || 'Tunnel sans nom';
 
 /** Fiche : tunnel interdit au code du véhicule. */
 export function describeForbidden(p) {
-  const why = p.cat === CATEGORY_ALL ? 'interdit aux matières dangereuses' : `(catégorie ${p.cat}) interdit au ${codeText(p.code)}`;
+  const why = p.cat === CATEGORY_ALL ? 'interdit aux matières dangereuses'
+    : p.code === 'none' ? `(catégorie ${p.cat}) interdit à toutes les matières dangereuses, même sans code tunnel`
+      : `(catégorie ${p.cat}) interdit au ${codeText(p.code)}`;
   return `${tunnelName(p)} ${why} : vous y seriez vers ${km(p.enter)} (vers ${hhmm(p.at)}).${p.note ? ` ${p.note}` : ''} ${capital(ADR.SIGNAGE)}.`;
 }
 

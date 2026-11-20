@@ -112,8 +112,8 @@ export function convertTunnels(json, { updated = null } = {}) {
 }
 
 /**
- * Recoupement des tunnels gardés en dur (Bison Futé) avec OpenStreetMap : tubes OSM du même nom, ou à moins de
- * 2 km du point donné, et leur catégorie. Écrit dans le journal de l'Action.
+ * Recoupement des tunnels gardés en dur (Bison Futé) avec OpenStreetMap : tubes OSM à moins de 2 km du point donné,
+ * ou du même nom à moins de 20 km, et leur catégorie. Écrit dans le journal de l'Action.
  * @param {object} json voies OSM ({ elements })
  * @param {{ name:RegExp, near:number[] }[]} probes
  */
@@ -126,7 +126,8 @@ export function crossCheck(json, probes) {
       const g = e.geometry.map((p) => [p.lon, p.lat]);
       const name = String(e.tags?.['tunnel:name'] ?? e.tags?.name ?? '');
       const mid = checkPoints(g, 3)[1];
-      if (!probe.name.test(name) && haversine(mid, probe.near) > 2000) continue;
+      const d = haversine(mid, probe.near);
+      if (!(d <= 2000 || (probe.name.test(name) && d <= 20000))) continue;
       hits.push(`w${e.id} « ${name} » catégorie OSM ${categoryFromTags(e.tags) ?? '?'} ; tracé ${JSON.stringify(shrink(g))}`);
     }
     lines.push(`${probe.label} (Bison Futé : ${probe.cat}) : ${hits.length ? hits.join(' | ') : 'absent des données OSM'}`);
@@ -158,8 +159,8 @@ export function knownTubesFromMap(json, nameRe) {
 /** Repères de recoupement pour les trois tunnels gardés en dur (point proche du milieu, d'après la carte). */
 export const KNOWN_PROBES = Object.freeze([
   { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605], search: ['Tunnel de Fourvière', 'Tunnel sous Fourvière', 'Fourvière tunnel Lyon'] },
-  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135], search: ['Tunnel routier du Fréjus'] },
-  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858], search: ['Tunnel du Mont-Blanc'] },
+  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus/i, near: [6.685, 45.135], search: ['Tunnel routier du Fréjus'] },
+  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco/i, near: [6.905, 45.858], search: ['Tunnel du Mont-Blanc'] },
 ].map((p) => Object.freeze(p)));
 
 export { KNOWN_TUNNELS };
