@@ -24,6 +24,8 @@ import { arrowColors } from './lib/prefs.js';
 import { coordsLabel } from './lib/coords.js';
 import { canDuckMedia } from './ui/voice.js';
 import { createAreas } from './ui/areas.js';
+import { createWeather } from './ui/weather.js';
+import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
 
 function pickStorage() {
   try {
@@ -118,6 +120,8 @@ navigation = createNavigation({
   },
   onAreaOpen: (id) => areas.openSheet(id),
   onView: () => areas.refreshDrive(),
+  // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
+  onDriving: (d) => saveDriving(storage, d),
   onEnd: (message) => {
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
@@ -136,6 +140,15 @@ const areas = createAreas({
   onPool: (pool) => navigation.setAreas(pool),
 });
 
+// Vent fort (phase 5) : une requête Open-Meteo par calcul ; prévisions placées sur l'itinéraire choisi.
+const weather = createWeather({
+  storage,
+  onChange: (w) => {
+    if (w.status === 'ok') navigation.setWind(w.forecast);
+    renderChoice();
+  },
+});
+
 // ───────── Réglementation (phase 5) : ZFE (data/zfe.json) et interdictions PL ─────────
 /** ZFE lues (parseZfeData), null tant qu'elles ne sont pas arrivées ou si le fichier est illisible. */
 let zfeData = null;
@@ -150,14 +163,27 @@ fetch(ZFE.DATA_PATH, { cache: 'no-cache' })
   .catch(() => { zfeFailed = true; })
   .finally(() => renderChoice());
 
-/** Réglementation déjà calculée par itinéraire (même minute de départ, mêmes données) : un toucher ne recalcule rien. */
+/** Vent : prévisions, état de la requête et seuil de Réglages. */
+function windCtx() {
+  return { status: weather.status, forecast: weather.forecast, threshold: data.settings.windGust };
+}
+
+/**
+ * Réglementation déjà calculée par itinéraire (même minute de départ, mêmes données, même décompte de conduite) :
+ * un toucher ne recalcule rien.
+ */
 const rulesCache = new WeakMap();
 function rulesOf(route, vehicle, departure) {
   const minute = Math.floor(departure.getTime() / 60000);
   const hit = rulesCache.get(route);
-  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle) return hit.rules;
-  const rules = routeRules(route, { vehicle, departure, zfe: zfeData });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, rules });
+  const w = windCtx();
+  const sig = `${w.status}:${w.threshold}`;
+  const driving = loadDriving(storage);
+  const dsig = JSON.stringify([driving.at, driving.sinceBreak, driving.day, driving.mode, driving.stopWork]);
+  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+    && hit.sig === sig && hit.dsig === dsig) return hit.rules;
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, rules });
   return rules;
 }
 
@@ -226,6 +252,7 @@ function renderChoice() {
   renderRouteChoice(summaryNode, notesNode, {
     choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
     rules, rulesSource: rulesSourceText(zfeData), onAvoidZfe: avoidZfe, avoidBusy,
+    windCredit: weather.status === 'ok',
   });
   showZfeOnMap(rules);
 }
@@ -254,6 +281,11 @@ function startGuidance(simulate = null) {
     areas: areas.pool,
     announceAreas: data.settings.areaVoice,
     rules: { vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice },
+    driving: loadDriving(storage),
+    driveVoice: data.settings.driveVoice,
+    wind: weather.forecast,
+    windGust: data.settings.windGust,
+    windVoice: data.settings.windVoice,
   });
   return null;
 }
@@ -291,6 +323,10 @@ const settings = createSettings({
   onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
   onAreaVoiceChange: (on) => setSetting({ areaVoice: on }),
   onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
+  onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
+  onWindVoiceChange: (on) => setSetting({ windVoice: on }),
+  onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
+  onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
 });
 createVehicles({ getData: () => data, update });
 
@@ -327,6 +363,7 @@ const form = createRouteForm({
       navStartBtn.hidden = false;
       map.showRoutes(options.map((o) => o.route), selected);
       areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
+      weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
@@ -338,6 +375,7 @@ const form = createRouteForm({
       navStartBtn.hidden = true;
       choice = null;
       areas.clear();
+      weather.clear();
       map.showZfe([]);
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {
