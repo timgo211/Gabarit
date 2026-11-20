@@ -1,6 +1,8 @@
-// Aires et parkings PL du trajet (phase 9) : une requête Overpass par calcul (serveur de secours si le premier
-// échoue), jeu officiel copié dans data/aires-pl.json, liste avant le départ, repères sur la carte, fiche d'une aire
-// et « Mon avis ». Les décisions et les textes viennent de src/lib/areas-*.js ; ici, réseau et affichage.
+// Aires et parkings PL du trajet (phases 9 et 9b) : copie OpenStreetMap data/aires-osm/ (cases de 1° que le tracé
+// touche, placées sans requête réseau), Overpass en direct seulement pour les morceaux du tracé hors de la zone
+// couverte (une requête, serveur de secours si le premier échoue), jeu officiel copié dans data/aires-pl.json, liste
+// avant le départ, repères sur la carte, fiche d'une aire et « Mon avis ». Les décisions et les textes viennent de
+// src/lib/areas-*.js ; ici, réseau et affichage.
 //
 // Le résultat d'Overpass est gardé sur l'appareil (src/lib/areas-cache.js, localStorage), jamais dans le cache du
 // service worker (requête POST, ignorée par sw.js).
@@ -13,13 +15,15 @@ import {
 } from '../lib/areas-route.js';
 import { AVIS, AVIS_RULES, canReport, latestReport, reportText, addAreaReport } from '../lib/areas-avis.js';
 import { createAreasCache, routeKey } from '../lib/areas-cache.js';
+import { AREAS_DATA, parseIndex, parseTile, routePlan, tilePath, mergeOsmSources, copyDateText } from '../lib/areas-osm-data.js';
 import { formatArrival } from '../lib/format.js';
 
 export const AREAS_TEXT = Object.freeze({
   loading: 'Recherche des aires et parkings PL le long du trajet…',
   none: 'Aucune aire ni parking PL trouvé le long de ce trajet.',
-  unavailable: 'Aires OpenStreetMap indisponibles (serveurs injoignables). L\'itinéraire reste utilisable.',
-  offline: 'Hors ligne : aires OpenStreetMap indisponibles.',
+  unavailable: 'Aires OpenStreetMap indisponibles hors de la zone de la copie (serveurs injoignables). L\'itinéraire reste utilisable.',
+  offline: 'Hors ligne : aires OpenStreetMap indisponibles hors de la zone de la copie.',
+  noCopy: 'Aires indisponibles sur ce trajet (données non chargées).',
   officialOnly: 'Seules les aires du jeu officiel sont affichées.',
   avisStopped: `À l'arrêt seulement (moins de ${AVIS_RULES.MAX_SPEED_KMH} km/h).`,
   avisSaved: 'Avis enregistré sur cet appareil.',
@@ -84,6 +88,31 @@ export function createAreas(ctx) {
   let note = '';
   let openId = null;
 
+  let indexPromise = null;
+  const tilePromises = new Map();
+
+  /** data/aires-osm/index.json (null : absent, vide ou illisible ; redemandé au calcul suivant). */
+  function osmIndex() {
+    indexPromise ??= fetch(AREAS_DATA.INDEX_PATH, { cache: 'no-cache' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => parseIndex(j))
+      .catch(() => null)
+      .then((idx) => { if (!idx) indexPromise = null; return idx; });
+    return indexPromise;
+  }
+
+  /** Une case de la copie (null : absente ou illisible ; redemandée au calcul suivant). */
+  function osmTile(key, updated) {
+    if (!tilePromises.has(key)) {
+      tilePromises.set(key, fetch(tilePath(key), { cache: 'no-cache' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => parseTile(j, updated))
+        .catch(() => null)
+        .then((t) => { if (!t) tilePromises.delete(key); return t; }));
+    }
+    return tilePromises.get(key);
+  }
+
   function official() {
     officialPromise ??= fetch(OFFICIAL.DATA_PATH, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
@@ -139,8 +168,9 @@ export function createAreas(ctx) {
   }
 
   /**
-   * Au calcul : une seule requête Overpass pour tous les itinéraires proposés (ou le résultat gardé sur l'appareil),
-   * fusion avec le jeu officiel, puis la liste de l'itinéraire choisi.
+   * Au calcul : aires de la copie data/aires-osm/ pour les cases que les itinéraires proposés touchent, une seule
+   * requête Overpass pour les morceaux hors de la zone couverte (ou le résultat gardé sur l'appareil), fusion avec le
+   * jeu officiel, puis la liste de l'itinéraire choisi. Copie absente, vide ou illisible : message, jamais un silence.
    * @param {{ options:{ route:object }[], selected:number }} choice
    */
   async function load(choice) {
@@ -157,25 +187,47 @@ export function createAreas(ctx) {
     ctx.map.showAreas([]);
     setStatus(AREAS_TEXT.loading);
     const line = combineRoutes(choice.options.map((o) => o.route.coordinates));
-    const key = routeKey(line);
-    let osm = cache.get(key);
-    if (!osm) {
-      if (!navigator.onLine) {
-        note = AREAS_TEXT.offline;
-      } else {
-        try {
-          osm = parseOverpass(await fetchOverpass(buildOverpassQuery(line), ctrl.signal));
-          cache.set(key, osm);
-        } catch {
-          if (ctrl.signal.aborted) return;
-          note = AREAS_TEXT.unavailable;
+    const notes = [];
+    let copied = [];
+    let live = null;
+    let copyDate = null;
+    const index = await osmIndex();
+    if (ctrl.signal.aborted || request !== ctrl) return;
+    if (!index) {
+      notes.push(AREAS_TEXT.noCopy);
+    } else {
+      copyDate = index.updated;
+      const plan = routePlan(line, index);
+      const tiles = await Promise.all(plan.tiles.map((k) => osmTile(k, index.updated)));
+      if (ctrl.signal.aborted || request !== ctrl) return;
+      if (tiles.some((t) => !t)) notes.push(AREAS_TEXT.noCopy);
+      copied = tiles.flatMap((t) => t ?? []);
+      // Overpass seulement pour les morceaux hors de la zone couverte (jamais pour le reste du trajet).
+      if (plan.uncovered.length) {
+        const key = `hors-copie:${routeKey(plan.uncovered.flat())}`;
+        live = cache.get(key);
+        if (!live) {
+          if (!navigator.onLine) {
+            notes.push(AREAS_TEXT.offline);
+          } else {
+            try {
+              live = parseOverpass(await fetchOverpass(buildOverpassQuery(plan.uncovered), ctrl.signal));
+              cache.set(key, live);
+            } catch {
+              if (ctrl.signal.aborted) return;
+              notes.push(AREAS_TEXT.unavailable);
+            }
+          }
         }
       }
     }
     const off = await official();
     if (ctrl.signal.aborted || request !== ctrl) return;
-    pool = mergeAreas(osm ?? [], off);
-    if (note && off.length) note = `${note} ${AREAS_TEXT.officialOnly}`;
+    pool = mergeAreas(mergeOsmSources(copied, live ?? []), off);
+    note = notes.join(' ');
+    if (note && off.length && !pool.some((a) => a.sources.includes('osm'))) note = `${note} ${AREAS_TEXT.officialOnly}`;
+    const date = copyDateText(copyDate);
+    $('#areas-copy-date').textContent = date ? `, copie du ${date}` : '';
     request = null;
     setStatus(note);
     place(ctx.getRoute() ?? choice.options[choice.selected]?.route);

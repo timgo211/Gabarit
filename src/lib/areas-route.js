@@ -219,7 +219,11 @@ export function sourcesText(a) {
   const s = a.sources ?? [a.source];
   const parts = [];
   if (s.includes('official')) parts.push(`${OFFICIAL.SOURCE} (${OFFICIAL.LICENCE})`);
-  if (s.includes('osm')) parts.push('© contributeurs OpenStreetMap (ODbL)');
+  if (s.includes('osm')) {
+    // Copie data/aires-osm/ (phase 9b) : date de la copie ; Overpass en direct : sans date.
+    const date = typeof a.copy === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(a.copy) ? a.copy.split('-').reverse().join('/') : null;
+    parts.push(`© contributeurs OpenStreetMap (ODbL${date ? `, copie du ${date}` : ''})`);
+  }
   return parts.join(' ; ');
 }
 

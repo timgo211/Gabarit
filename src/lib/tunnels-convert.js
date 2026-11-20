@@ -1,6 +1,6 @@
 // Tunnels signalés aux matières dangereuses (phase 5b) : conversion des voies OpenStreetMap (extraits Geofabrik filtrés
-// par osmium dans l'Action hebdomadaire) en data/tunnels-adr.json. Logique pure (testée sous Node) ; téléchargements
-// et osmium dans tools/tunnels-update.mjs.
+// par osmium dans l'Action mensuelle « Données OSM », tools/osm-update.mjs) en data/tunnels-adr.json. Logique pure (testée sous Node) ; téléchargements
+// et osmium dans tools/osm-update.mjs.
 //
 // Pas d'Overpass, ni dans l'appli ni dans l'Action : mesuré le 20/11/2026, la requête « aires + tunnels » comme
 // « tunnels seuls » dépassait 26 s sur 520 km (A6 + A43), et l'Action a échoué trois fois (serveurs publics pleins,
@@ -55,12 +55,19 @@ export function elementsFromGeojsonSeq(text) {
     if (!line) continue;
     let f;
     try { f = JSON.parse(line); } catch { continue; }
-    const m = /^w(\d+)$/.exec(String(f?.id ?? ''));
-    const tags = { ...(f?.properties ?? {}) };
-    if (!m || f?.geometry?.type !== 'LineString' || !tags.highway || !tags.tunnel || tags.tunnel === 'no') continue;
-    out.push({ type: 'way', id: Number(m[1]), tags, geometry: f.geometry.coordinates.map(([lon, lat]) => ({ lon, lat })) });
+    const e = tunnelElementFromFeature(f);
+    if (e) out.push(e);
   }
   return out;
+}
+
+/** Un objet GeoJSON exporté par osmium → voie en tunnel (format Overpass), ou null (phase 9b : même export que les aires). */
+export function tunnelElementFromFeature(f) {
+  const m = /^w(\d+)$/.exec(String(f?.id ?? ''));
+  const tags = { ...(f?.properties ?? {}) };
+  if (!m || f?.geometry?.type !== 'LineString' || !tags.highway || !tags.tunnel || tags.tunnel === 'no') return null;
+  if (!TUNNELS_CONVERT.KEYS.some((k) => Object.hasOwn(tags, k))) return null;
+  return { type: 'way', id: Number(m[1]), tags, geometry: f.geometry.coordinates.map(([lon, lat]) => ({ lon, lat })) };
 }
 
 const r5 = (x) => Math.round(x * 1e5) / 1e5;

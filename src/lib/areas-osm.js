@@ -117,18 +117,26 @@ const fmt = (x) => (Math.round(x * 1e5) / 1e5).toString();
 
 /**
  * Requête Overpass QL (une seule par calcul) : aires de repos / de service à 400 m du tracé, parkings PL à 800 m
- * (+ l'écart de simplification).
- * @param {number[][]} coords tracé [lon, lat] (combineRoutes pour plusieurs itinéraires)
+ * (+ l'écart de simplification). Phase 9b : seulement les morceaux du tracé hors de la copie data/aires-osm/
+ * (src/lib/areas-osm-data.js, routePlan) ; les MAX_POINTS points sont partagés entre les morceaux selon leur longueur.
+ * @param {number[][]|number[][][]} coords tracé [lon, lat] (combineRoutes), ou liste de morceaux de tracé
  */
 export function buildOverpassQuery(coords) {
-  const { line, tolerance } = queryLine(coords);
-  if (line.length < 2) throw new TypeError('Tracé trop court.');
-  const pts = line.map(([lon, lat]) => `${fmt(lat)},${fmt(lon)}`).join(',');
+  const pieces = (Array.isArray(coords?.[0]?.[0]) ? coords : [coords]).filter((l) => Array.isArray(l) && l.length >= 2);
+  if (!pieces.length) throw new TypeError('Tracé trop court.');
+  const lengths = pieces.map((l) => l.reduce((t, p, i) => (i ? t + haversine(l[i - 1], p) : 0), 0));
+  const total = lengths.reduce((a, b) => a + b, 0) || 1;
+  let tolerance = 0;
+  const lines = pieces.map((l, i) => {
+    const q = queryLine(l, { maxPoints: Math.max(2, Math.floor((AREAS_OSM.MAX_POINTS * lengths[i]) / total)) });
+    tolerance = Math.max(tolerance, q.tolerance);
+    return q.line.map(([lon, lat]) => `${fmt(lat)},${fmt(lon)}`).join(',');
+  });
   const rest = Math.round(AREAS_OSM.REST_RADIUS_M + tolerance);
   const park = Math.round(AREAS_OSM.PARKING_RADIUS_M + tolerance);
   return `[out:json][timeout:${AREAS_OSM.SERVER_TIMEOUT_S}];(`
-    + `nwr["highway"~"^(rest_area|services)$"](around:${rest},${pts});`
-    + `nwr["amenity"="parking"][~"^(hgv|capacity:hgv)$"~"^(yes|designated|[1-9][0-9]*)$"](around:${park},${pts});`
+    + lines.map((pts) => `nwr["highway"~"^(rest_area|services)$"](around:${rest},${pts});`).join('')
+    + lines.map((pts) => `nwr["amenity"="parking"][~"^(hgv|capacity:hgv)$"~"^(yes|designated|[1-9][0-9]*)$"](around:${park},${pts});`).join('')
     + ');out center tags;';
 }
 

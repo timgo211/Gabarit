@@ -1,0 +1,239 @@
+// Copie mensuelle des données OpenStreetMap lues sans réseau par l'appli : tunnels signalés aux matières dangereuses
+// (phase 5b, data/tunnels-adr.json) et aires et parkings PL (phase 9b, data/aires-osm/). Lancé par
+// .github/workflows/osm-data.yml (le 1er du mois, à la main, ou quand ce fichier change) ; Node 22, sans dépendance
+// npm ; osmium-tool installé par l'Action (apt).
+//
+// Par pays : un seul téléchargement de l'extrait Geofabrik, un seul filtrage osmium (tunnels hazmat + aires), un seul
+// export GeoJSON, lu ligne à ligne et séparé ici en tunnels et en aires ; le contour .poly de l'extrait donne la zone
+// couverte par la copie des aires.
+//
+//   node tools/osm-update.mjs                            télécharge les extraits Geofabrik et les filtre (osmium)
+//   node tools/osm-update.mjs fichier.osm[.pbf] …         filtre des fichiers OSM locaux (essai en local ; zone
+//                                                         couverte : fichiers .poly passés aussi en arguments)
+//   node tools/osm-update.mjs --known                    recoupement des trois tunnels gardés en dur seulement
+//
+// Un pays en échec (téléchargement, osmium) : rien n'est écrit (ancienne copie des tunnels et des aires gardée, aucune
+// copie partielle), code de sortie 1. Le journal donne le poids des fichiers, la durée de chaque pays et le
+// recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc (catégories Bison Futé) avec OpenStreetMap.
+
+import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createInterface } from 'node:readline';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import {
+  convertTunnels, crossCheck, knownTubesFromMap, osmiumFilter, tunnelElementFromFeature, KNOWN_PROBES, TUNNELS_CONVERT,
+} from '../src/lib/tunnels-convert.js';
+import {
+  AREAS_DATA, areaElementFromFeature, buildCoverage, convertAreas, elementKey, parseGeojsonLine, parsePoly,
+} from '../src/lib/areas-osm-data.js';
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const OUT = join(ROOT, 'data', 'tunnels-adr.json');
+const AREAS_DIR = join(ROOT, 'data', 'aires-osm');
+const UA = 'Gabarit (GitHub Action, mise a jour mensuelle)';
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: { 'user-agent': UA } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Un seul filtrage osmium (tunnels + aires) puis un seul export GeoJSON, lu ligne à ligne (l'export d'un grand pays
+ * dépasse la taille maximale d'une chaîne de Node). Les parkings sans hgv=yes/designated ni capacity:hgv sont écartés
+ * ici (un filtre osmium hgv=* prendrait toutes les routes ouvertes aux PL).
+ */
+async function filterFile(file, dir, tunnels, areas) {
+  const kept = join(dir, 'kept.osm.pbf');
+  const seq = join(dir, 'kept.geojsonseq');
+  execFileSync('osmium', ['tags-filter', '--overwrite', '-o', kept, file, ...osmiumFilter(), ...AREAS_DATA.OSMIUM_FILTER], { stdio: 'inherit' });
+  execFileSync('osmium', ['export', '--overwrite', '-f', 'geojsonseq', '--add-unique-id=type_id', '-o', seq, kept], { stdio: 'inherit' });
+  let nt = 0; let na = 0; let lines = 0;
+  const rl = createInterface({ input: createReadStream(seq, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of rl) {
+    lines += 1;
+    const f = parseGeojsonLine(line);
+    if (!f) continue;
+    const t = tunnelElementFromFeature(f);
+    if (t) { tunnels.set(t.id, t); nt += 1; }
+    const a = areaElementFromFeature(f);
+    if (a) { areas.set(elementKey(a), a); na += 1; }
+  }
+  const size = statSync(seq).size;
+  rmSync(kept, { force: true });
+  rmSync(seq, { force: true });
+  return { nt, na, lines, size };
+}
+
+/** Date de l'extrait (en-tête osmosis_replication_timestamp du fichier .pbf), ou null. */
+function extractDate(file) {
+  try {
+    const v = execFileSync('osmium', ['fileinfo', '-g', 'header.option.osmosis_replication_timestamp', file], { encoding: 'utf8' }).trim();
+    return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function download(url, file) {
+  for (let i = 0; i < 3; i += 1) {
+    if (i) await sleep(30000 * i);
+    try {
+      const res = await fetch(url, { headers: { 'user-agent': UA } });
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(file));
+      return;
+    } catch (err) {
+      console.log(`⚠ téléchargement ${url} (essai ${i + 1}) : ${err.message}`);
+    }
+  }
+  throw new Error(`Téléchargement impossible : ${url} — data/tunnels-adr.json et data/aires-osm/ non modifiés (pas de copie partielle).`);
+}
+
+/** Tubes des trois tunnels gardés en dur, lus dans l'API principale d'OSM (sans Overpass). */
+async function known() {
+  for (const probe of KNOWN_PROBES) {
+    const [w, s, e, n] = TUNNELS_CONVERT.KNOWN_BBOX[probe.id];
+    try {
+      const found = new Map();
+      // Recherche par nom (Nominatim, une requête par seconde au plus), puis chaque voie trouvée avec ses nœuds.
+      for (const q of probe.search) {
+        try {
+          await sleep(1500);
+          const hits = await getJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&q=${encodeURIComponent(q)}`);
+          console.log(`  Nominatim « ${q} » : ${(Array.isArray(hits) ? hits : []).map((h) => `${h.osm_type} ${h.osm_id} (${h.category}/${h.type})`).join(', ') || 'aucun résultat'}`);
+          for (const h of Array.isArray(hits) ? hits : []) {
+            if (h.osm_type !== 'way') continue;
+            await sleep(1500);
+            const full = await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`);
+            const way = full.elements?.find((x) => x.type === 'way');
+            console.log(`    w${h.osm_id} : ${JSON.stringify(way?.tags ?? {})}`);
+            for (const t of knownTubesFromMap(full, probe.name)) found.set(t.id, t);
+          }
+        } catch (err) {
+          console.log(`⚠ recherche ${probe.label} : ${err.message}`);
+        }
+      }
+      // Emprise autour du tunnel ; refusée en ville (trop de nœuds) : découpée en quatre, deux fois au plus.
+      const boxes = [[w, s, e, n, 0]];
+      while (boxes.length) {
+        const [bw, bs, be, bn, depth] = boxes.shift();
+        try {
+          await sleep(1000);
+          for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${bw},${bs},${be},${bn}`), probe.name)) found.set(t.id, t);
+        } catch (err) {
+          if (depth < 2) {
+            const mx = (bw + be) / 2; const my = (bs + bn) / 2;
+            boxes.push([bw, bs, mx, my, depth + 1], [mx, bs, be, my, depth + 1], [bw, my, mx, bn, depth + 1], [mx, my, be, bn, depth + 1]);
+          } else console.log(`⚠ emprise ${probe.label} ${[bw, bs, be, bn].map((x) => x.toFixed(4)).join(',')} : ${err.message}`);
+        }
+      }
+      const tubes = [...found.values()];
+      console.log(`Recoupement OSM (API) — ${probe.label} (Bison Futé : ${probe.cat}) : ${tubes.length ? '' : 'aucun tube trouvé'}`);
+      for (const t of tubes) console.log(`  ${t.id} « ${t.name} » catégorie OSM ${t.cat ?? 'non renseignée'} ; tracé ${JSON.stringify(t.g)}`);
+    } catch (err) {
+      console.log(`⚠ recoupement ${probe.label} : ${err.message}`);
+    }
+    await sleep(2000);
+  }
+}
+
+const kb = (n) => `${(n / 1024).toFixed(0)} Ko`;
+
+/** Écrit data/aires-osm/ d'un coup : dossier temporaire complet, puis remplacement (aucune case périmée gardée). */
+function writeAreas(index, tiles) {
+  const tmp = `${AREAS_DIR}.tmp`;
+  rmSync(tmp, { recursive: true, force: true });
+  mkdirSync(tmp, { recursive: true });
+  let total = 0;
+  let biggest = ['', 0];
+  for (const [key, tile] of tiles) {
+    const text = `${JSON.stringify(tile)}\n`;
+    writeFileSync(join(tmp, `${key}.json`), text);
+    const n = Buffer.byteLength(text);
+    total += n;
+    if (n > biggest[1]) biggest = [key, n];
+  }
+  const text = `${JSON.stringify(index)}\n`;
+  writeFileSync(join(tmp, 'index.json'), text);
+  total += Buffer.byteLength(text);
+  rmSync(AREAS_DIR, { recursive: true, force: true });
+  renameSync(tmp, AREAS_DIR);
+  console.log(`data/aires-osm/ : ${index.count} aires, ${tiles.size} cases + index.json (${kb(Buffer.byteLength(text))}, `
+    + `zone couverte ${index.grid.cells} cellules de 0,1°) ; poids total ${(total / 1024 / 1024).toFixed(2)} Mo, `
+    + `plus grosse case ${biggest[0]} (${kb(biggest[1])}), ${readdirSync(AREAS_DIR).length} fichiers.`);
+}
+
+async function main() {
+  const args = process.argv.slice(2);
+  if (args[0] === '--known') { await known(); return; }
+  const start = Date.now();
+  const dir = mkdtempSync(join(tmpdir(), 'osm-'));
+  const tunnels = new Map();
+  const areas = new Map();
+  const polys = [];
+  let updated = null;
+  try {
+    if (args.length) {
+      for (const f of args) {
+        if (f.endsWith('.poly')) { polys.push(parsePoly(readFileSync(f, 'utf8'))); continue; }
+        const r = await filterFile(f, dir, tunnels, areas);
+        console.log(`${f} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires.`);
+      }
+    } else {
+      for (const region of TUNNELS_CONVERT.GEOFABRIK) {
+        const url = `https://download.geofabrik.de/${region}-latest.osm.pbf`;
+        const file = join(dir, 'pays.osm.pbf');
+        const t0 = Date.now();
+        await download(url, file);
+        const mb = statSync(file).size / 1024 / 1024;
+        const t1 = Date.now();
+        const polyFile = join(dir, 'pays.poly');
+        await download(`https://download.geofabrik.de/${region}.poly`, polyFile);
+        const poly = parsePoly(readFileSync(polyFile, 'utf8'));
+        if (!poly.bbox) throw new Error(`Contour illisible : ${region}.poly — rien n'est modifié.`);
+        polys.push(poly);
+        const date = extractDate(file);
+        if (date && (!updated || date < updated)) updated = date; // date la plus ancienne des extraits
+        const r = await filterFile(file, dir, tunnels, areas);
+        rmSync(file, { force: true });
+        console.log(`${region} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires (extrait du ${date ?? '?'}, `
+          + `${mb.toFixed(0)} Mo téléchargés en ${Math.round((t1 - t0) / 1000)} s, filtrage + export ${Math.round((Date.now() - t1) / 1000)} s, `
+          + `${r.lines} objets exportés, ${(r.size / 1024 / 1024).toFixed(0)} Mo de GeoJSON).`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+  const day = updated ?? new Date().toISOString().slice(0, 10);
+  // Tunnels
+  const json = { elements: [...tunnels.values()] };
+  const { data, log } = convertTunnels(json, { updated: day });
+  for (const line of log) console.log(line);
+  for (const line of crossCheck(json, KNOWN_PROBES)) console.log(`Recoupement — ${line}`);
+  // Aires
+  const t2 = Date.now();
+  const grid = buildCoverage(polys);
+  const countries = TUNNELS_CONVERT.GEOFABRIK.map((c) => c.split('/').pop());
+  const conv = convertAreas([...areas.values()], { updated: day, grid, countries });
+  for (const line of conv.log) console.log(line);
+  console.log(`Zone couverte : grille ${grid.cols} × ${grid.rows}, ${grid.cells} cellules couvertes (${Math.round((Date.now() - t2) / 1000)} s).`);
+  // Rien n'est écrit si l'un des deux jeux est vide (ancienne copie gardée).
+  if (!data.tunnels.length) throw new Error('Aucun tunnel lu : data/tunnels-adr.json et data/aires-osm/ non modifiés.');
+  if (!conv.index.count || !grid.cells) throw new Error('Aucune aire ou zone couverte vide : data/tunnels-adr.json et data/aires-osm/ non modifiés.');
+  const text = `${JSON.stringify(data)}\n`;
+  writeFileSync(OUT, text);
+  console.log(`data/tunnels-adr.json : ${data.tunnels.length} tubes, ${kb(Buffer.byteLength(text))} (extraits du ${data.updated}).`);
+  writeAreas(conv.index, conv.tiles);
+  console.log(`Durée totale : ${Math.round((Date.now() - start) / 60000)} min.`);
+}
+
+main().catch((err) => {
+  console.error(err.message);
+  process.exit(1);
+});

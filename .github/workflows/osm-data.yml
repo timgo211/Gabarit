@@ -1,0 +1,66 @@
+name: Données OSM (tunnels ADR, aires PL)
+
+# Copie mensuelle des données OpenStreetMap (licence ODbL) lues sans réseau par l'appli : tunnels signalés aux
+# matières dangereuses (data/tunnels-adr.json, phase 5b) et aires et parkings PL (data/aires-osm/, phase 9b).
+# Un seul téléchargement des extraits par pays de Geofabrik et un seul filtrage osmium pour les deux (voir
+# tools/osm-update.mjs). Échec : rien n'est enregistré, l'ancienne copie reste.
+# Lancée aussi à la main (onglet Actions › Données OSM › Run workflow) et à chaque envoi qui modifie l'outil de copie,
+# sur n'importe quelle branche (première copie des aires créée sur la branche de la phase 9b, avant la fusion).
+
+on:
+  schedule:
+    - cron: '17 3 1 * *' # le 1er du mois, 3 h 17 (UTC)
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/osm-update.mjs
+      - src/lib/tunnels-convert.js
+      - src/lib/areas-osm-data.js
+      - .github/workflows/osm-data.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: osm-data-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc avec OpenStreetMap (API principale d'OSM et
+  # Nominatim, sans Overpass) : journal seulement, n'empêche jamais la copie.
+  known:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node tools/osm-update.mjs --known
+
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Installer osmium
+        run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
+      - name: Télécharger les extraits, filtrer et convertir
+        run: node tools/osm-update.mjs
+      - name: Enregistrer si changé
+        run: |
+          git add -A -N data/tunnels-adr.json data/aires-osm
+          if git diff --quiet -- data/tunnels-adr.json data/aires-osm; then
+            echo "Aucun changement."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/tunnels-adr.json data/aires-osm
+          git commit -m "Données : tunnels ADR et aires PL OpenStreetMap (mise à jour automatique)"
+          git pull --rebase
+          git push

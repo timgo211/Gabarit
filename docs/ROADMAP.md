@@ -197,7 +197,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     `hazmat:adr_tunnel_cat` : phrase dans les notes (« l'itinéraire peut être plus long que nécessaire »).
     Tunnels : pas d'Overpass (mesuré le 20/11/2026 sur 520 km, A6 + A43 : aires seules, tunnels seuls ou les deux
     dépassent 26 s, ou serveur plein ; l'Action elle-même a échoué trois fois) ; copie hebdomadaire
-    `data/tunnels-adr.json` par l'Action « Tunnels ADR » depuis les extraits par pays de Geofabrik filtrés par osmium
+    `data/tunnels-adr.json` par l'Action « Tunnels ADR » (devenue « Données OSM », phase 9b) depuis les extraits par pays de Geofabrik filtrés par osmium
     (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
     catégorie = plus haute lettre marquée « no », ADR 8.6.4 : un code interdit sa catégorie et les suivantes), lue
     seulement pour un chargement ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
@@ -209,11 +209,20 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     (jamais « sans tunnel interdit »). Guidage : bandeau sous 20 km, voix une fois vers 5 km. Rappel ADR : mêmes
     interdictions de circulation que les autres PL (arrêté du 16 avril 2021, rien de propre au transport de
     matières dangereuses), dérogations préfectorales (annexe III).
-  - [ ] **Phase 9b — Aires PL sur les longs trajets** (avant la 5c)
+  - [x] **Phase 9b — Aires PL sur les longs trajets** (avant la 5c)
     La requête Overpass des aires échoue au-delà d'environ 500 km (mesure du 20/11/2026 : 26 s dépassées ou serveur
-    plein). Copier les aires et parkings PL d'OpenStreetMap (France et pays voisins) chaque semaine dans `data/`
-    comme les tunnels ADR (extraits Geofabrik + osmium), placés sur l'appareil sans requête ; Overpass en direct
-    gardé seulement hors de la zone copiée, sur un tracé court.
+    plein). Copier les aires et parkings PL d'OpenStreetMap (France et pays voisins) dans `data/` comme les tunnels
+    ADR (extraits Geofabrik + osmium), placés sur l'appareil sans requête ; Overpass en direct gardé seulement hors de
+    la zone copiée.
+    Fait : l'Action « Tunnels ADR » devient « Données OSM (tunnels ADR, aires PL) », mensuelle (le 1er) + à la main ;
+    par pays un seul téléchargement, un seul filtrage osmium (tunnels + aires de repos, aires de service,
+    amenity=parking, capacity:hgv ; parkings gardés en JS avec hgv=yes/designated ou capacity:hgv), un seul export ;
+    un pays en échec : rien d'écrit. Premier passage (20/11/2026, extraits du 19/11) : 72 min, 19 285 aires (repos
+    9 733, service 6 442, parkings PL 3 110), **1,39 Mo** en 316 cases de 1° + `index.json` (25 Ko, zone couverte
+    d'après les contours `.poly` de Geofabrik, cellules de 0,1°) ; Paris → Lyon → Fréjus : 8 cases, 66 Ko lus, aucune
+    requête Overpass. Tunnels inchangés (1 182 tubes). Mêmes identifiants qu'Overpass (« Mon avis » gardé), mêmes
+    rayons et même sens de circulation, fusion Bison Futé à 300 m ; copie absente ou illisible : « Aires
+    indisponibles sur ce trajet (données non chargées) » ; date de la copie dans la note de source et sur la fiche.
   - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
     Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
     pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,

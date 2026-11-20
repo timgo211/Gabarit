@@ -34,10 +34,13 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
+  - phase 9b (aires sur les longs trajets) : `areas-osm-data.js` (copie `data/aires-osm/` : export osmium → aires,
+    contours `.poly` → zone couverte, cases de 1°, `routePlan` : cases touchées et morceaux hors copie)
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
-  - `areas.js` (aires du trajet : requête Overpass, liste, repères HTML sur la carte, fiche et « Mon avis »)
+  - `areas.js` (aires du trajet : copie `data/aires-osm/`, Overpass hors copie, liste, repères HTML sur la carte, fiche et
+    « Mon avis »)
   - `weather.js` (une requête Open-Meteo par calcul, copie sur l'appareil, « Météo indisponible »)
   - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
     vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
@@ -47,11 +50,13 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
-- `tools/tunnels-update.mjs` + `.github/workflows/tunnels.yml` : copie hebdomadaire des tunnels signalés aux matières
-  dangereuses (OSM, extraits par pays de Geofabrik, filtrés par `osmium`) dans `data/tunnels-adr.json` ; job à part
-  `known` : recoupement Fourvière / Fréjus / Mont-Blanc (API OSM + Nominatim) ; lancée aussi à chaque envoi qui
-  modifie l'outil (toute branche) et à la main une fois sur main ; `node tools/tunnels-update.mjs fichier.osm` en local
-  (osmium installé)
+- `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL) ») : copie
+  mensuelle (le 1er, 3 h 17 UTC) des tunnels signalés aux matières dangereuses (`data/tunnels-adr.json`) et des aires
+  et parkings PL (`data/aires-osm/`) ; par pays, un seul téléchargement Geofabrik, un seul `osmium tags-filter`
+  (tunnels + aires), un seul export lu ligne à ligne ; un pays en échec → rien d'écrit ; job à part `known` :
+  recoupement Fourvière / Fréjus / Mont-Blanc (API OSM + Nominatim) ; lancée aussi à chaque envoi qui modifie l'outil,
+  `tunnels-convert.js` ou `areas-osm-data.js` (toute branche) et à la main ;
+  `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé)
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
@@ -78,10 +83,10 @@ node tools/ui-check.mjs            # ou un scénario : layout | long | satellite
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
-un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
+un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v19 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v20 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
@@ -140,8 +145,22 @@ rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
 - Coordonnées saisies (départ / arrivée) : proposées sans appel Pelias ; appui long et coordonnées ne lancent jamais
   de calcul. Toute saisie dans un champ oublie le point choisi (et le repère de l'appui long) ; la liste de
   suggestions est remplacée dès la frappe (`suggestionPlan`), jamais d'ancienne suggestion à toucher.
-- Aires PL (phase 9) : une seule requête Overpass par calcul, pour tous les itinéraires proposés (`combineRoutes` :
-  A, B à l'envers, C ; tracé simplifié ≤ 400 points, écart ajouté au rayon) ; rayons 400 m (aires de repos / de
+- Aires PL, copie (phase 9b) : Overpass échoue au-delà d'environ 500 km (mesuré sur 520 km) → `data/aires-osm/` :
+  `index.json` (`updated`, `grid` : zone couverte en cellules de 0,1° en base64, cellule couverte si elle et ses 8
+  voisines sont dans les contours `.poly` de Geofabrik ; `tiles` : cases non vides et leur nombre d'aires) + une case
+  `E_N.json` par degré (coin sud-ouest), aires compactes (`compactArea` / `expandArea`). Filtre osmium
+  `nwr/highway=rest_area,services`, `nwr/amenity=parking`, `nwr/capacity:hgv` (jamais `hgv=*` global : toutes les
+  routes), parkings gardés en JS si `hgv=yes/designated` ou `capacity:hgv` (`isAreaTags`). Identifiants osmium « a » :
+  voie = 2 × id, relation = 2 × id + 1 → mêmes identifiants qu'Overpass (`osm:w123`, ids des parkings rattachés
+  gardés) : « Mon avis » reste sur la même aire. Appli : tracé lu tous les 500 m, cases à 1 km autour des points
+  couverts, Overpass seulement pour les morceaux hors zone (une requête, `buildOverpassQuery(morceaux)`, cache
+  `hors-copie:`), jamais dans la zone couverte ; index ou case absent / vide / illisible → « Aires indisponibles sur
+  ce trajet (données non chargées) », sans repli Overpass ; date de la copie dans la note (« ODbL, copie du
+  JJ/MM/AAAA ») et sur la fiche. Fichiers de `data/aires-osm/` hors `APP_FILES` (lus seulement pour les cases du
+  trajet). ui-check : copie simulée (`osmCopy` : 'fixture', 'uncovered', null). Test statique : `grid.bits` de
+  `index.json` exclu de la recherche de clés. Premier passage : 19 285 aires, 1,39 Mo, 72 min (13 pays).
+- Aires PL (phase 9) : une seule requête Overpass par calcul (phase 9b : seulement hors copie), pour tous les
+  itinéraires proposés (`combineRoutes` : A, B à l'envers, C ; tracé simplifié ≤ 400 points, écart ajouté au rayon) ; rayons 400 m (aires de repos / de
   service) et 800 m (parkings `hgv=yes/designated` ou `capacity:hgv`) ; `OVERPASS_ENDPOINTS` : overpass-api.de puis
   overpass.private.coffee (échec ou 30 s) avant « Aires indisponibles » ; résultat dans `localStorage`
   (`gabarit.areasCache`, 5 trajets, 7 jours), jamais dans le cache du service worker (POST ignoré). Changer

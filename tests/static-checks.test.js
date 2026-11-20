@@ -105,7 +105,9 @@ test('aucune clé API dans le dépôt, aucun log', () => {
     // Les clés ORS/HeiGIT sont de longues chaînes alphanumériques (ou base64).
     // data/ et fixtures : les liens publics des jeux de données (arrêtés ZFE…) peuvent contenir de longs jetons :
     // retirés d'abord.
-    const scanned = name.startsWith('data/') || name.startsWith('tests/fixtures/') ? text.replace(/"https?:\/\/[^"]*"/g, '""') : text;
+    let scanned = name.startsWith('data/') || name.startsWith('tests/fixtures/') ? text.replace(/"https?:\/\/[^"]*"/g, '""') : text;
+    // data/aires-osm/index.json : zone couverte en base64 (grid.bits, phase 9b), seul champ retiré.
+    if (name === 'data/aires-osm/index.json') scanned = scanned.replace(/"bits":"[A-Za-z0-9+/=]*"/, '"bits":""');
     let suspects = (scanned.match(/[A-Za-z0-9+=_]{32,}/g) ?? []).filter((m) => /\d/.test(m) && /[A-Za-z]/.test(m));
     // data/ : données publiques converties par une Action (identifiants « aire_de_douane_…_a0027 », noms de fichiers
     // « Donnees_statiques_… ») ; une clé (base64) n'a pas de « _ » entre des mots.
