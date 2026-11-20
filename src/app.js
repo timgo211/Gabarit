@@ -13,6 +13,7 @@ import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption } from './l
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText } from './lib/route-rules.js';
+import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
 import { createNavigation } from './ui/navigation.js';
@@ -188,6 +189,22 @@ function ensureTunnels(vehicle) {
     });
 }
 
+// ───────── Pays voisins (phase 5c) : data/pays/XX.json, petits fichiers mis en cache (lisibles hors ligne) ─────────
+/** code → { status:'loading'|'ok'|'failed', data } ; nouvelle Map à chaque arrivée (cache des règles invalidé). */
+let countries = new Map(COUNTRY_RULES.FILES.map((c) => [c, { status: 'loading', data: null }]));
+for (const code of COUNTRY_RULES.FILES) {
+  fetch(countryDataPath(code), { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => parseCountryData(j))
+    .catch(() => null)
+    .then((d) => {
+      countries = new Map(countries);
+      countries.set(code, d && d.code === code ? { status: 'ok', data: d } : { status: 'failed', data: null });
+      navigation?.setCountries?.(countries);
+      renderChoice();
+    });
+}
+
 /** Vent : prévisions, état de la requête et seuil de Réglages. */
 function windCtx() {
   return { status: weather.status, forecast: weather.forecast, threshold: data.settings.windGust };
@@ -207,12 +224,13 @@ function rulesOf(route, vehicle, departure) {
   const dsig = JSON.stringify([driving.at, driving.sinceBreak, driving.day, driving.mode, driving.stopWork]);
   const pool = areas.pool;
   const tun = tunnels;
+  const ctry = countries;
   if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
-    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun) return hit.rules;
+    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
-  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, rules });
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, rules });
   return rules;
 }
 
@@ -359,6 +377,7 @@ function startGuidance(simulate = null) {
     rules: {
       vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice,
       tunnels: tunnels.status === 'ok' ? tunnels.data : null, // phase 5b ; les trois tunnels en dur dans tous les cas
+      countries, // phase 5c : règles des pays voisins (data/pays)
     },
     driving: loadDriving(storage),
     driveVoice: data.settings.driveVoice,

@@ -1,0 +1,43 @@
+{
+  "code": "CH",
+  "name": "Suisse",
+  "orsIds": [193],
+  "verified": "2026-11-20",
+  "sources": {
+    "ocr": { "name": "Ordonnance sur les règles de la circulation routière (OCR, RS 741.11), art. 5 et 91", "url": "https://www.fedlex.admin.ch/eli/cc/1962/1364_1409_1420/fr", "kind": "national" },
+    "astra": { "name": "Office fédéral des routes (OFROU), Circulation le dimanche ou la nuit", "url": "https://www.astra.admin.ch/fr/circulation-le-dimanche-ou-la-nuit", "kind": "national" },
+    "rplp": { "name": "Office fédéral de la douane (OFDF), La RPLP en bref", "url": "https://www.bazg.admin.ch/fr/la-rplp-en-bref", "kind": "national" },
+    "lva": { "name": "Loi sur la vignette autoroutière (LVA, RS 741.71), art. 3", "url": "https://www.fedlex.admin.ch/eli/cc/2011/577/fr", "kind": "national" },
+    "astraadr": { "name": "OFROU, Transport de marchandises dangereuses dans les tunnels", "url": "https://www.astra.admin.ch/fr/transport-de-marchandises-dangereuses-dans-les-tunnels", "kind": "national" },
+    "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
+  },
+  "holidays": { "list": "CH", "source": "ocr", "verified": "2026-11-20" },
+  "speeds": {
+    "source": "ocr",
+    "verified": "2026-11-20",
+    "bands": [
+      { "over": 3.5, "upTo": null, "motorway": 80, "road": 80, "town": 50 }
+    ],
+    "notes": [
+      { "text": "80 km/h pour les voitures automobiles lourdes, les trains routiers et les véhicules articulés, autoroute comprise (OCR art. 5).", "source": "ocr", "verified": "2026-11-20" }
+    ]
+  },
+  "bans": [
+    { "id": "sunday", "kind": "weekly", "over": 3.5, "days": [0], "holidays": "CH", "from": "00:00", "to": "24:00",
+      "label": "Dimanche et jours fériés", "text": "Plus de 3,5 t (véhicule articulé plus de 5 t, remorque plus de 3,5 t) : interdiction tout le dimanche et les jours fériés (Nouvel An, Vendredi saint, lundi de Pâques, Ascension, lundi de Pentecôte, 1er août, Noël, 26 décembre sauf si Noël tombe un lundi ou un vendredi). Dérogation : canton d'entrée en Suisse.",
+      "voice": "interdiction le dimanche et les jours fériés", "source": "ocr", "verified": "2026-11-20" },
+    { "id": "night", "kind": "daily", "over": 3.5, "from": "22:00", "to": "05:00",
+      "label": "Nuit", "text": "Plus de 3,5 t : interdiction de circuler la nuit, de 22 h à 5 h, tous les jours.",
+      "voice": "interdiction de nuit de 22 heures à 5 heures", "source": "ocr", "verified": "2026-11-20" }
+  ],
+  "toll": [
+    { "text": "Redevance poids lourds (RPLP) pour les véhicules de plus de 3,5 t transportant des biens, immatriculés en Suisse ou à l'étranger : kilomètres saisis par un système embarqué (NETS ou SET).", "source": "rplp", "verified": "2026-11-20" },
+    { "text": "Vignette autoroutière : pas due pour les véhicules soumis à la RPLP (LVA art. 3 al. 2).", "source": "lva", "verified": "2026-11-20" }
+  ],
+  "lez": [
+    { "text": "Zones à faibles émissions (Genève : macaron Stick'AIR lors des pics de pollution) : à vérifier.", "source": null, "verified": null }
+  ],
+  "adr": [
+    { "text": "Tunnels routiers : marchandises dangereuses soumises aux restrictions de l'ADR ; certains tunnels désignés seulement avec une autorisation spéciale de l'OFROU.", "source": "astraadr", "verified": "2026-11-20" }
+  ]
+}

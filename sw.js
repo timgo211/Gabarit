@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v21';
+const VERSION = 'v22';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -19,6 +19,13 @@ const APP_FILES = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './src/styles.css',
+  // Règles PL des pays voisins (phase 5c) : petits fichiers, lisibles hors ligne à l'étranger.
+  './data/pays/BE.json',
+  './data/pays/CH.json',
+  './data/pays/DE.json',
+  './data/pays/ES.json',
+  './data/pays/IT.json',
+  './data/pays/LU.json',
   './src/app.js',
   './src/lib/adr.js',
   './src/lib/adr-settings.js',
@@ -31,6 +38,8 @@ const APP_FILES = [
   './src/lib/areas-route.js',
   './src/lib/config.js',
   './src/lib/coords.js',
+  './src/lib/countries.js',
+  './src/lib/country-rules.js',
   './src/lib/driving-time.js',
   './src/lib/format.js',
   './src/lib/hgv-bans.js',

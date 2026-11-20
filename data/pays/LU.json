@@ -1,0 +1,43 @@
+{
+  "code": "LU",
+  "name": "Luxembourg",
+  "orsIds": [117],
+  "verified": "2026-11-20",
+  "sources": {
+    "cdr": { "name": "Code de la route luxembourgeois, arrêté grand-ducal du 23 novembre 1955, art. 139 (texte coordonné du 12/06/2026, Legilux)", "url": "https://legilux.public.lu/eli/etat/leg/code/route/20260612", "kind": "national" },
+    "police": { "name": "Police grand-ducale, Routiers / poids lourds (règlement grand-ducal du 19 juillet 1997)", "url": "https://police.public.lu/en/legislation/code-de-la-route/routiers-poids-lourds1.html", "kind": "national" },
+    "guichet": { "name": "Guichet.lu, Eurovignette : droit d'usage routier pour poids lourds", "url": "https://guichet.public.lu/fr/entreprises/import-export/transit/transit-ue/e-vignette-poids-lourds.html", "kind": "national" },
+    "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
+  },
+  "holidays": { "list": "LU", "source": "bf", "verified": "2026-11-20" },
+  "speeds": {
+    "source": "cdr",
+    "verified": "2026-11-20",
+    "bands": [
+      { "over": 3.5, "upTo": 7.5, "motorway": 130, "road": 90, "town": 50 },
+      { "over": 7.5, "upTo": null, "motorway": 90, "road": 75, "town": 50 }
+    ],
+    "notes": [
+      { "text": "Ensembles de véhicules couplés (avec remorque ou semi-remorque), quel que soit le poids : 90 km/h sur autoroute, 75 km/h hors agglomération ; 90 km/h dans les tunnels signalés.", "source": "cdr", "verified": "2026-11-20" }
+    ]
+  },
+  "bans": [
+    { "id": "transit-fr", "kind": "weekly", "over": 7.5, "transitTo": "FR", "days": [0], "holidays": "LU_FR", "from": "00:00", "to": "21:45", "eve": { "from": "21:30" },
+      "label": "Transit vers la France", "text": "Transit de plus de 7,5 t vers la France interdit du samedi (et veille de jour férié) 21 h 30 au dimanche (et jour férié) 21 h 45, stationnement sur la voie publique compris. Exceptions : animaux vivants, denrées périssables, fleurs, presse…",
+      "voice": "transit vers la France interdit du samedi 21 heures 30 au dimanche 21 heures 45", "source": "police", "verified": "2026-11-20" },
+    { "id": "transit-de", "kind": "weekly", "over": 7.5, "transitTo": "DE", "days": [0], "holidays": "LU_DE", "from": "00:00", "to": "21:45", "eve": { "from": "23:30" },
+      "label": "Transit vers l'Allemagne", "text": "Transit de plus de 7,5 t vers l'Allemagne interdit du samedi (et veille de jour férié) 23 h 30 au dimanche (et jour férié) 21 h 45, stationnement sur la voie publique compris. Exceptions : animaux vivants, denrées périssables, fleurs, presse…",
+      "voice": "transit vers l'Allemagne interdit du samedi 23 heures 30 au dimanche 21 heures 45", "source": "police", "verified": "2026-11-20" },
+    { "id": "transit-be", "kind": "none", "text": "Transit vers la Belgique et transport à l'intérieur du Luxembourg : pas concernés par l'interdiction du week-end.", "source": "police", "verified": "2026-11-20" }
+  ],
+  "toll": [
+    { "text": "Eurovignette : droit d'usage des poids lourds pour certaines routes (accord avec le Danemark, les Pays-Bas et la Suède), à acquitter avant le passage.", "source": "guichet", "verified": "2026-11-20" },
+    { "text": "Seuil de poids et routes soumises à l'Eurovignette : à vérifier.", "source": null, "verified": null }
+  ],
+  "lez": [
+    { "text": "Zones à faibles émissions : aucune source lue, à vérifier.", "source": null, "verified": null }
+  ],
+  "adr": [
+    { "text": "Restrictions ADR propres au Luxembourg : à vérifier.", "source": null, "verified": null }
+  ]
+}

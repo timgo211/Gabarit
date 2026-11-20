@@ -10,6 +10,7 @@ import { windAlongRoute, describeWindZone, windCalmText, WIND } from './wind.js'
 import {
   ADR, effectiveCode, tunnelsAlongRoute, describeForbidden, describeAllowed, noTunnelText, tunnelName,
 } from './adr.js';
+import { countryRules } from './country-rules.js';
 
 /**
  * Tunnels du trajet (phase 5b) pour un véhicule ADR. Code tunnel vide : aucune alerte. Données absentes ou vides :
@@ -45,6 +46,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
 /**
  * @param {object} route itinéraire (parseDirections)
  * @param {{ vehicle:object, departure?:Date, zfe?:{ zones:object[], voies:object[] }|null, driving?:object|null,
+ *   countries?:Map<string,{ status:string, data:object|null }>|null,
  *   wind?:{ status:string, forecast:object|null, threshold:number }|null }} ctx
  *   driving : décompte du temps de conduite (driving-time.js) ; wind : prévisions Open-Meteo et seuil de rafales ;
  *   areas : aires placées sur ce tracé (placeAlongRoute), pour proposer la pause sur une aire du bon sens
@@ -53,7 +55,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
  *   banned : passages interdits ; lines : notes complètes ; short : résumé pour la fiche (« ZFE Lyon interdite »)
  */
 export function routeRules(route, {
-  vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null,
+  vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -88,12 +90,19 @@ export function routeRules(route, {
   } else if (wind?.status === 'failed') lines.push({ level: 'info', text: WIND.UNAVAILABLE_TEXT });
   lines.push(...tun.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
+  // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
+  const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
+  lines.push(...ctry.lines);
+  short.push(...ctry.short);
   if (driving) {
     const plan = planDriving(driving, route, departure.getTime(), { schedule });
     lines.push(...plan);
     if (plan.some((l) => l.level === 'warn')) short.push('Pause conseillée');
   }
-  return { passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden };
+  return {
+    passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
+    countries: ctry,
+  };
 }
 
 /** Note de source, sous les règles (données ZFE et date de la copie). */
