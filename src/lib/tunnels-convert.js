@@ -24,10 +24,12 @@ export const TUNNELS_CONVERT = Object.freeze({
    */
   ENDPOINTS: Object.freeze([
     'https://overpass-api.de/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   ]),
+  /** Case en échec sur tous les serveurs : découpée en 4 (jusqu'à 1,25°), chaque morceau redemandé. */
+  MIN_TILE_DEG: 1.25,
   /**
    * Recoupement des tunnels gardés en dur : API principale d'OpenStreetMap (/api/0.6/map, emprise ≤ 0,25 degré²),
    * sans Overpass. [ouest, sud, est, nord] autour de chaque tunnel.
@@ -43,6 +45,13 @@ export const TUNNELS_CONVERT = Object.freeze({
 });
 
 /** Requête Overpass QL pour une case [sud, ouest, nord, est] : voies en tunnel portant une étiquette hazmat, tracé compris. */
+/** Une case [sud, ouest, nord, est] coupée en quatre. */
+export function splitTile([s, w, n, e]) {
+  const my = Math.round(((s + n) / 2) * 1000) / 1000;
+  const mx = Math.round(((w + e) / 2) * 1000) / 1000;
+  return [[s, w, my, mx], [s, mx, my, e], [my, w, n, mx], [my, mx, n, e]];
+}
+
 /** Cases de TILE_DEG degrés qui couvrent la zone [sud, ouest, nord, est]. */
 export function tiles(bbox = TUNNELS_CONVERT.BBOX, step = TUNNELS_CONVERT.TILE_DEG) {
   const [s, w, n, e] = bbox;
@@ -151,9 +160,9 @@ export function knownTubesFromMap(json, nameRe) {
 
 /** Repères de recoupement pour les trois tunnels gardés en dur (point proche du milieu, d'après la carte). */
 export const KNOWN_PROBES = Object.freeze([
-  { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605] },
-  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135] },
-  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858] },
+  { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605], search: 'Tunnel de Fourvière, Lyon' },
+  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135], search: 'Tunnel routier du Fréjus' },
+  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858], search: 'Tunnel du Mont-Blanc' },
 ].map((p) => Object.freeze(p)));
 
 export { KNOWN_TUNNELS };

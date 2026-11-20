@@ -75,12 +75,16 @@ export const KNOWN_TUNNELS = Object.freeze([
   Object.freeze({
     id: 'known:frejus', name: 'Tunnel du Fréjus', cat: 'C', known: true,
     note: 'Règlement du tunnel : classe 1 interdite, autres classes selon le conditionnement ; classe 2 (codes 2A, 2O, 3A, 3O) admise (Bison Futé, sftrf.fr).',
-    tubes: Object.freeze([]),
+    // OSM (API, 20/11/2026) : tube 1 = w101986702 « Tunnel Routier du Fréjus » + w24593777 « Traforo Stradale del
+    // Frejus », hazmat de catégorie C (= Bison Futé) ; tube 2 = w317397424 + w1476732975 + w849010780 (sans catégorie).
+    tubes: Object.freeze([Object.freeze([[6.67746,45.19582],[6.67934,45.19549],[6.68212,45.19391],[6.68437,45.19052],[6.68494,45.17842],[6.68154,45.16095],[6.682,45.15391],[6.68756,45.14007],[6.69369,45.12416],[6.71297,45.0894],[6.71347,45.08801],[6.71337,45.08674]]), Object.freeze([[6.7138,45.08677],[6.71417,45.08785],[6.71372,45.0889],[6.69855,45.11551],[6.69385,45.12417],[6.688,45.14003],[6.68293,45.15412],[6.68221,45.15762],[6.68243,45.16088],[6.68545,45.17744],[6.68508,45.19058],[6.68479,45.19184],[6.68426,45.19294],[6.68333,45.19396],[6.68232,45.19472],[6.67992,45.19562],[6.67748,45.19593]])]),
   }),
   Object.freeze({
     id: 'known:montblanc', name: 'Tunnel du Mont-Blanc', cat: 'E', known: true,
     note: 'PL de plus de 3,5 t : accréditation obligatoire avant le tunnel (Passy-Le Fayet ou Aoste).',
-    tubes: Object.freeze([]),
+    // OSM (API, 20/11/2026) : w1212015047 + w4525912 « Tunnel du Mont Blanc » (côté français, sans catégorie) +
+    // w205544546 « Traforo del Monte Bianco » (hazmat=no) ; Bison Futé : catégorie E, gardée.
+    tubes: Object.freeze([Object.freeze([[6.86128,45.90122],[6.86287,45.90086],[6.8782,45.88706],[6.92139,45.84674],[6.9517,45.8181]])]),
   }),
 ]);
 

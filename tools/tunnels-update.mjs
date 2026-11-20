@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  buildTunnelsQuery, convertTunnels, crossCheck, knownTubesFromMap, tiles, KNOWN_PROBES, TUNNELS_CONVERT,
+  buildTunnelsQuery, convertTunnels, crossCheck, knownTubesFromMap, tiles, splitTile, KNOWN_PROBES, TUNNELS_CONVERT,
 } from '../src/lib/tunnels-convert.js';
 import { overpassBody } from '../src/lib/areas-osm.js';
 
@@ -46,9 +46,9 @@ async function ask(url, query) {
 async function tile(bbox) {
   const query = buildTunnelsQuery(bbox);
   const servers = TUNNELS_CONVERT.ENDPOINTS;
-  for (let i = 0; i < servers.length * 2; i += 1) {
-    const url = servers[i % servers.length];
-    if (i) await sleep(i < servers.length ? 5000 : 30000);
+  for (let i = 0; i < servers.length; i += 1) {
+    const url = servers[i];
+    if (i) await sleep(5000);
     const t0 = Date.now();
     try {
       const json = await ask(url, query);
@@ -58,7 +58,25 @@ async function tile(bbox) {
       console.log(`⚠ case ${bbox.join(',')}, ${new URL(url).host} : ${err.message} après ${Math.round((Date.now() - t0) / 1000)} s`);
     }
   }
-  return null;
+  // Tous les serveurs en échec : case découpée en quatre (zone dense), jusqu'à MIN_TILE_DEG.
+  if (bbox[2] - bbox[0] <= TUNNELS_CONVERT.MIN_TILE_DEG + 1e-9) return null;
+  console.log(`Case ${bbox.join(',')} découpée en quatre.`);
+  const elements = [];
+  let base = null;
+  for (const part of splitTile(bbox)) {
+    await sleep(10000);
+    const r = await tile(part);
+    if (!r) return null;
+    base ??= r.osm3s?.timestamp_osm_base ?? null;
+    elements.push(...r.elements);
+  }
+  return { osm3s: { timestamp_osm_base: base }, elements };
+}
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: { 'user-agent': UA } });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
 }
 
 /** Tubes des trois tunnels gardés en dur, lus dans l'API principale d'OSM (sans Overpass). */
@@ -66,9 +84,25 @@ async function known() {
   for (const probe of KNOWN_PROBES) {
     const [w, s, e, n] = TUNNELS_CONVERT.KNOWN_BBOX[probe.id];
     try {
-      const res = await fetch(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`, { headers: { 'user-agent': UA } });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const tubes = knownTubesFromMap(await res.json(), probe.name);
+      const found = new Map();
+      // Recherche par nom (Nominatim, une requête par seconde au plus), puis chaque voie trouvée avec ses nœuds.
+      try {
+        const hits = await getJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&q=${encodeURIComponent(probe.search)}`);
+        for (const h of Array.isArray(hits) ? hits : []) {
+          if (h.osm_type !== 'way') continue;
+          await sleep(1500);
+          for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`), probe.name)) found.set(t.id, t);
+        }
+      } catch (err) {
+        console.log(`⚠ recherche ${probe.label} : ${err.message}`);
+      }
+      // Emprise autour du tunnel (refusée si la zone a trop de nœuds, en ville).
+      try {
+        for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`), probe.name)) found.set(t.id, t);
+      } catch (err) {
+        console.log(`⚠ emprise ${probe.label} : ${err.message}`);
+      }
+      const tubes = [...found.values()];
       console.log(`Recoupement OSM (API) — ${probe.label} (Bison Futé : ${probe.cat}) : ${tubes.length ? '' : 'aucun tube trouvé'}`);
       for (const t of tubes) console.log(`  ${t.id} « ${t.name} » catégorie OSM ${t.cat ?? 'non renseignée'} ; tracé ${JSON.stringify(t.g)}`);
     } catch (err) {
