@@ -455,7 +455,9 @@ async function contextLossCheck(browser, base) {
 
 async function parkedCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
-  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav });
+  // Sans aires, comme avant la phase 9b (Overpass non simulé ici) : avec des aires affichées, le compte d'images
+  // monte déjà à 144 sur main (v19), à traiter à part.
+  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav, osmCopy: null });
   await page.fill('#to-input', 'Lyon');
   await page.waitForSelector('#to-list li');
   await page.dispatchEvent('#to-list li', 'pointerdown');
