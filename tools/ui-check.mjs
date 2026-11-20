@@ -1034,7 +1034,7 @@ async function driveWindCheck(browser, base) {
     await page.click('#btn-nav-start');
     await drive(ctx, page, line, 50, 4);
     const main = await page.textContent('#nav-drive-main');
-    check(await page.isVisible('#nav-drive') && /^Conduite 4 h 2\d · pause de 45 min conseillée dans \d+ min$/.test(main)
+    check(await page.isVisible('#nav-drive') && /^Conduite 4 h 2\d · pause 45 min conseillée dans \d+ min$/.test(main)
       && await page.getAttribute('#nav-drive', 'data-level') === 'soon', `${label} : temps de conduite en guidage (orange)`, main);
     check(!(await page.isVisible('#btn-nav-work')), `${label} : pas de bouton « travail » en roulant`);
     check(/Rafales (jusqu'à )?95 km\/h.*\(Open-Meteo\)/.test(await page.textContent('#nav-rule')), `${label} : bandeau vent fort avec Open-Meteo`, await page.textContent('#nav-rule'));

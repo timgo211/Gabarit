@@ -358,7 +358,7 @@ export function drivingView(state, t, speedKmh) {
     main = `Pause de ${minutes(need)} conseillée : 4 h 30 de conduite dépassées de ${minutes(-left)}`;
   } else {
     if (left <= DRIVING.WARN_BEFORE_S) level = 'soon';
-    main = `Conduite ${hm(d.sinceBreak)} · pause de ${minutes(need)} conseillée dans ${hm(left)}`;
+    main = `Conduite ${hm(d.sinceBreak)} · pause ${minutes(need)} conseillée dans ${hm(left)}`;
   }
   let detail;
   if (d.day >= DRIVING.DAY_EXTENDED_S || (d.day >= DRIVING.DAY_MAX_S && dLimit === DRIVING.DAY_MAX_S)) {

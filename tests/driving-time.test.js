@@ -48,7 +48,7 @@ test('fractionnement : 15 min PUIS 30 min remet à zéro ; 30 min puis 15 min ne
   [d, t] = run(d, t, 15 * MIN, 0);
   [d, t] = run(d, t, H, 90);
   assert.equal(d.split, true);
-  assert.match(drivingView(d, t, 90).main, /pause de 30 min conseillée dans 1 h 30/);
+  assert.match(drivingView(d, t, 90).main, /pause 30 min conseillée dans 1 h 30/);
   [d, t] = run(d, t, 30 * MIN, 0);
   [d, t] = run(d, t, 60, 90);
   assert.ok(d.sinceBreak < 70, 'remis à zéro après 15 + 30');

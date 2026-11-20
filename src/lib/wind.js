@@ -225,7 +225,7 @@ export function guidanceWind(wind, { along, now, timeTo }) {
   const g = Math.round(gust);
   const text = distance > 0
     ? `Rafales ${g} km/h dans ${distance >= 1000 ? `${Math.round(distance / 1000)} km` : `${Math.round(distance / 100) * 100} m`} (Open-Meteo)`
-    : `Rafales jusqu'à ${g} km/h sur cette partie du trajet (Open-Meteo)`;
+    : `Rafales jusqu'à ${g} km/h ici (Open-Meteo)`;
   let speak = null;
   const key = String(Math.round(first.along));
   if (!announced[key] && distance <= WIND.ANNOUNCE_M) {
