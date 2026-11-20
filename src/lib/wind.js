@@ -12,10 +12,10 @@
 // - timeformat=unixtime : heures en secondes UNIX (GMT).
 // - Conditions d'utilisation (API gratuite, usage non commercial) : moins de 10 000 appels par jour, 5 000 par heure,
 //   600 par minute ; chaque lieu demandé compte comme un appel → 40 points au plus par calcul.
-// - Licence des données : CC BY 4.0, attribution « Weather data by Open-Meteo.com » avec un lien vers le site
-//   (affichée sous les fiches et dans Réglages).
+// - Licence des données : CC BY 4.0, attribution « Weather data by Open-Meteo.com » avec un lien vers le site et la
+//   licence (affichée sous les fiches, dans Réglages et « (Open-Meteo) » dans le bandeau du guidage).
 // Seuil : aucune règle nationale unique pour les poids lourds (fermetures de ponts et de viaducs décidées localement
-// et signalées sur place) ; seuil de rafales choisi dans Réglages, 80 km/h par défaut. Aide seulement : la
+// et signalées sur place) ; seuil de rafales choisi dans Réglages, 70 km/h par défaut. Aide seulement : la
 // signalisation, les consignes des gestionnaires et la vigilance Météo-France font foi.
 
 import { prepareLine, locateOnLine, pointAt, haversine } from './nav-geo.js';
@@ -36,7 +36,7 @@ export const WIND = Object.freeze({
   ZONE_HALF_M: 5000,
   FORECAST_DAYS: 3,
   /** Seuil de rafales (km/h) : réglable dans Réglages. */
-  GUST: Object.freeze({ min: 40, max: 150, step: 5, default: 80 }),
+  GUST: Object.freeze({ min: 40, max: 150, step: 5, default: 70 }),
   /** Guidage : bandeau sous 30 km, annonce une fois vers 15 km. */
   BANNER_M: 30000,
   ANNOUNCE_M: 15000,
@@ -47,6 +47,8 @@ export const WIND = Object.freeze({
   CACHE_MAX_ENTRIES: 3,
   ATTRIBUTION: 'Weather data by Open-Meteo.com',
   ATTRIBUTION_URL: 'https://open-meteo.com/',
+  LICENSE: 'CC BY 4.0',
+  LICENSE_URL: 'https://creativecommons.org/licenses/by/4.0/',
   UNAVAILABLE_TEXT: 'Météo indisponible : vent non vérifié sur ce trajet.',
 });
 
@@ -147,17 +149,17 @@ export function placeWind(forecast, route) {
 }
 
 /**
- * Vent fort sur un itinéraire, à l'heure de passage estimée depuis `departure`.
+ * Vent fort sur un itinéraire, à l'heure de passage estimée depuis `departure` (elapsed : pauses conseillées comprises).
  * @returns {{ checked:number, zones:{ from:number, to:number, gust:number, at:Date, points:number }[] }}
  *   zones : passages consécutifs au-dessus du seuil (km de départ et de fin, rafale la plus forte et son heure)
  */
-export function windAlongRoute(route, forecast, { departure = new Date(), threshold = WIND.GUST.default } = {}) {
+export function windAlongRoute(route, forecast, { departure = new Date(), threshold = WIND.GUST.default, elapsed = (t) => t } = {}) {
   const placed = placeWind(forecast, route);
   const zones = [];
   let cur = null;
   let checked = 0;
   for (const p of placed) {
-    const at = departure.getTime() + p.time * 1000;
+    const at = departure.getTime() + elapsed(p.time) * 1000;
     const g = gustAt(p.point, at);
     if (g === null) { cur = null; continue; }
     checked += 1;
@@ -222,8 +224,8 @@ export function guidanceWind(wind, { along, now, timeTo }) {
   const distance = Math.max(0, first.along - WIND.ZONE_HALF_M - along);
   const g = Math.round(gust);
   const text = distance > 0
-    ? `Rafales ${g} km/h dans ${distance >= 1000 ? `${Math.round(distance / 1000)} km` : `${Math.round(distance / 100) * 100} m`}`
-    : `Rafales jusqu'à ${g} km/h sur cette partie du trajet`;
+    ? `Rafales ${g} km/h dans ${distance >= 1000 ? `${Math.round(distance / 1000)} km` : `${Math.round(distance / 100) * 100} m`} (Open-Meteo)`
+    : `Rafales jusqu'à ${g} km/h sur cette partie du trajet (Open-Meteo)`;
   let speak = null;
   const key = String(Math.round(first.along));
   if (!announced[key] && distance <= WIND.ANNOUNCE_M) {

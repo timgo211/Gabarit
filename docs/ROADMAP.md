@@ -173,14 +173,17 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       foi) : conduite à partir de 5 km/h, arrêt compté comme pause à partir de 15 min ; art. 7 : 4 h 30 puis 45 min, ou
       15 min PUIS 30 min (30 puis 15 ne suffit pas) ; art. 6 : 9 h par jour (10 h deux fois par semaine), 56 h par
       semaine, 90 h sur deux semaines ; arrêt de 9 h = repos journalier. Compté pendant le guidage (positions interrompues
-      = arrêt), gardé sur l'appareil (pas exporté), remise à zéro dans Réglages. Fiche : « Pause de 45 min à prévoir
-      après 1 h 30 de route (vers km 96) », 9 h du jour ; guidage : ligne « Conduite 3 h 12 · pause de 45 min dans
-      1 h 18 » + journée (orange 30 min avant, rouge au-delà), voix 30 min avant 4 h 30 (avec la prochaine aire), à
+      = arrêt), gardé sur l'appareil (pas exporté), remise à zéro dans Réglages. Fiche : « Pause de 45 min conseillée
+      après 1 h 30 de route (vers km 96) », ou sur une aire du bon sens atteinte dans l'heure avant 4 h 30 (« … : Aire
+      de …, km 327 »), 9 h du jour ; heures des ZFE, interdictions et vent recalées avec les pauses conseillées (repos
+      de 11 h au-delà de 9 h) ; jamais « obligatoire » ; guidage : ligne « Conduite 3 h 12 · pause de 45 min conseillée
+      dans 1 h 18 » + journée (orange 30 min avant, rouge au-delà), voix 30 min avant 4 h 30 (avec la prochaine aire), à
       4 h 30, à 9 h / 10 h, et à l'arrêt (15 min comptées, pause faite) ; bouton « Pas une pause (travail) » à l'arrêt
       seulement (sous 10 km/h), qui retire l'arrêt en cours ou le dernier arrêt du décompte (second appui : recompté).
-    - [x] **Alerte vent fort** (PR B) : Open-Meteo (sans clé, CC BY 4.0, attribution sous les fiches et dans Réglages),
+    - [x] **Alerte vent fort** (PR B) : Open-Meteo (sans clé, CC BY 4.0, attribution sous les fiches, dans Réglages et
+      dans le bandeau),
       une requête par calcul pour tous les itinéraires proposés (40 points au plus, un tous les 15 km), rafales à
-      l'heure de passage (maximum de l'heure précédente), seuil réglable (80 km/h par défaut) ; prévision gardée 3 h sur
+      l'heure de passage (maximum de l'heure précédente), seuil réglable (70 km/h par défaut) ; prévision gardée 3 h sur
       l'appareil, jamais dans le cache du service worker ; « Météo indisponible » si échec, jamais bloquant. Fiche
       (« Vent fort : rafales jusqu'à 95 km/h vers km 120 (vers 14 h 20) »), bandeau en guidage sous 30 km, voix une fois
       vers 15 km (réglage). Recalcul : points replacés sans requête.

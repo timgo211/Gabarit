@@ -996,7 +996,7 @@ function drivenFor(seconds, end = Date.now()) {
 
 /**
  * Phase 5 (PR B) : temps de conduite et vent fort. 4 h 25 de conduite déjà comptées, rafales de 95 km/h partout
- * (Open-Meteo simulé). Fiches (vent, pause à prévoir, attribution Open-Meteo, une seule requête par calcul), guidage
+ * (Open-Meteo simulé). Fiches (vent, pause conseillée, attribution Open-Meteo, une seule requête par calcul), guidage
  * avec le GPS émulé : ligne du temps de conduite, bandeau vent, bouton « Pas une pause (travail) » seulement à
  * l'arrêt, sans recouvrir les boutons de carte ; 360, 412 px, tablette et paysage. Puis Réglages, copie sur
  * l'appareil (pas de seconde requête) et Open-Meteo en échec (« Météo indisponible », guidage normal).
@@ -1012,12 +1012,15 @@ async function driveWindCheck(browser, base) {
     await page.waitForSelector('.wind-credit', { timeout: 10000 });
     const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
     check(notes.some((t) => /^Vent fort : rafales jusqu'à 95 km\/h/.test(t)), `${label} : fiche, vent fort à l'heure de passage`, notes.join(' | '));
-    check(notes.some((t) => /^Pause de 45 min à prévoir après \d+ min de route/.test(t))
+    check(notes.some((t) => /^Pause de 45 min conseillée après \d+ min de route/.test(t))
       && notes.some((t) => /^Temps de conduite : 4 h 2\d depuis la dernière pause.*chronotachygraphe fait foi/.test(t)),
-    `${label} : fiche, pause à prévoir et rappel « le chronotachygraphe fait foi »`);
+    `${label} : fiche, pause conseillée et rappel « le chronotachygraphe fait foi »`);
+    check(/Pause conseillée/.test(await page.textContent('.route-card[aria-checked="true"] .route-card-rules')), `${label} : résumé « Pause conseillée »`);
     check(/Rafales 95 km\/h/.test(await page.textContent('.route-card[aria-checked="true"] .route-card-rules')), `${label} : résumé sur la fiche`);
     check(await page.getAttribute('.wind-credit a', 'href') === 'https://open-meteo.com/'
-      && /Weather data by Open-Meteo\.com/.test(await page.textContent('.wind-credit')), `${label} : attribution Open-Meteo avec lien`);
+      && /Weather data by Open-Meteo\.com \(CC BY 4\.0\)/.test(await page.textContent('.wind-credit'))
+      && await page.getAttribute('.wind-credit a:last-child', 'href') === 'https://creativecommons.org/licenses/by/4.0/',
+    `${label} : attribution Open-Meteo (CC BY 4.0) avec liens`);
     const cards = await page.locator('.route-card').count();
     if (cards > 1) { await page.locator('.route-card').nth(1).click(); await page.waitForTimeout(400); }
     check(stats.wind === 1, `${label} : une seule requête Open-Meteo pour le calcul (choix d'itinéraire compris)`, `${stats.wind}`);
@@ -1031,10 +1034,11 @@ async function driveWindCheck(browser, base) {
     await page.click('#btn-nav-start');
     await drive(ctx, page, line, 50, 4);
     const main = await page.textContent('#nav-drive-main');
-    check(await page.isVisible('#nav-drive') && /^Conduite 4 h 2\d · pause de 45 min dans \d+ min$/.test(main)
+    check(await page.isVisible('#nav-drive') && /^Conduite 4 h 2\d · pause de 45 min conseillée dans \d+ min$/.test(main)
       && await page.getAttribute('#nav-drive', 'data-level') === 'soon', `${label} : temps de conduite en guidage (orange)`, main);
     check(!(await page.isVisible('#btn-nav-work')), `${label} : pas de bouton « travail » en roulant`);
-    check(/Rafales (jusqu'à )?95 km\/h/.test(await page.textContent('#nav-rule')), `${label} : bandeau vent fort`, await page.textContent('#nav-rule'));
+    check(/Rafales (jusqu'à )?95 km\/h.*\(Open-Meteo\)/.test(await page.textContent('#nav-rule')), `${label} : bandeau vent fort avec Open-Meteo`, await page.textContent('#nav-rule'));
+    check(!/obligatoire/i.test(await page.textContent('body')), `${label} : jamais « obligatoire »`);
     let foot = await footOverlaps(page);
     check(foot.out.length === 0, `${label} : boutons de carte hors du bandeau (conduite, vent)`, foot.out.join(' ; '));
     let under = await bannerOverBottom(page);
@@ -1077,8 +1081,8 @@ async function driveWindCheck(browser, base) {
   {
     const { page, ctx, stats, errors } = await open(browser, base, { width: 412, height: 900, wind: () => 60 });
     await page.click('#btn-settings');
-    check(await page.isChecked('#drive-voice') && await page.isChecked('#wind-voice') && (await page.inputValue('#wind-gust')) === '80',
-      'Réglages : voix des pauses et du vent activées, seuil 80 km/h par défaut');
+    check(await page.isChecked('#drive-voice') && await page.isChecked('#wind-voice') && (await page.inputValue('#wind-gust')) === '70',
+      'Réglages : voix des pauses et du vent activées, seuil 70 km/h par défaut');
     await page.fill('#wind-gust', '55');
     await page.click('#btn-wind-save');
     check(/55 km\/h/.test(await page.textContent('#wind-status')), 'Réglages : seuil enregistré (55 km/h)');

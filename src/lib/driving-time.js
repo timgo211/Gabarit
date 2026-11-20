@@ -1,7 +1,8 @@
 // Temps de conduite et pauses (phase 5, PR B). Logique pure : décompte de la conduite d'après les positions du
 // guidage, pauses, alertes, plan des pauses d'un itinéraire, lecture et écriture sur l'appareil.
 //
-// AIDE SEULEMENT : le chronotachygraphe fait foi. Gabarit ne voit que les trajets faits avec son guidage ; un trajet
+// AIDE SEULEMENT : le chronotachygraphe fait foi. Textes, bandeau et voix disent « Pause conseillée », jamais
+// « obligatoire ». Gabarit ne voit que les trajets faits avec son guidage ; un trajet
 // sans l'appli, le travail et la disponibilité ne sont pas connus. Le décompte reste sur l'appareil (jamais exporté).
 //
 // Source officielle : règlement (CE) n° 561/2006 du Parlement européen et du Conseil du 15 mars 2006 relatif à
@@ -31,6 +32,8 @@
 // arrêté, GPS perdu) : intervalle compté comme arrêt.
 
 import { sampleRoute } from './route-samples.js';
+import { prepareLine } from './nav-geo.js';
+import { timeAt, areaName } from './areas-route.js';
 import { formatDuration } from './format.js';
 
 export const DRIVING = Object.freeze({
@@ -47,6 +50,10 @@ export const DRIVING = Object.freeze({
   BREAK_SECOND_S: 30 * 60,
   /** Art. 4 g) / art. 8 : repos journalier réduit d'au moins 9 h. */
   DAILY_REST_S: 9 * 3600,
+  /** Repos journalier normal (art. 4 g) : 11 h, durée retenue pour estimer les heures après la limite du jour. */
+  DAILY_REST_NORMAL_S: 11 * 3600,
+  /** Pause conseillée sur une aire du bon sens atteinte au plus 1 h avant la limite des 4 h 30. */
+  AREA_WINDOW_S: 3600,
   /** Art. 6 § 1 : 9 h par jour, 10 h deux fois par semaine. */
   DAY_MAX_S: 9 * 3600,
   DAY_EXTENDED_S: 10 * 3600,
@@ -348,10 +355,10 @@ export function drivingView(state, t, speedKmh) {
     if (left <= 0) level = 'over';
   } else if (left <= 0) {
     level = 'over';
-    main = `Pause de ${minutes(need)} obligatoire : 4 h 30 de conduite dépassées de ${minutes(-left)}`;
+    main = `Pause de ${minutes(need)} conseillée : 4 h 30 de conduite dépassées de ${minutes(-left)}`;
   } else {
     if (left <= DRIVING.WARN_BEFORE_S) level = 'soon';
-    main = `Conduite ${hm(d.sinceBreak)} · pause de ${minutes(need)} dans ${hm(left)}`;
+    main = `Conduite ${hm(d.sinceBreak)} · pause de ${minutes(need)} conseillée dans ${hm(left)}`;
   }
   let detail;
   if (d.day >= DRIVING.DAY_EXTENDED_S || (d.day >= DRIVING.DAY_MAX_S && dLimit === DRIVING.DAY_MAX_S)) {
@@ -397,12 +404,12 @@ export function drivingAnnouncements(state, t, { nextArea = null } = {}) {
   if (d.mode === 'drive') {
     const b = `b:${d.breakFrom}`;
     if (left <= 0) {
-      once(`${b}:over`, `4 heures 30 de conduite : faites une pause de ${spoken(need)} dès que possible.`);
+      once(`${b}:over`, `4 heures 30 de conduite : pause de ${spoken(need)} conseillée dès que possible.`);
       d.announced[`${b}:soon`] = true;
     } else if (left <= DRIVING.WARN_BEFORE_S) {
       const area = nextArea && nextArea.distance > 0
         ? ` Prochaine aire : ${nextArea.name}, dans ${Math.max(1, Math.round(nextArea.distance / 1000))} kilomètres.` : '';
-      once(`${b}:soon`, `Pause de ${spoken(need)} à faire dans ${spoken(left)}.${area}`);
+      once(`${b}:soon`, `Pause de ${spoken(need)} conseillée dans ${spoken(left)}.${area}`);
     }
     const day = `d:${d.dayFrom}`;
     const others = DRIVING.EXTENSIONS_PER_WEEK - d.week.extensions; // prolongations restantes après aujourd'hui
@@ -424,20 +431,85 @@ export function drivingAnnouncements(state, t, { nextArea = null } = {}) {
       once(`${s}:done`, `Pause de ${spoken(need)} faite.`);
       d.announced[`${s}:15`] = true;
     } else if (!d.split && cur >= DRIVING.BREAK_FIRST_S) {
-      once(`${s}:15`, '15 minutes de pause comptées. Il faudra encore 30 minutes, maintenant ou plus tard, avant 4 heures 30 de conduite.');
+      once(`${s}:15`, '15 minutes de pause comptées. Encore 30 minutes conseillées, maintenant ou plus tard, avant 4 heures 30 de conduite.');
     }
   }
   return { state: d, speak };
 }
 
 /**
- * Avant le départ (fiche de l'itinéraire) : où tomberont la pause de 4 h 30 et la limite du jour, d'après le décompte
- * et la durée ORS (sans les pauses).
+ * Pauses conseillées sur un itinéraire (avant le départ), d'après le décompte et les durées ORS : la première quand
+ * les 4 h 30 seront atteintes (30 min si les 15 min sont déjà faites), puis toutes les 4 h 30 ; chacune sur une aire
+ * du bon sens (phase 9) atteinte dans l'heure qui précède, s'il y en a une. Au-delà de la limite du jour (9 h), repos
+ * journalier de 11 h. Sert aux textes de la fiche et à recaler les heures de passage des autres règles.
+ * @param {object} state décompte (sanitizeDriving)
+ * @param {object} route itinéraire (parseDirections)
+ * @param {number} now heure de départ (ms)
+ * @param {{ areas?:object[] }} opts aires placées sur ce tracé (placeAlongRoute) : along, otherSide
+ * @returns {{ breaks:{ drive:number, along:number, duration:number, area:object|null }[],
+ *   rest:{ drive:number, along:number }|null, elapsed:(t:number)=>number }}
+ *   drive : secondes de conduite depuis le départ ; elapsed(t) : temps écoulé (s), pauses et repos compris
+ */
+export function breakSchedule(state, route, now = Date.now(), { areas = [] } = {}) {
+  const identity = (t) => t;
+  const empty = { breaks: [], rest: null, elapsed: identity };
+  if (!state || !isNum(route?.duration) || !Array.isArray(route?.coordinates) || route.coordinates.length < 2) return empty;
+  const d = drivingAt(state, now);
+  const line = prepareLine(route.coordinates);
+  const duration = route.duration;
+  const alongAt = (t) => {
+    if (timeAt(route, line, line.total) <= t) return line.total;
+    let lo = 0;
+    let hi = line.total;
+    for (let k = 0; k < 40; k += 1) {
+      const mid = (lo + hi) / 2;
+      if (timeAt(route, line, mid) < t) lo = mid; else hi = mid;
+    }
+    return hi;
+  };
+  const usable = (Array.isArray(areas) ? areas : []).filter((a) => a && isNum(a.along) && !a.otherSide)
+    .sort((a, b) => a.along - b.along);
+  const dayLeft = Math.max(0, DRIVING.DAY_MAX_S - d.day);
+  const restAt = duration > dayLeft ? dayLeft : null;
+  const breaks = [];
+  let limit = Math.max(0, DRIVING.CONTINUOUS_MAX_S - d.sinceBreak);
+  let need = breakNeeded(d);
+  let prev = -1;
+  while (limit < duration && (restAt === null || limit < restAt) && breaks.length < 20) {
+    const limitAlong = alongAt(limit);
+    let area = null;
+    for (const a of usable) {
+      if (a.along > limitAlong) break;
+      const t = timeAt(route, line, a.along);
+      if (t >= limit - DRIVING.AREA_WINDOW_S && t > prev) area = a;
+    }
+    const drive = area ? timeAt(route, line, area.along) : limit;
+    breaks.push({ drive, along: area ? area.along : limitAlong, duration: need, area });
+    prev = drive;
+    limit = drive + DRIVING.CONTINUOUS_MAX_S;
+    need = DRIVING.BREAK_FULL_S;
+  }
+  const rest = restAt !== null ? { drive: restAt, along: alongAt(restAt) } : null;
+  const elapsed = (t) => {
+    let e = t;
+    for (const b of breaks) if (t > b.drive) e += b.duration;
+    if (rest && t > rest.drive) e += DRIVING.DAILY_REST_NORMAL_S;
+    return e;
+  };
+  return { breaks, rest, elapsed };
+}
+
+/**
+ * Avant le départ (fiche de l'itinéraire) : où tomberont la pause conseillée et la limite du jour, d'après le
+ * décompte et les durées ORS.
+ * @param {{ areas?:object[], schedule?:object }} opts aires placées (pause proposée sur une aire du bon sens) ou plan
+ *   déjà calculé (breakSchedule)
  * @returns {{ level:'warn'|'info', text:string }[]}
  */
-export function planDriving(state, route, now = Date.now()) {
+export function planDriving(state, route, now = Date.now(), { areas = [], schedule = null } = {}) {
   if (!state || !isNum(route?.duration)) return [];
   const d = drivingAt(state, now);
+  const plan = schedule ?? breakSchedule(state, route, now, { areas });
   const lines = [];
   const samples = sampleRoute(route, 1000);
   const kmAt = (s) => {
@@ -450,13 +522,16 @@ export function planDriving(state, route, now = Date.now()) {
     lines.push({ level: 'info', text: `Temps de conduite : ${hm(d.sinceBreak)} depuis la dernière pause, ${hm(d.day)} aujourd'hui. ${DRIVING.NOTICE}` });
   }
   if (route.duration > left) {
-    const km = kmAt(left);
-    lines.push({
-      level: 'warn',
-      text: left <= 0
-        ? `Pause de ${minutes(need)} à faire avant de partir (4 h 30 de conduite atteintes).`
-        : `Pause de ${minutes(need)} à prévoir après ${hm(left)} de route${km !== null ? ` (vers km ${km})` : ''}.`,
-    });
+    const b = plan.breaks[0];
+    let text;
+    if (left <= 0) text = `Pause de ${minutes(need)} conseillée avant de partir (4 h 30 de conduite atteintes).`;
+    else if (b?.area) {
+      text = `Pause de ${minutes(need)} conseillée après ${hm(b.drive)} de route : ${areaName(b.area)} (km ${Math.round(b.along / 1000)}).`;
+    } else {
+      const km = kmAt(left);
+      text = `Pause de ${minutes(need)} conseillée après ${hm(left)} de route${km !== null ? ` (vers km ${km})` : ''}.`;
+    }
+    lines.push({ level: 'warn', text });
   }
   const dayLeft = DRIVING.DAY_MAX_S - d.day;
   if (route.duration > dayLeft) {

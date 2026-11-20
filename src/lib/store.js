@@ -106,7 +106,7 @@ export function sanitizeData(raw) {
       ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE et interdictions PL (phase 5), activées par défaut
       driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
-      windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 80 par défaut
+      windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 70 par défaut
     },
   };
 }
