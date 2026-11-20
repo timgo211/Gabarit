@@ -20,7 +20,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, markStopAsWork, mapButtonSize, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, markStopAsWork, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea, nextAreasChanged } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
@@ -281,7 +281,7 @@ export function createNavigation(ctx) {
 
     // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
     // Phase 5c : frontière proche (pays, vitesse PL, interdictions confirmées), une ligne.
-    const rules = [view.rules?.border?.text, view.rules?.tunnel?.text, view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
+    const rules = [view.rules?.border?.text, view.rules?.tunnel?.text, view.rules?.access?.text, view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
     if (ui.rule.dataset.text !== rules.join('\n')) {
       ui.rule.dataset.text = rules.join('\n');
       ui.rule.replaceChildren(...rules.map((t) => {
@@ -634,6 +634,11 @@ export function createNavigation(ctx) {
     setTunnels(data) {
       if (!s) return;
       s.state = setNavigationTunnels(s.state, data);
+    },
+    /** Voies à accès conditionnel arrivées après « Démarrer » (phase 5d) : le moteur les replace sur le tracé. */
+    setAccess(ways) {
+      if (!s) return;
+      s.state = setNavigationAccess(s.state, ways);
     },
     /** Fichiers des pays voisins arrivés après « Démarrer » (phase 5c) : le moteur replace les frontières. */
     setCountries(countries) {

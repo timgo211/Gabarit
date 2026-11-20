@@ -1,9 +1,12 @@
-name: Données OSM (tunnels ADR, aires PL)
+name: Données OSM (tunnels ADR, aires PL, accès)
 
 # Copie mensuelle des données OpenStreetMap (licence ODbL) lues sans réseau par l'appli : tunnels signalés aux
-# matières dangereuses (data/tunnels-adr.json, phase 5b) et aires et parkings PL (data/aires-osm/, phase 9b).
-# Un seul téléchargement des extraits par pays de Geofabrik et un seul filtrage osmium pour les deux (voir
-# tools/osm-update.mjs). Échec : rien n'est enregistré, l'ancienne copie reste.
+# matières dangereuses (data/tunnels-adr.json, phase 5b), aires et parkings PL (data/aires-osm/, phase 9b) et voies à
+# accès conditionnel (data/acces-osm/, phase 5d). Un seul téléchargement des extraits par pays de Geofabrik et un
+# seul filtrage osmium pour les trois (voir tools/osm-update.mjs). Échec : rien n'est enregistré, l'ancienne copie
+# reste.
+# Lancement à la main avec « r411 » coché : lecture seule du Code de la route, art. R411-8 (pouvoir de police), texte
+# écrit dans le journal pour être cité dans src/lib/access-conditional.js ; aucune copie de données ce jour-là.
 # Lancée aussi à la main (onglet Actions › Données OSM › Run workflow) et à chaque envoi qui modifie l'outil de copie,
 # sur n'importe quelle branche (première copie des aires créée sur la branche de la phase 9b, avant la fusion).
 
@@ -11,11 +14,17 @@ on:
   schedule:
     - cron: '17 3 1 * *' # le 1er du mois, 3 h 17 (UTC)
   workflow_dispatch:
+    inputs:
+      r411:
+        description: "Lire seulement le Code de la route, art. R411-8 (journal), sans copier les données"
+        type: boolean
+        default: false
   push:
     paths:
       - tools/osm-update.mjs
       - src/lib/tunnels-convert.js
       - src/lib/areas-osm-data.js
+      - src/lib/access-convert.js
       - .github/workflows/osm-data.yml
 
 permissions:
@@ -29,6 +38,7 @@ jobs:
   # Recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc avec OpenStreetMap (API principale d'OSM et
   # Nominatim, sans Overpass) : journal seulement, n'empêche jamais la copie.
   known:
+    if: ${{ !inputs.r411 }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -39,7 +49,44 @@ jobs:
           node-version: 22
       - run: node tools/osm-update.mjs --known
 
+  # Code de la route, art. R411-8 : Légifrance est bloqué depuis le conteneur de développement ; lu ici (Légifrance,
+  # sinon le PDF du code sur codes.droit.org). Journal seulement, lancé à la main.
+  r411:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.r411 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Installer pdftotext
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+      - name: Lire l'article R411-8
+        run: |
+          UA="Mozilla/5.0 (X11; Linux x86_64) Gabarit"
+          for u in "https://www.legifrance.gouv.fr/codes/article_lc/LEGIARTI000006842210" \
+                   "https://www.legifrance.gouv.fr/codes/section_lc/LEGITEXT000006074228/LEGISCTA000006159537/"; do
+            code=$(curl -sS -L -A "$UA" -o page.html -w '%{http_code}' "$u" || echo 000)
+            echo "Légifrance $u : HTTP $code"
+            if [ "$code" = 200 ]; then
+              python3 - <<'PY'
+          import html, re
+          t = open('page.html', encoding='utf-8', errors='replace').read()
+          t = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', t, flags=re.S)
+          t = html.unescape(re.sub(r'<[^>]+>', ' ', t))
+          t = re.sub(r'\s+', ' ', t)
+          i = t.find('R411-8')
+          print(t[max(0, i - 200):i + 2500] if i >= 0 else 'R411-8 absent de la page')
+          PY
+            fi
+          done
+          code=$(curl -sS -L -A "$UA" -o code.pdf -w '%{http_code}' "https://codes.droit.org/PDF/Code%20de%20la%20route.pdf" || echo 000)
+          echo "codes.droit.org : HTTP $code"
+          if [ "$code" = 200 ]; then
+            pdftotext -layout code.pdf code.txt
+            head -c 600 code.txt; echo
+            grep -n -A 25 "Article R411-8" code.txt | head -60 || echo "Article R411-8 absent du PDF"
+          fi
+
   update:
+    if: ${{ !inputs.r411 }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -53,14 +100,14 @@ jobs:
         run: node tools/osm-update.mjs
       - name: Enregistrer si changé
         run: |
-          git add -A -N data/tunnels-adr.json data/aires-osm
-          if git diff --quiet -- data/tunnels-adr.json data/aires-osm; then
+          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm
+          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm; then
             echo "Aucun changement."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/tunnels-adr.json data/aires-osm
-          git commit -m "Données : tunnels ADR et aires PL OpenStreetMap (mise à jour automatique)"
+          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm
+          git commit -m "Données : tunnels ADR, aires PL et accès conditionnels OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push

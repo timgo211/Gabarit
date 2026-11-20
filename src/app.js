@@ -9,7 +9,9 @@ import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
 import { fetchRouteOptions, fetchRoute } from './ui/api.js';
-import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption } from './lib/route-options.js';
+import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption } from './lib/route-options.js';
+import { avoidLocalFor } from './lib/access-local.js';
+import { createAccess } from './ui/access.js';
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText } from './lib/route-rules.js';
@@ -120,6 +122,7 @@ navigation = createNavigation({
     };
     renderChoice();
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
+    access.extend(route); // phase 5d : cases de data/acces-osm/ manquantes pour le nouveau tracé
   },
   onAreaOpen: (id) => areas.openSheet(id),
   onView: () => areas.refreshDrive(),
@@ -189,6 +192,15 @@ function ensureTunnels(vehicle) {
     });
 }
 
+// ───────── Accès (phase 5d) : data/acces-osm/, cases touchées par les itinéraires proposés ─────────
+let localBusy = false;
+const access = createAccess({
+  onChange: (st) => {
+    navigation.setAccess(st.status === 'ok' ? st.ways : null);
+    renderChoice();
+  },
+});
+
 // ───────── Pays voisins (phase 5c) : data/pays/XX.json, petits fichiers mis en cache (lisibles hors ligne) ─────────
 /** code → { status:'loading'|'ok'|'failed', data } ; nouvelle Map à chaque arrivée (cache des règles invalidé). */
 let countries = new Map(COUNTRY_RULES.FILES.map((c) => [c, { status: 'loading', data: null }]));
@@ -225,12 +237,15 @@ function rulesOf(route, vehicle, departure) {
   const pool = areas.pool;
   const tun = tunnels;
   const ctry = countries;
+  const acc = access.state;
   if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
-    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry) return hit.rules;
+    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
-  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, rules });
+  const rules = routeRules(route, {
+    vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc,
+  });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, rules });
   return rules;
 }
 
@@ -293,6 +308,7 @@ async function avoidZfe() {
     choice = { ...choice, options, selected: options.length - 1 };
     map.showRoutes(options.map((o) => o.route), choice.selected);
     areas.select(route); // aires déjà trouvées replacées (la requête Overpass couvrait les premiers itinéraires)
+    access.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).banned;
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
   } catch (err) {
@@ -329,6 +345,7 @@ async function avoidTunnel() {
     choice = { ...choice, options, selected: options.length - 1 };
     map.showRoutes(options.map((o) => o.route), choice.selected);
     areas.select(route);
+    access.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
   } catch (err) {
@@ -339,13 +356,52 @@ async function avoidTunnel() {
   }
 }
 
+/**
+ * « Éviter la desserte locale » (à l'arrêt, phase 5d) : une requête ORS avec un petit carré sur chaque route réservée
+ * à la desserte locale traversée en transit (options.avoid_polygons, ajouté aux zones déjà évitées).
+ */
+async function avoidLocal() {
+  if (!choice || navigation.active || localBusy) return;
+  const option = choice.options[choice.selected];
+  const transit = rulesOf(option.route, choice.vehicle, new Date()).localTransit ?? [];
+  const plan = avoidLocalFor(transit, { start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null });
+  if (!plan.ok) { showMessage(messageNode, plan.text); return; }
+  localBusy = true;
+  renderChoice();
+  showMessage(messageNode, '');
+  try {
+    const route = await fetchRoute({
+      apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
+      avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
+      avoidPolygons: plan.geometry,
+    });
+    if (!choice || navigation.active) return;
+    const nl = noLocalOption(option, route, plan.geometry);
+    const options = [...choice.options.filter((o) => o.key !== 'nolocal'), nl];
+    choice = { ...choice, options, selected: options.length - 1 };
+    map.showRoutes(options.map((o) => o.route), choice.selected);
+    areas.select(route);
+    access.extend(route);
+    const still = rulesOf(route, choice.vehicle, new Date()).localTransit ?? [];
+    if (still.length) showMessage(messageNode, `L'itinéraire « Sans desserte » traverse encore une route réservée à la desserte locale (km ${still.map((p) => Math.round(p.enter / 1000)).join(', ')}). La signalisation fait foi.`, 'info');
+  } catch (err) {
+    showMessage(messageNode, `Éviter la desserte locale : ${errorText(err) || 'calcul impossible.'}`);
+  } finally {
+    localBusy = false;
+    renderChoice();
+  }
+}
+
 function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
   renderRouteChoice(summaryNode, notesNode, {
     choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
-    rules, rulesSource: rulesSourceText(zfeData, { hazmat: !!choice.vehicle?.hazmat, tunnelsUpdated: tunnels.data?.updated ?? null }),
-    onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy,
+    rules,
+    rulesSource: rulesSourceText(zfeData, {
+      hazmat: !!choice.vehicle?.hazmat, tunnelsUpdated: tunnels.data?.updated ?? null, accessUpdated: access.state.updated,
+    }),
+    onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy, onAvoidLocal: avoidLocal, localBusy,
     windCredit: weather.status === 'ok',
   });
   showZfeOnMap(rules);
@@ -378,6 +434,7 @@ function startGuidance(simulate = null) {
       vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice,
       tunnels: tunnels.status === 'ok' ? tunnels.data : null, // phase 5b ; les trois tunnels en dur dans tous les cas
       countries, // phase 5c : règles des pays voisins (data/pays)
+      access: access.state.status === 'ok' ? access.state.ways : null, // phase 5d : voies à accès conditionnel
     },
     driving: loadDriving(storage),
     driveVoice: data.settings.driveVoice,
@@ -465,6 +522,7 @@ const form = createRouteForm({
       map.showRoutes(options.map((o) => o.route), selected);
       areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
       weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
+      access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
@@ -477,6 +535,7 @@ const form = createRouteForm({
       choice = null;
       areas.clear();
       weather.clear();
+      access.clear();
       map.showZfe([]);
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
     } finally {

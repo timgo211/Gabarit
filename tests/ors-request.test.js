@@ -21,7 +21,7 @@ test('requête construite depuis un profil', () => {
   assert.equal(req.url, 'https://api.heigit.org/openrouteservice/v2/directions/driving-hgv/geojson');
   assert.equal(req.method, 'POST');
   assert.deepEqual(req.body.coordinates, [start, end]);
-  assert.deepEqual(req.body.extra_info, ['tollways', 'countryinfo']);
+  assert.deepEqual(req.body.extra_info, ['tollways', 'countryinfo', 'roadaccessrestrictions']);
   assert.equal(req.body.language, 'fr');
   assert.equal(req.body.units, 'm');
   assert.equal(req.body.maximum_speed, 90);
