@@ -10,7 +10,7 @@
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
 import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
-import { planMove, frameAt } from '../lib/nav-anim.js';
+import { planMove, frameAt, holdStill } from '../lib/nav-anim.js';
 import { haversine } from '../lib/nav-geo.js';
 import { overviewPadding } from '../lib/navigation.js';
 
@@ -554,10 +554,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       const now = performance.now();
       const cur = anim ? frameAt(anim.move, (now - anim.start) / (anim.move.duration || 1)) : lastNav;
       const target = { lonlat, bearing, zoom, pitch };
+      // À l'arrêt, GPS qui dérive : rien ne bouge, aucune image (ni carte ni repères des aires).
+      if (holdStill(lastNav, { follow, padding }, lastNav ? haversine(lastNav.lonlat, lonlat) : NaN, speedKmh)) return;
       // À l'arrêt (< 3 km/h) ou sans changement : une seule image, puis plus aucun rendu jusqu'à la position suivante.
       const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, lonlat) : NaN,
         { speedKmh });
-      lastNav = { ...target, at: now };
+      lastNav = { ...target, at: now, follow: !!follow, padding };
       if (follow && map) map.stop(); // fin d'une vue d'ensemble animée
       anim = { move, start: now, follow: !!follow, padding };
       if (animFrame === null) animFrame = requestAnimationFrame(tick);

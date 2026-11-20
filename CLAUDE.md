@@ -42,7 +42,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - `areas.js` (aires du trajet : copie `data/aires-osm/`, Overpass hors copie, liste, repères HTML sur la carte, fiche et
     « Mon avis »)
   - `weather.js` (une requête Open-Meteo par calcul, copie sur l'appareil, « Météo indisponible »)
-  - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
+  - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation ;
+    à l'arrêt < 3 km/h, dérive < 100 m, même suivi et mêmes marges : aucune image, `holdStill` — sinon MapLibre
+    remet à jour chaque repère d'aire à chaque position : 144 images pour 8 positions en v20),
     vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
@@ -86,7 +88,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v20 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v21 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
@@ -168,7 +170,9 @@ rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
   25 m à gauche du tracé : gardée en gris « autre sens ? », hors des « Prochaines aires » et sans annonce (on roule à
   droite, R412-9) ; parking PL : des deux sens. Doublons OSM / officiel fusionnés à 300 m (places, prix, sécurité
   officiels). Guidage : `view.nextAreas` (3, une aire dépassée de moins de 500 m reste), annonce une fois sous 10 km
-  (pas sous 2 km) si `settings.areaVoice` ; encart ouvert / fermé d'un appui, ligne = fiche ; « Mon avis » (Plein,
+  (pas sous 2 km) si `settings.areaVoice` ; encart ouvert / fermé d'un appui, ligne = fiche,
+  reconstruite seulement si ses textes changent (distance arrondie à 50 m sous 1 km) et, à l'arrêt, figée avec les
+  mêmes aires (une fois par minute, `nextAreasChanged`) ; « Mon avis » (Plein,
   Quelques places, OK) sous 10 km/h en guidage (`canReport`), `data.areaReports` exporté, retrouvé par identifiant
   ou à 150 m. Jeu officiel : Bison Futé, Licence Ouverte ; tableurs non lisibles par le navigateur → Action ;
   titres cherchés dans les 5 premières lignes, en français ou en anglais (xlsx concédé 2025 : ligne 1 date + titres

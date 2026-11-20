@@ -22,7 +22,7 @@ import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
   setNavigationAreas, setNavigationWind, setNavigationTunnels, markStopAsWork, mapButtonSize, NAV,
 } from '../lib/navigation.js';
-import { describeNextArea } from '../lib/areas-route.js';
+import { describeNextArea, nextAreasChanged } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
@@ -214,12 +214,20 @@ export function createNavigation(ctx) {
     if (!s?.areasOpen) return;
     const next = view?.nextAreas ?? [];
     const now = new Date();
-    const rows = next.map((n) => {
-      const d = describeNextArea(n, now);
+    const texts = next.map((n) => ({ id: n.id, d: describeNextArea(n, now) }));
+    // Mêmes textes, ou arrêté avec les mêmes aires : rien à redessiner (src/lib/areas-route.js).
+    const shown = {
+      key: JSON.stringify([s.areasCount, texts.map(({ id, d }) => [id, d.name, d.distance, d.eta, d.places])]),
+      ids: JSON.stringify([s.areasCount, texts.map(({ id }) => id)]),
+      at: now.getTime(),
+    };
+    if (!nextAreasChanged(s.areasShown, shown, view?.speedKmh, shown.at)) return;
+    s.areasShown = shown;
+    const rows = texts.map(({ id, d }) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'nav-area';
-      b.dataset.id = n.id;
+      b.dataset.id = id;
       const name = document.createElement('span');
       name.className = 'nav-area-name';
       name.textContent = d.name;
@@ -284,7 +292,7 @@ export function createNavigation(ctx) {
     ui.rule.hidden = !rules.length;
     renderDriving(view.driving);
 
-    ui.road.textContent = view.roadName ?? '';
+    if (ui.road.textContent !== (view.roadName ?? '')) ui.road.textContent = view.roadName ?? '';
     ui.road.hidden = !view.roadName;
     renderAreas(view);
     layoutFoot();
@@ -474,7 +482,7 @@ export function createNavigation(ctx) {
         driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice,
       }),
       drivingSavedAt: now,
-      areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0,
+      areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0, areasShown: null,
       params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
       layer: GUIDANCE_START_LAYER, layerMessage: '',
       sim: simulate ? createSimulator(route.coordinates, { speedKmh: simulate.speedKmh }) : null,
@@ -573,6 +581,7 @@ export function createNavigation(ctx) {
   ui.areasBtn.addEventListener('click', () => {
     if (!s) return;
     s.areasOpen = !s.areasOpen;
+    s.areasShown = null; // encart ouvert : lignes à jour
     renderAreas(s.view);
     layoutFoot();
     if (s.view && s.follow) render(s.view); // caméra recadrée au-dessus de l'encart

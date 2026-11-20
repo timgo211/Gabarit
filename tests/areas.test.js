@@ -12,7 +12,7 @@ import {
 } from '../src/lib/areas-official.js';
 import {
   mergeAreas, placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, describeArea, describeNextArea, placesText,
-  sourcesText, AREAS,
+  sourcesText, AREAS, nextAreasChanged, NEXT_AREAS_VIEW,
 } from '../src/lib/areas-route.js';
 import {
   addAreaReport, latestReport, reportText, canReport, sanitizeAreaReports, AVIS_RULES,
@@ -476,4 +476,23 @@ test('constantes : rayons demandés (400 m / 800 m), 3 prochaines aires, annonce
   assert.equal(AREAS.NEXT_COUNT, 3);
   assert.equal(AREAS.ANNOUNCE_M, 10000);
   assert.ok(haversine([0, 0], [0, 0]) === 0);
+});
+
+test('encart « Prochaines aires » : distance arrondie à 50 m, rien de redessiné à l\'arrêt avec les mêmes aires', () => {
+  const d = (m) => describeNextArea({ name: 'X', distance: m, eta: 60, hgvPlaces: null }).distance;
+  assert.equal(d(188), '200 m');
+  assert.equal(d(221), '200 m', 'GPS qui dérive de 30 m : même texte');
+  assert.equal(d(278), '300 m');
+  assert.equal(d(980), '1,0 km');
+  assert.equal(d(2560), '2,6 km');
+  assert.equal(d(30), 'Ici');
+  const drawn = { key: 'a|200 m', ids: 'a', at: 0 };
+  assert.equal(nextAreasChanged(null, { key: 'a|200 m', ids: 'a' }, 0, 0), true, 'premier affichage');
+  assert.equal(nextAreasChanged(drawn, { key: 'a|200 m', ids: 'a' }, 80, 1000), false, 'textes identiques');
+  assert.equal(nextAreasChanged(drawn, { key: 'a|250 m', ids: 'a' }, 80, 1000), true, 'en roulant : distance à jour');
+  assert.equal(nextAreasChanged(drawn, { key: 'a|250 m', ids: 'a' }, 0, 1000), false, 'arrêté : figé');
+  assert.equal(nextAreasChanged(drawn, { key: 'a|250 m', ids: 'a' }, 2.9, NEXT_AREAS_VIEW.STILL_REFRESH_MS - 1), false);
+  assert.equal(nextAreasChanged(drawn, { key: 'a|250 m', ids: 'a' }, 0, NEXT_AREAS_VIEW.STILL_REFRESH_MS), true, 'une fois par minute (heure d\'arrivée)');
+  assert.equal(nextAreasChanged(drawn, { key: 'b|200 m', ids: 'b' }, 0, 1000), true, 'autres aires : redessiné même à l\'arrêt');
+  assert.equal(nextAreasChanged(drawn, { key: 'a|250 m', ids: 'a' }, null, 1000), true, 'vitesse inconnue');
 });
