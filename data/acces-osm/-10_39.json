@@ -1,0 +1,1 @@
+{"t":[{"motor_vehicle":"no","motor_vehicle:conditional":"delivery @ (weight< 5); destination @ (Mo-Fr 08:00-17:00)"},{"motor_vehicle:conditional":"delivery @ 7:00-10:00","oneway":"yes"}],"n":["Rua 1º Sargento Peixoto","Rua Herois da Grande Guerra"],"w":[[103150669,0,0,-913865,3940426,-9,-35,7,-19,8,-8,36,-13],[421295424,1,1,-913493,3940583,-16,-50]]}
