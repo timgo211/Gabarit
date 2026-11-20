@@ -160,9 +160,9 @@ export function knownTubesFromMap(json, nameRe) {
 
 /** Repères de recoupement pour les trois tunnels gardés en dur (point proche du milieu, d'après la carte). */
 export const KNOWN_PROBES = Object.freeze([
-  { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605], search: 'Tunnel de Fourvière, Lyon' },
-  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135], search: 'Tunnel routier du Fréjus' },
-  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858], search: 'Tunnel du Mont-Blanc' },
+  { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605], search: ['Tunnel de Fourvière', 'Tunnel sous Fourvière', 'Fourvière tunnel Lyon'] },
+  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135], search: ['Tunnel routier du Fréjus'] },
+  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858], search: ['Tunnel du Mont-Blanc'] },
 ].map((p) => Object.freeze(p)));
 
 export { KNOWN_TUNNELS };

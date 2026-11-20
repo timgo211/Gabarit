@@ -87,21 +87,33 @@ async function known() {
     try {
       const found = new Map();
       // Recherche par nom (Nominatim, une requête par seconde au plus), puis chaque voie trouvée avec ses nœuds.
-      try {
-        const hits = await getJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&q=${encodeURIComponent(probe.search)}`);
-        for (const h of Array.isArray(hits) ? hits : []) {
-          if (h.osm_type !== 'way') continue;
+      for (const q of probe.search) {
+        try {
           await sleep(1500);
-          for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`), probe.name)) found.set(t.id, t);
+          const hits = await getJson(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=10&q=${encodeURIComponent(q)}`);
+          console.log(`  Nominatim « ${q} » : ${(Array.isArray(hits) ? hits : []).map((h) => `${h.osm_type} ${h.osm_id} (${h.category}/${h.type})`).join(', ') || 'aucun résultat'}`);
+          for (const h of Array.isArray(hits) ? hits : []) {
+            if (h.osm_type !== 'way') continue;
+            await sleep(1500);
+            for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`), probe.name)) found.set(t.id, t);
+          }
+        } catch (err) {
+          console.log(`⚠ recherche ${probe.label} : ${err.message}`);
         }
-      } catch (err) {
-        console.log(`⚠ recherche ${probe.label} : ${err.message}`);
       }
-      // Emprise autour du tunnel (refusée si la zone a trop de nœuds, en ville).
-      try {
-        for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${w},${s},${e},${n}`), probe.name)) found.set(t.id, t);
-      } catch (err) {
-        console.log(`⚠ emprise ${probe.label} : ${err.message}`);
+      // Emprise autour du tunnel ; refusée en ville (trop de nœuds) : découpée en quatre, deux fois au plus.
+      const boxes = [[w, s, e, n, 0]];
+      while (boxes.length) {
+        const [bw, bs, be, bn, depth] = boxes.shift();
+        try {
+          await sleep(1000);
+          for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/map.json?bbox=${bw},${bs},${be},${bn}`), probe.name)) found.set(t.id, t);
+        } catch (err) {
+          if (depth < 2) {
+            const mx = (bw + be) / 2; const my = (bs + bn) / 2;
+            boxes.push([bw, bs, mx, my, depth + 1], [mx, bs, be, my, depth + 1], [bw, my, mx, bn, depth + 1], [mx, my, be, bn, depth + 1]);
+          } else console.log(`⚠ emprise ${probe.label} ${[bw, bs, be, bn].map((x) => x.toFixed(4)).join(',')} : ${err.message}`);
+        }
       }
       const tubes = [...found.values()];
       console.log(`Recoupement OSM (API) — ${probe.label} (Bison Futé : ${probe.cat}) : ${tubes.length ? '' : 'aucun tube trouvé'}`);
