@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import { deflateSync, crc32 } from 'node:zlib';
 
 import { emptyDriving, trackDriving } from '../src/lib/driving-time.js';
+import { buildCoverage, convertAreas, parsePoly } from '../src/lib/areas-osm-data.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -105,7 +106,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
-  slowTiles = false,
+  slowTiles = false, osmCopy = 'fixture',
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -124,7 +125,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0 };
+  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [] };
   if (driving) await ctx.addInitScript((d) => { if (!sessionStorage.getItem('ui-check-init')) localStorage.setItem('gabarit.driving', d); }, JSON.stringify(driving));
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -201,6 +202,15 @@ async function open(browser, base, {
   if (tunnels !== undefined) {
     await ctx.route(/\/data\/tunnels-adr\.json$/, (route) => (tunnels ? route.fulfill({ json: tunnels }) : route.fulfill({ status: 404, body: '' })));
   }
+  // Phase 9b : copie data/aires-osm/ (null : absente, 404). 'fixture' : aires de tests/fixtures/overpass-aires.json,
+  // zone couverte autour du trajet ; 'uncovered' : mêmes cases, zone couverte loin du trajet (Overpass demandé).
+  const copy = osmCopyFiles(osmCopy);
+  await ctx.route(/\/data\/aires-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.copy.push(name);
+    const json = copy?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -208,6 +218,15 @@ async function open(browser, base, {
   await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
   await page.waitForTimeout(800);
   return { page, ctx, stats, errors };
+}
+
+/** Fichiers de la copie des aires simulée (nom → JSON), d'après les fonctions de l'Action. */
+function osmCopyFiles(kind) {
+  if (!kind) return null;
+  const box = kind === 'uncovered' ? [20, 55, 22, 57] : [-5, 42, 8.3, 51.2];
+  const poly = parsePoly(`zone\n1\n   ${box[0]} ${box[1]}\n   ${box[2]} ${box[1]}\n   ${box[2]} ${box[3]}\n   ${box[0]} ${box[3]}\nEND\nEND\n`);
+  const { index, tiles } = convertAreas(fixture('overpass-aires.json').elements, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
 }
 
 async function computeRoute(page) {
@@ -773,15 +792,18 @@ async function pressThenTypeCheck(browser, base) {
 
 // ───────── Phase 9 : aires et parkings PL ─────────
 
-/** Liste, repères, fiche + « Mon avis », secours Overpass, cache, encart en guidage avec un GPS émulé comme le vrai. */
+/**
+ * Liste, repères, fiche + « Mon avis », encart en guidage avec un GPS émulé comme le vrai : aires lues dans la copie
+ * data/aires-osm/ sans Overpass (phase 9b). Puis trajet hors de la zone couverte (Overpass, serveur de secours,
+ * cache), deux serveurs en échec, copie absente.
+ */
 async function areasCheck(browser, base) {
   for (const [width, height] of [[360, 760], [1280, 800]]) {
     const nav = fixture('ors-directions-nav.json');
     const line = nav.features[0].geometry.coordinates;
     const { page, ctx, stats, errors } = await open(browser, base, {
       width, height, directions: () => nav, official: fixture('aires-pl.json'),
-      // Premier serveur en échec : le serveur de secours répond.
-      overpass: (url) => (url.includes('overpass-api.de') ? null : fixture('overpass-aires.json')),
+      overpass: () => fixture('overpass-aires.json'),
     });
     await computeRoute(page);
     await page.waitForSelector('#areas-list li', { timeout: 10000 });
@@ -791,8 +813,10 @@ async function areasCheck(browser, base) {
       `${width} px : aire de l'autre côté en gris « autre sens ? »`);
     check(rows[0].text.includes('km 1') && rows[0].text.includes('40 places PL') && /\d\d:\d\d/.test(rows[0].text),
       `${width} px : km, heure d'arrivée et places PL`, rows[0].text);
-    check(stats.overpass.length === 2 && stats.overpass[0] === 'overpass-api.de' && stats.overpass[1] !== 'overpass-api.de',
-      `${width} px : une requête Overpass, serveur de secours après un échec`, stats.overpass.join(' → '));
+    check(stats.overpass.length === 0 && stats.copy.includes('index.json') && stats.copy.length >= 2,
+      `${width} px : aires lues dans la copie, aucune requête Overpass`, `${stats.overpass.length} requêtes ; ${stats.copy.join(', ')}`);
+    check((await page.textContent('.areas-credit')).includes('ODbL, copie du 01/12/2026'), `${width} px : date de la copie dans la note de source`,
+      await page.textContent('.areas-credit'));
     const markers = await page.$$eval('.area-marker', (n) => n.map((m) => m.classList.contains('other-side')));
     check(markers.length === 5 && markers.filter(Boolean).length === 1, `${width} px : repères des aires sur la carte`,
       `${markers.length} repères`);
@@ -805,6 +829,8 @@ async function areasCheck(browser, base) {
     await page.waitForSelector('#dlg-area[open]');
     check((await page.textContent('#area-title')) === 'Aire PL de Test-Est', `${width} px : toucher un repère ouvre sa fiche`,
       await page.textContent('#area-title'));
+    check((await page.textContent('#area-sources')).includes('copie du 01/12/2026'), `${width} px : fiche, date de la copie OSM`,
+      await page.textContent('#area-sources'));
     check(await page.isEnabled('[data-avis="full"]'), `${width} px : « Mon avis » possible à l'arrêt`);
     await noHorizontalScroll(page, `${width} px fiche d'une aire`);
     await page.screenshot({ path: join(SHOTS, `${width}-aire-fiche.png`) });
@@ -814,12 +840,11 @@ async function areasCheck(browser, base) {
     check((await page.textContent('#areas-list')).includes('Plein à l\'instant'), `${width} px : avis affiché dans la liste`);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).areaReports?.length ?? 0);
     check(saved === 1, `${width} px : avis gardé sur l'appareil (données exportées)`, `${saved}`);
-    check(await page.evaluate(() => !!localStorage.getItem('gabarit.areasCache')), `${width} px : aires gardées sur l'appareil`);
 
-    // Même trajet recalculé : aires reprises sur l'appareil, aucune requête Overpass.
+    // Même trajet recalculé : mêmes aires, aucune requête Overpass.
     await page.click('#btn-route');
     await page.waitForTimeout(1500);
-    check(stats.overpass.length === 2 && (await page.$$('#areas-list li')).length === 5,
+    check(stats.overpass.length === 0 && (await page.$$('#areas-list li')).length === 5,
       `${width} px : même trajet recalculé sans requête Overpass`, `${stats.overpass.length} requêtes`);
 
     // Guidage avec le GPS émulé (une position par seconde, vitesse fournie).
@@ -869,14 +894,50 @@ async function areasCheck(browser, base) {
     check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
   }
-  // Les deux serveurs Overpass en échec : « Aires indisponibles », itinéraire utilisable.
   const nav = fixture('ors-directions-nav.json');
-  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav, overpass: () => null });
-  await computeRoute(page);
-  await page.waitForFunction(() => /indisponibles/.test(document.querySelector('#areas-status')?.textContent ?? ''), null, { timeout: 10000 });
-  check(stats.overpass.length === 2 && await page.isVisible('#btn-nav-start'),
-    'deux serveurs en échec : « Aires indisponibles », itinéraire utilisable', await page.textContent('#areas-status'));
-  await ctx.close();
+  // Trajet hors de la zone couverte : une requête Overpass, serveur de secours après un échec, résultat gardé.
+  {
+    const { page, ctx, stats, errors } = await open(browser, base, {
+      width: 360, height: 760, directions: () => nav, official: fixture('aires-pl.json'), osmCopy: 'uncovered',
+      overpass: (url) => (url.includes('overpass-api.de') ? null : fixture('overpass-aires.json')),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('#areas-list li', { timeout: 10000 });
+    check((await page.$$('#areas-list li')).length === 5, 'hors zone couverte : aires trouvées par Overpass');
+    check(stats.overpass.length === 2 && stats.overpass[0] === 'overpass-api.de' && stats.overpass[1] !== 'overpass-api.de',
+      'hors zone couverte : une requête Overpass, serveur de secours après un échec', stats.overpass.join(' → '));
+    check(await page.evaluate(() => !!localStorage.getItem('gabarit.areasCache')), 'hors zone couverte : aires gardées sur l\'appareil');
+    await page.click('#btn-route');
+    await page.waitForTimeout(1500);
+    check(stats.overpass.length === 2 && (await page.$$('#areas-list li')).length === 5,
+      'hors zone couverte : même trajet recalculé sans requête Overpass', `${stats.overpass.length} requêtes`);
+    check(errors.length === 0, 'hors zone couverte : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+  // Les deux serveurs Overpass en échec : « Aires indisponibles », itinéraire utilisable.
+  {
+    const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav, overpass: () => null, osmCopy: 'uncovered' });
+    await computeRoute(page);
+    await page.waitForFunction(() => /indisponibles/.test(document.querySelector('#areas-status')?.textContent ?? ''), null, { timeout: 10000 });
+    check(stats.overpass.length === 2 && await page.isVisible('#btn-nav-start'),
+      'deux serveurs en échec : « Aires indisponibles », itinéraire utilisable', await page.textContent('#areas-status'));
+    await ctx.close();
+  }
+  // Copie absente : message clair, aucune requête Overpass, aires officielles gardées, itinéraire utilisable.
+  {
+    const { page, ctx, stats } = await open(browser, base, {
+      width: 360, height: 760, directions: () => nav, official: fixture('aires-pl.json'), osmCopy: null, overpass: () => fixture('overpass-aires.json'),
+    });
+    await computeRoute(page);
+    await page.waitForFunction(() => /données non chargées/.test(document.querySelector('#areas-status')?.textContent ?? ''), null, { timeout: 10000 });
+    const text = await page.textContent('#areas-status');
+    check(text.startsWith('Aires indisponibles sur ce trajet (données non chargées).') && stats.overpass.length === 0
+      && await page.isVisible('#btn-nav-start'), 'copie absente : « Aires indisponibles sur ce trajet (données non chargées) »', text);
+    await noHorizontalScroll(page, '360 px copie des aires absente');
+    await page.locator('#areas').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, '360-aires-copie-absente.png') });
+    await ctx.close();
+  }
 }
 
 /** Recouvrements entre boutons de carte, bandeau, encart des aires, nom de la route et barre du bas du guidage. */

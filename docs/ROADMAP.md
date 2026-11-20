@@ -197,7 +197,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     `hazmat:adr_tunnel_cat` : phrase dans les notes (« l'itinéraire peut être plus long que nécessaire »).
     Tunnels : pas d'Overpass (mesuré le 20/11/2026 sur 520 km, A6 + A43 : aires seules, tunnels seuls ou les deux
     dépassent 26 s, ou serveur plein ; l'Action elle-même a échoué trois fois) ; copie hebdomadaire
-    `data/tunnels-adr.json` par l'Action « Tunnels ADR » depuis les extraits par pays de Geofabrik filtrés par osmium
+    `data/tunnels-adr.json` par l'Action « Tunnels ADR » (devenue « Données OSM », phase 9b) depuis les extraits par pays de Geofabrik filtrés par osmium
     (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
     catégorie = plus haute lettre marquée « no », ADR 8.6.4 : un code interdit sa catégorie et les suivantes), lue
     seulement pour un chargement ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
