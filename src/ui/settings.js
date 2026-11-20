@@ -3,6 +3,7 @@
 // prix du gazole, export/import des données, simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
+import { VERSION_REQUEST, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
 import { exportData, importData, parseDieselPrice } from '../lib/store.js';
 import { formatPricePerLiter } from '../lib/format.js';
@@ -118,7 +119,28 @@ export function createSettings(ctx) {
     setStatus(windStatus, '');
     setStatus(drivingStatus, '');
     syncChoices(ctx.getData().settings);
+    showVersion();
     dlg.showModal();
+  }
+
+  // Version du service worker qui contrôle la page (celle qui tourne), demandée à chaque ouverture.
+  function showVersion() {
+    const line = $('#app-version');
+    line.textContent = versionLabel(null);
+    const sw = navigator.serviceWorker?.controller;
+    if (!sw) return;
+    const channel = new MessageChannel();
+    const timer = setTimeout(() => channel.port1.close(), 2000);
+    channel.port1.onmessage = (e) => {
+      clearTimeout(timer);
+      line.textContent = versionLabel(e.data);
+      channel.port1.close();
+    };
+    try {
+      sw.postMessage({ type: VERSION_REQUEST }, [channel.port2]);
+    } catch {
+      clearTimeout(timer);
+    }
   }
 
   $('#btn-settings').addEventListener('click', open);

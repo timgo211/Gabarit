@@ -467,7 +467,29 @@ async function comfortCheck(browser, base) {
     const music = await page.textContent('#voice-music');
     check(/Musique/.test(music ?? ''), `${width} px : phrase sur la musique`, music?.slice(0, 50));
     await noHorizontalScroll(page, `${width} px Réglages`);
+    // Version en bas de Réglages : sans service worker actif (bloqué ici) → « version inconnue ».
+    const ver = await page.evaluate(() => {
+      const line = document.querySelector('#app-version');
+      const body = line.closest('.dialog-body');
+      const b = line.getBoundingClientRect(); const d = body.getBoundingClientRect();
+      return { text: line.textContent, last: body.lastElementChild === line, inside: b.left >= d.left && b.right <= d.right,
+        small: parseFloat(getComputedStyle(line).fontSize) < parseFloat(getComputedStyle(document.body).fontSize) };
+    });
+    check(ver.text === 'version inconnue' && ver.last && ver.inside && ver.small,
+      `${width} px : « version inconnue » en petit tout en bas de Réglages (pas de service worker)`, JSON.stringify(ver));
     await page.screenshot({ path: join(SHOTS, `${width}-reglages.png`), fullPage: true });
+    await page.click('#dlg-settings [data-close]');
+    // Service worker actif qui répond (faux contrôleur, même message que sw.js) → « Gabarit vN ».
+    const swVersion = readFileSync(join(ROOT, 'sw.js'), 'utf8').match(/const VERSION = '([^']+)';/)[1];
+    await page.evaluate((v) => {
+      const controller = { postMessage: (m, [port]) => { if (m.type === 'GET_VERSION') port.postMessage({ type: 'VERSION', version: v }); } };
+      Object.defineProperty(navigator.serviceWorker, 'controller', { configurable: true, get: () => controller });
+    }, swVersion);
+    await page.click('#btn-settings');
+    await page.waitForTimeout(200);
+    const verOk = await page.textContent('#app-version');
+    check(verOk === `Gabarit ${swVersion}`, `${width} px : version du service worker actif affichée`, verOk);
+    await noHorizontalScroll(page, `${width} px Réglages avec version`);
     await page.click('#dlg-settings [data-close]');
     // Partager Gabarit : guide pas à pas.
     await page.click('#btn-share');
