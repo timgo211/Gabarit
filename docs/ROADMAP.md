@@ -193,9 +193,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     ORS ne reçoit que `hazmat` (oui / non) ; d'après son code source (HazmatAccessParser, HeavyVehicleEdgeFilter), il
     évite alors toute voie `hazmat=no` ou `hazmat:B…E=no`, quelle que soit la lettre, et ne lit pas
     `hazmat:adr_tunnel_cat` : phrase dans les notes (« l'itinéraire peut être plus long que nécessaire »).
-    Tunnels : pas de requête Overpass en direct (mesurée le 20/11/2026 sur 520 km, A6 + A43 : aires seules, tunnels
-    seuls ou les deux dépassent 26 s, ou serveur plein) ; copie hebdomadaire `data/tunnels-adr.json` par l'Action
-    « Tunnels ADR » (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
+    Tunnels : pas d'Overpass (mesuré le 20/11/2026 sur 520 km, A6 + A43 : aires seules, tunnels seuls ou les deux
+    dépassent 26 s, ou serveur plein ; l'Action elle-même a échoué trois fois) ; copie hebdomadaire
+    `data/tunnels-adr.json` par l'Action « Tunnels ADR » depuis les extraits par pays de Geofabrik filtrés par osmium
+    (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
     catégorie = plus haute lettre marquée « no », ADR 8.6.4 : un code interdit sa catégorie et les suivantes), lue
     seulement pour un véhicule ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
     Futé, « Interdictions dans les principaux tunnels »), recoupés avec OSM dans le journal de l'Action. Fiche :
@@ -209,8 +210,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [ ] **Phase 9b — Aires PL sur les longs trajets** (avant la 5c)
     La requête Overpass des aires échoue au-delà d'environ 500 km (mesure du 20/11/2026 : 26 s dépassées ou serveur
     plein). Copier les aires et parkings PL d'OpenStreetMap (France et pays voisins) chaque semaine dans `data/`
-    comme les tunnels ADR, placés sur l'appareil sans requête ; Overpass en direct gardé seulement hors de la zone
-    copiée, sur un tracé court.
+    comme les tunnels ADR (extraits Geofabrik + osmium), placés sur l'appareil sans requête ; Overpass en direct
+    gardé seulement hors de la zone copiée, sur un tracé court.
   - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
     Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
     pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
@@ -222,7 +223,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
     livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
     `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
-    Données sans Overpass en direct : copie hebdomadaire par une Action (comme `data/tunnels-adr.json`) des voies PL
+    Données sans Overpass : copie hebdomadaire par une Action (comme `data/tunnels-adr.json` : extraits Geofabrik
+    par pays filtrés par osmium) des voies PL
     conditionnelles d'OpenStreetMap (`hgv:conditional`, `maxweight:conditional`, `access:conditional`,
     `hgv=destination` / `delivery`) en France et pays voisins, découpée en cases de 1° (un fichier par case, lu
     seulement pour les cases touchées par le tracé), avant de vérifier ce qu'ORS en fait.

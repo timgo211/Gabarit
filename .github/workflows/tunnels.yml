@@ -1,7 +1,7 @@
 name: Tunnels ADR (OpenStreetMap)
 
 # Copie hebdomadaire des tunnels signalés aux matières dangereuses (OpenStreetMap, licence ODbL) dans
-# data/tunnels-adr.json (voir src/lib/tunnels-convert.js). Lancée aussi à la main (onglet Actions › Tunnels ADR ›
+# data/tunnels-adr.json (voir src/lib/tunnels-convert.js) : extraits par pays de Geofabrik filtrés par osmium. Lancée aussi à la main (onglet Actions › Tunnels ADR ›
 # Run workflow, une fois le fichier sur main) et à chaque envoi qui modifie l'outil de copie, sur n'importe quelle
 # branche : le premier fichier est ainsi créé sur la branche de la phase 5b, avant la fusion.
 
@@ -38,13 +38,15 @@ jobs:
 
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-      - name: Interroger Overpass et convertir
+      - name: Installer osmium
+        run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
+      - name: Télécharger les extraits, filtrer et convertir
         run: node tools/tunnels-update.mjs
       - name: Enregistrer si changé
         run: |

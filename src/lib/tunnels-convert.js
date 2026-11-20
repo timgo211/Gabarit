@@ -1,9 +1,11 @@
-// Tunnels signalés aux matières dangereuses (phase 5b) : requête Overpass de l'Action hebdomadaire et conversion de
-// la réponse en data/tunnels-adr.json. Logique pure (testée sous Node) ; le réseau est dans tools/tunnels-update.mjs.
+// Tunnels signalés aux matières dangereuses (phase 5b) : conversion des voies OpenStreetMap (extraits Geofabrik filtrés
+// par osmium dans l'Action hebdomadaire) en data/tunnels-adr.json. Logique pure (testée sous Node) ; téléchargements
+// et osmium dans tools/tunnels-update.mjs.
 //
-// Pas de requête Overpass en direct depuis l'appli pour les tunnels : mesurée le 20/11/2026 sur un trajet de 520 km
-// (A6 + A43), la requête « aires + tunnels » comme « tunnels seuls » dépassait 26 s (ou serveur plein, 502). Une copie
-// hebdomadaire, lue sur l'appareil, ne dépend plus de la charge des serveurs.
+// Pas d'Overpass, ni dans l'appli ni dans l'Action : mesuré le 20/11/2026, la requête « aires + tunnels » comme
+// « tunnels seuls » dépassait 26 s sur 520 km (A6 + A43), et l'Action a échoué trois fois (serveurs publics pleins,
+// 502 / 504, même sur des cases de 1,25° sans aucune voie). Les extraits par pays de Geofabrik ne dépendent pas de
+// la charge d'un serveur de requêtes.
 // Données © contributeurs OpenStreetMap, licence ODbL (attribution dans la note de source des fiches).
 
 import { categoryFromTags, KNOWN_TUNNELS, checkPoints } from './adr.js';
@@ -11,60 +13,54 @@ import { simplifyLine } from './areas-osm.js';
 import { haversine } from './nav-geo.js';
 
 export const TUNNELS_CONVERT = Object.freeze({
-  /** France et pays voisins (Espagne, Portugal, Italie, Suisse, Autriche, Allemagne, Benelux) [sud, ouest, nord, est]. */
-  BBOX: Object.freeze([35.9, -9.6, 55.1, 17.2]),
-  /** Clés lues (wiki OSM « Key:hazmat ») : une requête par clé, toutes réunies. */
-  KEYS: Object.freeze(['hazmat', 'hazmat:B', 'hazmat:C', 'hazmat:D', 'hazmat:E', 'hazmat:adr_tunnel_cat', 'hazmat:tunnel_cat']),
-  SERVER_TIMEOUT_S: 180,
-  /** Zone découpée en cases de 5° (petites requêtes : le 20/11/2026, la zone entière dépassait 300 s). */
-  TILE_DEG: 5,
   /**
-   * Serveurs de l'Action (dans l'ordre) : ceux de l'appli, puis deux serveurs publics de plus (wiki OSM « Overpass
-   * API », instances publiques).
+   * Extraits OpenStreetMap par pays de Geofabrik (download.geofabrik.de, refaits chaque jour, licence ODbL) : France
+   * et pays voisins. L'Action télécharge chaque fichier .osm.pbf, garde les voies portant une étiquette hazmat
+   * (osmium tags-filter), les exporte en GeoJSON (osmium export), puis efface le fichier avant le pays suivant.
    */
-  ENDPOINTS: Object.freeze([
-    'https://overpass-api.de/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
-    'https://overpass.kumi.systems/api/interpreter',
-    'https://overpass.private.coffee/api/interpreter',
+  GEOFABRIK: Object.freeze([
+    'europe/france', 'europe/belgium', 'europe/luxembourg', 'europe/netherlands', 'europe/germany',
+    'europe/switzerland', 'europe/liechtenstein', 'europe/austria', 'europe/italy', 'europe/monaco',
+    'europe/andorra', 'europe/spain', 'europe/portugal',
   ]),
-  /** Case en échec sur tous les serveurs : découpée en 4 (jusqu'à 1,25°), chaque morceau redemandé. */
-  MIN_TILE_DEG: 1.25,
+  /** Clés lues (wiki OSM « Key:hazmat »). */
+  KEYS: Object.freeze(['hazmat', 'hazmat:B', 'hazmat:C', 'hazmat:D', 'hazmat:E', 'hazmat:adr_tunnel_cat', 'hazmat:tunnel_cat']),
+  /** Tube simplifié à 10 m près, 12 points au plus. */
+  TOLERANCE_M: 10,
+  MAX_POINTS: 12,
   /**
-   * Recoupement des tunnels gardés en dur : API principale d'OpenStreetMap (/api/0.6/map, emprise ≤ 0,25 degré²),
-   * sans Overpass. [ouest, sud, est, nord] autour de chaque tunnel.
+   * Recoupement des tunnels gardés en dur : API principale d'OpenStreetMap (/api/0.6/map, emprise ≤ 0,25 degré²) et
+   * Nominatim. [ouest, sud, est, nord] autour de chaque tunnel.
    */
   KNOWN_BBOX: Object.freeze({
     'known:fourviere': Object.freeze([4.800, 45.750, 4.826, 45.774]),
     'known:frejus': Object.freeze([6.655, 45.075, 6.715, 45.195]),
     'known:montblanc': Object.freeze([6.840, 45.805, 6.970, 45.910]),
   }),
-  /** Tube simplifié à 10 m près, 12 points au plus. */
-  TOLERANCE_M: 10,
-  MAX_POINTS: 12,
 });
 
-/** Requête Overpass QL pour une case [sud, ouest, nord, est] : voies en tunnel portant une étiquette hazmat, tracé compris. */
-/** Une case [sud, ouest, nord, est] coupée en quatre. */
-export function splitTile([s, w, n, e]) {
-  const my = Math.round(((s + n) / 2) * 1000) / 1000;
-  const mx = Math.round(((w + e) / 2) * 1000) / 1000;
-  return [[s, w, my, mx], [s, mx, my, e], [my, w, n, mx], [my, mx, n, e]];
+/** Filtre osmium tags-filter : voies portant l'une des clés hazmat. */
+export function osmiumFilter() {
+  return TUNNELS_CONVERT.KEYS.map((k) => `w/${k}`);
 }
 
-/** Cases de TILE_DEG degrés qui couvrent la zone [sud, ouest, nord, est]. */
-export function tiles(bbox = TUNNELS_CONVERT.BBOX, step = TUNNELS_CONVERT.TILE_DEG) {
-  const [s, w, n, e] = bbox;
+/**
+ * Lignes GeoJSON (osmium export -f geojsonseq --add-unique-id=type_id) → voies en tunnel au format d'une réponse
+ * Overpass « out tags geom » ({ type:'way', id, tags, geometry:[{ lon, lat }] }), pour convertTunnels.
+ */
+export function elementsFromGeojsonSeq(text) {
   const out = [];
-  for (let y = s; y < n; y += step) {
-    for (let x = w; x < e; x += step) out.push([y, x, Math.min(n, y + step), Math.min(e, x + step)].map((v) => Math.round(v * 100) / 100));
+  for (const raw of String(text ?? '').split('\n')) {
+    const line = raw.replace(/^\u001e/, '').trim(); // geojsonseq : séparateur RS (RFC 8142) en tête de ligne
+    if (!line) continue;
+    let f;
+    try { f = JSON.parse(line); } catch { continue; }
+    const m = /^w(\d+)$/.exec(String(f?.id ?? ''));
+    const tags = { ...(f?.properties ?? {}) };
+    if (!m || f?.geometry?.type !== 'LineString' || !tags.highway || !tags.tunnel || tags.tunnel === 'no') continue;
+    out.push({ type: 'way', id: Number(m[1]), tags, geometry: f.geometry.coordinates.map(([lon, lat]) => ({ lon, lat })) });
   }
   return out;
-}
-
-export function buildTunnelsQuery(bbox = TUNNELS_CONVERT.BBOX) {
-  const parts = TUNNELS_CONVERT.KEYS.map((k) => `way["${k}"]["tunnel"]["tunnel"!="no"]["highway"];`).join('');
-  return `[out:json][timeout:${TUNNELS_CONVERT.SERVER_TIMEOUT_S}][bbox:${bbox.join(',')}];(${parts});out tags geom;`;
 }
 
 const r5 = (x) => Math.round(x * 1e5) / 1e5;
@@ -81,8 +77,9 @@ function shrink(g) {
 }
 
 /**
- * Réponse Overpass → contenu de data/tunnels-adr.json. Tunnels de catégorie A ou sans catégorie lisible : retirés.
- * @returns {{ data:{ source:string, license:string, updated:string|null, bbox:number[], tunnels:object[] }, log:string[] }}
+ * Voies OSM ({ elements } au format Overpass, voir elementsFromGeojsonSeq) → contenu de data/tunnels-adr.json.
+ * Tunnels de catégorie A ou sans catégorie lisible : retirés.
+ * @returns {{ data:{ source:string, license:string, updated:string|null, countries:string[], tunnels:object[] }, log:string[] }}
  */
 export function convertTunnels(json, { updated = null } = {}) {
   const log = [];
@@ -106,9 +103,9 @@ export function convertTunnels(json, { updated = null } = {}) {
   log.push(`${tunnels.length} tubes gardés (${Object.entries(counts).map(([k, v]) => `${k === 'X' ? 'hazmat=no' : k} : ${v}`).join(', ') || 'aucun'}), ${skipped} sans catégorie (A ou illisible).`);
   return {
     data: {
-      source: 'OpenStreetMap (Overpass API), voies en tunnel portant hazmat, hazmat:B…E, hazmat:adr_tunnel_cat',
+      source: 'OpenStreetMap (extraits Geofabrik), voies en tunnel portant hazmat, hazmat:B…E, hazmat:adr_tunnel_cat',
       license: 'ODbL, © contributeurs OpenStreetMap',
-      updated, bbox: [...TUNNELS_CONVERT.BBOX], tunnels,
+      updated, countries: TUNNELS_CONVERT.GEOFABRIK.map((c) => c.split('/').pop()), tunnels,
     },
     log,
   };
@@ -117,7 +114,7 @@ export function convertTunnels(json, { updated = null } = {}) {
 /**
  * Recoupement des tunnels gardés en dur (Bison Futé) avec OpenStreetMap : tubes OSM du même nom, ou à moins de
  * 2 km du point donné, et leur catégorie. Écrit dans le journal de l'Action.
- * @param {object} json réponse Overpass brute
+ * @param {object} json voies OSM ({ elements })
  * @param {{ name:RegExp, near:number[] }[]} probes
  */
 export function crossCheck(json, probes) {

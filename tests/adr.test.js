@@ -10,7 +10,9 @@ import {
   ADR, KNOWN_TUNNELS, CATEGORY_ALL, categoryFromTags, isForbidden, effectiveCode, parseTunnelData, tunnelsAlongRoute,
   describeForbidden, describeAllowed, noTunnelText, avoidingOptionsText, guidanceTunnel, avoidTunnelsFor, squareAround,
 } from '../src/lib/adr.js';
-import { convertTunnels, buildTunnelsQuery, crossCheck, KNOWN_PROBES, tiles, knownTubesFromMap } from '../src/lib/tunnels-convert.js';
+import {
+  convertTunnels, crossCheck, KNOWN_PROBES, knownTubesFromMap, elementsFromGeojsonSeq, osmiumFilter, TUNNELS_CONVERT,
+} from '../src/lib/tunnels-convert.js';
 import { routeRules, tunnelRules, rulesSourceText } from '../src/lib/route-rules.js';
 import { startNavigation, updateNavigation, rerouteDone, setNavigationTunnels } from '../src/lib/navigation.js';
 import { createSimulator } from '../src/lib/nav-sim.js';
@@ -104,17 +106,28 @@ test('conversion de la réponse Overpass : catégories, catégorie A et étiquet
   assert.ok(d.tunnels.every((t) => t.g.length >= 2 && t.g.length <= 12));
   assert.equal(d.tunnels[0].g.length, 2, 'tube droit : deux points suffisent');
   assert.match(log[0], /5 tubes gardés.*2 sans catégorie/);
-  const q = buildTunnelsQuery([44, 4, 49, 9]);
-  assert.match(q, /^\[out:json\]\[timeout:180\]\[bbox:44,4,49,9\]/);
-  const t = tiles();
-  assert.equal(t.length, 24, 'France et pays voisins en cases de 5°');
-  assert.deepEqual(t[0], [35.9, -9.6, 40.9, -4.6]);
-  assert.deepEqual(t.at(-1), [50.9, 15.4, 55.1, 17.2]);
-  for (const k of ['hazmat', 'hazmat:B', 'hazmat:E', 'hazmat:adr_tunnel_cat']) assert.ok(q.includes(`["${k}"]`), k);
-  assert.match(q, /out tags geom;$/);
+  assert.deepEqual(d.countries.slice(0, 2), ['france', 'belgium']);
+  assert.deepEqual(osmiumFilter(), ['w/hazmat', 'w/hazmat:B', 'w/hazmat:C', 'w/hazmat:D', 'w/hazmat:E', 'w/hazmat:adr_tunnel_cat', 'w/hazmat:tunnel_cat']);
+  assert.ok(TUNNELS_CONVERT.GEOFABRIK.includes('europe/france') && TUNNELS_CONVERT.GEOFABRIK.includes('europe/italy'));
   const cc = crossCheck(raw, KNOWN_PROBES);
   assert.equal(cc.length, 3);
   assert.match(cc[0], /^Fourvière \(Bison Futé : E\) : absent des données OSM$/);
+});
+
+test('export osmium (geojsonseq, RFC 8142) → voies en tunnel ; route ordinaire et ligne illisible ignorées', () => {
+  const RS = '\u001e';
+  const text = [
+    `${RS}{"type":"Feature","id":"w10","geometry":{"type":"LineString","coordinates":[[5,45.05],[5.01,45.05],[5.02,45.05]]},"properties":{"highway":"motorway","tunnel":"yes","hazmat:C":"no","tunnel:name":"Tunnel de Test"}}`,
+    `${RS}{"type":"Feature","id":"w11","geometry":{"type":"LineString","coordinates":[[5,45.06],[5.02,45.06]]},"properties":{"highway":"primary","hazmat":"no"}}`,
+    `${RS}{"type":"Feature","id":"w12","geometry":{"type":"LineString","coordinates":[[5,45.06],[5,45.05]]},"properties":{"highway":"primary","tunnel":"no","hazmat":"no"}}`,
+    `${RS}{"type":"Feature","id":"n3","geometry":{"type":"Point","coordinates":[5,45]},"properties":{"hazmat":"no"}}`,
+    'pas du json',
+  ].join('\n');
+  const els = elementsFromGeojsonSeq(text);
+  assert.deepEqual(els.map((e) => e.id), [10]);
+  assert.deepEqual(els[0].geometry[1], { lon: 5.01, lat: 45.05 });
+  const { data: d } = convertTunnels({ elements: els }, { updated: '2026-11-19' });
+  assert.deepEqual(d.tunnels, [{ id: 'w10', cat: 'C', g: [[5, 45.05], [5.02, 45.05]], name: 'Tunnel de Test' }]);
 });
 
 test('recoupement des tunnels en dur : tubes lus dans une réponse de l\'API OSM /api/0.6/map (format JSON)', () => {
