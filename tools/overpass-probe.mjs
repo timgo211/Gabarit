@@ -18,7 +18,12 @@ async function post(url, q, ms = 60000) {
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const geo = await post(OVERPASS_ENDPOINTS[0], '[out:json][timeout:120];way["highway"="motorway"]["ref"~"^A ?(6|43)$"](44.9,2.0,49.0,7.0);out geom;', 180000);
+let geo = null;
+for (let i = 0; i < 8 && !geo?.json; i += 1) {
+  if (i) await sleep(30000);
+  geo = await post(OVERPASS_ENDPOINTS[i % 2], '[out:json][timeout:120];way["highway"="motorway"]["ref"~"^A ?(6|43)$"](44.9,2.0,49.0,7.0);out geom;', 180000);
+  console.log('essai géométrie', i + 1, geo.status, geo.ms, 'ms', geo.text ?? '', geo.error ?? '');
+}
 console.log('géométrie', geo.status, geo.ms, 'ms', geo.bytes, 'octets', geo.error ?? '');
 const paris = [2.35, 48.85];
 let pts = [];
