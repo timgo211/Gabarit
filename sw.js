@@ -5,8 +5,10 @@
 // ⚠️ Incrémenter VERSION à chaque modification des fichiers listés ci-dessous.
 
 import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
+import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
-const VERSION = 'v15';
+// Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
+const VERSION = 'v16';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -18,6 +20,7 @@ const APP_FILES = [
   './icons/icon-512.png',
   './src/styles.css',
   './src/app.js',
+  './src/lib/app-version.js',
   './src/lib/areas-avis.js',
   './src/lib/areas-cache.js',
   './src/lib/areas-official.js',
@@ -81,6 +84,7 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('message', (event) => {
   if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data?.type === VERSION_REQUEST) event.ports[0]?.postMessage(versionReply(VERSION));
 });
 
 self.addEventListener('activate', (event) => {

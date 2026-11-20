@@ -263,6 +263,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .card h3 { margin: 0 0 8px; font-size: 1.1rem; }
 .row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .hint { color: var(--muted); font-size: .9rem; margin: 4px 0; }
+.app-version { color: var(--muted); font-size: .8rem; text-align: center; margin: 0; overflow-wrap: anywhere; }
 .status { min-height: 1.4em; font-weight: 600; margin: 8px 0 0; }
 .status.ok { color: var(--ok); }
 .status.err { color: var(--danger); }
