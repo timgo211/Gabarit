@@ -34,6 +34,10 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5b (ADR) : `adr.js` (code tunnel du véhicule, catégorie OSM, ADR 8.6.4, tunnels en dur, passage du tracé,
     textes, guidage, « Éviter le tunnel »), `adr-settings.js` (réglage global `settings.adr` : classes en clair, code
     tunnel saisi, reprise des anciens profils, `withAdr`), `tunnels-convert.js` (extraits Geofabrik filtrés par osmium dans l'Action → `data/tunnels-adr.json`)
+  - phase 5d (accès) : `access-local.js` (extra `roadaccessrestrictions` d'ORS → routes « sauf desserte », acceptées
+    près du départ ou de l'arrivée, « Éviter la desserte locale »), `access-conditional.js` (étiquettes `*:conditional`,
+    priorité, rapprochement avec le tracé, heure de passage, textes, guidage), `access-convert.js` (export osmium →
+    `data/acces-osm/`)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -44,6 +48,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
   - `areas.js` (aires du trajet : copie `data/aires-osm/`, Overpass hors copie, liste, repères HTML sur la carte, fiche et
     « Mon avis »)
+  - `access.js` (cases `data/acces-osm/` du trajet, 'failed' si index ou case illisible)
   - `weather.js` (une requête Open-Meteo par calcul, copie sur l'appareil, « Météo indisponible »)
   - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation ;
     à l'arrêt < 3 km/h, dérive < 100 m, même suivi et mêmes marges : aucune image, `holdStill` — sinon MapLibre
@@ -55,12 +60,14 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
-- `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL) ») : copie
-  mensuelle (le 1er, 3 h 17 UTC) des tunnels signalés aux matières dangereuses (`data/tunnels-adr.json`) et des aires
-  et parkings PL (`data/aires-osm/`) ; par pays, un seul téléchargement Geofabrik, un seul `osmium tags-filter`
-  (tunnels + aires), un seul export lu ligne à ligne ; un pays en échec → rien d'écrit ; job à part `known` :
-  recoupement Fourvière / Fréjus / Mont-Blanc (API OSM + Nominatim) ; lancée aussi à chaque envoi qui modifie l'outil,
-  `tunnels-convert.js` ou `areas-osm-data.js` (toute branche) et à la main ;
+- `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :
+  copie mensuelle (le 1er, 3 h 17 UTC) des tunnels signalés aux matières dangereuses (`data/tunnels-adr.json`), des
+  aires et parkings PL (`data/aires-osm/`) et des voies à accès conditionnel (`data/acces-osm/`) ; par pays, un seul
+  téléchargement Geofabrik, un seul `osmium tags-filter` (tunnels + aires + voies), un seul export lu ligne à ligne ;
+  un pays en échec → rien d'écrit ; job à part `known` : recoupement Fourvière / Fréjus / Mont-Blanc (API OSM +
+  Nominatim) ; job `r411` (à la main seulement, case « r411 », groupe de concurrence à part : n'annule jamais une
+  copie) : texte du Code de la route art. R411-8 dans le journal ; lancée aussi à chaque envoi qui modifie l'outil,
+  `tunnels-convert.js`, `areas-osm-data.js` ou `access-convert.js` (toute branche) et à la main ;
   `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé)
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
@@ -70,6 +77,10 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
+- fixtures phase 5d : `ors-directions-access.json` (31 km plein est à 45,6° N, `roadaccessrestrictions` 4 / 12 / 8
+  près du départ, vers km 16 et près de l'arrivée, d'après la doc ORS), `osm-access.geojsonseq` (voies au format de
+  l'export osmium le long de ce tracé : tranche 7 h–19 h, parallèle à 25 m, pont, hgv yes + motor_vehicle no, wet,
+  22 h–6 h, maxweight Su,PH, chemin, hgv=yes masquant, sens unique à contresens)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
   réelles du xlsx concédé 2025)
@@ -93,12 +104,15 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v22 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v23 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
 « à vérifier », 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé : bandeau et une annonce vers 3 km captée,
-countryinfo absent, fichier pays absent). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+countryinfo absent, fichier pays absent), accès (`access` : desserte traversée vers km 16, desserte près du départ et
+de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8 h, condition non lue sur une ligne,
+« Éviter la desserte locale » = une requête ORS, 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé à 360 et
+1280 px : bandeau et une annonce vers 3 km captée, copie absente). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -272,6 +286,31 @@ countryinfo absent, fichier pays absent). Captures dans `tools/ui-shots/` (ignor
   1 km après, une ligne), voix une fois vers 3 km (`settings.ruleVoice`) : vitesse et interdictions confirmées
   seulement, jamais une absence d'interdiction. mit.gov.it coupe la connexion depuis le conteneur : décret lu dans la
   Gazzetta Ufficiale ; Fedlex et Legilux lus par leurs points SPARQL (fedlex.data.admin.ch, data.legilux.public.lu).
+- Accès (phase 5d) — desserte locale (`access-local.js`) : `roadaccessrestrictions` dans `extra_info` de toutes les
+  requêtes (aucune requête en plus) ; valeurs cumulées (bits : 2 Customers, 4 Destination, 8 Delivery, 16 Private
+  ignoré car ORS l'interdit déjà) ; ORS (`HeavyVehicleFlagEncoder`) accepte `hgv=destination` / `delivery` partout,
+  `vehicle_type` reste `hgv`. Tronçon accepté s'il touche le départ / l'arrivée ou s'en trouve à moins de
+  `LOCAL.RADIUS_M` (3 km, à vol d'oiseau), sinon alerte « Route réservée à la desserte locale vers km X : vous la
+  traversez. » et bouton « Éviter la desserte locale » à l'arrêt (une requête ORS sur appui, carré de 80 m,
+  `avoid_polygons` ajouté aux zones déjà évitées, 150 km au plus, option « Sans desserte ») ; extra absent →
+  « information indisponible ». Tranches horaires (`access-conditional.js`) : ORS n'applique les accès
+  conditionnels que si son graphe est construit avec `conditional_access` (faux par défaut) et `departure` est caché
+  → alerte seulement, jamais `departure`. Copie `data/acces-osm/` (même index que `data/aires-osm/` : `grid`,
+  `tiles` ; case `{ t, n, w }`, coordonnées 1e-5° en écarts, simplifiées à 3 m), routes carrossables seulement
+  (`HIGHWAYS`), conditions sans effet retirées (`canRestrict`), hors `APP_FILES`, cases lues seulement si le tracé
+  les touche (`routePlan`), jamais d'Overpass. Priorité hgv > motor_vehicle > vehicle > access (comme ORS) : une
+  condition vraie l'emporte sur l'étiquette sans condition du même moyen, la dernière écrite gagne, une étiquette sans
+  condition d'un moyen plus précis masque les moins précis ; `:forward` / `:backward` selon le sens de passage.
+  Rapprochement : 80 % de la longueur à moins de 15 m, points dans l'ordre du tracé, sens unique respecté (pas
+  d'autre chaussée, de parallèle ni de pont). Horaires lus par `parseHours` (ZFE) : plages sans jours, passage de
+  minuit (« Mo 22:00-06:00 » = lundi 22 h → mardi 6 h), « PH » avec les fériés du pays traversé (`holidayFor`,
+  countryinfo) ; pays sans calendrier, saison, météo → non lue : aucune alerte, une ligne « N voies avec conditions
+  non lues, à vérifier ». Messages : jamais « aucune restriction » mais « Aucune restriction horaire signalée dans les
+  données (copie du JJ/MM), la signalisation fait foi » ; copie absente → « Restrictions horaires indisponibles
+  (données non chargées) » ; chaque alerte finit par « La signalisation fait foi. ». Guidage : `view.rules.access`,
+  bandeau sous 10 km (voie interdite à l'heure de passage d'abord, sinon la plus proche ; desserte comprise), voix une
+  fois vers 3 km seulement si interdite à l'heure de passage (`settings.ruleVoice`). Pouvoir de police : Code de la
+  route art. R411-8 (`POLICE_TEXT`), légifrance bloqué depuis le conteneur → job `r411` de l'Action.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
