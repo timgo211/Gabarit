@@ -56,6 +56,17 @@ const RED_TILE = solidPng([220, 0, 0]);
 const DAY_BG = '#dcdcdc';
 const NIGHT_BG = '#305070'; // bien distinct du fond de la page (--panel nuit #0f1720), visible si le canevas est vide
 const style = (bg) => ({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }] });
+/**
+ * Style avec une source de tuiles lentes (comme le vrai fond vectoriel sur la tablette) : tant qu'une tuile se
+ * charge, map.isStyleLoaded() est faux alors que le style est prêt depuis longtemps (régression v17 : tracé absent).
+ */
+const slowStyle = (bg) => ({
+  version: 8,
+  sources: { slow: { type: 'raster', tiles: ['https://slow-tiles.test/{z}/{x}/{y}.png'], tileSize: 256 } },
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } },
+    { id: 'slow', type: 'raster', source: 'slow', paint: { 'raster-opacity': 0 } }],
+});
+const SLOW_TILE_MS = 6000;
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -94,6 +105,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
+  slowTiles = false,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -133,10 +145,19 @@ async function open(browser, base, {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
       const name = url.endsWith('.css') ? 'maplibre-gl.css' : 'maplibre-gl.js';
-      return route.fulfill({ body: readFileSync(join(ML, name)), contentType: TYPES[extname(name)] });
+      // Cartes créées gardées dans window.__maps (vérification de la source et des couches du tracé).
+      const tail = name.endsWith('.js')
+        ? '\n;(() => { const M = maplibregl.Map; window.__maps = []; maplibregl.Map = class extends M { constructor(o) { super(o); window.__maps.push(this); } }; })();'
+        : '';
+      return route.fulfill({ body: Buffer.concat([readFileSync(join(ML, name)), Buffer.from(tail)]), contentType: TYPES[extname(name)] });
     }
     if (url.includes('tiles.openfreemap.org/styles/') || url.includes('tiles.versatiles.org')) {
-      return route.fulfill({ json: style(url.includes('/dark') || url.includes('eclipse') ? NIGHT_BG : DAY_BG) });
+      const bg = url.includes('/dark') || url.includes('eclipse') ? NIGHT_BG : DAY_BG;
+      return route.fulfill({ json: slowTiles ? slowStyle(bg) : style(bg) });
+    }
+    if (url.startsWith('https://slow-tiles.test/')) {
+      await new Promise((r) => setTimeout(r, SLOW_TILE_MS));
+      return route.fulfill({ body: RED_TILE, contentType: 'image/png' }).catch(() => {});
     }
     if (url.includes('data.geopf.fr')) {
       stats.tiles += 1;
@@ -1007,7 +1028,7 @@ async function rulesCheck(browser, base) {
  * tunnel, phrase ORS, rappel ADR, source OSM), « Éviter le tunnel » (requête ORS avec avoid_polygons), guidage avec
  * le GPS émulé (bandeau dans sa case), puis fichier absent (« Alerte tunnels indisponible »), code vide (aucune
  * alerte), formulaire du véhicule (champs ADR affichés avec la case) ; 360, 412, 800 et 1280 px. Enfin le vrai
- * service worker : « Gabarit v17 » en bas de Réglages.
+ * service worker : « Gabarit v18 » en bas de Réglages.
  */
 async function adrCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
@@ -1116,7 +1137,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v17', 'vrai service worker : « Gabarit v17 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v18', 'vrai service worker : « Gabarit v18 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1261,12 +1282,81 @@ async function driveWindCheck(browser, base) {
 const server = await serve();
 const base = `http://127.0.0.1:${server.address().port}/`;
 const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] });
+/** Tracés dessinés sur la carte : features de la source 'route', couche 'route-line' présente et visible. */
+async function drawnRoutes(page) {
+  return page.evaluate(() => {
+    const map = window.__maps?.at(-1);
+    if (!map) return { maps: 0 };
+    const src = map.getSource('route');
+    const features = src?._data?.features?.length ?? 0;
+    const layer = map.getLayer('route-line');
+    const visible = !!layer && map.getLayoutProperty('route-line', 'visibility') !== 'none';
+    const order = (map.getStyle()?.layers ?? []).map((l) => l.id);
+    return { maps: window.__maps.length, features, layer: !!layer, visible, top: order.at(-1), loaded: map.isStyleLoaded() };
+  });
+}
+
+/** Pixels bleus du tracé choisi (--route #0b57d0) dans la carte : le tracé est vraiment rendu. */
+async function bluePixels(page) {
+  const png = await page.locator('#map').screenshot();
+  return page.evaluate(async (b64) => {
+    const img = await createImageBitmap(await (await fetch(`data:image/png;base64,${b64}`)).blob());
+    const c = new OffscreenCanvas(img.width, img.height);
+    const g = c.getContext('2d');
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, img.width, img.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 60 && d[i + 1] > 60 && d[i + 1] < 120 && d[i + 2] > 170) n += 1;
+    return n;
+  }, png.toString('base64'));
+}
+
+/**
+ * Régression v17 : tuiles encore en chargement (map.isStyleLoaded() faux) au moment du calcul → aucun tracé.
+ * Calcul, autre fiche, Plan / Satellite, rechargement puis nouveau calcul : tracés toujours dessinés.
+ */
+async function drawCheck(browser, base) {
+  const { page, ctx, errors } = await open(browser, base, { width: 1280, height: 800, theme: 'day', layer: 'plan', slowTiles: true });
+  // Pixels bleus déjà là sans tracé (bouton « Plan », point GPS) : le tracé doit en ajouter nettement.
+  let baseline = await bluePixels(page);
+  const expect = async (label, n) => {
+    await page.waitForTimeout(1500);
+    const d = await drawnRoutes(page);
+    const blue = (await bluePixels(page)) - baseline;
+    check(d.features === n && d.layer && d.visible && blue > 2000, `${label} : tracés dessinés`,
+      `source ${d.features}/${n}, couche ${d.layer ? (d.visible ? 'visible' : 'masquée') : 'absente'}, +${blue} px bleus, tuiles chargées : ${d.loaded}`);
+  };
+  // Fond qui bouge encore (tuiles lentes en cours) au moment du calcul, comme sur la tablette.
+  await page.evaluate(() => window.__maps.at(-1).panBy([200, 120], { duration: 0 }));
+  await computeRoute(page);
+  const cards = await page.locator('.route-card').count();
+  await expect('après « Calculer l\'itinéraire »', cards);
+  await page.screenshot({ path: join(SHOTS, 'draw-calcul.png') });
+  if (cards > 1) {
+    await page.locator('.route-card').nth(1).click();
+    await expect('autre fiche touchée', cards);
+  }
+  await page.click('[data-layer="satellite"]');
+  await expect('satellite', cards);
+  await page.click('[data-layer="plan"]');
+  await expect('retour au plan', cards);
+  await page.reload();
+  await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+  await page.waitForTimeout(800);
+  baseline = await bluePixels(page);
+  await page.evaluate(() => window.__maps.at(-1).panBy([-200, 80], { duration: 0 }));
+  await computeRoute(page);
+  await expect('page rechargée puis nouveau calcul', await page.locator('.route-card').count());
+  check(errors.length === 0, 'aucune erreur JavaScript', errors.join(' | '));
+  await ctx.close();
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

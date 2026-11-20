@@ -200,6 +200,15 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     });
   }
 
+  /**
+   * Style lu et prêt à recevoir sources et couches. Pas map.isStyleLoaded() : il reste faux tant qu'une tuile ou
+   * une source GeoJSON se charge (Style.loaded() de MapLibre 4.7.1), alors que « style.load » ne sera plus émis
+   * → tracé jamais dessiné (régression constatée en v17). map.getStyle() n'est vide qu'avant la lecture du style.
+   */
+  function styleReady() {
+    return !!map?.getStyle();
+  }
+
   function removeRouteLayers() {
     if (!map) return;
     for (const id of ROUTE_LAYERS) if (map.getLayer(id)) map.removeLayer(id);
@@ -486,7 +495,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     routeBbox = routesBbox(routes);
     if (!map || !routes.length) return;
     removeRouteLayers();
-    if (map.isStyleLoaded()) addRouteLayers();
+    if (styleReady()) addRouteLayers();
     else map.once('style.load', addRouteLayers);
     const line = routes[selected].coordinates;
     marker('start', line[0], '#146c2e');
@@ -519,7 +528,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     /** Contours des ZFE du trajet (phase 5) : [{ name, banned, polygons }] ; liste vide = aucun contour. */
     showZfe(items) {
       zfeItems = Array.isArray(items) ? items.filter((z) => Array.isArray(z?.polygons) && z.polygons.length) : [];
-      if (map?.isStyleLoaded()) addZfeLayers();
+      if (styleReady()) addZfeLayers();
     },
     /** Appelé avec l'identifiant de l'aire touchée sur la carte. */
     onAreaPick(cb) {
