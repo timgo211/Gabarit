@@ -25,9 +25,7 @@ import { coordsLabel } from './lib/coords.js';
 import { canDuckMedia } from './ui/voice.js';
 import { createAreas } from './ui/areas.js';
 import { createWeather } from './ui/weather.js';
-import { placeAlongRoute } from './lib/areas-route.js';
-import { windPlanFromRoute } from './lib/wind.js';
-import { DRIVE, driveApplies, normalizeDriven, resumeDriveLog } from './lib/driving-time.js';
+import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
 
 function pickStorage() {
   try {
@@ -121,13 +119,9 @@ navigation = createNavigation({
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
   },
   onAreaOpen: (id) => areas.openSheet(id),
-  onView: (view, info) => {
-    areas.refreshDrive();
-    if (!info?.simulated) {
-      saveDriveLog(view.driveLog);
-      refreshGuidanceWind();
-    }
-  },
+  onView: () => areas.refreshDrive(),
+  // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
+  onDriving: (d) => saveDriving(storage, d),
   onEnd: (message) => {
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
@@ -143,50 +137,17 @@ const areas = createAreas({
   update,
   getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
   getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
-  onPool: (pool) => {
-    navigation.setAreas(pool);
-    renderChoice(); // pauses conseillées sur les aires trouvées
-  },
+  onPool: (pool) => navigation.setAreas(pool),
 });
 
-// ───────── Temps de conduite et vent (phase 5, PR B) ─────────
-/** Conduite déjà faite aujourd'hui (saisie à l'arrêt, ou reprise du dernier guidage de moins de 24 h). */
-function readDriveLog() {
-  try {
-    return resumeDriveLog(JSON.parse(storage.getItem(DRIVE.LOG_KEY) ?? 'null'));
-  } catch {
-    return null;
-  }
-}
-let driven = normalizeDriven(readDriveLog() ?? {});
-let driveLogSavedAt = 0;
-/** Compteur du guidage gardé sur l'appareil (toutes les 30 s), jamais en simulation. */
-function saveDriveLog(log) {
-  if (!log || Date.now() - driveLogSavedAt < 30000) return;
-  driveLogSavedAt = Date.now();
-  try { storage.setItem(DRIVE.LOG_KEY, JSON.stringify(log)); } catch { /* stockage plein : tant pis */ }
-}
-
-const weather = createWeather({ storage, onChange: () => renderChoice() });
-/** Vent pour un itinéraire : points du calcul, ou points rattachés (itinéraire « Sans ZFE », recalcul). */
-function windFor(route) {
-  const w = weather.current;
-  if (!w) return null;
-  if (w.failed) return { failed: true };
-  if (!w.forecast) return null;
-  const i = w.routes.indexOf(route);
-  return { plan: i >= 0 ? w.plan[i] : windPlanFromRoute(route, w.points), forecast: w.forecast, threshold: data.settings.windGust };
-}
-/** Guidage avec le vrai GPS : nouvelle prévision au plus une fois par heure, pour l'itinéraire suivi. */
-function refreshGuidanceWind() {
-  const w = weather.current;
-  const route = choice?.options[choice.selected]?.route;
-  if (!navigation.active || !route || weather.busy || (w && Date.now() - w.at < WIND_REFRESH_MS)) return;
-  weather.load([route]).then((st) => {
-    if (st?.forecast && navigation.active) navigation.setWind({ points: st.points, forecast: st.forecast, threshold: data.settings.windGust });
-  });
-}
-const WIND_REFRESH_MS = 3600 * 1000;
+// Vent fort (phase 5) : une requête Open-Meteo par calcul ; prévisions placées sur l'itinéraire choisi.
+const weather = createWeather({
+  storage,
+  onChange: (w) => {
+    if (w.status === 'ok') navigation.setWind(w.forecast);
+    renderChoice();
+  },
+});
 
 // ───────── Réglementation (phase 5) : ZFE (data/zfe.json) et interdictions PL ─────────
 /** ZFE lues (parseZfeData), null tant qu'elles ne sont pas arrivées ou si le fichier est illisible. */
@@ -202,21 +163,27 @@ fetch(ZFE.DATA_PATH, { cache: 'no-cache' })
   .catch(() => { zfeFailed = true; })
   .finally(() => renderChoice());
 
-/** Réglementation déjà calculée par itinéraire (même minute de départ, mêmes données) : un toucher ne recalcule rien. */
+/** Vent : prévisions, état de la requête et seuil de Réglages. */
+function windCtx() {
+  return { status: weather.status, forecast: weather.forecast, threshold: data.settings.windGust };
+}
+
+/**
+ * Réglementation déjà calculée par itinéraire (même minute de départ, mêmes données, même décompte de conduite) :
+ * un toucher ne recalcule rien.
+ */
 const rulesCache = new WeakMap();
 function rulesOf(route, vehicle, departure) {
   const minute = Math.floor(departure.getTime() / 60000);
   const hit = rulesCache.get(route);
-  const pool = areas.pool;
-  const w = weather.current;
-  const threshold = data.settings.windGust;
-  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.pool === pool
-    && hit.driven === driven && hit.w === w && hit.forecast === w?.forecast && hit.failed === w?.failed
-    && hit.threshold === threshold) return hit.rules;
-  const rules = routeRules(route, {
-    vehicle, departure, zfe: zfeData, driven, areas: pool.length ? placeAlongRoute(pool, route) : [], wind: windFor(route),
-  });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, pool, driven, w, forecast: w?.forecast, failed: w?.failed, threshold, rules });
+  const w = windCtx();
+  const sig = `${w.status}:${w.threshold}`;
+  const driving = loadDriving(storage);
+  const dsig = JSON.stringify([driving.at, driving.sinceBreak, driving.day, driving.mode, driving.stopWork]);
+  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+    && hit.sig === sig && hit.dsig === dsig) return hit.rules;
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, rules });
   return rules;
 }
 
@@ -285,10 +252,7 @@ function renderChoice() {
   renderRouteChoice(summaryNode, notesNode, {
     choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
     rules, rulesSource: rulesSourceText(zfeData), onAvoidZfe: avoidZfe, avoidBusy,
-    drive: {
-      applies: driveApplies(choice.vehicle), today: driven.today, sinceBreak: driven.sinceBreak,
-      onChange: (v) => { driven = normalizeDriven({ ...driven, ...v }); renderChoice(); },
-    },
+    windCredit: weather.status === 'ok',
   });
   showZfeOnMap(rules);
 }
@@ -316,11 +280,12 @@ function startGuidance(simulate = null) {
     simulate,
     areas: areas.pool,
     announceAreas: data.settings.areaVoice,
-    rules: {
-      vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice, driven: simulate ? {} : driven,
-      wind: weather.current?.forecast
-        ? { points: weather.current.points, forecast: weather.current.forecast, threshold: data.settings.windGust } : null,
-    },
+    rules: { vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice },
+    driving: loadDriving(storage),
+    driveVoice: data.settings.driveVoice,
+    wind: weather.forecast,
+    windGust: data.settings.windGust,
+    windVoice: data.settings.windVoice,
   });
   return null;
 }
@@ -358,7 +323,10 @@ const settings = createSettings({
   onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
   onAreaVoiceChange: (on) => setSetting({ areaVoice: on }),
   onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
-  onWindGustChange: (kmh) => { setSetting({ windGust: kmh }); renderChoice(); },
+  onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
+  onWindVoiceChange: (on) => setSetting({ windVoice: on }),
+  onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
+  onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
 });
 createVehicles({ getData: () => data, update });
 
@@ -395,10 +363,7 @@ const form = createRouteForm({
       navStartBtn.hidden = false;
       map.showRoutes(options.map((o) => o.route), selected);
       areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
-      // Une requête Open-Meteo pour tous les itinéraires proposés (gardée 1 h sur l'appareil).
-      weather.load(options.map((o) => o.route));
-      const resumed = readDriveLog();
-      if (resumed && !driven.today && !driven.sinceBreak) driven = normalizeDriven(resumed);
+      weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,

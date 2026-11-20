@@ -15,8 +15,8 @@ import { ERROR_KINDS } from './ors-errors.js';
 import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
 import { zfeAlongRoute, guidanceZfe } from './zfe.js';
 import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
-import { startDrive, stepDrive, guidanceDrive, driveApplies, driveLog } from './driving-time.js';
-import { windPlanFromRoute, windAlongRoute, guidanceWind, WIND } from './wind.js';
+import { emptyDriving, trackDriving, drivingView, drivingAnnouncements, toggleStopWork, DRIVING } from './driving-time.js';
+import { prepareGuidanceWind, guidanceWind, placeWind } from './wind.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -134,18 +134,6 @@ function placeAreas(pool, route) {
   return Array.isArray(pool) && pool.length ? placeAlongRoute(pool, route) : [];
 }
 
-/**
- * Rafales au-dessus du seuil sur un itinéraire (phase 5), à partir des points déjà demandés à Open-Meteo (aucune
- * requête), heures de passage depuis `now`.
- */
-function placeWind(wind, route, now) {
-  if (!wind?.forecast || !Array.isArray(wind.points)) return [];
-  const plan = windPlanFromRoute(route, wind.points);
-  return windAlongRoute(plan, wind.forecast, {
-    departure: new Date(now || Date.now()), threshold: wind.threshold ?? WIND.THRESHOLD_KMH,
-  }).alerts;
-}
-
 /** ZFE interdites sur un itinéraire (phase 5), d'après l'heure de passage estimée depuis `now`. */
 function placeZfe(rules, route, now) {
   if (!rules?.zfe || !rules.vehicle) return [];
@@ -161,21 +149,22 @@ function placeZfe(rules, route, now) {
  *   destination choisie [lon, lat] (peut être hors route) ; areas : aires trouvées au calcul (phase 9, mergeAreas) ;
  *   announceAreas : annonce vocale vers 10 km avant une aire (réglage, désactivé par défaut) ;
  *   rules (phase 5) : profil véhicule et ZFE (parseZfeData) pour les alertes ZFE et interdictions PL, voice :
- *   alertes dites à voix haute (réglage, activé par défaut) ; driven : conduite déjà faite aujourd'hui
- *   ({ today, sinceBreak } en s) ; wind : { points, forecast, threshold } (wind.js) ou null
+ *   alertes dites à voix haute (réglage, activé par défaut) ;
+ *   driving (phase 5, PR B) : décompte du temps de conduite lu sur l'appareil (driving-time.js), driveVoice : annonces
+ *   des pauses ; wind : prévisions Open-Meteo (parseWind) ou null, windGust : seuil de rafales (km/h), windVoice
  */
-export function startNavigation(route, { destination = null, now = 0, areas = null, announceAreas = false, rules = null } = {}) {
-  const r = rules?.vehicle
-    ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false, wind: rules.wind ?? null }
-    : null;
+export function startNavigation(route, {
+  destination = null, now = 0, areas = null, announceAreas = false, rules = null,
+  driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true,
+} = {}) {
   return {
-    rules: r,
+    driving: driving ?? emptyDriving(),
+    driveVoice: driveVoice !== false,
+    wind: prepareGuidanceWind(wind, route, windGust),
+    windVoice: windVoice !== false,
+    rules: rules?.vehicle ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false } : null,
     zfe: placeZfe(rules, route, now),
     zfeAnnounced: {},
-    drive: r ? startDrive(rules.driven, now || Date.now()) : null,
-    driveApplies: r ? driveApplies(r.vehicle) : false,
-    wind: placeWind(r?.wind, route, now),
-    windAnnounced: {},
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     route: prepareRoute(route),
     source: route,
@@ -317,20 +306,8 @@ export function updateNavigation(state, fix) {
 
   // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
   // seulement, rien à toucher.
-  const rules = { zfe: null, ban: null, wind: null, drive: null };
-  if (s.drive) {
-    s.drive = stepDrive(s.drive, { t, speed });
-    const na = nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al), 1)[0] ?? null;
-    const d = guidanceDrive(s.drive, { applies: s.driveApplies && !s.arrived, nextArea: na && na.distance > 0 ? na : null });
-    s.drive = { ...s.drive, announced: d.announced };
-    rules.drive = d.view;
-    if (d.speak && s.rules.voice) events.push({ type: 'speak', text: d.speak });
-  }
+  const rules = { zfe: null, ban: null, wind: null };
   if (s.rules && !s.arrived) {
-    const w = guidanceWind(s.wind, loc.along, s.windAnnounced);
-    s.windAnnounced = w.announced;
-    rules.wind = w.view;
-    if (w.speak && s.rules.voice && onRoute && !s.rerouting) events.push({ type: 'speak', text: w.speak });
     const z = guidanceZfe(s.zfe, loc.along, s.zfeAnnounced);
     s.zfeAnnounced = z.announced;
     rules.zfe = z.view;
@@ -342,6 +319,22 @@ export function updateNavigation(state, fix) {
       if (b.speak) events.push({ type: 'speak', text: b.speak });
     }
   }
+
+  // Vent fort (phase 5, PR B) : rafales au-dessus du seuil devant, à l'heure où on y sera. Affichage et voix.
+  const w = guidanceWind(s.wind, {
+    along: loc.along, now: t, timeTo: (al) => remainingDuration(s.route, loc.along) - remainingDuration(s.route, al),
+  });
+  s.wind = { ...s.wind, announced: w.announced };
+  rules.wind = s.arrived ? null : w.view;
+  if (w.speak && s.windVoice && !s.arrived) events.push({ type: 'speak', text: w.speak });
+
+  // Temps de conduite et pauses (phase 5, PR B, règlement CE 561/2006, aide seulement) : chaque position compte, même
+  // hors du tracé ou après l'arrivée (manœuvres au dépôt).
+  s.driving = trackDriving(s.driving, t, speed * 3.6);
+  const areasAhead = s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al));
+  const da = drivingAnnouncements(s.driving, t, { nextArea: areasAhead.find((a) => a.distance > 0) ?? null });
+  s.driving = da.state;
+  if (s.driveVoice) for (const text of da.speak) events.push({ type: 'speak', text });
 
   const view = {
     position: onRoute ? loc.point : p,
@@ -366,14 +359,14 @@ export function updateNavigation(state, fix) {
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
     /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
-    nextAreas: s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al)),
+    nextAreas: areasAhead,
     /**
      * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,
-     * wind:{ distance, gust, text }|null, drive:{ blockLeft, dayLeft, stopped, text|null }|null }.
+     * wind:{ gust, distance, text }|null }.
      */
     rules,
-    /** Compteur de conduite à garder sur l'appareil (driving-time.js, driveLog). */
-    driveLog: driveLog(s.drive),
+    /** Temps de conduite (drivingView) : lignes du bandeau, niveau, bouton « Pas une pause (travail) ». */
+    driving: drivingView(s.driving, t, speed * 3.6),
   };
   if (nm) {
     const m = maneuvers[nm.index];
@@ -478,11 +471,22 @@ export function setNavigationAreas(state, areas) {
   return { ...state, areaPool: pool, areas: placeAreas(pool, state.source) };
 }
 
-/** Nouvelle prévision du vent (au plus une fois par heure en guidage) : rafales replacées sur le tracé suivi. */
-export function setNavigationWind(state, wind) {
-  if (!state?.rules) return state;
-  const rules = { ...state.rules, wind: wind ?? null };
-  return { ...state, rules, wind: placeWind(rules.wind, state.source, state.lastFixAt ?? state.startedAt) };
+/** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
+export function setNavigationWind(state, forecast) {
+  if (!state) return state;
+  return { ...state, wind: { ...prepareGuidanceWind(forecast, state.source, state.wind?.threshold), announced: state.wind?.announced ?? {} } };
+}
+
+/**
+ * Bouton « Pas une pause (travail) » (à l'arrêt, sous 10 km/h) : l'arrêt en cours, ou le dernier arrêt d'au moins
+ * 15 min, ne compte plus comme pause ; un second appui le recompte. Sans effet en roulant.
+ * @returns {{ state:object, driving:object|null }} driving : nouvelle vue du décompte (null si rien n'a changé)
+ */
+export function markStopAsWork(state, now) {
+  const kmh = (state?.speed ?? 0) * 3.6;
+  if (!state || kmh >= DRIVING.WORK_BUTTON_KMH) return { state, driving: null };
+  const driving = toggleStopWork(state.driving ?? emptyDriving());
+  return { state: { ...state, driving }, driving: drivingView(driving, now, kmh) };
 }
 
 /** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
@@ -493,8 +497,7 @@ export function rerouteDone(state, route) {
     source: route,
     areas: placeAreas(state.areaPool, route),
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
-    wind: placeWind(state.rules?.wind, route, state.lastFixAt ?? state.startedAt),
-    windAnnounced: {},
+    wind: state.wind ? { ...state.wind, placed: placeWind(state.wind.forecast, route) } : state.wind,
     segIndex: null,
     along: 0,
     announced: {},

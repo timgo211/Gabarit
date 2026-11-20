@@ -7,6 +7,9 @@ export const ORS_BASE = 'https://api.heigit.org/openrouteservice/v2';
 /** Géocodage Pelias (clé dans l'en-tête Authorization ; api_key en URL seulement en repli). */
 export const PELIAS_BASE = 'https://api.heigit.org/pelias/v1';
 
+/** Prévisions météo Open-Meteo (vent fort, phase 5) : sans clé, usage non commercial (open-meteo.com/en/terms). */
+export const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1';
+
 /** ORS refuse maximum_speed < 80 km/h. */
 export const ORS_MIN_MAX_SPEED = 80;
 

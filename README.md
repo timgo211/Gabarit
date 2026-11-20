@@ -52,6 +52,12 @@ Téléchargements. **Importer…** les restaure (par exemple sur une nouvelle ta
   (plus de 7,5 t) ; **Éviter la ZFE** propose un itinéraire qui la contourne. En guidage : bandeau et voix, sans rien
   à toucher. Situation du camion (concerné, article 4, véhicule spécialisé) dans le profil 🚚. La signalisation et
   les arrêtés font foi.
+- **Temps de conduite et pauses** (règlement CE 561/2006) : pendant le guidage, une ligne indique la conduite depuis
+  la dernière pause et la journée (« Conduite 3 h 12 · pause de 45 min dans 1 h 18 ») ; voix 30 min avant 4 h 30.
+  À l'arrêt, **Pas une pause (travail)** retire l'arrêt du décompte (chargement…). Aide seulement : le
+  chronotachygraphe fait foi.
+- **Vent fort** : rafales prévues à l'heure de passage (Open-Meteo), seuil réglable (80 km/h par défaut) ; fiche,
+  bandeau et voix. « Météo indisponible » si la prévision ne répond pas.
 - **Mode nuit** : automatique de 20 h à 7 h, ou forcé dans Réglages.
 
 ## Pour le développement

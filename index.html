@@ -46,6 +46,13 @@
           <div id="nav-then" class="nav-then" hidden></div>
           <div id="nav-alert" class="nav-alert" role="status" hidden></div>
           <div id="nav-rule" class="nav-rule" role="status" hidden></div>
+          <div id="nav-drive" class="nav-drive" role="status" data-level="ok" hidden>
+            <div class="nav-drive-text">
+              <span id="nav-drive-main" class="nav-drive-main"></span>
+              <span id="nav-drive-detail" class="nav-drive-detail"></span>
+            </div>
+            <button type="button" id="btn-nav-work" class="btn nav-work" hidden>Pas une pause (travail)</button>
+          </div>
           <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
         </div>
         <div class="nav-foot">
@@ -185,7 +192,9 @@
           <button type="button" id="btn-voice-test" class="btn">Tester</button>
         </div>
         <label class="toggle"><input type="checkbox" id="area-voice"> Annoncer les aires PL (vers 10 km avant)</label>
-        <label class="toggle"><input type="checkbox" id="rule-voice"> Annoncer les ZFE interdites (vers 5 km), les interdictions PL (1 h et 15 min avant), le vent fort (vers 20 km) et les pauses conseillées (30 et 10 min avant 4 h 30 de conduite)</label>
+        <label class="toggle"><input type="checkbox" id="rule-voice"> Annoncer les ZFE interdites (vers 5 km) et les interdictions PL (1 h et 15 min avant)</label>
+        <label class="toggle"><input type="checkbox" id="drive-voice"> Annoncer les pauses (30 min avant 4 h 30 de conduite, pause faite, 9 h du jour)</label>
+        <label class="toggle"><input type="checkbox" id="wind-voice"> Annoncer le vent fort (vers 15 km avant)</label>
         <p id="voice-status" class="status" role="status"></p>
         <p id="voice-music" class="hint"></p>
       </section>
@@ -202,17 +211,25 @@
       </section>
 
       <section class="card">
-        <h3>Vent fort</h3>
-        <p class="hint">Alerte sur le trajet quand les rafales prévues (Open-Meteo) atteignent ce seuil. Aucun seuil
-          officiel : c'est une aide, la signalisation et les fermetures (ponts, viaducs) font foi.</p>
-        <label for="wind-gust">Alerte à partir de (km/h de rafales)</label>
+        <h3>Temps de conduite et vent</h3>
+        <p class="hint">Temps de conduite et pauses d'après le règlement (CE) 561/2006 : 4 h 30 de conduite puis 45 min
+          de pause (ou 15 min puis 30 min, dans cet ordre), 9 h par jour (10 h deux fois par semaine), 56 h par
+          semaine. On conduit à partir de 5 km/h ; un arrêt compte comme pause à partir de 15 min. Compté seulement
+          pendant le guidage de Gabarit, gardé sur cet appareil. <strong>Aide seulement : le chronotachygraphe fait
+          foi.</strong></p>
+        <div class="row">
+          <button type="button" id="btn-driving-reset" class="btn">Remettre le temps de conduite à zéro</button>
+        </div>
+        <p id="driving-status" class="status" role="status"></p>
+        <label for="wind-gust" class="field-label">Alerte vent fort à partir de rafales de (km/h)</label>
         <div class="combo">
-          <input id="wind-gust" type="number" inputmode="numeric" min="40" max="130" step="5" autocomplete="off">
+          <input id="wind-gust" type="number" inputmode="numeric" min="40" max="150" step="5" value="80">
           <button type="button" id="btn-wind-save" class="btn btn-primary">Enregistrer</button>
         </div>
         <p id="wind-status" class="status" role="status"></p>
-        <p class="hint"><a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Météo : Open-Meteo.com</a>
-          (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>)</p>
+        <p class="hint">Prévisions de rafales à l'heure de passage, une requête par calcul d'itinéraire. Weather data by
+          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a> (CC BY 4.0).
+          La signalisation et les consignes sur place font foi.</p>
       </section>
 
       <section class="card">

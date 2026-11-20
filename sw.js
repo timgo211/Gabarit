@@ -64,8 +64,8 @@ const APP_FILES = [
   './src/ui/theme.js',
   './src/ui/vehicles.js',
   './src/ui/voice.js',
-  './src/ui/wake-lock.js',
   './src/ui/weather.js',
+  './src/ui/wake-lock.js',
 ].map((p) => new URL(p, self.location).href);
 
 self.addEventListener('install', (event) => {

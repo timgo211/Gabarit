@@ -242,12 +242,6 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .rules-notes .info { color: var(--muted); }
 .rules-notes a { margin-left: 6px; }
 .rules-source { color: var(--muted); font-size: .8rem; margin: 6px 0 0; overflow-wrap: anywhere; }
-.drive-block { margin: 10px 0 0; font-size: .9rem; }
-.drive-block summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
-.drive-fields { display: flex; flex-wrap: wrap; gap: 8px 16px; }
-.drive-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 140px; min-width: 0; font-weight: normal; }
-.drive-field input { min-width: 0; width: 100%; min-height: 44px; }
-.drive-error { color: var(--danger); font-size: .8rem; min-height: 1em; }
 .btn-avoid-zfe { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 
@@ -387,6 +381,36 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 }
 .nav-rule span { display: block; }
 @media (max-width: 600px) { .nav-rule { font-size: .95rem; padding: 6px 10px; } }
+/* Temps de conduite (phase 5) : une ligne pause + une ligne journée ; orange 30 min avant une limite, rouge au-delà.
+   Bouton « Pas une pause (travail) » à droite, seulement à l'arrêt. */
+.nav-drive {
+  justify-self: start; max-width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px;
+  padding: 6px 6px 6px 12px; border-radius: var(--radius); background: var(--nav-card); color: var(--nav-card-fg);
+  border: 2px solid var(--nav-sep); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.nav-drive[data-level="soon"] { border-color: var(--nav-rule-bg); }
+.nav-drive[data-level="over"] { background: var(--nav-alert-bg); color: var(--nav-alert-fg); border-color: var(--nav-alert-bg); }
+.nav-drive-text { min-width: 0; flex: 1 1 auto; display: grid; line-height: 1.2; overflow-wrap: anywhere; }
+.nav-drive-main { font-weight: 700; font-size: 1rem; }
+.nav-drive-detail { font-size: .88rem; opacity: .9; }
+.nav-work { flex: 0 0 auto; min-height: 48px; padding: 0 12px; font-size: .95rem; white-space: nowrap; }
+@media (max-width: 600px) {
+  .nav-drive { padding: 4px 4px 4px 8px; gap: 6px; }
+  .nav-drive-main { font-size: .9rem; }
+  .nav-drive-detail { font-size: .8rem; }
+  .nav-work { min-height: 44px; padding: 0 8px; font-size: .85rem; white-space: normal; max-width: 9.5em; }
+}
+/* Écran bas (posé par fitBanner, src/ui/navigation.js) : bandeau resserré pour ne jamais passer sous la barre du bas. */
+.nav-tight .nav-top { overflow-y: auto; gap: 4px; }
+.nav-tight .nav-then, .nav-tight .nav-drive-detail { display: none; }
+.nav-tight .nav-icon { width: 56px; height: 56px; }
+.nav-tight .nav-dist { font-size: 1.7rem; }
+.nav-tight .nav-instr, .nav-tight .nav-instr.long { font-size: .95rem; -webkit-line-clamp: 2; line-clamp: 2; }
+.nav-tight .nav-maneuver { padding: 4px 8px 4px 4px; }
+.nav-tight .nav-alert { font-size: .9rem; padding: 4px 10px; }
+.nav-tight .nav-rule { font-size: .85rem; padding: 4px 10px; }
+.nav-tight .nav-drive-main { font-size: .85rem; }
+.nav-tight .nav-work { min-height: 44px; }
 .nav-reroute { justify-self: start; min-height: 64px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 
 /* Bas de l'écran : boutons de carte (à droite), nom de la route, barre du bas. */

@@ -1,260 +1,265 @@
-// Alerte vent fort (phase 5, PR B) : rafales prévues le long du trajet, à l'heure de passage. Logique pure : points
-// du tracé, adresse de la requête, lecture de la réponse, rafales sur le trajet, textes. L'appel réseau est dans
-// src/ui/weather.js, le résultat gardé sur l'appareil (localStorage), jamais dans le cache du service worker.
+// Alerte vent fort (phase 5, PR B). Logique pure : points du trajet envoyés à Open-Meteo (une requête par calcul,
+// pour tous les itinéraires proposés), lecture de la réponse, rafales prévues à l'heure de passage, textes des
+// fiches et du guidage, copie sur l'appareil.
 //
-// API Open-Meteo (vérifiée le 20/11/2026 dans le README de github.com/open-meteo/open-meteo et la documentation du
-// site, dépôt github.com/open-meteo/open-meteo-website, src/routes/en/docs) :
-// - https://api.open-meteo.com/v1/forecast, sans clé, CORS autorisé ; « Free for non-commercial use with data under
-//   Attribution 4.0 International (CC BY 4.0) » ; « Less than 10'000 API calls per day, 5'000 per hour and 600 per
-//   minute » (open-meteo.com/en/terms) ; attribution à afficher près des données (ATTRIBUTION ci-dessous).
+// Source des prévisions : Open-Meteo (https://open-meteo.com/), API Forecast /v1/forecast, sans clé. Documentation
+// lue dans le dépôt du site (github.com/open-meteo/open-meteo-website, src/routes/en/docs, terms et licence ;
+// open-meteo.com est bloqué depuis le conteneur de développement) :
 // - « Multiple coordinates can be comma separated. E.g. &latitude=52.52,48.85&longitude=13.41,2.35. To return data
-//   for multiple locations the JSON output changes to a list of structures » ; « Up to 100 coordinates can be
-//   requested at once ».
-// - wind_gusts_10m : « Gusts at 10 meters above ground as a maximum of the preceding hour », km/h par défaut
-//   (wind_speed_unit=kmh) ; timeformat=unixtime : heures en secondes UTC ; forecast_days (16 au plus).
-// Aucun seuil réglementaire de vent n'existe pour la circulation des PL (fermetures décidées localement, ex. ponts) :
-// l'alerte est une aide, seuil réglable (WIND.THRESHOLD_KMH par défaut).
+//   for multiple locations the JSON output changes to a list of structures. »
+// - wind_gusts_10m : « Gusts at 10 meters above ground as a maximum of the preceding hour » (km/h par défaut) →
+//   la valeur de l'heure H couvre (H − 1 h, H] : pour un passage à 14 h 20, c'est celle de 15 h.
+// - timeformat=unixtime : heures en secondes UNIX (GMT).
+// - Conditions d'utilisation (API gratuite, usage non commercial) : moins de 10 000 appels par jour, 5 000 par heure,
+//   600 par minute ; chaque lieu demandé compte comme un appel → 40 points au plus par calcul.
+// - Licence des données : CC BY 4.0, attribution « Weather data by Open-Meteo.com » avec un lien vers le site
+//   (affichée sous les fiches et dans Réglages).
+// Seuil : aucune règle nationale unique pour les poids lourds (fermetures de ponts et de viaducs décidées localement
+// et signalées sur place) ; seuil de rafales choisi dans Réglages, 80 km/h par défaut. Aide seulement : la
+// signalisation, les consignes des gestionnaires et la vigilance Météo-France font foi.
 
-import { sampleRoute } from './route-samples.js';
-import { haversine } from './nav-geo.js';
+import { prepareLine, locateOnLine, pointAt, haversine } from './nav-geo.js';
+import { timeAt } from './areas-route.js';
+import { routeKey } from './areas-cache.js';
+import { OPEN_METEO_BASE } from './config.js';
 
 export const WIND = Object.freeze({
-  ENDPOINT: 'https://api.open-meteo.com/v1/forecast',
-  /** Seuil d'alerte par défaut : rafales de 70 km/h ou plus. */
-  THRESHOLD_KMH: 70,
-  THRESHOLD_MIN_KMH: 40,
-  THRESHOLD_MAX_KMH: 130,
-  /** Un point tous les 25 km (au moins), 100 points au plus par requête (limite d'Open-Meteo). */
-  STEP_M: 25000,
-  MAX_POINTS: 100,
-  /** Deux points à moins de 5 km (itinéraires qui se superposent) : un seul point demandé. */
-  MERGE_M: 5000,
-  /** Autre tracé rattaché aux points déjà demandés jusqu'à 15 km. */
-  REUSE_M: 15000,
-  /** Prévision sur 3 jours (trajet + repos journalier). */
+  /** Un point de prévision tous les 15 km (modèles de 2 à 11 km de maille). */
+  SAMPLE_M: 15000,
+  /** Points envoyés au plus (chacun compte comme un appel : quota gratuit 10 000 par jour). */
+  MAX_POINTS: 40,
+  /** Deux points à moins de 7 km (itinéraires proposés qui se superposent) : un seul. */
+  MERGE_M: 7000,
+  /** Un point sert à un itinéraire qui passe à moins de 10 km. */
+  NEAR_M: 10000,
+  /** Zone couverte par un point de part et d'autre (m) : début de la zone annoncée. */
+  ZONE_HALF_M: 5000,
   FORECAST_DAYS: 3,
-  /** Résultat gardé 1 h sur l'appareil ; en guidage, nouvelle requête au plus une fois par heure. */
-  CACHE_KEY: 'gabarit.windCache',
-  CACHE_MAX_AGE_MS: 3600 * 1000,
-  CACHE_MAX_ENTRIES: 4,
-  REFRESH_MS: 3600 * 1000,
-  CLIENT_TIMEOUT_MS: 20000,
-  /** Guidage : bandeau à moins de 30 km, annonce une fois vers 20 km. */
+  /** Seuil de rafales (km/h) : réglable dans Réglages. */
+  GUST: Object.freeze({ min: 40, max: 150, step: 5, default: 80 }),
+  /** Guidage : bandeau sous 30 km, annonce une fois vers 15 km. */
   BANNER_M: 30000,
-  ANNOUNCE_M: 20000,
-  ATTRIBUTION: 'Météo : Open-Meteo.com (CC BY 4.0)',
+  ANNOUNCE_M: 15000,
+  TIMEOUT_MS: 15000,
+  CACHE_KEY: 'gabarit.windCache',
+  /** Prévisions gardées 3 h (modèles mis à jour toutes les 1 à 6 h), 3 trajets. */
+  CACHE_MAX_AGE_MS: 3 * 3600e3,
+  CACHE_MAX_ENTRIES: 3,
+  ATTRIBUTION: 'Weather data by Open-Meteo.com',
   ATTRIBUTION_URL: 'https://open-meteo.com/',
-  LICENSE_URL: 'https://creativecommons.org/licenses/by/4.0/',
+  UNAVAILABLE_TEXT: 'Météo indisponible : vent non vérifié sur ce trajet.',
 });
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
+const round3 = (x) => Math.round(x * 1000) / 1000;
 
-/** Seuil lu dans les réglages (km/h), borné ; illisible → défaut. */
-export function sanitizeWindThreshold(x) {
+/** Seuil lu dans les réglages (pas de 5 km/h, borné). */
+export function sanitizeWindGust(x) {
   const n = typeof x === 'string' ? Number(x.replace(',', '.')) : x;
-  if (!isNum(n)) return WIND.THRESHOLD_KMH;
-  return Math.min(WIND.THRESHOLD_MAX_KMH, Math.max(WIND.THRESHOLD_MIN_KMH, Math.round(n)));
+  const g = WIND.GUST;
+  if (!isNum(n)) return g.default;
+  return Math.min(g.max, Math.max(g.min, Math.round(n / g.step) * g.step));
 }
 
 /**
- * Points demandés pour tous les itinéraires proposés (une seule requête par calcul).
- * @param {object[]} routes itinéraires (parseDirections)
- * @returns {{ points:number[][], plan:{ along:number, time:number, roads:string[], point:number }[][] }}
- *   points [lon, lat] arrondis à 0,01° (≈ 1 km : grille d'Open-Meteo plus large) ; plan[i] : points du tracé i et
- *   l'indice du point demandé correspondant
+ * Points de prévision de tous les itinéraires proposés : un tous les 15 km (départ et arrivée compris), doublons à
+ * moins de 7 km retirés, 40 au plus (écart agrandi si besoin). Arrondis à 0,001° (≈ 100 m).
+ * @param {{ coordinates:number[][] }[]} routes
+ * @returns {number[][]} [lon, lat]
  */
-export function windPoints(routes) {
-  const list = (Array.isArray(routes) ? routes : []).filter((r) => Array.isArray(r?.coordinates) && r.coordinates.length >= 2);
-  const totalM = list.reduce((s, r) => s + (isNum(r.distance) ? r.distance : 0), 0);
-  // Pas élargi si les trajets sont longs : 100 points au plus en tout.
-  let step = Math.max(WIND.STEP_M, Math.ceil(totalM / (WIND.MAX_POINTS - list.length * 2 - 1)));
-  for (;;) {
-    const points = [];
-    const plan = list.map((r) => sampleRoute(r, step).map((sm) => {
-      const p = [Math.round(sm.lonlat[0] * 100) / 100, Math.round(sm.lonlat[1] * 100) / 100];
-      let k = points.findIndex((q) => haversine(q, p) <= WIND.MERGE_M);
-      if (k < 0) { points.push(p); k = points.length - 1; }
-      return { along: sm.along, time: sm.time, roads: sm.roads, point: k };
-    }));
-    if (points.length <= WIND.MAX_POINTS) return { points, plan };
-    step = Math.ceil(step * 1.3);
+export function windPoints(routes, { maxPoints = WIND.MAX_POINTS } = {}) {
+  const lines = (Array.isArray(routes) ? routes : [])
+    .filter((r) => Array.isArray(r?.coordinates) && r.coordinates.length >= 2)
+    .map((r) => prepareLine(r.coordinates));
+  for (let step = WIND.SAMPLE_M; ; step *= 1.25) {
+    const pts = [];
+    for (const line of lines) {
+      const n = Math.max(1, Math.round(line.total / step));
+      for (let k = 0; k <= n; k += 1) {
+        const p = pointAt(line, (line.total * k) / n).point;
+        if (!pts.some((q) => haversine(q, p) < Math.min(WIND.MERGE_M, step / 2))) pts.push([round3(p[0]), round3(p[1])]);
+      }
+    }
+    if (pts.length <= maxPoints || step > 1e6) return pts.slice(0, maxPoints);
   }
 }
 
-/**
- * Points d'un autre tracé (recalcul en guidage, itinéraire « Sans ZFE ») rattachés aux points déjà demandés, sans
- * nouvelle requête : point demandé le plus proche à moins de 15 km, sinon -1 (pas de prévision à cet endroit).
- */
-export function windPlanFromRoute(route, points) {
-  const pts = Array.isArray(points) ? points : [];
-  if (!pts.length || !Array.isArray(route?.coordinates) || route.coordinates.length < 2) return [];
-  return sampleRoute(route, WIND.STEP_M / 2).map((sm) => {
-    let best = -1;
-    let bestD = WIND.REUSE_M;
-    for (const [k, q] of pts.entries()) {
-      const d = haversine(q, sm.lonlat);
-      if (d <= bestD) { bestD = d; best = k; }
-    }
-    return { along: sm.along, time: sm.time, roads: sm.roads, point: best };
-  });
-}
-
-/** Adresse de la requête (GET) : rafales et vent moyen horaires, km/h, heures UTC en secondes. */
-export function buildWindUrl(points) {
-  const pts = (Array.isArray(points) ? points : []).slice(0, WIND.MAX_POINTS);
-  const q = new URLSearchParams();
-  q.set('latitude', pts.map((p) => p[1].toFixed(2)).join(','));
-  q.set('longitude', pts.map((p) => p[0].toFixed(2)).join(','));
-  q.set('hourly', 'wind_gusts_10m,wind_speed_10m');
-  q.set('wind_speed_unit', 'kmh');
-  q.set('timeformat', 'unixtime');
-  q.set('timezone', 'GMT');
-  q.set('forecast_days', String(WIND.FORECAST_DAYS));
-  return `${WIND.ENDPOINT}?${q.toString()}`;
+/** Requête Open-Meteo (GET) pour ces points : rafales et vent moyen à 10 m, heures UNIX. */
+export function windUrl(points) {
+  const lat = points.map((p) => p[1]).join(',');
+  const lon = points.map((p) => p[0]).join(',');
+  return `${OPEN_METEO_BASE}/forecast?latitude=${lat}&longitude=${lon}&hourly=wind_speed_10m,wind_gusts_10m`
+    + `&wind_speed_unit=kmh&timeformat=unixtime&timezone=GMT&forecast_days=${WIND.FORECAST_DAYS}`;
 }
 
 /**
- * Réponse Open-Meteo → une prévision par point demandé (un objet pour un point, une liste sinon).
- * @returns {{ times:number[], gusts:(number|null)[], speeds:(number|null)[] }[]|null} times en ms ; null si illisible
+ * Lit la réponse (un objet pour un point, une liste pour plusieurs), dans l'ordre des points demandés.
+ * @returns {{ points:{ lon:number, lat:number, time:number[], gust:(number|null)[], speed:(number|null)[] }[] }|null}
+ *   time en ms ; null si la réponse est illisible
  */
-export function parseWind(json, count) {
-  const list = Array.isArray(json) ? json : json && typeof json === 'object' ? [json] : null;
-  if (!list || (isNum(count) && list.length !== count)) return null;
+export function parseWind(json, points) {
+  const list = Array.isArray(json) ? json : json && typeof json === 'object' ? [json] : [];
+  if (!Array.isArray(points) || list.length !== points.length || !list.length) return null;
   const out = [];
-  for (const loc of list) {
-    const h = loc?.hourly;
+  for (let i = 0; i < list.length; i += 1) {
+    const h = list[i]?.hourly;
     if (!h || !Array.isArray(h.time) || !Array.isArray(h.wind_gusts_10m)) return null;
-    const num = (x) => (isNum(x) ? x : null);
+    const n = h.time.length;
+    if (h.wind_gusts_10m.length !== n) return null;
+    const val = (x) => (isNum(x) && x >= 0 && x < 500 ? x : null);
     out.push({
-      times: h.time.map((t) => (isNum(t) ? t * 1000 : NaN)),
-      gusts: h.wind_gusts_10m.map(num),
-      speeds: Array.isArray(h.wind_speed_10m) ? h.wind_speed_10m.map(num) : [],
+      lon: points[i][0],
+      lat: points[i][1],
+      time: h.time.map((x) => (isNum(x) ? x * 1000 : NaN)),
+      gust: h.wind_gusts_10m.map(val),
+      speed: Array.isArray(h.wind_speed_10m) && h.wind_speed_10m.length === n ? h.wind_speed_10m.map(val) : h.time.map(() => null),
     });
   }
-  return out;
-}
-
-/** Rafale prévue à l'instant t (ms) : heure suivante (maximum de l'heure précédente). */
-function gustAt(f, t) {
-  if (!f) return null;
-  for (let i = 0; i < f.times.length; i += 1) {
-    if (f.times[i] >= t) {
-      if (i === 0 && f.times[0] - t > 3600e3) return null; // avant la prévision
-      return { gust: f.gusts[i], speed: f.speeds[i] ?? null };
-    }
-  }
-  return null; // après la fin de la prévision
+  return { points: out };
 }
 
 /**
- * Rafales au-dessus du seuil le long d'un itinéraire, regroupées en tronçons.
- * @param {{ along:number, time:number, roads:string[], point:number }[]} plan points du tracé (windPoints().plan[i])
- * @param {object[]} forecast parseWind
- * @param {{ departure:Date, threshold?:number, elapsed?:(t:number)=>number }} ctx elapsed : pauses comprises (planBreaks)
- * @returns {{ alerts:{ from:number, to:number, gust:number, speed:number|null, time:Date, roads:string[] }[],
- *   max:number|null, covered:boolean }}
- *   max : plus forte rafale du trajet ; covered : prévision disponible pour tout le trajet
+ * Rafale prévue à l'heure `ms` en ce point : valeur de la première heure ≥ ms (maximum de l'heure qui précède).
+ * null hors de la période prévue.
  */
-export function windAlongRoute(plan, forecast, { departure = new Date(), threshold = WIND.THRESHOLD_KMH, elapsed = (t) => t } = {}) {
-  const alerts = [];
-  let max = null;
-  let covered = Array.isArray(plan) && plan.length > 0 && Array.isArray(forecast);
+export function gustAt(point, ms) {
+  if (!point || !isNum(ms)) return null;
+  const { time, gust } = point;
+  if (!time.length || ms < time[0] - 3600e3 || ms > time[time.length - 1]) return null;
+  for (let i = 0; i < time.length; i += 1) if (time[i] >= ms) return gust[i];
+  return null;
+}
+
+/**
+ * Points de prévision placés sur un itinéraire (à moins de 10 km), triés depuis le départ.
+ * @returns {{ along:number, time:number, point:object }[]} time : secondes depuis le départ (durées ORS)
+ */
+export function placeWind(forecast, route) {
+  if (!forecast?.points?.length || !Array.isArray(route?.coordinates) || route.coordinates.length < 2) return [];
+  const line = prepareLine(route.coordinates);
+  const out = [];
+  for (const point of forecast.points) {
+    const loc = locateOnLine(line, [point.lon, point.lat]);
+    if (loc.distance > WIND.NEAR_M) continue;
+    out.push({ along: loc.along, time: timeAt(route, line, loc.along), point });
+  }
+  return out.sort((a, b) => a.along - b.along);
+}
+
+/**
+ * Vent fort sur un itinéraire, à l'heure de passage estimée depuis `departure`.
+ * @returns {{ checked:number, zones:{ from:number, to:number, gust:number, at:Date, points:number }[] }}
+ *   zones : passages consécutifs au-dessus du seuil (km de départ et de fin, rafale la plus forte et son heure)
+ */
+export function windAlongRoute(route, forecast, { departure = new Date(), threshold = WIND.GUST.default } = {}) {
+  const placed = placeWind(forecast, route);
+  const zones = [];
   let cur = null;
-  for (const sm of Array.isArray(plan) ? plan : []) {
-    const t = departure.getTime() + elapsed(sm.time) * 1000;
-    const g = gustAt(forecast?.[sm.point], t);
-    if (!g || !isNum(g.gust)) { covered = false; cur = null; continue; }
-    if (max === null || g.gust > max) max = g.gust;
-    if (g.gust < threshold) { cur = null; continue; }
-    if (!cur) {
-      cur = { from: sm.along, to: sm.along, gust: g.gust, speed: g.speed, time: new Date(t), roads: sm.roads };
-      alerts.push(cur);
-    } else {
-      cur.to = sm.along;
-      if (g.gust > cur.gust) Object.assign(cur, { gust: g.gust, speed: g.speed, time: new Date(t), roads: sm.roads });
-    }
+  let checked = 0;
+  for (const p of placed) {
+    const at = departure.getTime() + p.time * 1000;
+    const g = gustAt(p.point, at);
+    if (g === null) { cur = null; continue; }
+    checked += 1;
+    if (g >= threshold) {
+      if (!cur) {
+        cur = { from: Math.max(0, p.along - WIND.ZONE_HALF_M), to: p.along, gust: g, at: new Date(at), points: 1 };
+        zones.push(cur);
+      } else {
+        cur.to = p.along;
+        cur.points += 1;
+        if (g > cur.gust) { cur.gust = g; cur.at = new Date(at); }
+      }
+    } else cur = null;
   }
-  return { alerts, max, covered };
+  return { checked, zones };
 }
 
-// ───────── Textes ─────────
+const hhmm = (d) => `${d.getHours()} h ${String(d.getMinutes()).padStart(2, '0')}`;
 
-const hourText = (d) => `${d.getHours()} h`;
-const roadText = (roads) => (roads?.length ? `${roads[0]}, ` : '');
-
-/** Ligne de la fiche : « Rafales jusqu'à 85 km/h vers km 230 (A7, vers 15 h). » */
-export function describeWindAlert(a) {
-  const km = Math.round(a.from / 1000);
-  const km2 = Math.round(a.to / 1000);
-  const where = km2 - km >= 5 ? `entre km ${km} et km ${km2}` : `vers km ${km}`;
-  return `Vent fort : rafales jusqu'à ${Math.round(a.gust)} km/h ${where} (${roadText(a.roads)}vers ${hourText(a.time)}). `
-    + 'Prudence (véhicule vide, bâché, ponts et viaducs).';
+/** Ligne de la fiche : « Vent fort : rafales jusqu'à 95 km/h vers km 120 (vers 14 h 20). » */
+export function describeWindZone(z) {
+  const a = Math.round(z.from / 1000);
+  const b = Math.round(z.to / 1000);
+  const where = z.points > 1 ? `entre km ${a} et km ${b}` : `vers km ${b}`;
+  return `Vent fort : rafales jusqu'à ${Math.round(z.gust)} km/h ${where} (vers ${hhmm(z.at)}). Prudence, véhicule vide ou bâché surtout.`;
 }
 
-/** Résumé court de la fiche d'itinéraire. */
-export function shortWind(wind) {
-  if (!wind?.alerts?.length) return null;
-  return `Vent ${Math.round(Math.max(...wind.alerts.map((a) => a.gust)))} km/h`;
+/** Note quand rien ne dépasse le seuil (prévision lue). */
+export function windCalmText(threshold) {
+  return `Vent : pas de rafales de ${threshold} km/h ou plus prévues sur ce trajet.`;
 }
 
-/** Ligne d'information quand rien ne dépasse le seuil. */
-export function windOkText(wind, threshold) {
-  if (!wind || wind.max === null) return null;
-  const part = wind.covered ? '' : ' (prévision partielle)';
-  return `Vent : rafales prévues jusqu'à ${Math.round(wind.max)} km/h, sous le seuil d'alerte de ${threshold} km/h${part}.`;
+/** Préparation pour le guidage : points placés sur l'itinéraire suivi, seuil, annonces déjà faites. */
+export function prepareGuidanceWind(forecast, route, threshold) {
+  return { forecast: forecast ?? null, placed: placeWind(forecast, route), threshold: sanitizeWindGust(threshold), announced: {} };
 }
-
-export const WIND_UNAVAILABLE_TEXT = 'Prévision du vent indisponible (Open-Meteo injoignable).';
 
 /**
- * Guidage : tronçon venteux devant (bandeau sous 30 km, dedans aussi), annonce une fois vers 20 km.
- * @returns {{ view:{ distance:number, gust:number, text:string }|null, speak:string|null, announced:object }}
+ * Guidage : rafales au-dessus du seuil dans les 30 km devant, à l'heure où on y sera.
+ * @param {{ placed:object[], threshold:number, announced:object }} wind
+ * @param {{ along:number, now:number, timeTo:(along:number)=>number }} p timeTo : secondes jusqu'à ce point
+ * @returns {{ view:{ gust:number, distance:number, text:string }|null, speak:string|null, announced:object }}
  */
-export function guidanceWind(alerts, along, announced = {}) {
-  const done = { ...announced };
-  for (const [i, a] of (Array.isArray(alerts) ? alerts : []).entries()) {
-    if (a.to < along) continue;
-    const distance = Math.max(0, a.from - along);
-    if (distance > WIND.BANNER_M) return { view: null, speak: null, announced: done };
-    const g = Math.round(a.gust);
-    const text = distance <= 500 ? `Vent fort : rafales ${g} km/h (Open-Meteo)` : `Rafales ${g} km/h dans ${Math.round(distance / 1000)} km (Open-Meteo)`;
-    let speak = null;
-    if (!done[i] && distance <= WIND.ANNOUNCE_M) {
-      done[i] = true;
-      speak = distance <= 1000
-        ? `Vent fort : rafales jusqu'à ${g} kilomètres heure.`
-        : `Vent fort dans ${Math.round(distance / 1000)} kilomètres : rafales jusqu'à ${g} kilomètres heure.`;
+export function guidanceWind(wind, { along, now, timeTo }) {
+  const announced = { ...(wind?.announced ?? {}) };
+  if (!wind?.placed?.length || !isNum(along)) return { view: null, speak: null, announced };
+  let first = null;
+  let gust = 0;
+  for (const p of wind.placed) {
+    const start = p.along - WIND.ZONE_HALF_M;
+    if (p.along + WIND.ZONE_HALF_M < along) continue;
+    if (start - along > WIND.BANNER_M) break;
+    const g = gustAt(p.point, now + Math.max(0, timeTo(p.along)) * 1000);
+    if (g === null || g < wind.threshold) {
+      if (first) break; // fin de la zone
+      continue;
     }
-    return { view: { distance, gust: a.gust, text }, speak, announced: done };
+    if (!first) first = p;
+    gust = Math.max(gust, g);
   }
-  return { view: null, speak: null, announced: done };
+  if (!first) return { view: null, speak: null, announced };
+  const distance = Math.max(0, first.along - WIND.ZONE_HALF_M - along);
+  const g = Math.round(gust);
+  const text = distance > 0
+    ? `Rafales ${g} km/h dans ${distance >= 1000 ? `${Math.round(distance / 1000)} km` : `${Math.round(distance / 100) * 100} m`}`
+    : `Rafales jusqu'à ${g} km/h sur cette partie du trajet`;
+  let speak = null;
+  const key = String(Math.round(first.along));
+  if (!announced[key] && distance <= WIND.ANNOUNCE_M) {
+    announced[key] = true;
+    speak = distance >= 1000
+      ? `Attention, rafales de vent jusqu'à ${g} kilomètres heure dans ${Math.round(distance / 1000)} kilomètres.`
+      : `Attention, rafales de vent jusqu'à ${g} kilomètres heure sur cette partie du trajet.`;
+  }
+  return { view: { gust: g, distance, text }, speak, announced };
 }
 
-// ───────── Cache sur l'appareil ─────────
+/** Empreinte d'une liste de points (copie sur l'appareil). */
+export const windKey = (points) => routeKey(points);
 
-function readCache(storage) {
-  try {
-    const v = JSON.parse(storage.getItem(WIND.CACHE_KEY) ?? '[]');
-    return Array.isArray(v) ? v.filter((e) => e && typeof e.url === 'string' && typeof e.at === 'number') : [];
-  } catch {
-    return [];
-  }
-}
-
-/** Réponses Open-Meteo gardées 1 h (localStorage, ou objet en mémoire dans les tests). */
+/** Prévisions gardées sur l'appareil (localStorage, jamais dans le cache du service worker, jamais exportées). */
 export function createWindCache(storage) {
+  const readAll = () => {
+    try {
+      const v = JSON.parse(storage.getItem(WIND.CACHE_KEY) ?? '[]');
+      return Array.isArray(v) ? v.filter((e) => e && typeof e.key === 'string' && typeof e.at === 'number' && e.forecast?.points) : [];
+    } catch {
+      return [];
+    }
+  };
   return {
-    get(url, now = Date.now()) {
-      const e = readCache(storage).find((x) => x.url === url);
-      return e && now - e.at <= WIND.CACHE_MAX_AGE_MS ? e.json : null;
+    get(key, now = Date.now()) {
+      const e = readAll().find((x) => x.key === key);
+      return e && now - e.at <= WIND.CACHE_MAX_AGE_MS && now >= e.at ? e.forecast : null;
     },
-    set(url, json, now = Date.now()) {
-      const list = readCache(storage).filter((x) => x.url !== url && now - x.at <= WIND.CACHE_MAX_AGE_MS);
-      list.unshift({ url, at: now, json });
+    set(key, forecast, now = Date.now()) {
+      const list = readAll().filter((x) => x.key !== key && now - x.at <= WIND.CACHE_MAX_AGE_MS);
+      list.unshift({ key, at: now, forecast });
       try {
         storage.setItem(WIND.CACHE_KEY, JSON.stringify(list.slice(0, WIND.CACHE_MAX_ENTRIES)));
       } catch {
-        try { storage.setItem(WIND.CACHE_KEY, JSON.stringify([{ url, at: now, json }])); } catch { /* tant pis */ }
+        try { storage.setItem(WIND.CACHE_KEY, JSON.stringify([{ key, at: now, forecast }])); } catch { /* tant pis */ }
       }
     },
   };

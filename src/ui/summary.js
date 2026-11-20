@@ -6,7 +6,6 @@ import { el } from './dom.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
-import { parseDriveTime, driveTimeText, DRIVE_NOTE } from '../lib/driving-time.js';
 
 function restrictionsText(v) {
   const n = (x) => String(x).replace('.', ',');
@@ -39,7 +38,7 @@ function card(d, { checked, onSelect, rules }) {
  * Réglementation de l'itinéraire choisi (phase 5) : une ligne par ZFE et par interdiction, lien vers l'arrêté (texte
  * et adresse venant de data/zfe.json : textContent, adresse http(s) vérifiée par safeUrl), bouton « Éviter la ZFE ».
  */
-function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid }) {
+function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit }) {
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
@@ -52,45 +51,13 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid }) {
       text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',
     }) : null,
     source ? el('p', { class: 'rules-source', text: source }) : null,
-    rules.wind ? el('p', { class: 'rules-source' }, [
-      el('a', { href: WIND.ATTRIBUTION_URL, target: '_blank', rel: 'noopener noreferrer', text: 'Météo : Open-Meteo.com' }),
-      ' (',
-      el('a', { href: WIND.LICENSE_URL, target: '_blank', rel: 'noopener noreferrer', text: 'CC BY 4.0' }),
-      ')',
+    // Licence CC BY 4.0 des données Open-Meteo : attribution avec un lien (open-meteo.com/en/licence).
+    windCredit ? el('p', { class: 'rules-source wind-credit' }, [
+      'Vent : ',
+      el('a', { href: WIND.ATTRIBUTION_URL, target: '_blank', rel: 'noopener noreferrer', text: WIND.ATTRIBUTION }),
+      ' (CC BY 4.0).',
     ]) : null,
   ].filter(Boolean);
-}
-
-/**
- * Conduite déjà faite aujourd'hui (saisie à l'arrêt, facultative) : sert aux pauses conseillées et au compteur du
- * guidage. Deux champs « 2 h 15 », validés à la sortie du champ.
- */
-let driveOpen = false;
-function driveBlock(drive) {
-  if (!drive?.applies) return null;
-  const field = (id, label, value, key) => {
-    const input = el('input', {
-      id, type: 'text', inputmode: 'text', autocomplete: 'off', placeholder: '0 h 00', value: value ? driveTimeText(value) : '',
-    });
-    const msg = el('span', { class: 'drive-error', role: 'status' });
-    input.addEventListener('change', () => {
-      const v = parseDriveTime(input.value);
-      if (v === null) { msg.textContent = 'Format : 2 h 15, 2:15 ou 45 min.'; return; }
-      msg.textContent = '';
-      drive.onChange?.({ [key]: v });
-    });
-    return el('label', { class: 'drive-field', for: id }, [el('span', { text: label }), input, msg]);
-  };
-  const details = el('details', { class: 'drive-block', open: driveOpen || drive.today || drive.sinceBreak ? '' : null }, [
-    el('summary', { text: 'Temps de conduite déjà fait aujourd\'hui (facultatif)' }),
-    el('div', { class: 'drive-fields' }, [
-      field('drive-today', 'Aujourd\'hui', drive.today, 'today'),
-      field('drive-since', 'Depuis la dernière pause', drive.sinceBreak, 'sinceBreak'),
-    ]),
-    el('p', { class: 'hint', text: `${DRIVE_NOTE} Repris du dernier guidage s'il date de moins de 24 h.` }),
-  ]);
-  details.addEventListener('toggle', () => { driveOpen = details.open; });
-  return details;
 }
 
 /**
@@ -98,13 +65,12 @@ function driveBlock(drive) {
  * @param {HTMLElement} notesNode bloc des notes (véhicule, avertissements), placé sous le bouton « Démarrer »
  * @param {{ choice:{ options:object[], failures:object[], selected:number, vehicle:object, toLabel?:string,
  *   avoidTolls?:boolean, avoidFerries?:boolean }, dieselPrice:number|null, now?:Date, onSelect:(i:number)=>void,
- *   rules?:object[]|null, rulesSource?:string, onAvoidZfe?:()=>void, avoidBusy?:boolean,
- *   drive?:{ applies:boolean, today:number, sinceBreak:number, onChange:(v:object)=>void }|null }} p
+ *   rules?:object[]|null, rulesSource?:string, onAvoidZfe?:()=>void, avoidBusy?:boolean, windCredit?:boolean }} p
  *   rules : réglementation de chaque itinéraire (routeRules, phase 5), dans l'ordre des options
  */
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
-  drive = null,
+  windCredit = false,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -134,11 +100,10 @@ export function renderRouteChoice(node, notesNode, {
     failures.length ? el('p', { class: 'route-failures', text: failures.map(failureText).join(' ') }) : null,
   ].filter(Boolean));
   node.hidden = false;
-  notesNode.replaceChildren(...[
-    ...rulesBlock(rules?.[selected], { source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe }),
-    driveBlock(drive),
+  notesNode.replaceChildren(
+    ...rulesBlock(rules?.[selected], { source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
-  ].filter(Boolean));
+  );
   notesNode.hidden = false;
 }
 

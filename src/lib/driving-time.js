@@ -1,325 +1,490 @@
-// Temps de conduite et pauses (phase 5, PR B). Logique pure : pauses conseillées sur le trajet (avant le départ) et
-// compteur de conduite pendant le guidage. Présenté comme une AIDE : « Pause conseillée », jamais « obligatoire ».
-// Le chronotachygraphe et le conducteur font foi (l'appli ne voit ni le travail hors conduite ni les autres jours).
+// Temps de conduite et pauses (phase 5, PR B). Logique pure : décompte de la conduite d'après les positions du
+// guidage, pauses, alertes, plan des pauses d'un itinéraire, lecture et écriture sur l'appareil.
 //
-// Source officielle (lue le 20/11/2026) : ministère de la Transition écologique, page « Temps de travail des
-// conducteurs routiers – transport de marchandises » (www.ecologie.gouv.fr/politiques-publiques/
-// temps-travail-conducteurs-routiers-transport-marchandises, mise à jour du 04/05/2022), qui résume le règlement (CE)
-// n° 561/2006 du 15 mars 2006 (art. 6, 7 et 8 ; EUR-Lex n'est pas lisible depuis le conteneur, page anti-robot) :
-//   « Pour les conducteurs de véhicules de plus de 3,5T, le règlement (CE) n° 561/2006 du 15 mars 2006 prévoit :
-//   l'obligation, après un temps de conduite de 4h30, de prendre une pause de 45 mn pouvant être fractionnée en une
-//   pause d'au moins 15 min suivie d'une pause d'au moins 30 mn ; une durée de conduite journalière limitée à 9 heures
-//   pouvant être portée à 10 heures deux fois par semaine ; une durée de conduite hebdomadaire limitée à 56heures et
-//   90 heures sur deux semaines consécutives. »
-//   « Temps de repos normal : période d'au moins 11 heures avec possibilité de fractionnement en une première tranche
-//   de 3 heures et deuxième tranche de 9 heures ; Temps de repos réduit : période d'une durée d'au moins 9 heures et de
-//   moins de 11 heures (possible trois fois maximum entre deux temps de repos hebdomadaires). »
-// Les limites hebdomadaires (56 h, 90 h) ne sont pas suivies : l'appli ne connaît pas les jours précédents.
+// AIDE SEULEMENT : le chronotachygraphe fait foi. Gabarit ne voit que les trajets faits avec son guidage ; un trajet
+// sans l'appli, le travail et la disponibilité ne sont pas connus. Le décompte reste sur l'appareil (jamais exporté).
+//
+// Source officielle : règlement (CE) n° 561/2006 du Parlement européen et du Conseil du 15 mars 2006 relatif à
+// l'harmonisation de certaines dispositions de la législation sociale dans le domaine des transports par route
+// (version consolidée, modifiée par le règlement (UE) 2020/1054), EUR-Lex CELEX 32006R0561 :
+// https://eur-lex.europa.eu/legal-content/FR/TXT/?uri=CELEX:32006R0561
+// (eur-lex.europa.eu est bloqué depuis le conteneur de développement : articles repris du texte publié au JOUE.)
+// - Art. 4 d) « pause » : toute période pendant laquelle un conducteur n'a pas le droit de conduire ou d'effectuer
+//   d'autres tâches et qui doit uniquement lui permettre de se reposer. → un arrêt marqué « travail » n'est pas une
+//   pause (bouton « Pas une pause (travail) »).
+// - Art. 4 g) temps de repos journalier : normal (au moins 11 heures, ou 3 heures + 9 heures) ou réduit (au moins
+//   9 heures et moins de 11 heures). → un arrêt d'au moins 9 heures termine la journée de conduite.
+// - Art. 4 i) « semaine » : la période comprise entre lundi 00 h 00 et dimanche 24 h 00.
+// - Art. 6 § 1 : la durée de conduite journalière ne dépasse pas neuf heures ; elle peut être prolongée jusqu'à
+//   dix heures au maximum deux fois au cours de la semaine. § 2 : la durée de conduite hebdomadaire ne dépasse pas
+//   56 heures. § 3 : la durée de conduite totale accumulée au cours de deux semaines consécutives ne dépasse pas
+//   90 heures.
+// - Art. 7 : « Après un temps de conduite de quatre heures et demie, un conducteur observe une pause ininterrompue
+//   d'au moins quarante-cinq minutes, à moins qu'il ne prenne un temps de repos. Cette pause peut être remplacée
+//   par une pause d'au moins quinze minutes suivie d'une pause d'au moins trente minutes réparties au cours de la
+//   période de manière à se conformer aux dispositions du premier alinéa. » → ordre imposé : 15 min PUIS 30 min
+//   (30 min puis 15 min ne suffit pas : la pause de 30 min compte alors comme la première partie).
+//
+// Détection : « conduite » = vitesse d'au moins 5 km/h ; un arrêt compte comme pause à partir de 15 minutes. La
+// reprise de la conduite n'est retenue qu'après 30 s au-dessus de 5 km/h (un saut du GPS à l'arrêt ne coupe pas une
+// pause) ; elle est alors comptée depuis son début. Positions interrompues plus de 60 s (appli fermée, guidage
+// arrêté, GPS perdu) : intervalle compté comme arrêt.
 
-import { prepareLine } from './nav-geo.js';
-import { timeAt } from './areas-route.js';
+import { sampleRoute } from './route-samples.js';
 import { formatDuration } from './format.js';
 
-export const DRIVE = Object.freeze({
-  /** Le règlement vise les véhicules de plus de 3,5 t. */
-  MIN_WEIGHT_T: 3.5,
-  /** Art. 7 : pause après 4 h 30 de conduite. */
-  BLOCK_S: 4.5 * 3600,
-  /** Pause de 45 min, ou 15 min puis 30 min. */
-  BREAK_S: 45 * 60,
-  SPLIT_FIRST_S: 15 * 60,
-  SPLIT_SECOND_S: 30 * 60,
-  /** Art. 6 : 9 h de conduite par jour (10 h deux fois par semaine). */
-  DAY_S: 9 * 3600,
+export const DRIVING = Object.freeze({
+  /** Vitesse à partir de laquelle on conduit (km/h). */
+  MOVING_KMH: 5,
+  /** Reprise de la conduite confirmée après 30 s au-dessus de MOVING_KMH. */
+  MOVE_CONFIRM_MS: 30000,
+  /** Positions espacées de plus de 60 s : l'intervalle est un arrêt. */
+  GAP_MS: 60000,
+  /** Art. 7 : 4 h 30 de conduite, pause de 45 min, ou 15 min puis 30 min. */
+  CONTINUOUS_MAX_S: 4.5 * 3600,
+  BREAK_FULL_S: 45 * 60,
+  BREAK_FIRST_S: 15 * 60,
+  BREAK_SECOND_S: 30 * 60,
+  /** Art. 4 g) / art. 8 : repos journalier réduit d'au moins 9 h. */
+  DAILY_REST_S: 9 * 3600,
+  /** Art. 6 § 1 : 9 h par jour, 10 h deux fois par semaine. */
+  DAY_MAX_S: 9 * 3600,
   DAY_EXTENDED_S: 10 * 3600,
-  /** Art. 8 : repos journalier normal 11 h, réduit 9 h (au plus trois fois). */
-  DAILY_REST_S: 11 * 3600,
-  REDUCED_REST_S: 9 * 3600,
-  /** Guidage : on roule à partir de 5 km/h (en dessous, arrêt : file, aire, livraison). */
-  MOVING_MS: 5 / 3.6,
-  /** Écart entre deux positions compté au plus (signal perdu) : au-delà, le temps compte comme un arrêt. */
-  MAX_GAP_S: 120,
-  /** Aire conseillée pour la pause : atteinte au plus 1 h avant la limite des 4 h 30. */
-  AREA_WINDOW_S: 3600,
-  /** Annonces vocales avant la limite des 4 h 30 (min). */
-  ANNOUNCE_MIN: Object.freeze([30, 10]),
-  /** Bandeau du guidage affiché à moins d'une heure de la limite. */
-  BANNER_BEFORE_S: 3600,
-  /** Journal du guidage gardé sur l'appareil (localStorage) pour reprendre le compteur. */
-  LOG_KEY: 'gabarit.drive',
-  SOURCE: 'Règlement (CE) n° 561/2006 (résumé du ministère de la Transition écologique, page du 04/05/2022)',
+  EXTENSIONS_PER_WEEK: 2,
+  /** Art. 6 § 2 et § 3 : 56 h par semaine, 90 h sur deux semaines consécutives. */
+  WEEK_MAX_S: 56 * 3600,
+  FORTNIGHT_MAX_S: 90 * 3600,
+  /** Alerte (bandeau orange et voix) 30 min avant une limite. */
+  WARN_BEFORE_S: 30 * 60,
+  /** Semaine affichée quand il reste moins de 5 h. */
+  WEEK_SHOW_LEFT_S: 5 * 3600,
+  /** Bouton « Pas une pause (travail) » : visible seulement sous 10 km/h. */
+  WORK_BUTTON_KMH: 10,
+  STORAGE_KEY: 'gabarit.driving',
+  NOTICE: 'Aide seulement : le chronotachygraphe fait foi. Compté seulement pendant le guidage de Gabarit.',
 });
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
-const clampS = (x) => (isNum(x) && x > 0 ? x : 0);
+const DAY_MS = 86400000;
 
-/** Le règlement s'applique au véhicule (plus de 3,5 t) ? PTAC inconnu → oui (profil PL). */
-export function driveApplies(vehicle) {
-  return !isNum(vehicle?.weight) || vehicle.weight > DRIVE.MIN_WEIGHT_T;
+/** Lundi 00 h 00 (heure locale de la tablette) de la semaine qui contient t (art. 4 i). */
+export function weekStart(t) {
+  const d = new Date(t);
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7));
+  return monday.getTime();
 }
 
-/** « 4:30 », « 4 h 30 », « 4h », « 45 », « 4,5 » → secondes ; vide → 0 ; illisible → null. */
-export function parseDriveTime(text) {
-  if (text === null || text === undefined) return 0;
-  const s = String(text).trim().toLowerCase().replace(/\s+/g, '');
-  if (s === '') return 0;
-  let m = s.match(/^(\d{1,2})(?:h|:)(\d{1,2})?(?:min|mn|m)?$/);
-  if (m) {
-    const min = m[2] ? Number(m[2]) : 0;
-    return min < 60 ? Number(m[1]) * 3600 + min * 60 : null;
-  }
-  m = s.match(/^(\d{1,3})(?:min|mn|m)$/);
-  if (m) return Number(m[1]) * 60;
-  m = s.match(/^(\d{1,2})(?:[.,](\d{1,2}))?$/);
-  if (m) {
-    // Un nombre seul : heures (« 4,5 ») jusqu'à 15, minutes au-delà (« 45 »).
-    const v = Number(`${m[1]}.${m[2] ?? '0'}`);
-    return v <= 15 ? Math.round(v * 3600) : (m[2] ? null : v * 60);
-  }
-  return null;
-}
-
-/** Secondes → « 4 h 30 » / « 45 min » (champ prérempli). */
-export function driveTimeText(seconds) {
-  const s = clampS(seconds);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  if (!h) return `${m} min`;
-  return `${h} h${m ? ` ${String(m).padStart(2, '0')}` : ''}`;
-}
-
-/** Conduite déjà faite (saisie à l'arrêt) normalisée : depuis la dernière pause ≤ aujourd'hui. */
-export function normalizeDriven({ today = 0, sinceBreak = 0 } = {}) {
-  const since = Math.min(clampS(sinceBreak), DRIVE.DAY_EXTENDED_S);
-  // La conduite depuis la dernière pause fait partie de celle du jour.
-  return { today: Math.min(Math.max(clampS(today), since), DRIVE.DAY_EXTENDED_S), sinceBreak: since };
-}
-
-/** Distance (m) du tracé où la conduite cumulée atteint `seconds` (recherche sur timeAt, qui croît avec la distance). */
-function alongAtTime(route, line, seconds) {
-  let lo = 0;
-  let hi = line.total;
-  if (timeAt(route, line, hi) <= seconds) return null;
-  for (let k = 0; k < 40; k += 1) {
-    const mid = (lo + hi) / 2;
-    if (timeAt(route, line, mid) < seconds) lo = mid; else hi = mid;
-  }
-  return hi;
-}
-
-/**
- * Pauses conseillées le long d'un itinéraire (avant le départ).
- * @param {object} route itinéraire (parseDirections : coordinates, steps, duration)
- * @param {{ vehicle?:object, driven?:{ today:number, sinceBreak:number }, areas?:object[], departure?:Date }} ctx
- *   areas : aires placées sur ce tracé (placeAlongRoute, phase 9) ; driven : conduite déjà faite aujourd'hui (s)
- * @returns {{ applies:boolean, breaks:{ along:number, drive:number, time:Date, area:object|null }[],
- *   dayLimit:{ along:number, drive:number, time:Date }|null, breakS:number, restS:number, arrival:Date,
- *   elapsed:(t:number)=>number }}
- *   drive : secondes de conduite depuis le départ au moment de la pause ; time : heure estimée (pauses précédentes
- *   comprises) ; elapsed(t) : temps écoulé (s, pauses comprises) quand t secondes de conduite sont faites
- */
-export function planBreaks(route, { vehicle = null, driven = {}, areas = [], departure = new Date() } = {}) {
-  const duration = isNum(route?.duration) ? route.duration : 0;
-  const identity = (t) => t;
-  const base = {
-    applies: false, breaks: [], dayLimit: null, breakS: 0, restS: 0,
-    arrival: new Date(departure.getTime() + duration * 1000), elapsed: identity,
+/** Décompte vide (première utilisation, ou remise à zéro dans Réglages). */
+export function emptyDriving() {
+  return {
+    v: 1,
+    at: null, // dernière position comptée (ms)
+    mode: 'stop', // 'drive' | 'stop'
+    stopStart: null, // début de l'arrêt en cours (ms)
+    stopWork: false, // arrêt en cours marqué « travail »
+    moveSince: null, // reprise de la conduite pas encore confirmée (ms)
+    sinceBreak: 0, // conduite depuis la dernière pause valable (s)
+    split: false, // 15 min déjà faites (art. 7, 2e alinéa)
+    breakFrom: 0, // fin de la dernière pause valable (ms) : identifie la période pour les annonces
+    day: 0, // conduite depuis le dernier repos journalier (s)
+    dayExtended: false, // journée passée au-delà de 9 h
+    dayFrom: 0,
+    week: { start: null, driving: 0, extensions: 0 },
+    prevWeek: 0, // conduite de la semaine précédente (art. 6 § 3)
+    last: null, // dernier arrêt d'au moins 15 min : { start, end, work, before, pause, drivenSince }
+    announced: {},
   };
-  if (!driveApplies(vehicle) || !Array.isArray(route?.coordinates) || route.coordinates.length < 2) return base;
-  const d = normalizeDriven(driven);
-  const line = prepareLine(route.coordinates);
-  const usable = (Array.isArray(areas) ? areas : []).filter((a) => a && isNum(a.along) && !a.otherSide)
-    .sort((a, b) => a.along - b.along);
+}
 
-  // Limite du jour (9 h), comptée depuis le départ.
-  const dayLeft = Math.max(0, DRIVE.DAY_S - d.today);
-  const dayAt = dayLeft < duration ? dayLeft : null;
-
-  const pauses = [];
-  let next = Math.max(0, DRIVE.BLOCK_S - d.sinceBreak);
-  while (next < duration && (dayAt === null || next < dayAt)) {
-    const limitAlong = alongAtTime(route, line, next);
-    if (limitAlong === null) break;
-    // Aire du bon sens atteinte au plus tard à la limite, et pas plus d'une heure avant : la plus proche de la limite.
-    let area = null;
-    for (const a of usable) {
-      if (a.along > limitAlong) break;
-      const t = timeAt(route, line, a.along);
-      if (t >= next - DRIVE.AREA_WINDOW_S && t > (pauses.length ? pauses[pauses.length - 1].drive : 0)) area = a;
-    }
-    const at = area ? timeAt(route, line, area.along) : next;
-    pauses.push({ along: area ? area.along : limitAlong, drive: at, area });
-    next = at + DRIVE.BLOCK_S;
-  }
-
-  const elapsed = (t) => {
-    let e = t;
-    for (const p of pauses) if (t > p.drive) e += DRIVE.BREAK_S;
-    if (dayAt !== null && t > dayAt) e += DRIVE.DAILY_REST_S;
-    return e;
-  };
-  const breaks = pauses.map((p) => ({ ...p, time: new Date(departure.getTime() + elapsed(p.drive) * 1000) }));
-  let dayLimit = null;
-  if (dayAt !== null) {
-    const along = alongAtTime(route, line, dayAt) ?? line.total;
-    dayLimit = { along, drive: dayAt, time: new Date(departure.getTime() + elapsed(dayAt) * 1000) };
+/** Nettoie un décompte lu sur l'appareil (rien d'illisible ne passe). */
+export function sanitizeDriving(raw) {
+  const e = emptyDriving();
+  if (!raw || typeof raw !== 'object' || raw.v !== 1) return e;
+  const num = (x, d = 0) => (isNum(x) && x >= 0 ? x : d);
+  const ts = (x) => (isNum(x) && x > 0 ? x : null);
+  const snap = (s) => (s && typeof s === 'object' ? {
+    sinceBreak: num(s.sinceBreak), split: s.split === true, breakFrom: num(s.breakFrom), day: num(s.day),
+    dayExtended: s.dayExtended === true, dayFrom: num(s.dayFrom),
+  } : null);
+  const last = raw.last && typeof raw.last === 'object' && ts(raw.last.start) && ts(raw.last.end)
+    && snap(raw.last.before) && snap(raw.last.pause)
+    ? { start: raw.last.start, end: raw.last.end, work: raw.last.work === true, before: snap(raw.last.before),
+      pause: snap(raw.last.pause), drivenSince: num(raw.last.drivenSince) }
+    : null;
+  const announced = {};
+  if (raw.announced && typeof raw.announced === 'object') {
+    for (const [k, v] of Object.entries(raw.announced).slice(-50)) if (v === true && k.length < 60) announced[k] = true;
   }
   return {
-    applies: true,
-    breaks,
-    dayLimit,
-    breakS: breaks.length * DRIVE.BREAK_S,
-    restS: dayLimit ? DRIVE.DAILY_REST_S : 0,
-    arrival: new Date(departure.getTime() + elapsed(duration) * 1000),
-    elapsed,
+    ...e,
+    at: ts(raw.at),
+    mode: raw.mode === 'drive' ? 'drive' : 'stop',
+    stopStart: ts(raw.stopStart),
+    stopWork: raw.stopWork === true,
+    moveSince: ts(raw.moveSince),
+    sinceBreak: num(raw.sinceBreak),
+    split: raw.split === true,
+    breakFrom: num(raw.breakFrom),
+    day: num(raw.day),
+    dayExtended: raw.dayExtended === true,
+    dayFrom: num(raw.dayFrom),
+    week: {
+      start: ts(raw.week?.start), driving: num(raw.week?.driving),
+      extensions: Math.min(7, Math.floor(num(raw.week?.extensions))),
+    },
+    prevWeek: num(raw.prevWeek),
+    last,
+    announced,
   };
 }
 
-// ───────── Textes de la fiche ─────────
+const snapshot = (d) => ({
+  sinceBreak: d.sinceBreak, split: d.split, breakFrom: d.breakFrom, day: d.day, dayExtended: d.dayExtended, dayFrom: d.dayFrom,
+});
 
-const hourText = (d) => `${d.getHours()} h ${String(d.getMinutes()).padStart(2, '0')}`;
-const kmText = (m) => `km ${Math.round(m / 1000)}`;
-
-/** Lignes de la fiche : pauses conseillées, repos journalier, arrivée avec pauses. */
-export function describeBreaks(plan, { areaName = (a) => a?.name ?? 'aire' } = {}) {
-  if (!plan?.applies) return [];
-  const lines = [];
-  for (const b of plan.breaks) {
-    lines.push(b.area
-      ? `Pause conseillée (45 min) : ${areaName(b.area)}, ${kmText(b.along)}, vers ${hourText(b.time)}.`
-      : `Pause conseillée (45 min) vers ${kmText(b.along)}, vers ${hourText(b.time)} (4 h 30 de conduite).`);
-  }
-  if (plan.dayLimit) {
-    lines.push(`Repos journalier conseillé vers ${kmText(plan.dayLimit.along)}, vers ${hourText(plan.dayLimit.time)} : `
-      + '9 h de conduite (10 h possible deux fois par semaine).');
-  }
-  if (plan.breaks.length || plan.dayLimit) {
-    const day = plan.dayLimit ? ` (repos de 11 h compris, ${plan.arrival.toLocaleDateString('fr-FR', { weekday: 'long' })})` : '';
-    lines.push(`Arrivée estimée avec les pauses : ${hourText(plan.arrival)}${day}.`);
-  }
-  return lines;
+function clone(d) {
+  return { ...d, week: { ...d.week }, last: d.last ? { ...d.last } : null, announced: { ...d.announced } };
 }
 
-/** Résumé court pour la fiche d'itinéraire. */
-export function shortBreaks(plan) {
-  if (!plan?.applies || (!plan.breaks.length && !plan.dayLimit)) return null;
-  const n = plan.breaks.length;
-  const parts = [];
-  if (n) parts.push(`${n} pause${n > 1 ? 's' : ''} conseillée${n > 1 ? 's' : ''}`);
-  if (plan.dayLimit) parts.push('repos journalier');
-  return parts.join(' + ');
+/** Nouvelle semaine (lundi 00 h 00) : la précédente est gardée pour la limite de deux semaines (90 h). */
+function rollWeek(d, t) {
+  const ws = weekStart(t);
+  if (d.week.start === ws) return;
+  const consecutive = d.week.start !== null && ws - d.week.start <= 7 * DAY_MS + 2 * 3600e3 && ws > d.week.start;
+  d.prevWeek = consecutive ? d.week.driving : 0;
+  d.week = { start: ws, driving: 0, extensions: 0 };
 }
 
-export const DRIVE_NOTE = 'Temps de conduite : aide seulement, le chronotachygraphe fait foi.';
-
-// ───────── Compteur du guidage ─────────
+function addDriving(d, seconds) {
+  if (!(seconds > 0)) return;
+  d.sinceBreak += seconds;
+  d.day += seconds;
+  d.week.driving += seconds;
+  if (d.last) d.last.drivenSince += seconds;
+  if (!d.dayExtended && d.day > DRIVING.DAY_MAX_S) {
+    d.dayExtended = true;
+    d.week.extensions += 1;
+  }
+}
 
 /**
- * Compteur de départ. `driven` : saisie à l'arrêt (ou reprise du journal).
- * block : conduite depuis la dernière pause valable ; day : conduite du jour ; stop : arrêt en cours (s) ;
- * split : une pause d'au moins 15 min déjà faite (il reste 30 min à prendre).
+ * Effet d'un arrêt de `seconds` terminé à `end` sur les compteurs (art. 7 et art. 4 g), sans le noter.
+ * @returns {object} compteurs après l'arrêt (snapshot)
  */
-export function startDrive(driven = {}, now = 0) {
-  const d = normalizeDriven(driven);
-  return { block: d.sinceBreak, day: d.today, stop: 0, split: false, rested: false, at: isNum(now) ? now : 0, announced: {} };
-}
-
-/** Arrêt terminé (ou en cours) : pause valable ? */
-function applyStop(c) {
-  // Arrêt d'au moins 9 h (repos réduit) : nouvelle journée de conduite.
-  if (c.stop >= DRIVE.REDUCED_REST_S) return { ...c, block: 0, day: 0, split: false, rested: true, announced: {} };
-  if (c.stop >= DRIVE.BREAK_S || (c.split && c.stop >= DRIVE.SPLIT_SECOND_S)) {
-    return { ...c, block: 0, split: false, rested: true, announced: {} };
+export function applyStop(counters, seconds, end) {
+  const c = { ...counters };
+  if (seconds >= DRIVING.DAILY_REST_S) {
+    return { ...c, sinceBreak: 0, split: false, breakFrom: end, day: 0, dayExtended: false, dayFrom: end };
   }
-  if (c.stop >= DRIVE.SPLIT_FIRST_S) return { ...c, split: true };
+  if (seconds >= DRIVING.BREAK_FULL_S || (c.split && seconds >= DRIVING.BREAK_SECOND_S)) {
+    return { ...c, sinceBreak: 0, split: false, breakFrom: end };
+  }
+  if (seconds >= DRIVING.BREAK_FIRST_S) return { ...c, split: true };
   return c;
 }
 
-/**
- * Une position du guidage. speed en m/s (lissée par le moteur), t en ms.
- * @returns compteur mis à jour
- */
-export function stepDrive(c, { t, speed }) {
-  if (!c || !isNum(t)) return c;
-  const dt = c.at ? Math.max(0, (t - c.at) / 1000) : 0;
-  const moving = isNum(speed) && speed >= DRIVE.MOVING_MS && dt <= DRIVE.MAX_GAP_S;
-  let n = { ...c, at: t };
-  if (moving) {
-    if (n.stop > 0 && !n.rested) n = applyStop(n);
-    n.stop = 0;
-    n.rested = false;
-    n.block += dt;
-    n.day += dt;
-  } else {
-    n.stop += dt;
-    // Pause complète pendant l'arrêt : comptée tout de suite (« Pause faite »), puis repos journalier après 9 h.
-    // (la première tranche de 15 min n'est comptée qu'à la fin de l'arrêt).
-    const full = n.stop >= DRIVE.BREAK_S || (n.split && n.stop >= DRIVE.SPLIT_SECOND_S);
-    if ((full && !n.rested) || n.stop >= DRIVE.REDUCED_REST_S) n = applyStop(n);
+function endStop(d, end) {
+  if (d.stopStart === null) return;
+  const seconds = Math.max(0, (end - d.stopStart) / 1000);
+  const before = snapshot(d);
+  const pause = applyStop(before, seconds, end);
+  if (!d.stopWork) Object.assign(d, pause);
+  if (seconds >= DRIVING.BREAK_FIRST_S) {
+    d.last = { start: d.stopStart, end, work: d.stopWork, before, pause, drivenSince: 0 };
   }
-  return n;
+  d.stopStart = null;
+  d.stopWork = false;
+  pruneAnnounced(d);
 }
 
-const minText = (s) => formatDuration(Math.max(0, Math.round(s / 60) * 60));
+/** Annonces gardées seulement pour la période en cours (pause, journée, semaine, arrêt). */
+function pruneAnnounced(d) {
+  const keep = {};
+  for (const k of Object.keys(d.announced)) {
+    const [kind, id] = k.split(':');
+    const cur = kind === 'b' ? d.breakFrom : kind === 'd' ? d.dayFrom : kind === 'w' ? d.week.start : kind === 's' ? d.stopStart : null;
+    if (String(cur) === id) keep[k] = true;
+  }
+  d.announced = keep;
+}
 
 /**
- * Vue et annonce du guidage. nextArea : prochaine aire du sens (nom, distance) ou null.
- * @returns {{ view:{ blockLeft:number, dayLeft:number, stopped:number, text:string|null }|null, speak:string|null,
- *   announced:object }}
+ * Une position du guidage.
+ * @param {object} state décompte (emptyDriving / sanitizeDriving)
+ * @param {number} t heure de la position (ms)
+ * @param {number|null} speedKmh vitesse (km/h)
+ * @returns {object} nouveau décompte
  */
-export function guidanceDrive(c, { applies = true, nextArea = null } = {}) {
-  if (!c || !applies) return { view: null, speak: null, announced: c?.announced ?? {} };
-  const blockLeft = DRIVE.BLOCK_S - c.block;
-  const dayLeft = DRIVE.DAY_S - c.day;
-  const left = Math.min(blockLeft, dayLeft);
-  const announced = { ...c.announced };
-  let speak = null;
-  let text = null;
-  const wanted = c.split ? DRIVE.SPLIT_SECOND_S : DRIVE.BREAK_S;
-  if (c.rested && c.stop > 0) {
-    text = 'Pause faite';
-  } else if (c.stop >= DRIVE.SPLIT_FIRST_S || (c.stop >= 60 && blockLeft <= DRIVE.BANNER_BEFORE_S)) {
-    text = `Pause : ${minText(c.stop)} sur ${minText(wanted)}`;
+export function trackDriving(state, t, speedKmh) {
+  if (!isNum(t)) return state;
+  const d = clone(state ?? emptyDriving());
+  rollWeek(d, t);
+  const moving = isNum(speedKmh) && speedKmh >= DRIVING.MOVING_KMH;
+  if (d.at === null || t < d.at) {
+    d.at = t;
+    if (d.mode === 'stop' && d.stopStart === null) d.stopStart = t;
+  }
+  const gap = t - d.at > DRIVING.GAP_MS;
+  if (d.mode === 'drive') {
+    if (gap) { // plus de positions : arrêt depuis la dernière
+      d.mode = 'stop';
+      d.stopStart = d.at;
+      d.stopWork = false;
+      d.moveSince = null;
+    } else addDriving(d, (t - d.at) / 1000);
+  } else if (gap) d.moveSince = null;
+  d.at = t;
+  if (d.mode === 'drive') {
+    if (!moving) {
+      d.mode = 'stop';
+      d.stopStart = t;
+      d.stopWork = false;
+      d.moveSince = null;
+    }
+  } else if (moving) {
+    if (d.moveSince === null) d.moveSince = t;
+    if (t - d.moveSince >= DRIVING.MOVE_CONFIRM_MS) {
+      const from = d.moveSince;
+      endStop(d, from);
+      d.mode = 'drive';
+      d.moveSince = null;
+      addDriving(d, (t - from) / 1000);
+    }
+  } else d.moveSince = null;
+  return d;
+}
+
+/**
+ * Bouton « Pas une pause (travail) » (à l'arrêt, sous 10 km/h) : l'arrêt en cours, sinon le dernier arrêt d'au
+ * moins 15 min, ne compte plus comme pause (chargement, attente au quai…). Un second appui le recompte.
+ */
+export function toggleStopWork(state) {
+  if (!state) return state;
+  const d = clone(state);
+  if (d.mode === 'stop' && d.stopStart !== null) {
+    d.stopWork = !d.stopWork;
+    return d;
+  }
+  if (!d.last) return d;
+  const work = !d.last.work;
+  const base = work ? d.last.before : d.last.pause;
+  const extra = d.last.drivenSince;
+  Object.assign(d, base, {
+    sinceBreak: base.sinceBreak + extra,
+    day: base.day + extra,
+    dayExtended: base.dayExtended || base.day + extra > DRIVING.DAY_MAX_S,
+  });
+  d.last = { ...d.last, work };
+  return d;
+}
+
+/** Décompte vu à l'heure `t` : l'arrêt en cours compté comme s'il finissait maintenant (fiches avant le départ). */
+export function drivingAt(state, t) {
+  const d = clone(state ?? emptyDriving());
+  if (!isNum(t)) return d;
+  rollWeek(d, t);
+  let stopStart = d.mode === 'stop' ? d.stopStart : d.at;
+  if (d.mode === 'drive' && d.at !== null && t - d.at <= DRIVING.GAP_MS) stopStart = null; // on roule encore
+  if (stopStart !== null && t > stopStart && !(d.mode === 'stop' && d.stopWork)) {
+    Object.assign(d, applyStop(snapshot(d), (t - stopStart) / 1000, t));
+  }
+  return d;
+}
+
+/** Prolongation à 10 h permise aujourd'hui (la journée déjà prolongée compte parmi les 2 de la semaine). */
+export function canExtend(d) {
+  return d.dayExtended ? d.week.extensions <= DRIVING.EXTENSIONS_PER_WEEK : d.week.extensions < DRIVING.EXTENSIONS_PER_WEEK;
+}
+
+/** Limite du jour (art. 6 § 1) : 10 h si la journée est déjà prolongée ou s'il reste une prolongation cette semaine. */
+export function dayLimit(d) {
+  return canExtend(d) ? DRIVING.DAY_EXTENDED_S : DRIVING.DAY_MAX_S;
+}
+
+/** Limite de la semaine : 56 h, moins si la semaine précédente rapproche des 90 h (art. 6 § 2 et § 3). */
+export function weekLimit(d) {
+  return Math.max(0, Math.min(DRIVING.WEEK_MAX_S, DRIVING.FORTNIGHT_MAX_S - d.prevWeek));
+}
+
+/** Pause à faire : 30 min si les 15 min sont déjà faites, sinon 45 min (art. 7). */
+export const breakNeeded = (d) => (d.split ? DRIVING.BREAK_SECOND_S : DRIVING.BREAK_FULL_S);
+
+const hm = (s) => formatDuration(Math.max(0, s));
+const minutes = (s) => `${Math.round(s / 60)} min`;
+/** « 4 heures 30 », « 45 minutes » (voix). */
+function spoken(s) {
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m} minute${m > 1 ? 's' : ''}`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return `${h} heure${h > 1 ? 's' : ''}${r ? ` ${r}` : ''}`;
+}
+
+/**
+ * Ce que montre le guidage (bandeau `#nav-drive`) : une ligne principale, une ligne secondaire, le niveau et le
+ * bouton « travail ».
+ * @returns {{ level:'ok'|'soon'|'over', main:string, detail:string, stopped:boolean, canMarkWork:boolean,
+ *   workLabel:string, sinceBreak:number, left:number, day:number, dayLeft:number }}
+ */
+export function drivingView(state, t, speedKmh) {
+  const d = state ?? emptyDriving();
+  const stopped = d.mode === 'stop' && d.stopStart !== null;
+  const cur = stopped && isNum(t) ? Math.max(0, (t - d.stopStart) / 1000) : 0;
+  const need = breakNeeded(d);
+  const left = DRIVING.CONTINUOUS_MAX_S - d.sinceBreak;
+  const dLimit = dayLimit(d);
+  const dayLeft = (d.day > DRIVING.DAY_MAX_S ? dLimit : DRIVING.DAY_MAX_S) - d.day;
+  const wLimit = weekLimit(d);
+  const wLeft = wLimit - d.week.driving;
+  let level = 'ok';
+  let main;
+  if (stopped && d.stopWork) {
+    main = `Arrêt ${cur >= 60 ? `${minutes(cur)} ` : ''}compté comme travail (pas une pause)`;
+  } else if (stopped && cur >= 60 && d.sinceBreak > 0) {
+    if (cur >= DRIVING.DAILY_REST_S) main = `Repos ${hm(cur)} : repos journalier fait`;
+    else if (cur >= need) main = `Pause ${minutes(cur)} faite : 4 h 30 de conduite possibles`;
+    else if (!d.split && cur >= DRIVING.BREAK_FIRST_S) main = `Pause ${minutes(cur)} : encore ${minutes(need - cur)} pour 45 min (15 min déjà comptées)`;
+    else main = `Pause ${minutes(cur)} : encore ${minutes(need - cur)} pour ${minutes(need)}`;
+    if (left <= 0) level = 'over';
   } else if (left <= 0) {
-    text = dayLeft <= 0 ? 'Repos journalier conseillé (9 h de conduite)' : 'Pause conseillée (4 h 30 de conduite)';
-    if (!announced.zero) {
-      announced.zero = true;
-      speak = dayLeft <= 0
-        ? 'Neuf heures de conduite aujourd\'hui : repos conseillé.'
-        : 'Quatre heures trente de conduite : pause conseillée.';
-    }
-  } else if (left <= DRIVE.BANNER_BEFORE_S) {
-    text = `Pause conseillée dans ${minText(left)}`;
-    for (const m of DRIVE.ANNOUNCE_MIN) {
-      if (left <= m * 60 && !announced[m]) {
-        for (const k of DRIVE.ANNOUNCE_MIN) if (k >= m) announced[k] = true;
-        const area = nextArea ? ` Prochaine aire : ${nextArea.name}, dans ${Math.max(1, Math.round(nextArea.distance / 1000))} kilomètres.` : '';
-        speak = `Pause conseillée dans ${m} minutes.${area}`;
-        break;
-      }
-    }
+    level = 'over';
+    main = `Pause de ${minutes(need)} obligatoire : 4 h 30 de conduite dépassées de ${minutes(-left)}`;
+  } else {
+    if (left <= DRIVING.WARN_BEFORE_S) level = 'soon';
+    main = `Conduite ${hm(d.sinceBreak)} · pause de ${minutes(need)} dans ${hm(left)}`;
   }
-  return { view: { blockLeft, dayLeft, stopped: c.stop, text }, speak, announced };
-}
-
-// ───────── Journal sur l'appareil ─────────
-
-/** Journal à enregistrer (localStorage) : compteur et heure de la dernière position. */
-export function driveLog(c) {
-  if (!c) return null;
-  return { block: Math.round(c.block), day: Math.round(c.day), stop: Math.round(c.stop), split: !!c.split, at: c.at };
+  let detail;
+  if (d.day >= DRIVING.DAY_EXTENDED_S || (d.day >= DRIVING.DAY_MAX_S && dLimit === DRIVING.DAY_MAX_S)) {
+    level = 'over';
+    detail = `Jour ${hm(d.day)} : maximum atteint, repos journalier`;
+  } else if (d.day >= DRIVING.DAY_MAX_S) {
+    if (level === 'ok') level = 'soon';
+    detail = `Jour ${hm(d.day)} / 10 h (prolongation, 2 fois par semaine)`;
+  } else {
+    if (dayLeft <= DRIVING.WARN_BEFORE_S && level === 'ok') level = 'soon';
+    detail = `Jour ${hm(d.day)} / 9 h`;
+  }
+  if (wLeft <= DRIVING.WEEK_SHOW_LEFT_S) {
+    detail += ` · semaine ${hm(d.week.driving)} / ${hm(wLimit)}`;
+    if (wLeft <= 0) level = 'over';
+  }
+  const slow = !isNum(speedKmh) || speedKmh < DRIVING.WORK_BUTTON_KMH;
+  const target = stopped ? { work: d.stopWork } : d.last;
+  return {
+    level, main, detail, stopped,
+    canMarkWork: slow && !!target,
+    workLabel: target?.work ? 'Compter comme pause' : 'Pas une pause (travail)',
+    sinceBreak: d.sinceBreak, left, day: d.day, dayLeft,
+  };
 }
 
 /**
- * Reprise du journal : le temps passé depuis la dernière position compte comme un arrêt (pause, repos).
- * @returns {{ today:number, sinceBreak:number }|null} null si illisible ou ancien (plus de 24 h)
+ * Annonces vocales du décompte (une fois par période) : 30 min avant 4 h 30, à 4 h 30, 30 min avant 9 h, à 9 h et
+ * 10 h, 56 h de la semaine ; à l'arrêt, 15 min comptées et pause faite.
+ * @param {{ nextArea?:{ name:string, distance:number }|null }} opts aire proposée dans l'annonce « dans 30 minutes »
+ * @returns {{ state:object, speak:string[] }}
  */
-export function resumeDriveLog(log, now = Date.now()) {
-  if (!log || !isNum(log.at) || !isNum(log.block) || !isNum(log.day) || now < log.at || now - log.at > 24 * 3600e3) return null;
-  let c = {
-    block: clampS(log.block), day: clampS(log.day), stop: clampS(log.stop) + (now - log.at) / 1000, split: !!log.split,
-    rested: false, at: now, announced: {},
+export function drivingAnnouncements(state, t, { nextArea = null } = {}) {
+  const d = clone(state);
+  const speak = [];
+  const once = (key, text) => {
+    if (d.announced[key]) return;
+    d.announced[key] = true;
+    speak.push(text);
   };
-  c = applyStop(c);
-  return { today: Math.round(c.day), sinceBreak: Math.round(c.block) };
+  const need = breakNeeded(d);
+  const left = DRIVING.CONTINUOUS_MAX_S - d.sinceBreak;
+  if (d.mode === 'drive') {
+    const b = `b:${d.breakFrom}`;
+    if (left <= 0) {
+      once(`${b}:over`, `4 heures 30 de conduite : faites une pause de ${spoken(need)} dès que possible.`);
+      d.announced[`${b}:soon`] = true;
+    } else if (left <= DRIVING.WARN_BEFORE_S) {
+      const area = nextArea && nextArea.distance > 0
+        ? ` Prochaine aire : ${nextArea.name}, dans ${Math.max(1, Math.round(nextArea.distance / 1000))} kilomètres.` : '';
+      once(`${b}:soon`, `Pause de ${spoken(need)} à faire dans ${spoken(left)}.${area}`);
+    }
+    const day = `d:${d.dayFrom}`;
+    const others = DRIVING.EXTENSIONS_PER_WEEK - d.week.extensions; // prolongations restantes après aujourd'hui
+    if (d.day >= DRIVING.DAY_EXTENDED_S) {
+      once(`${day}:10`, '10 heures de conduite aujourd\'hui : maximum atteint. Prévoyez le repos journalier.');
+    } else if (d.day >= DRIVING.DAY_MAX_S) {
+      once(`${day}:9`, canExtend(d)
+        ? `9 heures de conduite aujourd'hui. Prolongation possible jusqu'à 10 heures${others > 0 ? ', encore une autre cette semaine' : ', la dernière de la semaine'}.`
+        : '9 heures de conduite aujourd\'hui : plus de prolongation cette semaine. Prévoyez le repos journalier.');
+      d.announced[`${day}:soon`] = true;
+    } else if (DRIVING.DAY_MAX_S - d.day <= DRIVING.WARN_BEFORE_S) {
+      once(`${day}:soon`, `Conduite du jour : 9 heures dans ${spoken(DRIVING.DAY_MAX_S - d.day)}.`);
+    }
+    if (d.week.driving >= weekLimit(d)) once(`w:${d.week.start}:max`, 'Limite de conduite de la semaine atteinte.');
+  } else if (d.stopStart !== null && !d.stopWork && d.sinceBreak > 0 && isNum(t)) {
+    const cur = (t - d.stopStart) / 1000;
+    const s = `s:${d.stopStart}`;
+    if (cur >= need) {
+      once(`${s}:done`, `Pause de ${spoken(need)} faite.`);
+      d.announced[`${s}:15`] = true;
+    } else if (!d.split && cur >= DRIVING.BREAK_FIRST_S) {
+      once(`${s}:15`, '15 minutes de pause comptées. Il faudra encore 30 minutes, maintenant ou plus tard, avant 4 heures 30 de conduite.');
+    }
+  }
+  return { state: d, speak };
+}
+
+/**
+ * Avant le départ (fiche de l'itinéraire) : où tomberont la pause de 4 h 30 et la limite du jour, d'après le décompte
+ * et la durée ORS (sans les pauses).
+ * @returns {{ level:'warn'|'info', text:string }[]}
+ */
+export function planDriving(state, route, now = Date.now()) {
+  if (!state || !isNum(route?.duration)) return [];
+  const d = drivingAt(state, now);
+  const lines = [];
+  const samples = sampleRoute(route, 1000);
+  const kmAt = (s) => {
+    const p = samples.find((x) => x.time >= s);
+    return p ? Math.round(p.along / 1000) : null;
+  };
+  const need = breakNeeded(d);
+  const left = Math.max(0, DRIVING.CONTINUOUS_MAX_S - d.sinceBreak);
+  if (d.sinceBreak > 0 || d.day > 0) {
+    lines.push({ level: 'info', text: `Temps de conduite : ${hm(d.sinceBreak)} depuis la dernière pause, ${hm(d.day)} aujourd'hui. ${DRIVING.NOTICE}` });
+  }
+  if (route.duration > left) {
+    const km = kmAt(left);
+    lines.push({
+      level: 'warn',
+      text: left <= 0
+        ? `Pause de ${minutes(need)} à faire avant de partir (4 h 30 de conduite atteintes).`
+        : `Pause de ${minutes(need)} à prévoir après ${hm(left)} de route${km !== null ? ` (vers km ${km})` : ''}.`,
+    });
+  }
+  const dayLeft = DRIVING.DAY_MAX_S - d.day;
+  if (route.duration > dayLeft) {
+    const km = kmAt(Math.max(0, dayLeft));
+    const ext = canExtend(d);
+    lines.push({
+      level: 'warn',
+      text: `Conduite du jour : 9 h atteintes${km !== null && dayLeft > 0 ? ` vers km ${km}` : ''}${ext ? ' (10 h possibles 2 fois par semaine)' : ' ; plus de prolongation cette semaine'}.`,
+    });
+  }
+  const wLeft = weekLimit(d) - d.week.driving;
+  if (route.duration > wLeft) lines.push({ level: 'warn', text: `Conduite de la semaine : limite atteinte pendant ce trajet (${hm(weekLimit(d))}).` });
+  return lines;
+}
+
+/** Lecture sur l'appareil (localStorage injectable). */
+export function loadDriving(storage) {
+  try {
+    return sanitizeDriving(JSON.parse(storage.getItem(DRIVING.STORAGE_KEY) ?? 'null'));
+  } catch {
+    return emptyDriving();
+  }
+}
+
+export function saveDriving(storage, state) {
+  try {
+    storage.setItem(DRIVING.STORAGE_KEY, JSON.stringify(sanitizeDriving(state)));
+  } catch {
+    // stockage plein ou bloqué : le décompte reste en mémoire pendant ce guidage
+  }
 }

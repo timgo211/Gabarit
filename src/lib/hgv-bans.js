@@ -197,15 +197,15 @@ function networkOf(sample, prev, next) {
 /**
  * Interdictions rencontrées sur un itinéraire, d'après l'heure de passage estimée (durées ORS, sans pause).
  * @param {object} route itinéraire (parseDirections)
- * @param {{ vehicle:object, departure:Date, elapsed?:(t:number)=>number }} ctx elapsed : temps écoulé pauses comprises
+ * @param {{ vehicle:object, departure:Date }} ctx
  * @returns {{ applies:boolean, calendarKnown:boolean, conflicts:{ kind:string, along:number, time:Date,
  *   start:Date, end:Date, roads:string[], approximate:boolean }[] }}
  *   un conflit par fenêtre (le premier point du trajet qui y tombe) ; approximate : réseau AURA ou Île-de-France
  *   reconnu d'après le nom de la route (sections exactes : voir les arrêtés)
  */
-export function bansAlongRoute(route, { vehicle, departure = new Date(), elapsed = (t) => t } = {}) {
+export function bansAlongRoute(route, { vehicle, departure = new Date() } = {}) {
   const scope = vehicleBanScope(vehicle);
-  const years = [departure.getFullYear(), new Date(departure.getTime() + elapsed(route?.duration ?? 0) * 1000).getFullYear()];
+  const years = [departure.getFullYear(), new Date(departure.getTime() + (route?.duration ?? 0) * 1000).getFullYear()];
   const known = years.every(calendarKnown);
   if (!scope.general && !scope.idf) return { applies: false, calendarKnown: known, conflicts: [] };
   const samples = sampleRoute(route, HGV_BANS.SAMPLE_M);
@@ -215,7 +215,7 @@ export function bansAlongRoute(route, { vehicle, departure = new Date(), elapsed
   for (const [i, sm] of samples.entries()) {
     if (!isInFrance(sm.lonlat)) { prev = sm; continue; }
     const opts = { metropole: isInMetropole(sm.lonlat) };
-    const t = departure.getTime() + elapsed(sm.time) * 1000;
+    const t = departure.getTime() + sm.time * 1000;
     const net = networkOf(sm, prev, samples[i + 1]);
     prev = sm;
     const nets = [];

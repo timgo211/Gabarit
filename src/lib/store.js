@@ -10,7 +10,7 @@ import {
   sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
-import { WIND, sanitizeWindThreshold } from './wind.js';
+import { sanitizeWindGust, WIND } from './wind.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -52,7 +52,9 @@ export function emptyData() {
       arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
       ruleVoice: true,
-      windGust: WIND.THRESHOLD_KMH,
+      driveVoice: true,
+      windVoice: true,
+      windGust: WIND.GUST.default,
     },
   };
 }
@@ -101,8 +103,10 @@ export function sanitizeData(raw) {
       voiceRate: sanitizeVoiceRate(s.voiceRate),
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
       areaVoice: s.areaVoice === true, // annonce vocale des aires PL (phase 9), désactivée par défaut
-      ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE, interdictions PL, vent, pauses (phase 5), activées par défaut
-      windGust: sanitizeWindThreshold(s.windGust), // seuil d'alerte vent fort, rafales en km/h (phase 5)
+      ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE et interdictions PL (phase 5), activées par défaut
+      driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
+      windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
+      windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 80 par défaut
     },
   };
 }

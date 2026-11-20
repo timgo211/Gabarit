@@ -1,83 +1,58 @@
-// Prévision du vent le long du trajet (phase 5, PR B) : une requête Open-Meteo par calcul pour tous les itinéraires
-// proposés, puis au plus une par heure pendant le guidage. Les points, l'adresse et la lecture viennent de
-// src/lib/wind.js ; ici, seulement le réseau. Résultat gardé 1 h sur l'appareil (localStorage), jamais dans le cache
-// du service worker (sw-routing.js : domaine extérieur, réseau seulement).
+// Vent fort (phase 5, PR B) : une requête Open-Meteo (GET) par calcul d'itinéraire, pour tous les itinéraires
+// proposés. Résultat gardé sur l'appareil (src/lib/wind.js, localStorage, 3 h), jamais dans le cache du service
+// worker (autre domaine : sw-routing.js ne le met jamais en cache). Échec : « Météo indisponible », jamais bloquant.
 
-import { WIND, windPoints, buildWindUrl, parseWind, createWindCache } from '../lib/wind.js';
-
-/** Une requête GET (délai 20 s) ; erreur si HTTP en échec ou réponse illisible. */
-async function ask(url, count, signal) {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), WIND.CLIENT_TIMEOUT_MS);
-  const onAbort = () => ctrl.abort();
-  signal?.addEventListener('abort', onAbort, { once: true });
-  try {
-    const res = await fetch(url, { signal: ctrl.signal, cache: 'no-store', credentials: 'omit' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!parseWind(json, count)) throw new Error('réponse illisible');
-    return json;
-  } finally {
-    clearTimeout(timer);
-    signal?.removeEventListener('abort', onAbort);
-  }
-}
+import { WIND, windPoints, windUrl, parseWind, windKey, createWindCache } from '../lib/wind.js';
 
 /**
- * @param {{ storage:Storage, onChange:()=>void }} ctx onChange : prévision arrivée ou en échec (fiches à refaire)
+ * @param {{ storage:Storage, onChange:(w:{ status:'idle'|'loading'|'ok'|'failed', forecast:object|null })=>void }} ctx
  */
 export function createWeather(ctx) {
   const cache = createWindCache(ctx.storage);
-  /** { routes, points, plan, forecast, failed, at } ou null. */
-  let current = null;
-  let request = null;
+  let current = { status: 'idle', forecast: null };
+  let seq = 0;
 
-  /**
-   * Prévision pour ces itinéraires (calcul, ou itinéraire suivi en guidage).
-   * @returns {Promise<object|null>} état (voir current)
-   */
+  function set(w) {
+    current = w;
+    ctx.onChange?.(w);
+  }
+
+  /** Nouveau calcul : prévisions pour les points de tous les itinéraires proposés. */
   async function load(routes) {
-    request?.abort();
-    const { points, plan } = windPoints(routes);
-    if (!points.length) { current = null; return null; }
-    const url = buildWindUrl(points);
-    const state = { routes, points, plan, forecast: null, failed: false, at: Date.now() };
-    current = state;
-    const hit = cache.get(url);
-    if (hit) {
-      state.forecast = parseWind(hit, points.length);
-      ctx.onChange?.();
-      return state;
-    }
+    const id = ++seq;
+    const points = windPoints(routes);
+    if (!points.length) { set({ status: 'failed', forecast: null }); return; }
+    const key = windKey(points);
+    const hit = cache.get(key);
+    if (hit) { set({ status: 'ok', forecast: hit }); return; }
+    set({ status: 'loading', forecast: null });
     const ctrl = new AbortController();
-    request = ctrl;
+    const timer = setTimeout(() => ctrl.abort(), WIND.TIMEOUT_MS);
     try {
-      const json = await ask(url, points.length, ctrl.signal);
-      cache.set(url, json);
-      state.forecast = parseWind(json, points.length);
+      if (!navigator.onLine) throw new Error('hors ligne');
+      const res = await fetch(windUrl(points), { cache: 'no-store', credentials: 'omit', signal: ctrl.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const forecast = parseWind(await res.json(), points);
+      if (!forecast) throw new Error('réponse illisible');
+      if (id !== seq) return; // un autre calcul a commencé entre-temps
+      cache.set(key, forecast);
+      set({ status: 'ok', forecast });
     } catch {
-      if (ctrl.signal.aborted && current !== state) return null;
-      state.failed = true;
+      if (id === seq) set({ status: 'failed', forecast: null });
     } finally {
-      if (request === ctrl) request = null;
+      clearTimeout(timer);
     }
-    if (current === state) ctx.onChange?.();
-    return current === state ? state : null;
+  }
+
+  function clear() {
+    seq += 1;
+    set({ status: 'idle', forecast: null });
   }
 
   return {
     load,
-    get current() {
-      return current;
-    },
-    /** En cours de requête ? */
-    get busy() {
-      return !!request;
-    },
-    clear() {
-      request?.abort();
-      request = null;
-      current = null;
-    },
+    clear,
+    get status() { return current.status; },
+    get forecast() { return current.forecast; },
   };
 }
