@@ -20,7 +20,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, setNavigationWind, markStopAsWork, mapButtonSize, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, markStopAsWork, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
@@ -272,7 +272,7 @@ export function createNavigation(ctx) {
     renderAlert(view);
 
     // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
-    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
+    const rules = [view.rules?.tunnel?.text, view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
     if (ui.rule.dataset.text !== rules.join('\n')) {
       ui.rule.dataset.text = rules.join('\n');
       ui.rule.replaceChildren(...rules.map((t) => {
@@ -619,6 +619,11 @@ export function createNavigation(ctx) {
     setWind(forecast) {
       if (!s) return;
       s.state = setNavigationWind(s.state, forecast);
+    },
+    /** Fichier des tunnels arrivé après « Démarrer » (phase 5b) : le moteur replace les tunnels interdits. */
+    setTunnels(data) {
+      if (!s) return;
+      s.state = setNavigationTunnels(s.state, data);
     },
     /** Vue satellite hors de France pendant le guidage (message de src/lib/map-layers.js). */
     setLayerView(view) {

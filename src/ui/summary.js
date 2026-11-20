@@ -6,12 +6,16 @@ import { el } from './dom.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
+import { ADR, codeText, effectiveCode } from '../lib/adr.js';
 
 function restrictionsText(v) {
   const n = (x) => String(x).replace('.', ',');
   const parts = [`H ${n(v.height)} m`, `l ${n(v.width)} m`, `L ${n(v.length)} m`, `${n(v.weight)} t`];
   if (v.axleload) parts.push(`${n(v.axleload)} t/essieu`);
-  if (v.hazmat) parts.push('matières dangereuses');
+  if (v.hazmat) {
+    const code = effectiveCode(v);
+    parts.push(`matières dangereuses${code ? `, ${codeText(code)}` : ''}${v.adrClass ? `, classe ${v.adrClass}` : ''}${v.unNumber ? `, UN ${v.unNumber}` : ''}`);
+  }
   return parts.join(' · ');
 }
 
@@ -38,7 +42,7 @@ function card(d, { checked, onSelect, rules }) {
  * Réglementation de l'itinéraire choisi (phase 5) : une ligne par ZFE et par interdiction, lien vers l'arrêté (texte
  * et adresse venant de data/zfe.json : textContent, adresse http(s) vérifiée par safeUrl), bouton « Éviter la ZFE ».
  */
-function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit }) {
+function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy }) {
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
@@ -49,6 +53,10 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
     canAvoid && rules.banned.length ? el('button', {
       type: 'button', class: 'btn btn-avoid-zfe', disabled: !!avoidBusy, onclick: onAvoidZfe,
       text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',
+    }) : null,
+    onAvoidTunnel && rules.forbiddenTunnels?.length ? el('button', {
+      type: 'button', class: 'btn btn-avoid-tunnel', disabled: !!tunnelBusy, onclick: onAvoidTunnel,
+      text: tunnelBusy ? 'Calcul du contournement…' : '⛔ Éviter le tunnel',
     }) : null,
     source ? el('p', { class: 'rules-source', text: source }) : null,
     // Licence CC BY 4.0 des données Open-Meteo : attribution avec un lien (open-meteo.com/en/licence).
@@ -72,7 +80,7 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
  */
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
-  windCredit = false,
+  windCredit = false, onAvoidTunnel = null, tunnelBusy = false,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -86,6 +94,7 @@ export function renderRouteChoice(node, notesNode, {
   if (sentSpeed !== null && sentSpeed !== vehicle.maxSpeed) {
     notes.push(`Vitesse max envoyée : ${sentSpeed} km/h (minimum imposé par OpenRouteService).`);
   }
+  if (vehicle.hazmat) notes.push(ADR.ORS_TEXT); // phase 5b : restrictions.hazmat d'ORS, plus large que le code tunnel
   if (choice.avoidTolls) notes.push('Péages évités si possible.');
   if (choice.avoidFerries) notes.push('Ferries évités si possible.');
   if (current.key === VARIANTS.alternative.key) {
@@ -103,7 +112,9 @@ export function renderRouteChoice(node, notesNode, {
   ].filter(Boolean));
   node.hidden = false;
   notesNode.replaceChildren(
-    ...rulesBlock(rules?.[selected], { source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit }),
+    ...rulesBlock(rules?.[selected], {
+      source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy,
+    }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
   );
   notesNode.hidden = false;

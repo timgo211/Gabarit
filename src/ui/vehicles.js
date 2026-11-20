@@ -1,7 +1,9 @@
 // Écran Véhicules : liste, profil actif, création / modification / suppression.
 
 import { $, el, wireDialog } from './dom.js';
-import { NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle } from '../lib/vehicle.js';
+import {
+  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, TUNNEL_CODE_VALUES, ADR_CLASS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle,
+} from '../lib/vehicle.js';
 import { BAN_STATUS } from '../lib/hgv-bans.js';
 
 const fmt = (x) => (x === null || x === undefined ? '' : String(x).replace('.', ','));
@@ -10,12 +12,22 @@ function dims(v) {
   const p = [`H ${fmt(v.height)} m`, `l ${fmt(v.width)} m`, `L ${fmt(v.length)} m`, `${fmt(v.weight)} t`];
   if (v.axleload) p.push(`${fmt(v.axleload)} t/essieu`);
   p.push(`${fmt(v.maxSpeed)} km/h`);
-  if (v.hazmat) p.push('ADR');
+  if (v.hazmat) {
+    const extra = [v.tunnelCode ? TUNNEL_CODE_LABELS[v.tunnelCode] : null, v.adrClass ? `classe ${v.adrClass}` : null,
+      v.unNumber ? `UN ${v.unNumber}` : null].filter(Boolean);
+    p.push(extra.length ? `ADR (${extra.join(', ')})` : 'ADR');
+  }
   p.push(`Crit'Air ${v.critair}`);
   if (v.banStatus === 'art4') p.push('art. 4');
   if (v.banStatus === 'exempt') p.push('spécialisé');
   return p.join(' · ');
 }
+
+/** Libellés du code de restriction en tunnel (accord ADR 8.6.4). */
+export const TUNNEL_CODE_LABELS = Object.freeze({
+  '': 'Non renseigné (aucune alerte tunnel)',
+  B: 'code B', C: 'code C', D: 'code D', E: 'code E', none: 'sans code tunnel (« - »)',
+});
 
 /**
  * @param {{ getData:()=>object, update:(fn:(data)=>object)=>void }} ctx
@@ -95,12 +107,37 @@ export function createVehicles(ctx) {
         el('input', { type: 'checkbox', name: 'hazmat', checked: v.hazmat }),
         ' Matières dangereuses (ADR)',
       ]),
+      // Phase 5b : champs ADR facultatifs, affichés seulement avec « Matières dangereuses » coché.
+      el('fieldset', { class: 'adr-fields full', hidden: !v.hazmat }, [
+        el('legend', { text: 'ADR (facultatif)' }),
+        el('div', {}, [
+          el('label', { for: 'veh-tunnel', text: 'Code de restriction en tunnel' }),
+          el('select', { id: 'veh-tunnel', name: 'tunnelCode' },
+            TUNNEL_CODE_VALUES.map((c) => el('option', { value: c, text: c ? TUNNEL_CODE_LABELS[c].replace(/^code/, 'Code').replace(/^sans/, 'Sans') : TUNNEL_CODE_LABELS[''], selected: c === (v.tunnelCode ?? '') }))),
+          el('p', { class: 'err', 'data-err': 'tunnelCode' }),
+        ]),
+        el('div', {}, [
+          el('label', { for: 'veh-adrclass', text: 'Classe ADR' }),
+          el('select', { id: 'veh-adrclass', name: 'adrClass' },
+            ADR_CLASS_VALUES.map((c) => el('option', { value: c, text: c || '—', selected: c === (v.adrClass ?? '') }))),
+          el('p', { class: 'err', 'data-err': 'adrClass' }),
+        ]),
+        el('div', {}, [
+          el('label', { for: 'veh-un', text: 'Numéro ONU' }),
+          el('input', { id: 'veh-un', name: 'unNumber', inputmode: 'numeric', maxlength: 7, value: v.unNumber ?? '', autocomplete: 'off', placeholder: 'Ex. : 1202' }),
+          el('p', { class: 'err', 'data-err': 'unNumber' }),
+        ]),
+        el('p', { class: 'hint full', text: 'Code tunnel : lettre du document de transport (ADR 8.6.4). Code combiné (B/D, C5000D…) : choisis la lettre qui s\'applique à ton chargement. Sans code : aucune alerte tunnel.' }),
+      ]),
       el('p', { class: 'hint full', text: 'La vitesse envoyée au calcul est au minimum 80 km/h (limite OpenRouteService).' }),
       el('div', { class: 'row full' }, [
         el('button', { type: 'submit', class: 'btn btn-primary', text: 'Enregistrer' }),
         el('button', { type: 'button', class: 'btn', text: 'Annuler', onclick: renderList }),
       ]),
     ]);
+
+    const hazmatBox = form.querySelector('input[name="hazmat"]');
+    hazmatBox.addEventListener('change', () => { form.querySelector('.adr-fields').hidden = !hazmatBox.checked; });
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();

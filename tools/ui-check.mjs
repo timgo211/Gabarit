@@ -93,7 +93,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
  */
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
-  zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null,
+  zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -119,16 +119,16 @@ async function open(browser, base, {
     const raf = window.requestAnimationFrame.bind(window);
     window.requestAnimationFrame = (cb) => { window.__raf += 1; return raf(cb); };
   });
-  await ctx.addInitScript(({ theme: t, layer: l }) => {
+  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
     localStorage.setItem('gabarit.orsKey', 'cle-factice-de-test');
     localStorage.setItem('gabarit.data', JSON.stringify({
-      version: 1, vehicles: [{ id: 'v1', name: 'Semi-remorque frigorifique 44 t', height: 4, width: 2.55, length: 16.5,
+      version: 1, vehicles: [v ?? { id: 'v1', name: 'Semi-remorque frigorifique 44 t', height: 4, width: 2.55, length: 16.5,
         weight: 44, axleload: 11.5, maxSpeed: 90 }],
       activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: false },
     }));
-  }, { theme, layer });
+  }, { theme, layer, vehicle });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async (route) => {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
@@ -176,6 +176,10 @@ async function open(browser, base, {
   });
   if (official) await ctx.route(/\/data\/aires-pl\.json$/, (route) => route.fulfill({ json: official }));
   if (zfe) await ctx.route(/\/data\/zfe\.json$/, (route) => route.fulfill({ json: zfe }));
+  // Phase 5b : data/tunnels-adr.json (null : fichier absent, réponse 404 ; undefined : fichier du dépôt).
+  if (tunnels !== undefined) {
+    await ctx.route(/\/data\/tunnels-adr\.json$/, (route) => (tunnels ? route.fulfill({ json: tunnels }) : route.fulfill({ status: 404, body: '' })));
+  }
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -997,6 +1001,125 @@ async function rulesCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 5b : matières dangereuses. Profil ADR code C ; un tunnel de catégorie D (copie OSM simulée) posé sur le
+ * milieu du trajet des fixtures. Fiche (« interdit »), notes (« la signalisation fait foi » sur chaque ligne de
+ * tunnel, phrase ORS, rappel ADR, source OSM), « Éviter le tunnel » (requête ORS avec avoid_polygons), guidage avec
+ * le GPS émulé (bandeau dans sa case), puis fichier absent (« Alerte tunnels indisponible »), code vide (aucune
+ * alerte), formulaire du véhicule (champs ADR affichés avec la case) ; 360, 412, 800 et 1280 px. Enfin le vrai
+ * service worker : « Gabarit v17 » en bas de Réglages.
+ */
+async function adrCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const tunnels = {
+    source: 'test', license: 'ODbL', updated: '2026-11-17',
+    tunnels: [{ id: 'w1', name: 'Tunnel de Test', cat: 'D', g: line.slice(10, 15) }],
+  };
+  const vehicle = (tunnelCode) => ({
+    id: 'v1', name: 'Citerne ADR', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90,
+    hazmat: true, tunnelCode, adrClass: '3', unNumber: '1202', critair: '1',
+  });
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const avoid = [];
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, tunnels, vehicle: vehicle('C'), overpass: () => fixture('overpass-aires.json'),
+      directions: (body) => {
+        if (body.options?.avoid_polygons) avoid.push(body.options.avoid_polygons);
+        return nav;
+      },
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.route-card-rules', { timeout: 10000 });
+    const card = await page.textContent('.route-card[aria-checked="true"] .route-card-rules');
+    check(/Tunnel de Test interdit/.test(card), `${width} px : fiche, tunnel interdit`, card);
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    const tun = notes.filter((n) => /^Tunnel de Test/.test(n.text));
+    check(tun.length === 1 && tun[0].cls === 'warn'
+      && /^Tunnel de Test \(catégorie D\) interdit au code C : vous y seriez vers km \d+ \(vers \d+ h \d\d\)\. La signalisation fait foi\.$/.test(tun[0].text),
+    `${width} px : note du tunnel avec « la signalisation fait foi »`, notes.map((n) => n.text).join(' | '));
+    check(notes.some((n) => /^ADR : mêmes interdictions de circulation/.test(n.text)), `${width} px : rappel ADR`);
+    check(!notes.some((n) => /sans tunnel interdit/i.test(n.text)), `${width} px : jamais « sans tunnel interdit »`);
+    const summary = await page.$$eval('.summary-notes li', (n) => n.map((li) => li.textContent));
+    check(summary.some((t) => /OpenRouteService évite tous les tunnels.*plus long que nécessaire/.test(t)),
+      `${width} px : phrase ORS (itinéraire peut être plus long)`, summary.join(' | '));
+    check(summary.some((t) => /matières dangereuses, code C, classe 3, UN 1202/.test(t)), `${width} px : profil ADR dans les notes`);
+    check(/OpenStreetMap \(ODbL\).*Copie OSM du 17\/11\/2026/.test(await page.textContent('.rules-source')), `${width} px : source des tunnels`);
+    check(await page.isVisible('.btn-avoid-tunnel'), `${width} px : bouton « Éviter le tunnel » à l'arrêt`);
+    await noHorizontalScroll(page, `${width} px fiches ADR`);
+    await page.locator('#route-notes').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-adr.png`) });
+
+    await page.click('.btn-avoid-tunnel');
+    await page.waitForSelector('.route-card:has-text("Contournement")', { timeout: 10000 });
+    check(avoid.length === 1 && avoid[0].type === 'MultiPolygon' && avoid[0].coordinates.length === 1
+      && avoid[0].coordinates[0][0].length === 5, `${width} px : « Éviter le tunnel » = une requête ORS, un carré`, JSON.stringify(avoid[0] ?? null).slice(0, 90));
+    check(/Le contournement passe encore par : Tunnel de Test\. La signalisation fait foi\./.test(await page.textContent('#message')),
+      `${width} px : prévient si le contournement y passe encore (fixture identique)`);
+    await noHorizontalScroll(page, `${width} px après « Éviter le tunnel »`);
+
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await drive(ctx, page, line, 50, 4);
+    const rule = await page.textContent('#nav-rule');
+    check(await page.isVisible('#nav-rule') && /Tunnel de Test dans [\d,]+ (km|m) : interdit \(code C\) · la signalisation fait foi/.test(rule),
+      `${width} px : bandeau du tunnel en guidage`, rule);
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${width} px : boutons de carte hors du bandeau`, foot.out.join(' ; '));
+    await noHorizontalScroll(page, `${width} px guidage ADR`);
+    await page.screenshot({ path: join(SHOTS, `${width}-adr-guidage.png`) });
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+
+    // Fichier absent : jamais un silence.
+    const missing = await open(browser, base, { width, height, tunnels: null, vehicle: vehicle('C'), overpass: () => fixture('overpass-aires.json') });
+    await computeRoute(missing.page);
+    await missing.page.waitForFunction(() => /Alerte tunnels indisponible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 10000 });
+    const mnotes = await missing.page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    check(mnotes.some((t) => /^Alerte tunnels indisponible \(données non chargées\)/.test(t)), `${width} px : fichier absent → « Alerte tunnels indisponible »`, mnotes.join(' | '));
+    await missing.ctx.close();
+
+    // Code tunnel vide : aucune alerte ; formulaire du véhicule.
+    const empty = await open(browser, base, { width, height, tunnels, vehicle: vehicle(''), overpass: () => fixture('overpass-aires.json') });
+    await computeRoute(empty.page);
+    await empty.page.waitForTimeout(500);
+    const enotes = await empty.page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    check(!enotes.some((t) => /^Tunnel de Test/.test(t)) && enotes.some((t) => /^Code tunnel non renseigné/.test(t)),
+      `${width} px : code vide, aucune alerte tunnel`, enotes.join(' | '));
+    await empty.page.click('#btn-vehicles');
+    await empty.page.click('#vehicles-body .btn:has-text("Modifier")');
+    check(await empty.page.isVisible('.adr-fields') && await empty.page.isVisible('#veh-tunnel'), `${width} px : champs ADR affichés (case cochée)`);
+    await empty.page.selectOption('#veh-tunnel', 'E');
+    await noHorizontalScroll(empty.page, `${width} px formulaire ADR`);
+    await empty.page.screenshot({ path: join(SHOTS, `${width}-adr-profil.png`) });
+    await empty.page.uncheck('input[name="hazmat"]');
+    check(!(await empty.page.isVisible('.adr-fields')), `${width} px : champs ADR masqués (case décochée)`);
+    await empty.page.check('input[name="hazmat"]');
+    await empty.page.click('.vehicle-form button[type="submit"]');
+    await empty.page.waitForSelector('.vehicle-card');
+    check(/ADR \(code E, classe 3, UN 1202\)/.test(await empty.page.textContent('.vehicle-card .dims')), `${width} px : profil enregistré avec le code E`);
+    check(empty.errors.length === 0, `${width} px : aucune erreur JavaScript (profil)`, empty.errors.join(' | '));
+    await empty.ctx.close();
+  }
+
+  // Vrai service worker : la ligne du bas de Réglages affiche VERSION de sw.js.
+  const swVersion = readFileSync(join(ROOT, 'sw.js'), 'utf8').match(/const VERSION = '([^']+)';/)[1];
+  const ctx = await browser.newContext({ viewport: { width: 800, height: 1280 }, serviceWorkers: 'allow', locale: 'fr-FR' });
+  await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, (route) => route.abort());
+  const page = await ctx.newPage();
+  await page.goto(base);
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
+  await page.click('#btn-settings');
+  await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+  const ver = await page.textContent('#app-version');
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v17', 'vrai service worker : « Gabarit v17 » en bas de Réglages', ver);
+  await ctx.close();
+}
+
 /** Éléments visibles du bandeau du haut qui passent sous la barre du bas (ou sortent du bandeau borné). */
 async function bannerOverBottom(page) {
   return page.evaluate(() => {
@@ -1143,7 +1266,7 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck };
+    drive: driveWindCheck, adr: adrCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

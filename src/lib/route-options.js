@@ -277,6 +277,17 @@ export function noZfeOption(option, route, avoidPolygons, names) {
   };
 }
 
+/**
+ * Itinéraire « Contournement » (phase 5b) : mêmes réglages que l'itinéraire choisi, tunnels interdits au code du
+ * véhicule évités (petits carrés options.avoid_polygons, ajoutés aux ZFE déjà évitées).
+ */
+export function noTunnelOption(option, route, avoidPolygons, names) {
+  return {
+    key: 'notunnel', label: 'Contournement', note: `Évite : ${names.join(', ')}. La signalisation fait foi.`, also: [], route,
+    request: { ...option.request, avoidPolygons },
+  };
+}
+
 /** Après un recalcul en route, les alternatives (parties de l'ancien départ) sont dépassées : il ne reste que lui. */
 export function reroutedOption(option, route) {
   return { key: 'rerouted', label: 'Recalculé en route', note: '', also: [], route, request: option.request };

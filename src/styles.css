@@ -242,7 +242,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .rules-notes .info { color: var(--muted); }
 .rules-notes a { margin-left: 6px; }
 .rules-source { color: var(--muted); font-size: .8rem; margin: 6px 0 0; overflow-wrap: anywhere; }
-.btn-avoid-zfe { margin-top: 10px; }
+.btn-avoid-zfe, .btn-avoid-tunnel { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 
 /* Dialogues */
@@ -281,6 +281,14 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .vehicle-form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
 .vehicle-form .full { grid-column: 1 / -1; }
 .vehicle-form .err { color: var(--danger); font-size: .85rem; min-height: 1em; margin: 2px 0 0; }
+/* Phase 5b : champs ADR (affichés avec « Matières dangereuses » coché). */
+.vehicle-form .adr-fields {
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  margin: 0; padding: 8px 10px 4px; min-width: 0; border: 1px solid var(--border, #8884); border-radius: var(--radius);
+}
+.vehicle-form .adr-fields[hidden] { display: none; }
+.vehicle-form .adr-fields legend { font-weight: 700; padding: 0 4px; }
+.vehicle-form .adr-fields input, .vehicle-form .adr-fields select { min-width: 0; width: 100%; }
 
 .update-banner {
   position: fixed; left: 12px; right: 12px; bottom: 40px; z-index: 50;

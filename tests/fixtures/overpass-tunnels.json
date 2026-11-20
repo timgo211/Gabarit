@@ -1,0 +1,294 @@
+{
+ "version": 0.6,
+ "generator": "Overpass API (réponse écrite d'après la doc : out tags geom)",
+ "osm3s": {
+  "timestamp_osm_base": "2026-11-17T08:00:00Z",
+  "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL."
+ },
+ "elements": [
+  {
+   "type": "way",
+   "id": 101,
+   "geometry": [
+    {
+     "lat": 45.05,
+     "lon": 5.0
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.003333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.006667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.01
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.013333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.016667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.02
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "name": "Tunnel de Test C",
+    "hazmat:B": "no",
+    "hazmat:C": "no"
+   }
+  },
+  {
+   "type": "way",
+   "id": 102,
+   "geometry": [
+    {
+     "lat": 45.05,
+     "lon": 5.2
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.200833
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.201667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.2025
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.203333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.204167
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.205
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "name": "Tunnel de Test E",
+    "hazmat:E": "no",
+    "ref": "A 99"
+   }
+  },
+  {
+   "type": "way",
+   "id": 103,
+   "geometry": [
+    {
+     "lat": 45.05,
+     "lon": 5.3
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.301667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.303333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.305
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.306667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.308333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.31
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "hazmat:adr_tunnel_cat": "D",
+    "name": "Tunnel double",
+    "oneway": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 104,
+   "geometry": [
+    {
+     "lat": 45.05018,
+     "lon": 5.31
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.308333
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.306667
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.305
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.303333
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.301667
+    },
+    {
+     "lat": 45.05018,
+     "lon": 5.3
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "hazmat:adr_tunnel_cat": "D",
+    "name": "Tunnel double",
+    "oneway": "yes"
+   }
+  },
+  {
+   "type": "way",
+   "id": 105,
+   "geometry": [
+    {
+     "lat": 45.07,
+     "lon": 5.1
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.101667
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.103333
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.105
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.106667
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.108333
+    },
+    {
+     "lat": 45.07,
+     "lon": 5.11
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "hazmat": "no",
+    "name": "Tunnel à côté"
+   }
+  },
+  {
+   "type": "way",
+   "id": 106,
+   "geometry": [
+    {
+     "lat": 45.05,
+     "lon": 5.12
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.121667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.123333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.125
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.126667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.128333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.13
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "hazmat:adr_tunnel_cat": "A",
+    "name": "Tunnel A"
+   }
+  },
+  {
+   "type": "way",
+   "id": 107,
+   "geometry": [
+    {
+     "lat": 45.05,
+     "lon": 5.14
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.141667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.143333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.145
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.146667
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.148333
+    },
+    {
+     "lat": 45.05,
+     "lon": 5.15
+    }
+   ],
+   "tags": {
+    "highway": "motorway",
+    "tunnel": "yes",
+    "hazmat:E": "yes",
+    "name": "Tunnel E autorisé"
+   }
+  }
+ ]
+}

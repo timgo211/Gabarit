@@ -28,6 +28,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     `hgv-bans.js` (interdictions PL week-ends / jours fériés, calendrier annuel, Île-de-France, guidage),
     `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches),
     `driving-time.js` (temps de conduite et pauses, CE 561/2006), `wind.js` (vent fort, Open-Meteo)
+  - phase 5b (ADR) : `adr.js` (code tunnel du véhicule, catégorie OSM, ADR 8.6.4, tunnels en dur, passage du tracé,
+    textes, guidage, « Éviter le tunnel »), `tunnels-convert.js` (extraits Geofabrik filtrés par osmium dans l'Action → `data/tunnels-adr.json`)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -44,9 +46,16 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
+- `tools/tunnels-update.mjs` + `.github/workflows/tunnels.yml` : copie hebdomadaire des tunnels signalés aux matières
+  dangereuses (OSM, extraits par pays de Geofabrik, filtrés par `osmium`) dans `data/tunnels-adr.json` ; job à part
+  `known` : recoupement Fourvière / Fréjus / Mont-Blanc (API OSM + Nominatim) ; lancée aussi à chaque envoi qui
+  modifie l'outil (toute branche) et à la main une fois sur main ; `node tools/tunnels-update.mjs fichier.osm` en local
+  (osmium installé)
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
+- fixture phase 5b : `overpass-tunnels.json` (voies au format « out tags geom » écrites d'après la doc : tunnels C, E, D double,
+  hazmat=no à côté, catégorie A, hazmat:E=yes, le long de la ligne de test à 45,05° N)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
@@ -63,14 +72,15 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot | rules | drive
+                                   #   | overview | press | areas | foot | rules | drive | adr
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
 un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
-21 h 57), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
+« Gabarit v17 »), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
@@ -189,6 +199,22 @@ bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages
   (CC BY 4.0, liens vers le site et la licence) sous les fiches et dans Réglages, « (Open-Meteo) » dans le bandeau.
   Guidage : `view.rules.wind`, bandeau sous 30 km, voix une
   fois vers 15 km ; recalcul / prévision tardive : `placeWind` sans requête.
+- ADR (phase 5b, `adr.js`) : ORS ne reçoit que `hazmat` ; avec lui il évite toute voie `hazmat=no` / `hazmat:B…E=no`
+  quelle que soit la lettre (code source HazmatAccessParser) et ignore `hazmat:adr_tunnel_cat` → phrase « l'itinéraire
+  peut être plus long » dans les notes. Code tunnel du profil (`tunnelCode` '', B–E, 'none'), `adrClass`, `unNumber`
+  facultatifs, vidés sans la case ADR ; code vide = aucune alerte (une ligne d'info seulement). Catégorie OSM = plus
+  haute lettre `hazmat:X=no`, `hazmat:adr_tunnel_cat`, `hazmat=no` → 'X' (tout interdit) ; code interdit si lettre ≤
+  catégorie. Tunnels : jamais d'Overpass (mesure 520 km : > 26 s ; Action en échec trois fois le 20/11/2026, serveurs pleins) :
+  extraits Geofabrik + osmium dans l'Action, `data/tunnels-adr.json` chargé seulement
+  pour un véhicule ADR avec code ; absent / vide → « Alerte tunnels indisponible (données non chargées) », jamais un
+  silence ; jamais « sans tunnel interdit » mais « Aucun tunnel signalé dans les données (copie du JJ/MM), la
+  signalisation fait foi » ; chaque alerte tunnel finit par « la signalisation fait foi ». `KNOWN_TUNNELS` : Fourvière
+  E, Fréjus C, Mont-Blanc E (Bison Futé), catégorie gardée face à OSM, vérifiés sans données. Tube sur le tracé : 5
+  points à 35 m au plus, dans l'ordre ; tubes qui se chevauchent réunis. « Éviter le tunnel » : carré de 80 m au milieu
+  (avoid_polygons ajouté aux ZFE évitées, 150 km), option « Contournement ». Guidage : `view.rules.tunnel`, bandeau
+  sous 20 km, voix vers 5 km (`settings.ruleVoice`). Nom affiché : `tunnel:name` d'abord (Fourvière : name =
+  « Autoroute du Soleil ») ; `hazmat=E` (lettre en valeur) = catégorie E. Overpass, Geofabrik, api.openstreetmap.org
+  et unece.org refusent le conteneur (Action GitHub pour mesurer / copier).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
