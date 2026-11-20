@@ -188,8 +188,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       (« Vent fort : rafales jusqu'à 95 km/h vers km 120 (vers 14 h 20) »), bandeau en guidage sous 30 km, voix une fois
       vers 15 km (réglage). Recalcul : points replacés sans requête.
   - [x] **Phase 5b — ADR (matières dangereuses)**
-    Profil véhicule : avec « Matières dangereuses (ADR) », code de restriction en tunnel (B, C, D, E, sans code ; vide =
-    aucune alerte), classe ADR et numéro ONU facultatifs (UN 2919, 3291, 3331, 3359, 3373 : sans code, ADR 1.9.5.2.2).
+    Réglages (réglage global depuis la v19 : l'ADR dépend du chargement, pas du camion) : « Je transporte des matières
+    dangereuses », classe en clair (1 explosibles … 9 divers), numéro ONU facultatif, code de restriction en tunnel
+    saisi à la main (vide = aucune alerte, B, C, D, E ; jamais déduit de la classe ; UN 2919, 3291, 3331, 3359, 3373 :
+    sans code, ADR 1.9.5.2.2). Anciens profils et anciens fichiers JSON repris (profil actif ADR, sinon le premier).
     ORS ne reçoit que `hazmat` (oui / non) ; d'après son code source (HazmatAccessParser, HeavyVehicleEdgeFilter), il
     évite alors toute voie `hazmat=no` ou `hazmat:B…E=no`, quelle que soit la lettre, et ne lit pas
     `hazmat:adr_tunnel_cat` : phrase dans les notes (« l'itinéraire peut être plus long que nécessaire »).
@@ -198,7 +200,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     `data/tunnels-adr.json` par l'Action « Tunnels ADR » depuis les extraits par pays de Geofabrik filtrés par osmium
     (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
     catégorie = plus haute lettre marquée « no », ADR 8.6.4 : un code interdit sa catégorie et les suivantes), lue
-    seulement pour un véhicule ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
+    seulement pour un chargement ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
     Futé, « Interdictions dans les principaux tunnels »), recoupés avec OSM dans le journal de l'Action. Fiche :
     « Tunnel du Fréjus (catégorie C) interdit au code C : vous y seriez vers km 412 (vers 14 h 20). La signalisation
     fait foi. », autres itinéraires proposés qui l'évitent, bouton « Éviter le tunnel » à l'arrêt (carré de 80 m,

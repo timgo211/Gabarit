@@ -19,7 +19,7 @@ test('normalisation depuis un formulaire', () => {
   assert.equal(v.name, 'Porteur');
   assert.equal(v.height, 3.5);
   assert.equal(v.axleload, null);
-  assert.equal(v.hazmat, true);
+  assert.equal('hazmat' in v, false, 'ADR : dans Réglages, plus dans le profil');
   assert.equal(v.critair, '2');
   assert.equal(validateVehicle(v).valid, true);
 });

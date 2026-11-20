@@ -10,6 +10,9 @@ import { formatPricePerLiter } from '../lib/format.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
 import { sanitizeVoiceRate, sanitizeVoiceVolume } from '../lib/prefs.js';
 import { sanitizeWindGust } from '../lib/wind.js';
+import {
+  ADR_CLASSES, ADR_TUNNEL_CODES, TUNNEL_CODE_HELP, sanitizeAdrSettings, cleanUnNumber, unNumberError,
+} from '../lib/adr-settings.js';
 
 /** Phrase de Réglages sur la musique pendant les consignes (phase 7c). */
 const MUSIC_TEXT = {
@@ -32,7 +35,7 @@ function setStatus(node, text, ok) {
  *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
  *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void,
  *   onDriveVoiceChange?:(on:boolean)=>void, onWindVoiceChange?:(on:boolean)=>void, onWindGustChange?:(g:number)=>void,
- *   onDrivingReset?:()=>void }} ctx
+ *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 export function createSettings(ctx) {
@@ -55,7 +58,15 @@ export function createSettings(ctx) {
   const voiceName = $('#voice-name');
   const voiceRate = $('#voice-rate');
   const voiceVolume = $('#voice-volume');
+  const adrEnabled = $('#adr-enabled');
+  const adrFields = $('#adr-fields');
+  const adrClass = $('#adr-class');
+  const adrUn = $('#adr-un');
+  const adrTunnel = $('#adr-tunnel');
+  const adrStatus = $('#adr-status');
   wireDialog(dlg);
+  $('#adr-tunnel-help').textContent = TUNNEL_CODE_HELP;
+  adrClass.append(...ADR_CLASSES.map((c) => new Option(c.label, c.value)));
   $('#voice-music').textContent = ctx.canDuckMedia ? MUSIC_TEXT.duck : MUSIC_TEXT.none;
 
   const rateText = (r) => String(r).replace('.', ',');
@@ -105,6 +116,36 @@ export function createSettings(ctx) {
     showVoiceValues();
     for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) r.checked = r.value === settings.arrowColor;
     dieselInput.value = formatPricePerLiter(settings.dieselPrice);
+    syncAdr(settings.adr);
+  }
+
+  /** Matières dangereuses (phase 5b) : code tunnel vide, B, C, D, E ; « sans code » seulement s'il vient d'un ancien profil. */
+  function syncAdr(raw) {
+    const a = sanitizeAdrSettings(raw);
+    adrEnabled.checked = a.enabled;
+    adrFields.hidden = !a.enabled;
+    adrClass.value = a.adrClass;
+    adrUn.value = a.unNumber;
+    adrUn.classList.remove('invalid');
+    const codes = a.tunnelCode === 'none' ? [...ADR_TUNNEL_CODES, 'none'] : ADR_TUNNEL_CODES;
+    adrTunnel.replaceChildren(...codes.map((c) => new Option(
+      c === '' ? 'Vide (aucune alerte tunnel)' : c === 'none' ? 'Sans code (repris du profil)' : c, c,
+    )));
+    adrTunnel.value = a.tunnelCode;
+  }
+
+  /** Enregistre le chargement à chaque changement ; numéro ONU mal saisi : rien d'enregistré, message. */
+  function saveAdr() {
+    adrFields.hidden = !adrEnabled.checked;
+    const err = unNumberError(adrUn.value);
+    adrUn.classList.toggle('invalid', !!err);
+    if (err) { setStatus(adrStatus, err, false); return; }
+    const adr = sanitizeAdrSettings({
+      enabled: adrEnabled.checked, adrClass: adrClass.value, unNumber: cleanUnNumber(adrUn.value), tunnelCode: adrTunnel.value,
+    });
+    adrUn.value = adr.unNumber;
+    ctx.onAdrChange?.(adr);
+    setStatus(adrStatus, adr.enabled ? 'Enregistré : vaut pour le prochain calcul d\'itinéraire.' : 'Enregistré : aucune matière dangereuse.', true);
   }
 
   function open() {
@@ -118,6 +159,7 @@ export function createSettings(ctx) {
     setStatus(dieselStatus, '');
     setStatus(windStatus, '');
     setStatus(drivingStatus, '');
+    setStatus(adrStatus, '');
     syncChoices(ctx.getData().settings);
     showVersion();
     dlg.showModal();
@@ -184,6 +226,7 @@ export function createSettings(ctx) {
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));
   areaVoice.addEventListener('change', () => ctx.onAreaVoiceChange?.(areaVoice.checked));
+  for (const n of [adrEnabled, adrClass, adrUn, adrTunnel]) n.addEventListener('change', saveAdr);
   ruleVoice.addEventListener('change', () => ctx.onRuleVoiceChange?.(ruleVoice.checked));
   driveVoice.addEventListener('change', () => ctx.onDriveVoiceChange?.(driveVoice.checked));
   windVoice.addEventListener('change', () => ctx.onWindVoiceChange?.(windVoice.checked));

@@ -211,6 +211,22 @@
       </section>
 
       <section class="card">
+        <h3>Matières dangereuses (ADR)</h3>
+        <p class="hint">Dépend du chargement, pas du camion : vaut pour tous les véhicules.</p>
+        <label class="toggle"><input type="checkbox" id="adr-enabled"> Je transporte des matières dangereuses</label>
+        <div id="adr-fields" class="adr-settings" hidden>
+          <label for="adr-class" class="field-label">Classe de la matière transportée</label>
+          <select id="adr-class"><option value="">Non renseignée</option></select>
+          <label for="adr-un" class="field-label">Numéro ONU (facultatif, 4 chiffres)</label>
+          <input id="adr-un" type="text" inputmode="numeric" maxlength="7" autocomplete="off" placeholder="Ex. : 1202">
+          <label for="adr-tunnel" class="field-label">Code tunnel</label>
+          <select id="adr-tunnel"></select>
+          <p id="adr-tunnel-help" class="hint"></p>
+        </div>
+        <p id="adr-status" class="status" role="status"></p>
+      </section>
+
+      <section class="card">
         <h3>Temps de conduite et vent</h3>
         <p class="hint">Temps de conduite et pauses d'après le règlement (CE) 561/2006 : 4 h 30 de conduite puis 45 min
           de pause (ou 15 min puis 30 min, dans cet ordre), 9 h par jour (10 h deux fois par semaine), 56 h par

@@ -1027,8 +1027,9 @@ async function rulesCheck(browser, base) {
  * milieu du trajet des fixtures. Fiche (« interdit »), notes (« la signalisation fait foi » sur chaque ligne de
  * tunnel, phrase ORS, rappel ADR, source OSM), « Éviter le tunnel » (requête ORS avec avoid_polygons), guidage avec
  * le GPS émulé (bandeau dans sa case), puis fichier absent (« Alerte tunnels indisponible »), code vide (aucune
- * alerte), formulaire du véhicule (champs ADR affichés avec la case) ; 360, 412, 800 et 1280 px. Enfin le vrai
- * service worker : « Gabarit v18 » en bas de Réglages.
+ * alerte), profil enregistré avant la v19 repris dans Réglages (section ADR, profil sans champs ADR, nouveau calcul) ;
+ * 360, 412, 800 et 1280 px. Enfin le vrai
+ * service worker : « Gabarit v19 » en bas de Réglages.
  */
 async function adrCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
@@ -1102,26 +1103,57 @@ async function adrCheck(browser, base) {
     check(mnotes.some((t) => /^Alerte tunnels indisponible \(données non chargées\)/.test(t)), `${width} px : fichier absent → « Alerte tunnels indisponible »`, mnotes.join(' | '));
     await missing.ctx.close();
 
-    // Code tunnel vide : aucune alerte ; formulaire du véhicule.
+    // Code tunnel vide : aucune alerte. Profil enregistré avant la v19 (ADR dans le véhicule) : repris dans Réglages.
     const empty = await open(browser, base, { width, height, tunnels, vehicle: vehicle(''), overpass: () => fixture('overpass-aires.json') });
     await computeRoute(empty.page);
     await empty.page.waitForTimeout(500);
     const enotes = await empty.page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
     check(!enotes.some((t) => /^Tunnel de Test/.test(t)) && enotes.some((t) => /^Code tunnel non renseigné/.test(t)),
       `${width} px : code vide, aucune alerte tunnel`, enotes.join(' | '));
+    // Formulaire du véhicule : plus aucun champ ADR.
     await empty.page.click('#btn-vehicles');
     await empty.page.click('#vehicles-body .btn:has-text("Modifier")');
-    check(await empty.page.isVisible('.adr-fields') && await empty.page.isVisible('#veh-tunnel'), `${width} px : champs ADR affichés (case cochée)`);
-    await empty.page.selectOption('#veh-tunnel', 'E');
-    await noHorizontalScroll(empty.page, `${width} px formulaire ADR`);
-    await empty.page.screenshot({ path: join(SHOTS, `${width}-adr-profil.png`) });
-    await empty.page.uncheck('input[name="hazmat"]');
-    check(!(await empty.page.isVisible('.adr-fields')), `${width} px : champs ADR masqués (case décochée)`);
-    await empty.page.check('input[name="hazmat"]');
-    await empty.page.click('.vehicle-form button[type="submit"]');
-    await empty.page.waitForSelector('.vehicle-card');
-    check(/ADR \(code E, classe 3, UN 1202\)/.test(await empty.page.textContent('.vehicle-card .dims')), `${width} px : profil enregistré avec le code E`);
-    check(empty.errors.length === 0, `${width} px : aucune erreur JavaScript (profil)`, empty.errors.join(' | '));
+    check(await empty.page.locator('.vehicle-form [name="hazmat"], .vehicle-form [name="tunnelCode"], .vehicle-form [name="adrClass"], .vehicle-form [name="unNumber"]').count() === 0
+      && /Matières dangereuses \(ADR\) : dans Réglages/.test(await empty.page.textContent('.vehicle-form')), `${width} px : profil sans champs ADR (renvoi vers Réglages)`);
+    await empty.page.click('#dlg-vehicles [data-close]');
+    // Réglages : section « Matières dangereuses (ADR) », reprise de l'ancien profil (classe 3, UN 1202, code vide).
+    await empty.page.click('#btn-settings');
+    await empty.page.locator('#adr-enabled').scrollIntoViewIfNeeded();
+    const adrUi = await empty.page.evaluate(() => ({
+      on: document.querySelector('#adr-enabled').checked, cls: document.querySelector('#adr-class').value,
+      un: document.querySelector('#adr-un').value, code: document.querySelector('#adr-tunnel').value,
+      codes: [...document.querySelectorAll('#adr-tunnel option')].map((o) => o.value),
+      classes: [...document.querySelectorAll('#adr-class option')].map((o) => o.textContent),
+      help: document.querySelector('#adr-tunnel-help').textContent,
+    }));
+    check(adrUi.on && adrUi.cls === '3' && adrUi.un === '1202' && adrUi.code === '', `${width} px : Réglages ADR repris de l'ancien profil`, JSON.stringify(adrUi).slice(0, 120));
+    check(JSON.stringify(adrUi.codes) === JSON.stringify(['', 'B', 'C', 'D', 'E']) && adrUi.classes.length === 14
+      && adrUi.classes.includes('3 — Liquides inflammables (gazole, essence…)') && /la classe seule ne la donne pas/.test(adrUi.help),
+    `${width} px : code tunnel vide / B–E, classes en clair, aide`, adrUi.codes.join(','));
+    await empty.page.fill('#adr-un', '12');
+    await empty.page.locator('#adr-un').blur();
+    check(/4 chiffres/.test(await empty.page.textContent('#adr-status')), `${width} px : numéro ONU mal saisi refusé`);
+    await empty.page.fill('#adr-un', 'UN 1202');
+    await empty.page.locator('#adr-un').blur();
+    await empty.page.selectOption('#adr-tunnel', 'E');
+    await noHorizontalScroll(empty.page, `${width} px Réglages ADR`);
+    await empty.page.locator('#adr-enabled').scrollIntoViewIfNeeded();
+    await empty.page.screenshot({ path: join(SHOTS, `${width}-adr-reglages.png`) });
+    await empty.page.uncheck('#adr-enabled');
+    check(!(await empty.page.isVisible('#adr-fields')), `${width} px : champs ADR masqués (case décochée)`);
+    await empty.page.check('#adr-enabled');
+    check(await empty.page.isVisible('#adr-tunnel'), `${width} px : champs ADR affichés (case cochée)`);
+    await empty.page.click('#dlg-settings [data-close]');
+    await empty.page.click('#btn-vehicles');
+    check(/ADR \(code E, classe 3, UN 1202\)/.test(await empty.page.textContent('.vehicle-card.active .dims')), `${width} px : résumé du profil lu dans Réglages (code E)`);
+    await empty.page.click('#dlg-vehicles [data-close]');
+    await empty.page.click('#btn-route');
+    await empty.page.waitForFunction(() => /code E, classe 3, UN 1202/.test(document.querySelector('.summary-notes')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+    const s2 = await empty.page.$$eval('.summary-notes li', (n) => n.map((li) => li.textContent));
+    check(s2.some((t) => /matières dangereuses, code E, classe 3, UN 1202/.test(t)), `${width} px : nouveau calcul avec le code des Réglages`, s2.join(' | '));
+    const stored = await empty.page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')));
+    check(stored.settings.adr?.tunnelCode === 'E' && !('hazmat' in stored.vehicles[0]), `${width} px : enregistré dans settings.adr, plus dans le profil`);
+    check(empty.errors.length === 0, `${width} px : aucune erreur JavaScript (Réglages ADR)`, empty.errors.join(' | '));
     await empty.ctx.close();
   }
 
@@ -1137,7 +1169,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v18', 'vrai service worker : « Gabarit v18 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v19', 'vrai service worker : « Gabarit v19 » en bas de Réglages', ver);
   await ctx.close();
 }
 

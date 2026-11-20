@@ -11,6 +11,7 @@ import {
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
 import { sanitizeWindGust, WIND } from './wind.js';
+import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -55,6 +56,7 @@ export function emptyData() {
       driveVoice: true,
       windVoice: true,
       windGust: WIND.GUST.default,
+      adr: emptyAdrSettings(),
     },
   };
 }
@@ -107,6 +109,8 @@ export function sanitizeData(raw) {
       driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
       windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 70 par défaut
+      // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
+      adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },
   };
 }
@@ -128,8 +132,10 @@ export function importData(text) {
   return sanitizeData(raw);
 }
 
+/** Profil actif, avec le chargement ADR des Réglages (hazmat, tunnelCode, adrClass, unNumber : withAdr). */
 export function activeVehicle(data) {
-  return data.vehicles.find((v) => v.id === data.activeVehicleId) ?? data.vehicles[0] ?? null;
+  const v = data.vehicles.find((o) => o.id === data.activeVehicleId) ?? data.vehicles[0] ?? null;
+  return withAdr(v, data.settings?.adr);
 }
 
 /** Ajoute un trajet en tête de l'historique (borné). Renvoie de nouvelles données. */
