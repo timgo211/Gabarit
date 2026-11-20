@@ -93,7 +93,7 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
   Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
   ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
 
-- [ ] **Phase 5 — Réglementation**
+- [x] **Phase 5 — Réglementation**
   ZFE (`aires.geojson` de la Base nationale BNZFE sur transport.data.gouv.fr, copié dans `data/` par une GitHub Action
   hebdomadaire) avec alerte selon ma vignette Crit'Air ; interdictions PL les week-ends et jours fériés ; temps de
   conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
@@ -112,8 +112,21 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
     ou « Véhicule spécialisé / agricole ». Fiche : « Interdiction PL samedi 22 h → dimanche 22 h : vous y seriez vers
     km 412 » ; guidage : annonces 1 h et 15 min avant si l'arrivée est après le début, bandeau. Vérifié avec le
     calendrier 2026 de la brochure Bison Futé (écarts du 4 avril et du 9 mai en Île-de-France : l'appli suit l'arrêté).
-  - [ ] Temps de conduite et pauses (PR B).
-  - [ ] Alerte vent fort (PR B).
+  - [x] **Temps de conduite et pauses** (PR B, règlement (CE) 561/2006, aide seulement : le chronotachygraphe fait
+    foi) : conduite à partir de 5 km/h, arrêt compté comme pause à partir de 15 min ; art. 7 : 4 h 30 puis 45 min, ou
+    15 min PUIS 30 min (30 puis 15 ne suffit pas) ; art. 6 : 9 h par jour (10 h deux fois par semaine), 56 h par
+    semaine, 90 h sur deux semaines ; arrêt de 9 h = repos journalier. Compté pendant le guidage (positions interrompues
+    = arrêt), gardé sur l'appareil (pas exporté), remise à zéro dans Réglages. Fiche : « Pause de 45 min à prévoir
+    après 1 h 30 de route (vers km 96) », 9 h du jour ; guidage : ligne « Conduite 3 h 12 · pause de 45 min dans
+    1 h 18 » + journée (orange 30 min avant, rouge au-delà), voix 30 min avant 4 h 30 (avec la prochaine aire), à
+    4 h 30, à 9 h / 10 h, et à l'arrêt (15 min comptées, pause faite) ; bouton « Pas une pause (travail) » à l'arrêt
+    seulement (sous 10 km/h), qui retire l'arrêt en cours ou le dernier arrêt du décompte (second appui : recompté).
+  - [x] **Alerte vent fort** (PR B) : Open-Meteo (sans clé, CC BY 4.0, attribution sous les fiches et dans Réglages),
+    une requête par calcul pour tous les itinéraires proposés (40 points au plus, un tous les 15 km), rafales à
+    l'heure de passage (maximum de l'heure précédente), seuil réglable (80 km/h par défaut) ; prévision gardée 3 h sur
+    l'appareil, jamais dans le cache du service worker ; « Météo indisponible » si échec, jamais bloquant. Fiche
+    (« Vent fort : rafales jusqu'à 95 km/h vers km 120 (vers 14 h 20) »), bandeau en guidage sous 30 km, voix une fois
+    vers 15 km (réglage). Recalcul : points replacés sans requête.
 
 - [ ] **Phase 5b — ADR (matières dangereuses)**
   Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D

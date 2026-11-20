@@ -26,7 +26,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
     `hgv-bans.js` (interdictions PL week-ends / jours fériés, calendrier annuel, Île-de-France, guidage),
-    `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches)
+    `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches),
+    `driving-time.js` (temps de conduite et pauses, CE 561/2006), `wind.js` (vent fort, Open-Meteo)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -34,6 +35,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
   - `areas.js` (aires du trajet : requête Overpass, liste, repères HTML sur la carte, fiche et « Mon avis »)
+  - `weather.js` (une requête Open-Meteo par calcul, copie sur l'appareil, « Météo indisponible »)
   - `map.js` : flèche animée (`navigateTo`, boucle requestAnimationFrame arrêtée à la fin de chaque interpolation),
     vue d'ensemble, appui long (600 ms, ou clic droit) → panneau « Aller ici / Partir d'ici » (`app.js`)
 - `tests/` : `*.test.js` + `fixtures/` (réponses ORS/Pelias écrites d'après la doc ; `ors-directions-nav.json` et
@@ -45,6 +47,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
+- fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
 - fixtures phase 9 : `overpass-aires.json` (aires le long de `ors-directions-nav.json`, une à gauche), `aires-pl.json`
   (jeu converti), `official-*.xml` (feuille xlsx, chaînes partagées, content.xml d'un ods ; `official-sca-2025-*` = lignes
   réelles du xlsx concédé 2025)
@@ -60,14 +63,15 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot | rules
+                                   #   | overview | press | areas | foot | rules | drive
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
 un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
-21 h 57). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+21 h 57), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -159,6 +163,25 @@ un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours,
   des étapes ORS (« à vérifier ») ; `vehicle.banStatus`. Guidage : `view.rules` (bandeau `#nav-rule`, une ligne par
   alerte), voix si `settings.ruleVoice` (par défaut oui). legifrance.gouv.fr répond 403 depuis le conteneur : arrêtés
   lus en PDF du JO sur bison-fute.gouv.fr. Tests de dates : `process.env.TZ = 'Europe/Paris'` en tête du fichier.
+- Temps de conduite (phase 5 B, `driving-time.js`) : règlement (CE) 561/2006 cité en commentaire (eur-lex bloqué
+  depuis le conteneur). Aide seulement, « le chronotachygraphe fait foi » affiché. Conduite ≥ 5 km/h (reprise retenue
+  après 30 s, comptée depuis son début), pause ≥ 15 min, art. 7 dans l'ordre 15 puis 30 min, 45 min, arrêt ≥ 9 h =
+  repos journalier ; 9 h / 10 h (2 fois par semaine, la journée prolongée compte), 56 h, 90 h sur deux semaines,
+  semaine du lundi 0 h (heure de la tablette). Positions espacées de plus de 60 s = arrêt. Décompte dans le moteur
+  (`state.driving`, `view.driving`), enregistré dans `localStorage` `gabarit.driving` (toutes les 15 s, fin du
+  guidage, pagehide), jamais exporté ; simulation : décompte vide, rien d'enregistré. « Pas une pause (travail) » :
+  `markStopAsWork`, refusé à 10 km/h et plus, bouton affiché seulement dessous ; second appui recompte. Voix si
+  `settings.driveVoice`. Bandeau `#nav-drive` dans `.nav-top` ; `fitBanner` resserre le bandeau (`.nav-tight`) quand
+  il passerait sous la barre du bas ou que la colonne de boutons ne tient plus (téléphone, plusieurs alertes).
+- Vent fort (phase 5 B, `wind.js`) : Open-Meteo `/v1/forecast` (`OPEN_METEO_BASE`), sans clé, usage non commercial,
+  < 10 000 appels/jour, chaque point compte → 40 points au plus ; doc lue sur raw.githubusercontent.com
+  (open-meteo/open-meteo-website : `src/routes/en/docs`, `terms`, `licence`), open-meteo.com et api.open-meteo.com
+  bloqués depuis le conteneur. Une requête GET par calcul (tous les itinéraires proposés), `wind_gusts_10m` = maximum
+  de l'heure précédente (valeur de l'heure suivant le passage), seuil `settings.windGust` (40–150, pas de 5, 80 par
+  défaut), voix `settings.windVoice`. Copie `localStorage` `gabarit.windCache` (3 trajets, 3 h), jamais dans le cache
+  du service worker ; échec → « Météo indisponible », jamais bloquant. Attribution « Weather data by Open-Meteo.com »
+  (CC BY 4.0) avec lien sous les fiches et dans Réglages. Guidage : `view.rules.wind`, bandeau sous 30 km, voix une
+  fois vers 15 km ; recalcul / prévision tardive : `placeWind` sans requête.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

@@ -9,15 +9,18 @@
 // tracé seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
 // Encart « Prochaines aires » (phase 9) : ouvert ou fermé d'un seul appui, rempli par le moteur à chaque position ;
 // toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
-// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min » et voix,
-// lecture seule (aucun bouton).
+// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min », « Rafales
+// 95 km/h dans 12 km » et voix, lecture seule (aucun bouton).
+// Temps de conduite (phase 5, règlement CE 561/2006, aide seulement) : ligne « Conduite 3 h 12 · pause de 45 min
+// dans 1 h 18 » sous le bandeau ; à l'arrêt seulement (sous 10 km/h), un bouton d'un seul appui « Pas une pause
+// (travail) ». Le décompte est enregistré sur l'appareil (ctx.onDriving) toutes les 15 s et à la fin du guidage.
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, mapButtonSize, NAV,
+  setNavigationAreas, setNavigationWind, markStopAsWork, mapButtonSize, NAV,
 } from '../lib/navigation.js';
 import { describeNextArea } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
@@ -36,12 +39,14 @@ const RELEASE_SCREEN_AFTER_ARRIVAL_MS = 120000;
 /** Encart des aires : hauteur sous laquelle on le met plutôt à droite du bandeau, et largeur minimale pour ça. */
 const AREAS_MIN_PX = 120;
 const AREAS_MIN_WIDTH_PX = 200;
+/** Décompte du temps de conduite enregistré au plus toutes les 15 s (une position par seconde). */
+const SAVE_DRIVING_MS = 15000;
 
 /**
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
  *   onVoiceToggle:(on:boolean)=>void, onSimSpeedChange:(kmh:number)=>void,
  *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void, onAreaOpen?:(id:string)=>void,
- *   onView?:(view:object)=>void }} ctx
+ *   onView?:(view:object)=>void, onDriving?:(driving:object)=>void }} ctx
  */
 export function createNavigation(ctx) {
   const app = $('.app');
@@ -53,6 +58,10 @@ export function createNavigation(ctx) {
     then: $('#nav-then'),
     alert: $('#nav-alert'),
     rule: $('#nav-rule'),
+    drive: $('#nav-drive'),
+    driveMain: $('#nav-drive-main'),
+    driveDetail: $('#nav-drive-detail'),
+    work: $('#btn-nav-work'),
     reroute: $('#btn-nav-reroute'),
     remaining: $('#nav-remaining'),
     time: $('#nav-time'),
@@ -148,8 +157,24 @@ export function createNavigation(ctx) {
    * des boutons s'adapte à la hauteur restante (mapButtonSize) ; l'encart est borné sous le bandeau et défile s'il
    * manque de place (paysage sur téléphone).
    */
-  function layoutFoot() {
+  /**
+   * Bandeau du haut (consigne, alertes, réglementation, temps de conduite) jamais sous la barre du bas : sur un écran
+   * bas (téléphone en paysage), version resserrée (« Puis », ligne de la journée masquées, textes plus petits), puis
+   * hauteur bornée en dernier recours.
+   */
+  function fitBanner(tight = false) {
+    root.classList.remove('nav-tight');
+    ui.top.style.maxHeight = '';
+    const limit = ui.bottom.getBoundingClientRect().top - 8;
+    if (!tight && ui.top.getBoundingClientRect().bottom <= limit) return;
+    root.classList.add('nav-tight');
+    const t = ui.top.getBoundingClientRect();
+    if (t.bottom > limit) ui.top.style.maxHeight = `${Math.max(0, Math.floor(limit - t.top))}px`;
+  }
+
+  function layoutFoot(tight = false) {
     if (!s || root.hidden) return;
+    fitBanner(tight);
     const r = root.getBoundingClientRect();
     const t = ui.top.getBoundingClientRect();
     const css = getComputedStyle(ui.foot);
@@ -166,6 +191,9 @@ export function createNavigation(ctx) {
     const bcss = getComputedStyle(ui.mapbtns);
     const columns = bcss.display === 'grid' ? bcss.gridTemplateColumns.split(' ').filter(Boolean).length : 1;
     const rows = Math.ceil(ui.mapbtns.children.length / Math.max(1, columns));
+    // Colonne de boutons qui ne tient plus sous le bandeau (téléphone, plusieurs alertes) : bandeau resserré.
+    const rowGap = parseFloat(bcss.rowGap) || 0;
+    if (!tight && top !== inset && side < rows * 44 + rowGap * (rows - 1)) { layoutFoot(true); return; }
     const size = mapButtonSize({ available: side, count: rows, gap: parseFloat(bcss.rowGap) || 0, preferred });
     ui.foot.style.setProperty('--mapbtn', `${size}px`);
     // Encart : sous le bandeau ; si la place y manque (paysage, écran bas) et qu'il y en a à droite du bandeau, à
@@ -244,7 +272,7 @@ export function createNavigation(ctx) {
     renderAlert(view);
 
     // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
-    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text].filter(Boolean);
+    const rules = [view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
     if (ui.rule.dataset.text !== rules.join('\n')) {
       ui.rule.dataset.text = rules.join('\n');
       ui.rule.replaceChildren(...rules.map((t) => {
@@ -254,6 +282,7 @@ export function createNavigation(ctx) {
       }));
     }
     ui.rule.hidden = !rules.length;
+    renderDriving(view.driving);
 
     ui.road.textContent = view.roadName ?? '';
     ui.road.hidden = !view.roadName;
@@ -266,6 +295,25 @@ export function createNavigation(ctx) {
       lonlat: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch,
       follow: s.follow, padding: cameraPadding(), speedKmh: view.speedKmh,
     });
+  }
+
+  /** Temps de conduite : deux lignes (pause, journée), couleur selon l'urgence, bouton « travail » à l'arrêt. */
+  function renderDriving(d) {
+    ui.drive.hidden = !d;
+    if (!d) return;
+    if (ui.driveMain.textContent !== d.main) ui.driveMain.textContent = d.main;
+    if (ui.driveDetail.textContent !== d.detail) ui.driveDetail.textContent = d.detail;
+    ui.drive.dataset.level = d.level;
+    ui.work.hidden = !d.canMarkWork;
+    if (ui.work.textContent !== d.workLabel) ui.work.textContent = d.workLabel;
+  }
+
+  function saveDriving(force = false) {
+    if (!s?.state?.driving || s.sim) return;
+    const now = Date.now();
+    if (!force && now - (s.drivingSavedAt ?? 0) < SAVE_DRIVING_MS) return;
+    s.drivingSavedAt = now;
+    ctx.onDriving?.(s.state.driving);
   }
 
   function handle(events) {
@@ -290,6 +338,7 @@ export function createNavigation(ctx) {
     if (r.view.onRoute) s.error = '';
     render(r.view);
     handle(r.events);
+    saveDriving();
   }
 
   async function reroute(from) {
@@ -412,11 +461,19 @@ export function createNavigation(ctx) {
    * @param {{ route:object, params:{ end:number[], avoidTolls:boolean, avoidFerries:boolean, preference?:string|null },
    *   vehicle:object, simulate?:{ speedKmh:number }|null }} p
    */
-  function start({ route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null }) {
+  function start({
+    route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
+    driving = null, driveVoice = true, wind = null, windGust, windVoice = true,
+  }) {
     if (s) stop();
     const now = Date.now();
     s = {
-      state: startNavigation(route, { destination: params.end, now, areas, announceAreas, rules }),
+      // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
+      state: startNavigation(route, {
+        destination: params.end, now, areas, announceAreas, rules,
+        driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice,
+      }),
+      drivingSavedAt: now,
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0,
       params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
       layer: GUIDANCE_START_LAYER, layerMessage: '',
@@ -429,13 +486,15 @@ export function createNavigation(ctx) {
     renderFollow();
     ui.road.hidden = true;
     renderAreas(null);
-    requestAnimationFrame(layoutFoot);
+    requestAnimationFrame(() => layoutFoot());
     ctx.map.setLayer(s.layer);
     renderLayer();
     ui.stop.textContent = '■ Arrêter';
     ui.then.hidden = true;
     ui.alert.hidden = true;
     ui.rule.hidden = true;
+    ui.drive.hidden = true;
+    ui.work.hidden = true;
     ui.reroute.hidden = true;
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';
@@ -469,6 +528,7 @@ export function createNavigation(ctx) {
 
   function stop(message) {
     if (!s) return;
+    if (!s.sim) saveDriving(true);
     const session = s;
     s = null;
     if (session.watchId !== null) navigator.geolocation.clearWatch(session.watchId);
@@ -485,6 +545,9 @@ export function createNavigation(ctx) {
   }
 
   window.addEventListener('resize', () => layoutFoot());
+  // Appli mise en arrière-plan ou fermée : le décompte de conduite est enregistré tout de suite.
+  window.addEventListener('pagehide', () => saveDriving(true));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveDriving(true); });
   ui.stop.addEventListener('click', () => stop());
   ui.reroute.addEventListener('click', () => {
     if (!s) return;
@@ -492,6 +555,17 @@ export function createNavigation(ctx) {
     s.state = r.state;
     if (r.events.length) ui.reroute.disabled = true;
     handle(r.events);
+  });
+  // « Pas une pause (travail) » : un appui, seulement affiché sous 10 km/h ; le moteur refuse en roulant.
+  ui.work.addEventListener('click', () => {
+    if (!s) return;
+    const r = markStopAsWork(s.state, Date.now());
+    if (!r.driving) return;
+    s.state = r.state;
+    if (s.view) s.view = { ...s.view, driving: r.driving };
+    renderDriving(r.driving);
+    layoutFoot();
+    saveDriving(true);
   });
   ui.recenter.addEventListener('click', recenter);
   ui.overview.addEventListener('click', overview);
@@ -540,6 +614,11 @@ export function createNavigation(ctx) {
       if (!s) return;
       s.state = setNavigationAreas(s.state, areas);
       s.areasCount = Array.isArray(areas) ? areas.length : 0;
+    },
+    /** Prévisions de vent arrivées après « Démarrer » : le moteur les place sur le tracé. */
+    setWind(forecast) {
+      if (!s) return;
+      s.state = setNavigationWind(s.state, forecast);
     },
     /** Vue satellite hors de France pendant le guidage (message de src/lib/map-layers.js). */
     setLayerView(view) {
