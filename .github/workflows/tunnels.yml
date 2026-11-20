@@ -20,8 +20,22 @@ permissions:
 
 concurrency:
   group: tunnels-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  # Recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc avec OpenStreetMap (API principale d'OSM et
+  # Nominatim, sans Overpass) : journal seulement, n'empêche jamais la copie.
+  known:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node tools/tunnels-update.mjs --known
+
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 120

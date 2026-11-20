@@ -4,6 +4,7 @@
 //
 //   node tools/tunnels-update.mjs                    interroge Overpass, case par case (5°)
 //   node tools/tunnels-update.mjs reponse.json       lit une réponse Overpass enregistrée (essai en local)
+//   node tools/tunnels-update.mjs --known            recoupement des trois tunnels gardés en dur seulement
 //
 // Serveurs publics souvent pleins (502) : chaque case est demandée aux serveurs TUNNELS_CONVERT.ENDPOINTS, deux tours,
 // attente entre deux essais. Une case en échec : data/tunnels-adr.json n'est pas touché (ancienne copie gardée, aucune
@@ -114,10 +115,10 @@ async function known() {
 
 async function main() {
   const file = process.argv[2];
+  if (file === '--known') { await known(); return; }
   let json;
   if (file) json = JSON.parse(readFileSync(file, 'utf8'));
   else {
-    await known();
     const seen = new Map();
     let base = null;
     for (const b of tiles()) {
