@@ -15,19 +15,46 @@ export const TUNNELS_CONVERT = Object.freeze({
   BBOX: Object.freeze([35.9, -9.6, 55.1, 17.2]),
   /** Clés lues (wiki OSM « Key:hazmat ») : une requête par clé, toutes réunies. */
   KEYS: Object.freeze(['hazmat', 'hazmat:B', 'hazmat:C', 'hazmat:D', 'hazmat:E', 'hazmat:adr_tunnel_cat', 'hazmat:tunnel_cat']),
-  SERVER_TIMEOUT_S: 300,
+  SERVER_TIMEOUT_S: 180,
+  /** Zone découpée en cases de 5° (petites requêtes : le 20/11/2026, la zone entière dépassait 300 s). */
+  TILE_DEG: 5,
+  /**
+   * Serveurs de l'Action (dans l'ordre) : ceux de l'appli, puis deux serveurs publics de plus (wiki OSM « Overpass
+   * API », instances publiques).
+   */
+  ENDPOINTS: Object.freeze([
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ]),
+  /**
+   * Recoupement des tunnels gardés en dur : API principale d'OpenStreetMap (/api/0.6/map, emprise ≤ 0,25 degré²),
+   * sans Overpass. [ouest, sud, est, nord] autour de chaque tunnel.
+   */
+  KNOWN_BBOX: Object.freeze({
+    'known:fourviere': Object.freeze([4.800, 45.750, 4.826, 45.774]),
+    'known:frejus': Object.freeze([6.655, 45.075, 6.715, 45.195]),
+    'known:montblanc': Object.freeze([6.840, 45.805, 6.970, 45.910]),
+  }),
   /** Tube simplifié à 10 m près, 12 points au plus. */
   TOLERANCE_M: 10,
   MAX_POINTS: 12,
 });
 
-/**
- * Requête Overpass QL : voies en tunnel portant une étiquette hazmat, avec leur tracé ; plus les tubes de Fourvière,
- * du Fréjus et du Mont-Blanc même sans étiquette hazmat (recoupement des tunnels gardés en dur, journal seulement).
- */
+/** Requête Overpass QL pour une case [sud, ouest, nord, est] : voies en tunnel portant une étiquette hazmat, tracé compris. */
+/** Cases de TILE_DEG degrés qui couvrent la zone [sud, ouest, nord, est]. */
+export function tiles(bbox = TUNNELS_CONVERT.BBOX, step = TUNNELS_CONVERT.TILE_DEG) {
+  const [s, w, n, e] = bbox;
+  const out = [];
+  for (let y = s; y < n; y += step) {
+    for (let x = w; x < e; x += step) out.push([y, x, Math.min(n, y + step), Math.min(e, x + step)].map((v) => Math.round(v * 100) / 100));
+  }
+  return out;
+}
+
 export function buildTunnelsQuery(bbox = TUNNELS_CONVERT.BBOX) {
-  const parts = TUNNELS_CONVERT.KEYS.map((k) => `way["highway"]["tunnel"]["tunnel"!="no"]["${k}"];`).join('')
-    + 'way["highway"]["tunnel"]["name"~"Fourvi|Fr[ée]jus|Mont[- ]Blanc|Monte Bianco|Traforo",i](44.9,4.7,46.1,7.1);';
+  const parts = TUNNELS_CONVERT.KEYS.map((k) => `way["${k}"]["tunnel"]["tunnel"!="no"]["highway"];`).join('');
   return `[out:json][timeout:${TUNNELS_CONVERT.SERVER_TIMEOUT_S}][bbox:${bbox.join(',')}];(${parts});out tags geom;`;
 }
 
@@ -101,11 +128,32 @@ export function crossCheck(json, probes) {
   return lines;
 }
 
+/**
+ * Tubes d'un tunnel gardé en dur lus dans une réponse JSON de l'API OSM /api/0.6/map (éléments node et way) : voies
+ * highway + tunnel dont le nom correspond. Renvoie [{ id, name, cat, g }] (tracé simplifié, catégorie OSM).
+ */
+export function knownTubesFromMap(json, nameRe) {
+  const nodes = new Map();
+  for (const e of Array.isArray(json?.elements) ? json.elements : []) {
+    if (e?.type === 'node' && Number.isFinite(e.lon) && Number.isFinite(e.lat)) nodes.set(e.id, [e.lon, e.lat]);
+  }
+  const out = [];
+  for (const e of Array.isArray(json?.elements) ? json.elements : []) {
+    if (e?.type !== 'way' || !e.tags?.highway || !e.tags.tunnel || e.tags.tunnel === 'no') continue;
+    const name = String(e.tags.name ?? e.tags['tunnel:name'] ?? '');
+    if (!nameRe.test(name)) continue;
+    const g = (e.nodes ?? []).map((id) => nodes.get(id)).filter(Boolean);
+    if (g.length < 2) continue;
+    out.push({ id: `w${e.id}`, name, cat: categoryFromTags(e.tags), g: shrink(g) });
+  }
+  return out;
+}
+
 /** Repères de recoupement pour les trois tunnels gardés en dur (point proche du milieu, d'après la carte). */
 export const KNOWN_PROBES = Object.freeze([
-  { label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605] },
-  { label: 'Fréjus', cat: 'C', name: /fr[ée]jus/i, near: [6.685, 45.135] },
-  { label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc/i, near: [6.905, 45.858] },
+  { id: 'known:fourviere', label: 'Fourvière', cat: 'E', name: /fourvi[eè]re/i, near: [4.8135, 45.7605] },
+  { id: 'known:frejus', label: 'Fréjus', cat: 'C', name: /fr[ée]jus|traforo/i, near: [6.685, 45.135] },
+  { id: 'known:montblanc', label: 'Mont-Blanc', cat: 'E', name: /mont[- ]blanc|monte bianco|traforo/i, near: [6.905, 45.858] },
 ].map((p) => Object.freeze(p)));
 
 export { KNOWN_TUNNELS };

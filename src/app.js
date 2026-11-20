@@ -9,7 +9,8 @@ import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
 import { fetchRouteOptions, fetchRoute } from './ui/api.js';
-import { guidanceParams, reroutedOption, noZfeOption } from './lib/route-options.js';
+import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption } from './lib/route-options.js';
+import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText } from './lib/route-rules.js';
 import { createVoice } from './ui/voice.js';
@@ -167,6 +168,26 @@ fetch(ZFE.DATA_PATH, { cache: 'no-cache' })
   .catch(() => { zfeFailed = true; })
   .finally(() => renderChoice());
 
+// ───────── Tunnels ADR (phase 5b) : data/tunnels-adr.json, chargé seulement pour un véhicule ADR avec code tunnel ─────────
+/** { status:'idle'|'loading'|'ok'|'failed', data } ; absent, illisible ou vide → 'failed' (alerte indisponible). */
+let tunnels = { status: 'idle', data: null };
+let tunnelBusy = false;
+function ensureTunnels(vehicle) {
+  if (!effectiveCode(vehicle) || tunnels.status === 'loading' || tunnels.status === 'ok') return;
+  tunnels = { status: 'loading', data: null };
+  fetch(ADR.DATA_PATH, { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      const data = j ? parseTunnelData(j) : null;
+      tunnels = data?.ok ? { status: 'ok', data } : { status: 'failed', data: null };
+    })
+    .catch(() => { tunnels = { status: 'failed', data: null }; })
+    .finally(() => {
+      navigation.setTunnels(tunnels.status === 'ok' ? tunnels.data : null);
+      renderChoice();
+    });
+}
+
 /** Vent : prévisions, état de la requête et seuil de Réglages. */
 function windCtx() {
   return { status: weather.status, forecast: weather.forecast, threshold: data.settings.windGust };
@@ -185,12 +206,13 @@ function rulesOf(route, vehicle, departure) {
   const driving = loadDriving(storage);
   const dsig = JSON.stringify([driving.at, driving.sinceBreak, driving.day, driving.mode, driving.stopWork]);
   const pool = areas.pool;
+  const tun = tunnels;
   if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
-    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool) return hit.rules;
+    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
-  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, rules });
+  const rules = routeRules(route, { vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, rules });
   return rules;
 }
 
@@ -198,12 +220,22 @@ function rulesOf(route, vehicle, departure) {
 function choiceRules() {
   if (!choice) return null;
   const departure = new Date();
-  return choice.options.map((o) => {
+  const list = choice.options.map((o) => {
     const r = { ...rulesOf(o.route, choice.vehicle, departure) };
     r.lines = [...r.lines];
     if (zfeFailed) r.lines.unshift({ level: 'info', text: 'Zones à faibles émissions indisponibles (fichier non chargé) : vérifie la signalisation.' });
     return r;
   });
+  // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
+  const counts = choice.options.map((o, i) => ({ label: o.label, forbidden: list[i].forbiddenTunnels?.length ?? 0 }));
+  list.forEach((r, i) => {
+    const hint = avoidingOptionsText(counts, i);
+    if (hint) {
+      const at = r.lines.findLastIndex((l) => l.level === 'warn' && r.forbiddenTunnels.some((p) => l.text.startsWith(tunnelName(p))));
+      r.lines.splice(at + 1, 0, { level: 'warn', text: hint });
+    }
+  });
+  return list;
 }
 
 /** Contours des ZFE traversées par l'itinéraire choisi (rouge : interdite au véhicule). */
@@ -253,12 +285,49 @@ async function avoidZfe() {
   }
 }
 
+/**
+ * « Éviter le tunnel » (à l'arrêt) : une requête ORS avec un petit carré sur chaque tunnel interdit au code du
+ * véhicule (options.avoid_polygons, ajouté aux ZFE déjà évitées), mêmes réglages que l'itinéraire choisi.
+ */
+async function avoidTunnel() {
+  if (!choice || navigation.active || tunnelBusy) return;
+  const option = choice.options[choice.selected];
+  const forbidden = rulesOf(option.route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
+  const plan = avoidTunnelsFor(forbidden, { start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null });
+  if (!plan.ok) { showMessage(messageNode, plan.text); return; }
+  tunnelBusy = true;
+  renderChoice();
+  showMessage(messageNode, '');
+  try {
+    const route = await fetchRoute({
+      apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
+      avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
+      avoidPolygons: plan.geometry,
+    });
+    if (!choice || navigation.active) return;
+    const names = [...new Set(forbidden.map(tunnelName))];
+    const nt = noTunnelOption(option, route, plan.geometry, names);
+    const options = [...choice.options.filter((o) => o.key !== 'notunnel'), nt];
+    choice = { ...choice, options, selected: options.length - 1 };
+    map.showRoutes(options.map((o) => o.route), choice.selected);
+    areas.select(route);
+    const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
+    if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
+  } catch (err) {
+    showMessage(messageNode, `Éviter le tunnel : ${errorText(err) || 'calcul impossible.'}`);
+  } finally {
+    tunnelBusy = false;
+    renderChoice();
+  }
+}
+
 function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
   renderRouteChoice(summaryNode, notesNode, {
     choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
-    rules, rulesSource: rulesSourceText(zfeData), onAvoidZfe: avoidZfe, avoidBusy,
+    rules, rulesSource: rulesSourceText(zfeData, { hazmat: !!choice.vehicle?.hazmat, tunnelsUpdated: tunnels.data?.updated ?? null }),
+    onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy,
     windCredit: weather.status === 'ok',
   });
   showZfeOnMap(rules);
@@ -287,7 +356,10 @@ function startGuidance(simulate = null) {
     simulate,
     areas: areas.pool,
     announceAreas: data.settings.areaVoice,
-    rules: { vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice },
+    rules: {
+      vehicle: choice.vehicle, zfe: zfeData, voice: data.settings.ruleVoice,
+      tunnels: tunnels.status === 'ok' ? tunnels.data : null, // phase 5b ; les trois tunnels en dur dans tous les cas
+    },
     driving: loadDriving(storage),
     driveVoice: data.settings.driveVoice,
     wind: weather.forecast,
@@ -349,6 +421,7 @@ const form = createRouteForm({
     const vehicle = activeVehicle(data);
     showMessage(messageNode, '');
     form.setBusy(true);
+    ensureTunnels(vehicle); // phase 5b : fichier des tunnels lu seulement pour un véhicule ADR avec code tunnel
     try {
       const { options, failures } = await fetchRouteOptions({ apiKey: store.getApiKey(), vehicle, ...p });
       // Lien partagé : la variante choisie par l'expéditeur est présélectionnée (choix modifiable à l'arrêt).

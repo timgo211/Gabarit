@@ -187,13 +187,30 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       l'appareil, jamais dans le cache du service worker ; « Météo indisponible » si échec, jamais bloquant. Fiche
       (« Vent fort : rafales jusqu'à 95 km/h vers km 120 (vers 14 h 20) »), bandeau en guidage sous 30 km, voix une fois
       vers 15 km (réglage). Recalcul : points replacés sans requête.
-  - [ ] **Phase 5b — ADR (matières dangereuses)**
-    Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D
-    ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul
-    si un tunnel est interdit à mon code et proposer un autre itinéraire. Rappel des interdictions de circulation propres
-    au transport ADR. ORS ne gère que `hazmat` oui/non : vérifier dans la doc ce qui est possible et l'écrire. Sources
-    officielles citées (accord ADR, arrêtés français). Classe ADR (1 à 9) et numéro ONU facultatif dans le profil,
-    pour distinguer les règles qui en dépendent.
+  - [x] **Phase 5b — ADR (matières dangereuses)**
+    Profil véhicule : avec « Matières dangereuses (ADR) », code de restriction en tunnel (B, C, D, E, sans code ; vide =
+    aucune alerte), classe ADR et numéro ONU facultatifs (UN 2919, 3291, 3331, 3359, 3373 : sans code, ADR 1.9.5.2.2).
+    ORS ne reçoit que `hazmat` (oui / non) ; d'après son code source (HazmatAccessParser, HeavyVehicleEdgeFilter), il
+    évite alors toute voie `hazmat=no` ou `hazmat:B…E=no`, quelle que soit la lettre, et ne lit pas
+    `hazmat:adr_tunnel_cat` : phrase dans les notes (« l'itinéraire peut être plus long que nécessaire »).
+    Tunnels : pas de requête Overpass en direct (mesurée le 20/11/2026 sur 520 km, A6 + A43 : aires seules, tunnels
+    seuls ou les deux dépassent 26 s, ou serveur plein) ; copie hebdomadaire `data/tunnels-adr.json` par l'Action
+    « Tunnels ADR » (voies en tunnel portant `hazmat`, `hazmat:B…E`, `hazmat:adr_tunnel_cat`, France et pays voisins ;
+    catégorie = plus haute lettre marquée « no », ADR 8.6.4 : un code interdit sa catégorie et les suivantes), lue
+    seulement pour un véhicule ADR avec code tunnel. Fourvière (E), Fréjus (C), Mont-Blanc (E) gardés en dur (Bison
+    Futé, « Interdictions dans les principaux tunnels »), recoupés avec OSM dans le journal de l'Action. Fiche :
+    « Tunnel du Fréjus (catégorie C) interdit au code C : vous y seriez vers km 412 (vers 14 h 20). La signalisation
+    fait foi. », autres itinéraires proposés qui l'évitent, bouton « Éviter le tunnel » à l'arrêt (carré de 80 m,
+    options.avoid_polygons, 150 km au plus) ; fichier absent ou vide : « Alerte tunnels indisponible (données non
+    chargées) » ; aucun tunnel : « Aucun tunnel signalé dans les données (copie du JJ/MM), la signalisation fait foi »
+    (jamais « sans tunnel interdit »). Guidage : bandeau sous 20 km, voix une fois vers 5 km. Rappel ADR : mêmes
+    interdictions de circulation que les autres PL (arrêté du 16 avril 2021, rien de propre au transport de
+    matières dangereuses), dérogations préfectorales (annexe III).
+  - [ ] **Phase 9b — Aires PL sur les longs trajets** (avant la 5c)
+    La requête Overpass des aires échoue au-delà d'environ 500 km (mesure du 20/11/2026 : 26 s dépassées ou serveur
+    plein). Copier les aires et parkings PL d'OpenStreetMap (France et pays voisins) chaque semaine dans `data/`
+    comme les tunnels ADR, placés sur l'appareil sans requête ; Overpass en direct gardé seulement hors de la zone
+    copiée, sur un tracé court.
   - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
     Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
     pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
@@ -205,6 +222,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
     livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
     `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
+    Données sans Overpass en direct : copie hebdomadaire par une Action (comme `data/tunnels-adr.json`) des voies PL
+    conditionnelles d'OpenStreetMap (`hgv:conditional`, `maxweight:conditional`, `access:conditional`,
+    `hgv=destination` / `delivery`) en France et pays voisins, découpée en cases de 1° (un fichier par case, lu
+    seulement pour les cases touchées par le tracé), avant de vérifier ce qu'ORS en fait.
 
 ## Ensuite
 

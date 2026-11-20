@@ -17,6 +17,7 @@ import { zfeAlongRoute, guidanceZfe } from './zfe.js';
 import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
 import { emptyDriving, trackDriving, drivingView, drivingAnnouncements, toggleStopWork, DRIVING } from './driving-time.js';
 import { prepareGuidanceWind, guidanceWind, placeWind } from './wind.js';
+import { tunnelsAlongRoute, guidanceTunnel } from './adr.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -141,6 +142,12 @@ function placeZfe(rules, route, now) {
     .filter((p) => p.banned);
 }
 
+/** Tunnels interdits au code du véhicule sur un itinéraire (phase 5b ; les trois tunnels en dur même sans données). */
+function placeTunnels(rules, route) {
+  if (!rules?.vehicle) return [];
+  return tunnelsAlongRoute(route, { data: rules.tunnels ?? null, vehicle: rules.vehicle }).filter((p) => p.forbidden);
+}
+
 /**
  * Démarre le guidage.
  * @param {object} route itinéraire lu par parseDirections
@@ -162,9 +169,13 @@ export function startNavigation(route, {
     driveVoice: driveVoice !== false,
     wind: prepareGuidanceWind(wind, route, windGust),
     windVoice: windVoice !== false,
-    rules: rules?.vehicle ? { vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false } : null,
+    rules: rules?.vehicle ? {
+      vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false, tunnels: rules.tunnels ?? null,
+    } : null,
     zfe: placeZfe(rules, route, now),
     zfeAnnounced: {},
+    tunnels: placeTunnels(rules, route),
+    tunnelsAnnounced: {},
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     route: prepareRoute(route),
     source: route,
@@ -306,8 +317,13 @@ export function updateNavigation(state, fix) {
 
   // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
   // seulement, rien à toucher.
-  const rules = { zfe: null, ban: null, wind: null };
+  const rules = { zfe: null, ban: null, wind: null, tunnel: null };
   if (s.rules && !s.arrived) {
+    // Tunnel interdit au code du véhicule (phase 5b) : bandeau sous 20 km, voix une fois vers 5 km.
+    const tn = guidanceTunnel(s.tunnels, loc.along, s.tunnelsAnnounced);
+    s.tunnelsAnnounced = tn.announced;
+    rules.tunnel = tn.view;
+    if (s.rules.voice && tn.speak && onRoute && !s.rerouting) events.push({ type: 'speak', text: tn.speak });
     const z = guidanceZfe(s.zfe, loc.along, s.zfeAnnounced);
     s.zfeAnnounced = z.announced;
     rules.zfe = z.view;
@@ -362,7 +378,7 @@ export function updateNavigation(state, fix) {
     nextAreas: areasAhead,
     /**
      * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,
-     * wind:{ gust, distance, text }|null }.
+     * wind:{ gust, distance, text }|null, tunnel:{ name, distance, text }|null (phase 5b) }.
      */
     rules,
     /** Temps de conduite (drivingView) : lignes du bandeau, niveau, bouton « Pas une pause (travail) ». */
@@ -471,6 +487,13 @@ export function setNavigationAreas(state, areas) {
   return { ...state, areaPool: pool, areas: placeAreas(pool, state.source) };
 }
 
+/** Fichier des tunnels arrivé après « Démarrer » (phase 5b) : tunnels interdits replacés sur le tracé suivi. */
+export function setNavigationTunnels(state, data) {
+  if (!state?.rules) return state;
+  const rules = { ...state.rules, tunnels: data ?? null };
+  return { ...state, rules, tunnels: placeTunnels(rules, state.source) };
+}
+
 /** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
 export function setNavigationWind(state, forecast) {
   if (!state) return state;
@@ -497,6 +520,7 @@ export function rerouteDone(state, route) {
     source: route,
     areas: placeAreas(state.areaPool, route),
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
+    tunnels: placeTunnels(state.rules, route),
     wind: state.wind ? { ...state.wind, placed: placeWind(state.wind.forecast, route) } : state.wind,
     segIndex: null,
     along: 0,

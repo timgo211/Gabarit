@@ -10,6 +10,13 @@ export const CRITAIR_VALUES = ['0', '1', '2', '3', '4', '5', 'NC'];
 export const BAN_STATUS_VALUES = ['concerned', 'art4', 'exempt'];
 
 /**
+ * Matières dangereuses (phase 5b, accord ADR 8.6.4) : code de restriction en tunnel du chargement ('' = non renseigné,
+ * aucune alerte ; 'none' = chargement sans code), classe et numéro ONU facultatifs. Voir src/lib/adr.js.
+ */
+export const TUNNEL_CODE_VALUES = ['', 'B', 'C', 'D', 'E', 'none'];
+export const ADR_CLASS_VALUES = ['', '1', '2', '3', '4.1', '4.2', '4.3', '5.1', '5.2', '6.1', '6.2', '7', '8', '9'];
+
+/**
  * Champs numériques : unité, bornes acceptées, obligatoire ou non.
  * Les bornes sont larges (convois exceptionnels possibles) mais écartent les fautes de frappe.
  */
@@ -45,6 +52,9 @@ export function defaultVehicle() {
     consumption: 32,
     critair: '1',
     banStatus: 'concerned',
+    tunnelCode: '',
+    adrClass: '',
+    unNumber: '',
   };
 }
 
@@ -67,6 +77,13 @@ export function normalizeVehicle(raw) {
     critair: CRITAIR_VALUES.includes(String(raw?.critair)) ? String(raw.critair) : 'NC',
     banStatus: BAN_STATUS_VALUES.includes(raw?.banStatus) ? raw.banStatus : 'concerned',
   };
+  // Champs ADR : facultatifs, gardés seulement avec « Matières dangereuses » coché.
+  const code = String(raw?.tunnelCode ?? '');
+  const cls = String(raw?.adrClass ?? '');
+  const un = String(raw?.unNumber ?? '').replace(/^\s*UN\s*/i, '').trim();
+  v.tunnelCode = v.hazmat ? code : '';
+  v.adrClass = v.hazmat ? cls : '';
+  v.unNumber = v.hazmat ? un : '';
   for (const key of Object.keys(NUMERIC_FIELDS)) {
     v[key] = parseNumber(raw?.[key]);
   }
@@ -101,5 +118,8 @@ export function validateVehicle(v) {
   if (!CRITAIR_VALUES.includes(v.critair)) errors.critair = 'Vignette Crit\'Air inconnue.';
   if (typeof v.hazmat !== 'boolean') errors.hazmat = 'Valeur invalide.';
   if (!BAN_STATUS_VALUES.includes(v.banStatus)) errors.banStatus = 'Valeur invalide.';
+  if (!TUNNEL_CODE_VALUES.includes(v.tunnelCode ?? '')) errors.tunnelCode = 'Code tunnel inconnu.';
+  if (!ADR_CLASS_VALUES.includes(v.adrClass ?? '')) errors.adrClass = 'Classe ADR inconnue.';
+  if (v.unNumber && !/^\d{4}$/.test(v.unNumber)) errors.unNumber = 'Numéro ONU : 4 chiffres (ex. 1202).';
   return { valid: Object.keys(errors).length === 0, errors };
 }
