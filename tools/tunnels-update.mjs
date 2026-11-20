@@ -95,7 +95,10 @@ async function known() {
           for (const h of Array.isArray(hits) ? hits : []) {
             if (h.osm_type !== 'way') continue;
             await sleep(1500);
-            for (const t of knownTubesFromMap(await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`), probe.name)) found.set(t.id, t);
+            const full = await getJson(`https://api.openstreetmap.org/api/0.6/way/${h.osm_id}/full.json`);
+            const way = full.elements?.find((x) => x.type === 'way');
+            console.log(`    w${h.osm_id} : ${JSON.stringify(way?.tags ?? {})}`);
+            for (const t of knownTubesFromMap(full, probe.name)) found.set(t.id, t);
           }
         } catch (err) {
           console.log(`⚠ recherche ${probe.label} : ${err.message}`);
