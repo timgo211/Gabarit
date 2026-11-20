@@ -157,7 +157,8 @@ rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
   `hors-copie:`), jamais dans la zone couverte ; index ou case absent / vide / illisible → « Aires indisponibles sur
   ce trajet (données non chargées) », sans repli Overpass ; date de la copie dans la note (« ODbL, copie du
   JJ/MM/AAAA ») et sur la fiche. Fichiers de `data/aires-osm/` hors `APP_FILES` (lus seulement pour les cases du
-  trajet). ui-check : copie simulée (`osmCopy` : 'fixture', 'uncovered', null).
+  trajet). ui-check : copie simulée (`osmCopy` : 'fixture', 'uncovered', null). Test statique : `grid.bits` de
+  `index.json` exclu de la recherche de clés. Premier passage : 19 285 aires, 1,39 Mo, 72 min (13 pays).
 - Aires PL (phase 9) : une seule requête Overpass par calcul (phase 9b : seulement hors copie), pour tous les
   itinéraires proposés (`combineRoutes` : A, B à l'envers, C ; tracé simplifié ≤ 400 points, écart ajouté au rayon) ; rayons 400 m (aires de repos / de
   service) et 800 m (parkings `hgv=yes/designated` ou `capacity:hgv`) ; `OVERPASS_ENDPOINTS` : overpass-api.de puis

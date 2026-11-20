@@ -312,3 +312,24 @@ test('cases : nom par coin sud-ouest, tracé lu tous les 500 m, marge de 1 km au
   assert.deepEqual(routePlan([[4.5, 45.997], [4.51, 45.997]], idx).tiles, ['4_45', '4_46']);
   assert.ok(combineRoutes([LINE]).length === LINE.length);
 });
+
+test('vraie copie du dépôt (data/aires-osm/) : lisible, Paris → Lyon → Fréjus couvert sans Overpass', async () => {
+  const { readFileSync, existsSync } = await import('node:fs');
+  const dir = new URL('../data/aires-osm/', import.meta.url);
+  if (!existsSync(new URL('index.json', dir))) return; // copie pas encore créée par l'Action
+  const index = parseIndex(JSON.parse(readFileSync(new URL('index.json', dir), 'utf8')));
+  assert.ok(index && index.count > 1000, 'index lisible');
+  assert.ok(copyDateText(index.updated));
+  const plan = routePlan(LINE, index);
+  assert.equal(plan.uncovered.length, 0, 'trajet entièrement dans la zone couverte');
+  const areas = plan.tiles.flatMap((k) => {
+    const t = parseTile(JSON.parse(readFileSync(new URL(`${k}.json`, dir), 'utf8')), index.updated);
+    assert.ok(t, k);
+    return t;
+  });
+  assert.ok(areas.length > 100, `${areas.length} aires lues dans ${plan.tiles.length} cases`);
+  assert.ok(areas.every((a) => /^osm:[nwr]\d+$/.test(a.id)));
+  // Hors zone (Pologne) : non couvert.
+  assert.equal(index.inside(21, 52.2), false);
+  assert.equal(index.inside(2.35, 48.85), true);
+});
