@@ -39,18 +39,21 @@ const extQ = `[out:json][timeout:${AREAS_OSM.SERVER_TIMEOUT_S}];(`
   + `nwr["highway"~"^(rest_area|services)$"](around:${rest},${ptsTxt});`
   + `nwr["amenity"="parking"][~"^(hgv|capacity:hgv)$"~"^(yes|designated|[1-9][0-9]*)$"](around:${park},${ptsTxt});`
   + ')->.a;'
-  + `way["highway"]["tunnel"]["tunnel"!="no"][~"^hazmat(:[BCDE]|:adr_tunnel_cat|:tunnel_cat)?$"~"."](around:${tun},${ptsTxt})->.t;`
+  + '(' + ['hazmat', 'hazmat:B', 'hazmat:C', 'hazmat:D', 'hazmat:E', 'hazmat:adr_tunnel_cat'].map((k) => `way["${k}"]["tunnel"](around:${tun},${ptsTxt});`).join('') + ')->.t;'
   + '.a out center tags;.t out tags geom;';
+const tunQ = `[out:json][timeout:${AREAS_OSM.SERVER_TIMEOUT_S}];(`
+  + ['hazmat', 'hazmat:B', 'hazmat:C', 'hazmat:D', 'hazmat:E', 'hazmat:adr_tunnel_cat'].map((k) => `way["${k}"]["tunnel"](around:${tun},${ptsTxt});`).join('')
+  + ');out tags geom;';
 console.log('taille requête aires', areasQ.length, 'étendue', extQ.length);
 
 for (const url of OVERPASS_ENDPOINTS) {
-  for (const [name, q] of [['aires', areasQ], ['aires+tunnels', extQ], ['aires (2e)', areasQ], ['aires+tunnels (2e)', extQ]]) {
-    await sleep(8000);
-    const r = await post(url, q);
+  for (const [name, q] of [['tunnels seuls', tunQ], ['aires', areasQ], ['aires+tunnels', extQ], ['tunnels seuls (2e)', tunQ], ['aires (2e)', areasQ], ['aires+tunnels (2e)', extQ]]) {
+    await sleep(15000);
+    const r = await post(url, q, 90000);
     const els = r.json?.elements ?? [];
     const tunnels = els.filter((e) => e.type === 'way' && e.tags?.tunnel);
     console.log(`${url} ${name}: HTTP ${r.status} ${r.ms} ms ${r.bytes ?? 0} octets, ${els.length} éléments dont ${tunnels.length} tunnels ${r.error ?? ''} ${r.text ?? ''} ${r.json?.remark ?? ''}`);
-    if (name === 'aires+tunnels' && tunnels.length) {
+    if (name.startsWith('tunnels seuls') && tunnels.length && !globalThis.shown && (globalThis.shown = true)) {
       for (const t of tunnels.slice(0, 40)) {
         const h = Object.fromEntries(Object.entries(t.tags).filter(([k]) => /^(name|ref|tunnel|hazmat|tunnel:name|layer|oneway|length)/.test(k)));
         console.log('  ', t.id, JSON.stringify(h), (t.geometry ?? []).length, 'pts');
