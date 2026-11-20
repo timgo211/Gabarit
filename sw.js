@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v19';
+const VERSION = 'v20';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -26,6 +26,7 @@ const APP_FILES = [
   './src/lib/areas-avis.js',
   './src/lib/areas-cache.js',
   './src/lib/areas-official.js',
+  './src/lib/areas-osm-data.js',
   './src/lib/areas-osm.js',
   './src/lib/areas-route.js',
   './src/lib/config.js',

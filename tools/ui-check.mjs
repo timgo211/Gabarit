@@ -1029,7 +1029,7 @@ async function rulesCheck(browser, base) {
  * le GPS émulé (bandeau dans sa case), puis fichier absent (« Alerte tunnels indisponible »), code vide (aucune
  * alerte), profil enregistré avant la v19 repris dans Réglages (section ADR, profil sans champs ADR, nouveau calcul) ;
  * 360, 412, 800 et 1280 px. Enfin le vrai
- * service worker : « Gabarit v19 » en bas de Réglages.
+ * service worker : « Gabarit v20 » en bas de Réglages.
  */
 async function adrCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
@@ -1169,7 +1169,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v19', 'vrai service worker : « Gabarit v19 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v20', 'vrai service worker : « Gabarit v20 » en bas de Réglages', ver);
   await ctx.close();
 }
 
