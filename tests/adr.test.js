@@ -18,6 +18,10 @@ import { routeRules, tunnelRules, rulesSourceText } from '../src/lib/route-rules
 import { startNavigation, updateNavigation, rerouteDone, setNavigationTunnels } from '../src/lib/navigation.js';
 import { createSimulator } from '../src/lib/nav-sim.js';
 import { normalizeVehicle, validateVehicle, defaultVehicle } from '../src/lib/vehicle.js';
+import {
+  ADR_CLASSES, ADR_TUNNEL_CODES, TUNNEL_CODE_HELP, sanitizeAdrSettings, emptyAdrSettings, unNumberError, withAdr, adrSummary,
+} from '../src/lib/adr-settings.js';
+import { sanitizeData, importData, exportData, activeVehicle, createStore, memoryStorage, DATA_KEY } from '../src/lib/store.js';
 import { noTunnelOption, guidanceParams } from '../src/lib/route-options.js';
 import { buildDirectionsRequest } from '../src/lib/ors-request.js';
 import { haversine } from '../src/lib/nav-geo.js';
@@ -75,27 +79,80 @@ test('code du véhicule : vide = aucune vérification ; numéros ONU sans code (
   assert.equal(effectiveCode(adr('B', { unNumber: '1202' })), 'B');
 });
 
-test('profil véhicule : champs ADR facultatifs, gardés seulement avec « Matières dangereuses » coché', () => {
-  const v = normalizeVehicle({ ...defaultVehicle(), hazmat: 'on', tunnelCode: 'D', adrClass: '3', unNumber: 'UN 1202' });
-  assert.equal(v.tunnelCode, 'D');
-  assert.equal(v.adrClass, '3');
-  assert.equal(v.unNumber, '1202');
+test('Réglages ADR (réglage global) : nettoyage, numéro ONU, code tunnel jamais déduit de la classe', () => {
+  assert.deepEqual(sanitizeAdrSettings({ enabled: true, adrClass: '3', unNumber: 'UN 1202', tunnelCode: 'D' }),
+    { enabled: true, adrClass: '3', unNumber: '1202', tunnelCode: 'D' });
+  assert.deepEqual(sanitizeAdrSettings({ enabled: true, adrClass: '10', unNumber: '12', tunnelCode: 'Z' }),
+    { enabled: true, adrClass: '', unNumber: '', tunnelCode: '' }, 'valeurs inconnues → vides');
+  assert.deepEqual(sanitizeAdrSettings(null), emptyAdrSettings());
+  assert.equal(sanitizeAdrSettings({ enabled: true, adrClass: '3' }).tunnelCode, '', 'classe 3 seule : code tunnel vide');
+  assert.match(unNumberError('12'), /4 chiffres/);
+  assert.equal(unNumberError(''), null);
+  assert.equal(unNumberError('UN 1202'), null);
+  assert.deepEqual(ADR_TUNNEL_CODES, ['', 'B', 'C', 'D', 'E']);
+  assert.equal(ADR_CLASSES.length, 13);
+  assert.match(ADR_CLASSES.find((c) => c.value === '3').label, /gazole, essence/);
+  assert.match(TUNNEL_CODE_HELP, /document de transport ; la classe seule ne la donne pas/);
+  // Le profil ne garde plus aucun champ ADR.
+  const v = normalizeVehicle({ ...defaultVehicle(), hazmat: 'on', tunnelCode: 'D', adrClass: '3', unNumber: '1202' });
   assert.equal(validateVehicle(v).valid, true);
-  const off = normalizeVehicle({ ...defaultVehicle(), hazmat: false, tunnelCode: 'D', adrClass: '3', unNumber: '1202' });
-  assert.deepEqual([off.tunnelCode, off.adrClass, off.unNumber], ['', '', '']);
-  const empty = normalizeVehicle({ ...defaultVehicle(), hazmat: 'on' });
-  assert.equal(validateVehicle(empty).valid, true, 'tous les champs ADR vides : profil valide');
-  assert.match(validateVehicle(normalizeVehicle({ ...defaultVehicle(), hazmat: 'on', unNumber: '12' })).errors.unNumber, /4 chiffres/);
-  assert.ok(validateVehicle(normalizeVehicle({ ...defaultVehicle(), hazmat: 'on', tunnelCode: 'Z' })).errors.tunnelCode);
-  assert.ok(validateVehicle(normalizeVehicle({ ...defaultVehicle(), hazmat: 'on', adrClass: '10' })).errors.adrClass);
-  // Anciens profils (avant la phase 5b) : champs absents = vides.
-  const old = normalizeVehicle({ name: 'Ancien', height: 4, width: 2.55, length: 16.5, weight: 44, maxSpeed: 90, hazmat: true, critair: '1' });
-  assert.equal(validateVehicle(old).valid, true);
-  assert.equal(old.tunnelCode, '');
+  for (const k of ['hazmat', 'tunnelCode', 'adrClass', 'unNumber']) assert.equal(k in v, false, k);
+});
+
+test('withAdr : véhicule lu par ORS, les alertes et les notes = profil + Réglages', () => {
+  const on = { enabled: true, adrClass: '3', unNumber: '1202', tunnelCode: 'D' };
+  const v = withAdr(defaultVehicle(), on);
+  assert.deepEqual([v.hazmat, v.tunnelCode, v.adrClass, v.unNumber], [true, 'D', '3', '1202']);
+  assert.equal(effectiveCode(v), 'D');
+  const off = withAdr(defaultVehicle(), { ...on, enabled: false });
+  assert.deepEqual([off.hazmat, off.tunnelCode], [false, '']);
+  assert.equal(effectiveCode(off), null);
+  assert.equal(effectiveCode(withAdr(defaultVehicle(), { enabled: true, tunnelCode: '' })), null, 'code vide : aucune alerte');
+  for (const un of ADR.NO_CODE_UN) assert.equal(effectiveCode(withAdr(defaultVehicle(), { ...on, unNumber: un })), 'none', `UN ${un}`);
+  assert.equal(adrSummary(on), 'ADR (code D, classe 3, UN 1202)');
+  assert.equal(adrSummary({ enabled: true }), 'ADR');
+  assert.equal(adrSummary({ ...on, enabled: false }), '');
   // ORS ne reçoit que hazmat (oui / non) : le code tunnel n'est jamais envoyé.
   const { body } = buildDirectionsRequest({ start: [5, 45], end: [5.1, 45.1], vehicle: v });
   assert.equal(body.options.profile_params.restrictions.hazmat, true);
   assert.doesNotMatch(JSON.stringify(body), /tunnel|1202|adrClass/i);
+  const { body: b2 } = buildDirectionsRequest({ start: [5, 45], end: [5.1, 45.1], vehicle: off });
+  assert.equal('hazmat' in b2.options.profile_params.restrictions, false);
+});
+
+test('reprise des anciens profils ADR dans les Réglages (stockage et import d\'un ancien JSON)', () => {
+  const base = { height: 4, width: 2.55, length: 16.5, weight: 44, maxSpeed: 90, critair: '1' };
+  const old = {
+    version: 1, activeVehicleId: 'b',
+    vehicles: [
+      { ...base, id: 'a', name: 'Citerne', hazmat: true, tunnelCode: 'E', adrClass: '2', unNumber: '1965' },
+      { ...base, id: 'b', name: 'Semi', hazmat: true, tunnelCode: 'D', adrClass: '3', unNumber: 'UN 1202' },
+      { ...base, id: 'c', name: 'Porteur', hazmat: false },
+    ],
+    settings: { theme: 'day' },
+  };
+  const d = importData(JSON.stringify(old));
+  assert.deepEqual(d.settings.adr, { enabled: true, adrClass: '3', unNumber: '1202', tunnelCode: 'D' }, 'profil actif ADR repris');
+  for (const v of d.vehicles) assert.equal('hazmat' in v || 'tunnelCode' in v, false, `${v.name} : champs ADR retirés`);
+  assert.deepEqual(activeVehicle(d).tunnelCode, 'D');
+  assert.equal(activeVehicle(d).hazmat, true);
+  // Profil actif sans ADR : premier profil ADR.
+  const d2 = sanitizeData({ ...old, activeVehicleId: 'c' });
+  assert.deepEqual(d2.settings.adr, { enabled: true, adrClass: '2', unNumber: '1965', tunnelCode: 'E' });
+  // Ancien « sans code » gardé (même alerte qu'avant).
+  const d3 = sanitizeData({ ...old, vehicles: [{ ...base, id: 'x', name: 'X', hazmat: 'on', tunnelCode: 'none' }] });
+  assert.equal(d3.settings.adr.tunnelCode, 'none');
+  // Aucun profil ADR : réglage vide ; réglage déjà présent : gardé, profils ignorés.
+  assert.deepEqual(sanitizeData({ ...old, vehicles: [old.vehicles[2]] }).settings.adr, emptyAdrSettings());
+  const kept = sanitizeData({ ...old, settings: { adr: { enabled: false, adrClass: '8', unNumber: '', tunnelCode: 'C' } } });
+  assert.deepEqual(kept.settings.adr, { enabled: false, adrClass: '8', unNumber: '', tunnelCode: 'C' });
+  assert.equal(activeVehicle(kept).hazmat, false);
+  // Aller-retour export → import : rien de perdu.
+  assert.deepEqual(importData(exportData(d)).settings.adr, d.settings.adr);
+  // Le stockage local (ancien format) est repris au chargement.
+  const storage = memoryStorage();
+  storage.setItem(DATA_KEY, JSON.stringify(old));
+  assert.equal(createStore(storage).load().settings.adr.tunnelCode, 'D');
 });
 
 test('conversion de la réponse Overpass : catégories, catégorie A et étiquettes sans effet retirées, tube simplifié', () => {

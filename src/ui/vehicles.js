@@ -2,32 +2,25 @@
 
 import { $, el, wireDialog } from './dom.js';
 import {
-  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, TUNNEL_CODE_VALUES, ADR_CLASS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle,
+  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle,
 } from '../lib/vehicle.js';
 import { BAN_STATUS } from '../lib/hgv-bans.js';
+import { adrSummary } from '../lib/adr-settings.js';
 
 const fmt = (x) => (x === null || x === undefined ? '' : String(x).replace('.', ','));
 
-function dims(v) {
+/** Ligne du profil ; `adr` (réglage global de Réglages) affiché seulement sur le profil actif. */
+function dims(v, adr = null) {
   const p = [`H ${fmt(v.height)} m`, `l ${fmt(v.width)} m`, `L ${fmt(v.length)} m`, `${fmt(v.weight)} t`];
   if (v.axleload) p.push(`${fmt(v.axleload)} t/essieu`);
   p.push(`${fmt(v.maxSpeed)} km/h`);
-  if (v.hazmat) {
-    const extra = [v.tunnelCode ? TUNNEL_CODE_LABELS[v.tunnelCode] : null, v.adrClass ? `classe ${v.adrClass}` : null,
-      v.unNumber ? `UN ${v.unNumber}` : null].filter(Boolean);
-    p.push(extra.length ? `ADR (${extra.join(', ')})` : 'ADR');
-  }
+  const a = adr ? adrSummary(adr) : '';
+  if (a) p.push(a);
   p.push(`Crit'Air ${v.critair}`);
   if (v.banStatus === 'art4') p.push('art. 4');
   if (v.banStatus === 'exempt') p.push('spécialisé');
   return p.join(' · ');
 }
-
-/** Libellés du code de restriction en tunnel (accord ADR 8.6.4). */
-export const TUNNEL_CODE_LABELS = Object.freeze({
-  '': 'Non renseigné (aucune alerte tunnel)',
-  B: 'code B', C: 'code C', D: 'code D', E: 'code E', none: 'sans code tunnel (« - »)',
-});
 
 /**
  * @param {{ getData:()=>object, update:(fn:(data)=>object)=>void }} ctx
@@ -43,7 +36,7 @@ export function createVehicles(ctx) {
       const active = v.id === data.activeVehicleId;
       return el('section', { class: `card vehicle-card${active ? ' active' : ''}` }, [
         el('h3', {}, [v.name, active ? el('span', { class: 'badge', text: 'Actif' }) : null]),
-        el('p', { class: 'dims', text: dims(v) }),
+        el('p', { class: 'dims', text: dims(v, active ? data.settings?.adr : null) }),
         el('div', { class: 'row' }, [
           active ? null : el('button', {
             type: 'button', class: 'btn btn-primary', text: 'Utiliser',
@@ -103,32 +96,7 @@ export function createVehicles(ctx) {
         el('p', { class: 'hint', text: 'Article 4 : au moins la moitié du chargement en denrées périssables ou animaux vivants, presse, fret aérien… (arrêté du 16 avril 2021). Justificatifs à bord.' }),
         el('p', { class: 'err', 'data-err': 'banStatus' }),
       ]),
-      el('label', { class: 'toggle full' }, [
-        el('input', { type: 'checkbox', name: 'hazmat', checked: v.hazmat }),
-        ' Matières dangereuses (ADR)',
-      ]),
-      // Phase 5b : champs ADR facultatifs, affichés seulement avec « Matières dangereuses » coché.
-      el('fieldset', { class: 'adr-fields full', hidden: !v.hazmat }, [
-        el('legend', { text: 'ADR (facultatif)' }),
-        el('div', {}, [
-          el('label', { for: 'veh-tunnel', text: 'Code de restriction en tunnel' }),
-          el('select', { id: 'veh-tunnel', name: 'tunnelCode' },
-            TUNNEL_CODE_VALUES.map((c) => el('option', { value: c, text: c ? TUNNEL_CODE_LABELS[c].replace(/^code/, 'Code').replace(/^sans/, 'Sans') : TUNNEL_CODE_LABELS[''], selected: c === (v.tunnelCode ?? '') }))),
-          el('p', { class: 'err', 'data-err': 'tunnelCode' }),
-        ]),
-        el('div', {}, [
-          el('label', { for: 'veh-adrclass', text: 'Classe ADR' }),
-          el('select', { id: 'veh-adrclass', name: 'adrClass' },
-            ADR_CLASS_VALUES.map((c) => el('option', { value: c, text: c || '—', selected: c === (v.adrClass ?? '') }))),
-          el('p', { class: 'err', 'data-err': 'adrClass' }),
-        ]),
-        el('div', {}, [
-          el('label', { for: 'veh-un', text: 'Numéro ONU' }),
-          el('input', { id: 'veh-un', name: 'unNumber', inputmode: 'numeric', maxlength: 7, value: v.unNumber ?? '', autocomplete: 'off', placeholder: 'Ex. : 1202' }),
-          el('p', { class: 'err', 'data-err': 'unNumber' }),
-        ]),
-        el('p', { class: 'hint full', text: 'Code tunnel : lettre du document de transport (ADR 8.6.4). Code combiné (B/D, C5000D…) : choisis la lettre qui s\'applique à ton chargement. Sans code : aucune alerte tunnel.' }),
-      ]),
+      el('p', { class: 'hint full', text: 'Matières dangereuses (ADR) : dans Réglages (elles dépendent du chargement, pas du camion).' }),
       el('p', { class: 'hint full', text: 'La vitesse envoyée au calcul est au minimum 80 km/h (limite OpenRouteService).' }),
       el('div', { class: 'row full' }, [
         el('button', { type: 'submit', class: 'btn btn-primary', text: 'Enregistrer' }),
@@ -136,14 +104,10 @@ export function createVehicles(ctx) {
       ]),
     ]);
 
-    const hazmatBox = form.querySelector('input[name="hazmat"]');
-    hazmatBox.addEventListener('change', () => { form.querySelector('.adr-fields').hidden = !hazmatBox.checked; });
-
     form.addEventListener('submit', (e) => {
       e.preventDefault();
       const fd = new FormData(form);
       const raw = Object.fromEntries(fd.entries());
-      raw.hazmat = fd.has('hazmat');
       raw.id = v.id;
       const nv = normalizeVehicle(raw);
       const { valid, errors } = validateVehicle(nv);

@@ -29,7 +29,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     `route-samples.js` (points du tracé avec heure de passage et route), `route-rules.js` (réunit le tout pour les fiches),
     `driving-time.js` (temps de conduite et pauses, CE 561/2006), `wind.js` (vent fort, Open-Meteo)
   - phase 5b (ADR) : `adr.js` (code tunnel du véhicule, catégorie OSM, ADR 8.6.4, tunnels en dur, passage du tracé,
-    textes, guidage, « Éviter le tunnel »), `tunnels-convert.js` (extraits Geofabrik filtrés par osmium dans l'Action → `data/tunnels-adr.json`)
+    textes, guidage, « Éviter le tunnel »), `adr-settings.js` (réglage global `settings.adr` : classes en clair, code
+    tunnel saisi, reprise des anciens profils, `withAdr`), `tunnels-convert.js` (extraits Geofabrik filtrés par osmium dans l'Action → `data/tunnels-adr.json`)
   - phase 9 (aires et parkings PL) : `areas-osm.js` (requête Overpass, serveurs, lecture), `areas-official.js` (jeu
     officiel : lecture xlsx/ods, colonnes par mots-clés, Lambert 93, `data/aires-pl.json`), `areas-route.js` (fusion,
     placement sur le tracé, côté, prochaines aires, annonce, textes), `areas-avis.js` (« Mon avis »), `areas-cache.js`
@@ -80,7 +81,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, serveur Overpass de secours, cache, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v18 »), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v19 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
@@ -203,14 +204,19 @@ rechargement). Captures dans `tools/ui-shots/` (ignoré). Un comportement du gui
   (CC BY 4.0, liens vers le site et la licence) sous les fiches et dans Réglages, « (Open-Meteo) » dans le bandeau.
   Guidage : `view.rules.wind`, bandeau sous 30 km, voix une
   fois vers 15 km ; recalcul / prévision tardive : `placeWind` sans requête.
-- ADR (phase 5b, `adr.js`) : ORS ne reçoit que `hazmat` ; avec lui il évite toute voie `hazmat=no` / `hazmat:B…E=no`
+- ADR (phase 5b, `adr.js`) : réglage global dans Réglages (« Matières dangereuses (ADR) », `settings.adr` :
+  `enabled`, `adrClass`, `unNumber`, `tunnelCode`), jamais dans le profil véhicule (dépend du chargement). Code tunnel
+  vide / B–E saisi à la main (« lettre indiquée sur le document de transport ; la classe seule ne la donne pas »),
+  jamais déduit de la classe ; 'none' seulement s'il vient d'un ancien profil. Reprise (`migrateAdrSettings`, stockage
+  et import d'un ancien JSON) : profil actif ADR, sinon premier profil ADR. `activeVehicle(data)` = profil + `withAdr`
+  (hazmat, tunnelCode, adrClass, unNumber) : ORS, alertes, résumés et notes lisent ce véhicule. ORS ne reçoit que `hazmat` ; avec lui il évite toute voie `hazmat=no` / `hazmat:B…E=no`
   quelle que soit la lettre (code source HazmatAccessParser) et ignore `hazmat:adr_tunnel_cat` → phrase « l'itinéraire
-  peut être plus long » dans les notes. Code tunnel du profil (`tunnelCode` '', B–E, 'none'), `adrClass`, `unNumber`
-  facultatifs, vidés sans la case ADR ; code vide = aucune alerte (une ligne d'info seulement). Catégorie OSM = plus
+  peut être plus long » dans les notes. Code tunnel (`tunnelCode` '', B–E, 'none'), `adrClass`, `unNumber`
+  facultatifs, ignorés sans la case ADR ; code vide = aucune alerte (une ligne d'info seulement). Catégorie OSM = plus
   haute lettre `hazmat:X=no`, `hazmat:adr_tunnel_cat`, `hazmat=no` → 'X' (tout interdit) ; code interdit si lettre ≤
   catégorie. Tunnels : jamais d'Overpass (mesure 520 km : > 26 s ; Action en échec trois fois le 20/11/2026, serveurs pleins) :
   extraits Geofabrik + osmium dans l'Action, `data/tunnels-adr.json` chargé seulement
-  pour un véhicule ADR avec code ; absent / vide → « Alerte tunnels indisponible (données non chargées) », jamais un
+  pour un chargement ADR avec code ; absent / vide → « Alerte tunnels indisponible (données non chargées) », jamais un
   silence ; jamais « sans tunnel interdit » mais « Aucun tunnel signalé dans les données (copie du JJ/MM), la
   signalisation fait foi » ; chaque alerte tunnel finit par « la signalisation fait foi ». `KNOWN_TUNNELS` : Fourvière
   E, Fréjus C, Mont-Blanc E (Bison Futé), catégorie gardée face à OSM, vérifiés sans données. Tube sur le tracé : 5

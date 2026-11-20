@@ -9,12 +9,8 @@ export const CRITAIR_VALUES = ['0', '1', '2', '3', '4', '5', 'NC'];
  */
 export const BAN_STATUS_VALUES = ['concerned', 'art4', 'exempt'];
 
-/**
- * Matières dangereuses (phase 5b, accord ADR 8.6.4) : code de restriction en tunnel du chargement ('' = non renseigné,
- * aucune alerte ; 'none' = chargement sans code), classe et numéro ONU facultatifs. Voir src/lib/adr.js.
- */
-export const TUNNEL_CODE_VALUES = ['', 'B', 'C', 'D', 'E', 'none'];
-export const ADR_CLASS_VALUES = ['', '1', '2', '3', '4.1', '4.2', '4.3', '5.1', '5.2', '6.1', '6.2', '7', '8', '9'];
+// Matières dangereuses (phase 5b) : réglage global (Réglages, settings.adr), plus dans le profil depuis la v19.
+// Voir src/lib/adr-settings.js (reprise des anciens profils, withAdr).
 
 /**
  * Champs numériques : unité, bornes acceptées, obligatoire ou non.
@@ -47,14 +43,10 @@ export function defaultVehicle() {
     length: 16.5,
     weight: 44,
     axleload: 11.5,
-    hazmat: false,
     maxSpeed: 90,
     consumption: 32,
     critair: '1',
     banStatus: 'concerned',
-    tunnelCode: '',
-    adrClass: '',
-    unNumber: '',
   };
 }
 
@@ -73,17 +65,10 @@ export function normalizeVehicle(raw) {
   const v = {
     id: typeof raw?.id === 'string' && raw.id ? raw.id : newId(),
     name: typeof raw?.name === 'string' ? raw.name.trim() : '',
-    hazmat: raw?.hazmat === true || raw?.hazmat === 'on' || raw?.hazmat === 'true',
     critair: CRITAIR_VALUES.includes(String(raw?.critair)) ? String(raw.critair) : 'NC',
     banStatus: BAN_STATUS_VALUES.includes(raw?.banStatus) ? raw.banStatus : 'concerned',
   };
-  // Champs ADR : facultatifs, gardés seulement avec « Matières dangereuses » coché.
-  const code = String(raw?.tunnelCode ?? '');
-  const cls = String(raw?.adrClass ?? '');
-  const un = String(raw?.unNumber ?? '').replace(/^\s*UN\s*/i, '').trim();
-  v.tunnelCode = v.hazmat ? code : '';
-  v.adrClass = v.hazmat ? cls : '';
-  v.unNumber = v.hazmat ? un : '';
+  // Anciens champs ADR (hazmat, tunnelCode, adrClass, unNumber) : non gardés, repris dans settings.adr (store.js).
   for (const key of Object.keys(NUMERIC_FIELDS)) {
     v[key] = parseNumber(raw?.[key]);
   }
@@ -116,10 +101,6 @@ export function validateVehicle(v) {
     errors.axleload = "La charge à l'essieu ne peut pas dépasser le PTAC.";
   }
   if (!CRITAIR_VALUES.includes(v.critair)) errors.critair = 'Vignette Crit\'Air inconnue.';
-  if (typeof v.hazmat !== 'boolean') errors.hazmat = 'Valeur invalide.';
   if (!BAN_STATUS_VALUES.includes(v.banStatus)) errors.banStatus = 'Valeur invalide.';
-  if (!TUNNEL_CODE_VALUES.includes(v.tunnelCode ?? '')) errors.tunnelCode = 'Code tunnel inconnu.';
-  if (!ADR_CLASS_VALUES.includes(v.adrClass ?? '')) errors.adrClass = 'Classe ADR inconnue.';
-  if (v.unNumber && !/^\d{4}$/.test(v.unNumber)) errors.unNumber = 'Numéro ONU : 4 chiffres (ex. 1202).';
   return { valid: Object.keys(errors).length === 0, errors };
 }

@@ -405,6 +405,8 @@ const settings = createSettings({
   onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
   onWindVoiceChange: (on) => setSetting({ windVoice: on }),
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
+  // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
+  onAdrChange: (adr) => setSetting({ adr }),
   onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
 });
 createVehicles({ getData: () => data, update });
