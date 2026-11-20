@@ -455,9 +455,10 @@ async function contextLossCheck(browser, base) {
 
 async function parkedCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
-  // Sans aires, comme avant la phase 9b (Overpass non simulé ici) : avec des aires affichées, le compte d'images
-  // monte déjà à 144 sur main (v19), à traiter à part.
-  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav, osmCopy: null });
+  // Avec les aires de la copie simulée (repères sur la carte, encart « Prochaines aires » ouvert) : avant le correctif
+  // (v20), chaque position déplaçait flèche et caméra et MapLibre remettait à jour chaque repère → 144 images pour 8
+  // positions.
+  const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav });
   await page.fill('#to-input', 'Lyon');
   await page.waitForSelector('#to-list li');
   await page.dispatchEvent('#to-list li', 'pointerdown');
@@ -468,9 +469,16 @@ async function parkedCheck(browser, base) {
   await page.click('#btn-nav-start');
   await page.waitForTimeout(1500);
   const before = stats.directions;
+  await page.click('#btn-nav-areas');
+  await page.waitForTimeout(300);
   // Aire à ≈ 150 m au nord du tracé, GPS qui dérive (jusqu'à 60 m), précision 15 m, camion arrêté.
   for (let i = 0; i < 14; i += 1) {
-    if (i === 6) Object.assign(stats, { rafAt6: await page.evaluate(() => window.__raf) });
+    if (i === 6) {
+      Object.assign(stats, { rafAt6: await page.evaluate(() => {
+        window.__areaRow = document.querySelector('#nav-areas-list li');
+        return window.__raf;
+      }) });
+    }
     const r = 60 * Math.abs(Math.sin(i * 0.9));
     const a = (i * 137 * Math.PI) / 180;
     await setGeo(page, { lat: lat + (150 + r * Math.cos(a)) / 110540,
@@ -481,7 +489,15 @@ async function parkedCheck(browser, base) {
   // quelques images après chaque déplacement de caméra (fondu) ; avec l'interpolation continue, Chromium sans écran
   // en comptait plusieurs centaines par position (≈ 600 / position mesurées avant ce correctif).
   const parkedRaf = (await page.evaluate(() => window.__raf)) - stats.rafAt6;
-  check(parkedRaf <= 8 * 15, 'camion arrêté, GPS qui dérive : pas de rendu continu', `${parkedRaf} rAF pour 8 positions`);
+  const shown = await page.evaluate(() => ({
+    markers: document.querySelectorAll('.area-marker').length,
+    rows: document.querySelectorAll('#nav-areas-list li').length,
+    same: !!window.__areaRow && window.__areaRow === document.querySelector('#nav-areas-list li'),
+  }));
+  check(shown.markers > 0 && shown.rows > 0, 'aires affichées (repères et encart ouvert)', `${shown.markers} repère(s), ${shown.rows} ligne(s)`);
+  // Seuil strict : au plus une image par position (0 mesurée après le correctif, 144 avant).
+  check(parkedRaf <= 8, 'camion arrêté, GPS qui dérive, aires affichées : rien à redessiner', `${parkedRaf} rAF pour 8 positions`);
+  check(shown.same, 'encart « Prochaines aires » inchangé : lignes non reconstruites');
   check(stats.directions === before, 'arrêté sur une aire, GPS qui dérive : aucun recalcul', `${stats.directions - before} requête(s)`);
   check(await page.isVisible('#btn-nav-reroute'), 'bouton « Recalculer d\'ici » proposé');
   await noHorizontalScroll(page, '360 px guidage, proposition de recalcul');
@@ -872,7 +888,7 @@ async function areasCheck(browser, base) {
     const overNav = await overflowingNavText(page);
     check(overNav.length === 0, `${width} px : guidage, textes dans leurs cases avec l'encart`, overNav.join(' ; '));
     await page.screenshot({ path: join(SHOTS, `${width}-aires-guidage.png`) });
-    await drive(ctx, page, line, 50, 6);
+    await drive(ctx, page, line, 50, 12); // repart du début : 110 m plus loin qu'avant, au-delà de l'arrondi à 50 m
     const r2 = await navRows();
     const km = (t) => (t === 'Ici' ? 0 : Number.parseFloat(t.replace(',', '.')) * (t.endsWith(' km') ? 1000 : 1));
     check(km(r2[0].dist) < km(r1[0].dist), `${width} px : distance mise à jour à chaque position`, `${r1[0].dist} → ${r2[0].dist}`);
@@ -1092,7 +1108,7 @@ async function rulesCheck(browser, base) {
  * le GPS émulé (bandeau dans sa case), puis fichier absent (« Alerte tunnels indisponible »), code vide (aucune
  * alerte), profil enregistré avant la v19 repris dans Réglages (section ADR, profil sans champs ADR, nouveau calcul) ;
  * 360, 412, 800 et 1280 px. Enfin le vrai
- * service worker : « Gabarit v20 » en bas de Réglages.
+ * service worker : « Gabarit v21 » en bas de Réglages.
  */
 async function adrCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
@@ -1232,7 +1248,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v20', 'vrai service worker : « Gabarit v20 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v21', 'vrai service worker : « Gabarit v21 » en bas de Réglages', ver);
   await ctx.close();
 }
 

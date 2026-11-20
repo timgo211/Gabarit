@@ -12,6 +12,12 @@ import { normalizeBearing } from './nav-geo.js';
 export const ANIM = Object.freeze({
   MIN_MS: 200, MAX_MS: 1000, DEFAULT_MS: 1000, JUMP_M: 500,
   STILL_KMH: 3,
+  /**
+   * À l'arrêt, flèche et caméra restent où elles sont tant que la position reste à moins de 100 m de celle dessinée
+   * (GPS qui dérive sur une aire) : aucune image, ni la carte ni les repères (aires, départ, arrivée) ne sont
+   * redessinés. Au-delà (camion qui avance au pas), une image.
+   */
+  HOLD_M: 100,
   /** En dessous de ces écarts, rien n'a changé. */
   SAME_M: 0.5, SAME_DEG: 0.5, SAME_ZOOM: 0.01, SAME_PITCH: 0.1,
 });
@@ -40,6 +46,26 @@ export function unchanged(from, to, distanceM) {
   return !!from?.lonlat && Number.isFinite(distanceM) && distanceM < ANIM.SAME_M
     && same(from.bearing, to.bearing, ANIM.SAME_DEG, true) && same(from.zoom, to.zoom, ANIM.SAME_ZOOM)
     && same(from.pitch, to.pitch, ANIM.SAME_PITCH);
+}
+
+/** Mêmes marges de caméra ({ top, right, bottom, left }, absentes = égales). */
+export function samePadding(a, b) {
+  if (!a || !b) return !a && !b;
+  return ['top', 'right', 'bottom', 'left'].every((k) => Math.round(a[k] ?? 0) === Math.round(b[k] ?? 0));
+}
+
+/**
+ * Camion arrêté (moins de 3 km/h), position à moins de 100 m de celle dessinée, même suivi et mêmes marges de
+ * caméra : rien à redessiner (la dérive du GPS ne bouge ni la flèche ni la carte).
+ * @param {{ lonlat:number[], follow?:boolean, padding?:object }|null} drawn dernière position dessinée
+ * @param {{ follow?:boolean, padding?:object }} next
+ * @param {number} distanceM distance entre la position dessinée et la nouvelle
+ * @param {number|null} speedKmh
+ */
+export function holdStill(drawn, next, distanceM, speedKmh) {
+  return !!drawn?.lonlat && Number.isFinite(speedKmh) && speedKmh < ANIM.STILL_KMH
+    && Number.isFinite(distanceM) && distanceM < ANIM.HOLD_M
+    && !!drawn.follow === !!next.follow && samePadding(drawn.padding, next.padding);
 }
 
 /**

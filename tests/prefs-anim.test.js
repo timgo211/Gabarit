@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   ARROW_COLORS, sanitizeArrowColor, arrowColors, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, VOICE_RATE,
 } from '../src/lib/prefs.js';
-import { planMove, frameAt, shortestTurn, ANIM } from '../src/lib/nav-anim.js';
+import { planMove, frameAt, shortestTurn, ANIM, holdStill, samePadding } from '../src/lib/nav-anim.js';
 import { frenchVoices, pickVoice } from '../src/lib/nav-guidance.js';
 import { emptyData, sanitizeData } from '../src/lib/store.js';
 
@@ -116,4 +116,22 @@ test('flèche à l\'arrêt : sous 3 km/h ou sans changement, une seule image (pa
   assert.equal(unchanged(a, { ...a, bearing: null }, 0), false, 'cap perdu');
   assert.equal(unchanged(a, drift, 18), false, 'position changée');
   assert.equal(unchanged({ ...a, bearing: 359.9 }, { ...a, bearing: 0.1 }, 0), true, 'cap autour du nord');
+});
+
+test('arrêté, GPS qui dérive : flèche et carte figées (aucune image), sauf au-delà de 100 m', () => {
+  const pad = { top: 300, right: 0, bottom: 40, left: 0 };
+  const drawn = { lonlat: [6, 48], bearing: 90, follow: true, padding: pad };
+  const next = { follow: true, padding: { ...pad } };
+  assert.equal(holdStill(drawn, next, 60, 0), true, 'dérive de 60 m à 0 km/h');
+  assert.equal(holdStill(drawn, next, 99, 2.9), true);
+  assert.equal(holdStill(drawn, next, 120, 0), false, 'camion qui avance au pas : une image');
+  assert.equal(holdStill(drawn, next, 20, 3), false, 'en roulant : interpolation habituelle');
+  assert.equal(holdStill(drawn, next, 20, null), false, 'vitesse inconnue');
+  assert.equal(holdStill(null, next, 0, 0), false, 'première position : dessinée');
+  assert.equal(holdStill(drawn, { ...next, follow: false }, 10, 0), false, 'vue d\'ensemble / recentrer : redessiné');
+  assert.equal(holdStill(drawn, { ...next, padding: { ...pad, top: 200 } }, 10, 0), false, 'bandeau qui change de taille');
+  assert.equal(holdStill(drawn, next, NaN, 0), false);
+  assert.equal(samePadding(null, undefined), true);
+  assert.equal(samePadding(pad, { ...pad, top: 300.3 }), true, 'arrondi au pixel');
+  assert.equal(samePadding(pad, null), false);
 });

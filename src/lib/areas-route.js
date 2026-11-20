@@ -246,12 +246,35 @@ export function describeArea(a, departure = new Date()) {
   };
 }
 
+/**
+ * Encart « Prochaines aires » : distance arrondie à 50 m sous 1 km (le texte ne change pas à chaque mètre de dérive
+ * du GPS) ; à l'arrêt (moins de 3 km/h), lignes figées tant que ce sont les mêmes aires, rafraîchies une fois par
+ * minute (heure d'arrivée).
+ */
+export const NEXT_AREAS_VIEW = Object.freeze({ ROUND_M: 50, STILL_KMH: 3, STILL_REFRESH_MS: 60_000 });
+
 /** Ligne de l'encart « Prochaines aires » (guidage). */
 export function describeNextArea(n, now = new Date()) {
+  const r = NEXT_AREAS_VIEW.ROUND_M;
   return {
     name: n.name,
-    distance: n.distance < 50 ? 'Ici' : formatDistance(n.distance),
+    distance: n.distance < 50 ? 'Ici' : formatDistance(n.distance < 1000 ? Math.round(n.distance / r) * r : n.distance),
     eta: formatArrival(now, n.eta),
     places: placesText(n.hgvPlaces) ?? 'places PL ?',
   };
+}
+
+/**
+ * Faut-il reconstruire l'encart « Prochaines aires » ?
+ * @param {{ key:string, ids:string, at:number }|null} drawn dernier encart dessiné (key : tous les textes, ids : les aires)
+ * @param {{ key:string, ids:string }} next
+ * @param {number|null} speedKmh
+ * @param {number} now ms
+ * @returns {boolean} false si les textes sont identiques, ou à l'arrêt avec les mêmes aires depuis moins d'une minute
+ */
+export function nextAreasChanged(drawn, next, speedKmh, now) {
+  if (!drawn) return true;
+  if (drawn.key === next.key) return false;
+  const still = Number.isFinite(speedKmh) && speedKmh < NEXT_AREAS_VIEW.STILL_KMH;
+  return !(still && drawn.ids === next.ids && now - drawn.at < NEXT_AREAS_VIEW.STILL_REFRESH_MS);
 }
