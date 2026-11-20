@@ -888,7 +888,7 @@ async function areasCheck(browser, base) {
     const overNav = await overflowingNavText(page);
     check(overNav.length === 0, `${width} px : guidage, textes dans leurs cases avec l'encart`, overNav.join(' ; '));
     await page.screenshot({ path: join(SHOTS, `${width}-aires-guidage.png`) });
-    await drive(ctx, page, line, 50, 6);
+    await drive(ctx, page, line, 50, 12); // repart du début : 110 m plus loin qu'avant, au-delà de l'arrondi à 50 m
     const r2 = await navRows();
     const km = (t) => (t === 'Ici' ? 0 : Number.parseFloat(t.replace(',', '.')) * (t.endsWith(' km') ? 1000 : 1));
     check(km(r2[0].dist) < km(r1[0].dist), `${width} px : distance mise à jour à chaque position`, `${r1[0].dist} → ${r2[0].dist}`);
