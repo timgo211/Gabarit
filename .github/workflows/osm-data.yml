@@ -81,9 +81,17 @@ jobs:
           code=$(curl -sS -L -A "$UA" -o code.pdf -w '%{http_code}' "https://codes.droit.org/PDF/Code%20de%20la%20route.pdf" || echo 000)
           echo "codes.droit.org : HTTP $code"
           if [ "$code" = 200 ]; then
-            pdftotext -layout code.pdf code.txt
-            head -c 600 code.txt; echo
-            grep -n -A 25 "Article R411-8" code.txt | head -60 || echo "Article R411-8 absent du PDF"
+            pdftotext code.pdf code.txt
+            head -c 300 code.txt; echo
+            # Numéro écrit « R411-8 », « R. 411-8 » ou coupé en fin de ligne selon l'édition.
+            if grep -n -i -E "R\.? ?411-8([^0-9]|$)" code.txt > hits.txt; then
+              cat hits.txt | head -20
+              n=$(grep -n -i -E "Article R\.? ?411-8([^0-9]|$)" code.txt | head -1 | cut -d: -f1)
+              if [ -n "$n" ]; then sed -n "${n},$((n + 30))p" code.txt; fi
+            else
+              echo "Article R411-8 absent du PDF"
+              grep -n -i -E "411-[0-9]" code.txt | head -20
+            fi
           fi
 
   update:
