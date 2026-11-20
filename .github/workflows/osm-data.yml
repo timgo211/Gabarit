@@ -31,7 +31,8 @@ permissions:
   contents: write
 
 concurrency:
-  group: osm-data-${{ github.ref }}
+  # Lecture R411-8 à part : elle n'annule jamais une copie en cours.
+  group: osm-data-${{ github.ref }}-${{ inputs.r411 && 'r411' || 'copie' }}
   cancel-in-progress: true
 
 jobs:
