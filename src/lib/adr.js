@@ -72,7 +72,9 @@ export const KNOWN_TUNNELS = Object.freeze([
   Object.freeze({
     id: 'known:fourviere', name: 'Tunnel de Fourvière', cat: 'E', known: true,
     note: 'Interdit aussi aux PL de plus de 7,5 t et de plus de 4,50 m (arrêté DDT69/Métropole de Lyon du 2 avril 2019).',
-    tubes: Object.freeze([]),
+    // OSM (API, 20/11/2026) : w1960216 « Tunnel de Fourvière » et w4243622 « Tunnel sous Fourvière » (tunnel:name ;
+    // name = Autoroute du Soleil, M 6), hazmat=no ; Bison Futé : catégorie E, gardée.
+    tubes: Object.freeze([Object.freeze([[4.82041,45.75234],[4.81809,45.75471],[4.81089,45.75986],[4.80889,45.76079],[4.80553,45.76208],[4.80305,45.76346]]), Object.freeze([[4.80288,45.76334],[4.80553,45.76177],[4.80864,45.7606],[4.81048,45.75968],[4.81775,45.75453],[4.82021,45.75224]])]),
   }),
   Object.freeze({
     id: 'known:frejus', name: 'Tunnel du Fréjus', cat: 'C', known: true,
@@ -84,7 +86,7 @@ export const KNOWN_TUNNELS = Object.freeze([
   Object.freeze({
     id: 'known:montblanc', name: 'Tunnel du Mont-Blanc', cat: 'E', known: true,
     note: 'PL de plus de 3,5 t : accréditation obligatoire avant le tunnel (Passy-Le Fayet ou Aoste).',
-    // OSM (API, 20/11/2026) : w1212015047 + w4525912 « Tunnel du Mont Blanc » (côté français, sans catégorie) +
+    // OSM (API, 20/11/2026) : w1212015047 + w4525912 « Tunnel du Mont Blanc » (côté français, hazmat=E) +
     // w205544546 « Traforo del Monte Bianco » (hazmat=no) ; Bison Futé : catégorie E, gardée.
     tubes: Object.freeze([Object.freeze([[6.86128,45.90122],[6.86287,45.90086],[6.8782,45.88706],[6.92139,45.84674],[6.9517,45.8181]])]),
   }),
