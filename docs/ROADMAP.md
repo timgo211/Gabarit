@@ -1,6 +1,11 @@
 # Feuille de route Gabarit
 
-Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
+Ordre : Bloc 1 Aires PL → Bloc 2 Guidage → Bloc 3 Réglementation → 7d → (4, 6, 10) → 3
+
+**Règle de travail : prendre le prochain bloc non coché. Un bloc = une seule conversation** (toutes ses cases dans
+la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, comme un bloc.
+
+## Phases faites
 
 - [x] **Phase 1 — Base : réglages, véhicules, itinéraire camion**
   Réglages (clé ORS masquée + test, mode nuit auto/manuel, export/import JSON), profils véhicule multiples
@@ -64,93 +69,9 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
   changement de thème ; carte restaurée ou recréée après perte du contexte WebGL ; hors itinéraire seulement à
   10 km/h ou plus avec une précision de 30 m ou mieux, sinon bouton « Recalculer d'ici » proposé à l'arrêt.
 
-- [x] **Phase 9 — Aires et parkings PL** (priorité ; reprend la partie parkings de la phase 6)
-  - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
-    (`amenity=parking` + `hgv=yes/designated`, `capacity:hgv`, services) d'OpenStreetMap via Overpass ; jeu officiel
-    des aires de stationnement PL du point d'accès national (Bison Futé, transféré sur transport.data.gouv.fr par
-    l'arrêté du 24 mars 2026), copié dans `data/` par une GitHub Action hebdomadaire s'il n'est pas lisible depuis le
-    navigateur. Doublons entre sources fusionnés.
-  - Au calcul : aires le long de l'itinéraire choisi, dans le bon sens de circulation quand c'est connu ; une seule
-    requête Overpass par calcul, résultat gardé sur l'appareil (jamais dans le cache du service worker).
-  - Avant de partir : liste des aires du trajet (km depuis le départ, heure d'arrivée estimée, places PL, services,
-    sécurisé / payant), repères sur la carte, toucher une aire = sa fiche.
-  - En guidage : encart « Prochaines aires » (les 3 suivantes : nom, distance, heure d'arrivée, places PL), mis à jour
-    à chaque position, ouvert ou fermé d'un seul appui, aucune saisie. Annonce vocale optionnelle (Réglages) vers
-    10 km avant une aire PL.
-  - Mon avis : à l'arrêt seulement (sous 10 km/h), sur la fiche d'une aire, 3 gros boutons « Plein »,
-    « Quelques places », « OK » + heure, gardés sur l'appareil, inclus dans l'export / import, affichés sur la fiche et
-    dans la liste (« Plein il y a 2 j, 21h »).
-  - Occupation en temps réel : vérifier s'il existe une source gratuite pour la France. **Pour plus tard (non codé) :**
-    Allemagne, places libres des aires d'autoroute publiées par Toll Collect / SID sur Mobilithek (DATEX II).
-  Fait : une requête Overpass par calcul pour tous les itinéraires proposés (tracés mis bout à bout, simplifiés),
-  aires de repos / de service à 400 m, parkings PL à 800 m, serveur de secours (overpass.private.coffee) si le premier
-  échoue ou dépasse 30 s, résultat gardé 7 jours sur l'appareil (5 trajets) ; jeu officiel (xlsx du réseau concédé 2025,
-  ods du réseau non concédé 2018, Licence Ouverte) converti chaque lundi dans `data/aires-pl.json` par l'Action
-  « Aires PL officielles » (journal : en-têtes lus, colonnes retenues, nombre d'aires ; échec clair si le nom ou la
-  position manquent ; Lambert 93 accepté) ; doublons fusionnés à 300 m ; aire à gauche du tracé en gris « autre sens ? ».
-  Liste, repères, fiche, encart « Prochaines aires », annonce vocale (Réglages), « Mon avis » (sous 10 km/h en guidage).
-  **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
-  Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
-  ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
-
-- [ ] **Phase 5 — Réglementation**
-  ZFE (`aires.geojson` de la Base nationale BNZFE sur transport.data.gouv.fr, copié dans `data/` par une GitHub Action
-  hebdomadaire) avec alerte selon ma vignette Crit'Air ; interdictions PL les week-ends et jours fériés ; temps de
-  conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
-  (Open-Meteo). Vérifier chaque règle sur une source officielle avant de coder et la citer en commentaire.
-  - [x] **ZFE** (PR A) : base nationale (aires + tronçons spéciaux, licence ODbL d'après data.gouv.fr) copiée chaque
-    lundi dans `data/zfe.json` par l'Action « ZFE (base nationale) » ; seuil Crit'Air du schéma etalab (V3 = Crit'Air
-    3, 4, 5 et non classés interdits), règles PL au-delà de 3,5 t, horaires (« 24/7 », « Mo-Fr 07:00-9:00 », « PH off »),
-    dates d'entrée en vigueur, tronçons spéciaux prioritaires sur la zone ; fiche d'itinéraire et notes (lien vers
-    l'arrêté), contours sur la carte, bouton « Éviter la ZFE » à l'arrêt (options.avoid_polygons d'ORS, zones découpées
-    en carrés de 12 km ; message clair au-delà de 150 km à vol d'oiseau, limite de l'API publique) ; en guidage,
-    bandeau sous 20 km et annonce vers 5 km. Les ZFE restent en vigueur (suppression censurée, décision 2026-903 DC).
-  - [x] **Interdictions PL week-ends et jours fériés** (PR A) : arrêté du 16 avril 2021 (l'arrêté du 2 mars 2015 est
-    abrogé) : plus de 7,5 t, samedi et veille de jour férié 22 h → dimanche et jour férié 22 h ; samedis d'été et
-    d'hiver (Auvergne-Rhône-Alpes) de l'arrêté annuel (2026 : arrêté du 26 décembre 2025) ; Île-de-France (art. 3, A6,
-    A10, A12, A13, A106, selon le sens) ; jours fériés calculés ; profil : « Concerné », « Transport de l'article 4 »
-    ou « Véhicule spécialisé / agricole ». Fiche : « Interdiction PL samedi 22 h → dimanche 22 h : vous y seriez vers
-    km 412 » ; guidage : annonces 1 h et 15 min avant si l'arrivée est après le début, bandeau. Vérifié avec le
-    calendrier 2026 de la brochure Bison Futé (écarts du 4 avril et du 9 mai en Île-de-France : l'appli suit l'arrêté).
-  - [ ] Temps de conduite et pauses (PR B).
-  - [ ] Alerte vent fort (PR B).
-
-- [ ] **Phase 5b — ADR (matières dangereuses)**
-  Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D
-  ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul
-  si un tunnel est interdit à mon code et proposer un autre itinéraire. Rappel des interdictions de circulation propres
-  au transport ADR. ORS ne gère que `hazmat` oui/non : vérifier dans la doc ce qui est possible et l'écrire. Sources
-  officielles citées (accord ADR, arrêtés français). Classe ADR (1 à 9) et numéro ONU facultatif dans le profil,
-  pour distinguer les règles qui en dépendent.
-
-- [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
-  Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
-  pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
-  zones à faibles émissions ou vignettes, particularités ADR). Pendant le guidage : annonce vocale courte à l'approche
-  de la frontière, sans saisie. Fiches dans `data/pays/*.json`, avec la source officielle et la date de vérification
-  de chaque règle ; d'abord les pays voisins (BE, LU, DE, CH, IT, ES).
-
-- [ ] **Phase 5d — Accès : tranches horaires et desserte locale**
-  Interdictions PL par tranches horaires (tags OpenStreetMap conditionnels, par exemple `hgv:conditional`) : vérifier
-  si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
-  livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
-  `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
-
-- [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
-  Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
-  via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
-  alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
-  bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
-  itinéraire pour ménager les quotas.
-
-- [ ] **Phase 7d — Satellite hors de France**
-  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
-  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
-
-- [ ] **Phase 7c — Confort du guidage**
+- [x] **Phase 7c — Confort du guidage** (reste déplacé dans le Bloc Guidage)
   - [x] Boutons permanents « Vue d'ensemble » (tout le trajet restant) et « Recentrer ».
-  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
-    phase 2b), choix en un toucher.
+  - Autres itinéraires depuis la vue d'ensemble : déplacé dans le Bloc Guidage.
   - [x] Bouton Plan / Satellite aussi pendant le guidage (un toucher ; le guidage démarre en plan, choix non mémorisé).
   - [x] Guidage moins sombre en mode jour (bandeau du haut et barre du bas plus clairs, contraste gardé).
   - [x] Barre du bas : traits fins entre Reste, Temps, Arrivée et Vitesse.
@@ -158,20 +79,122 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
   - [x] Flèche du camion plus fluide : déplacement et rotation animés entre deux positions GPS.
   - Personnalisation :
     - [x] couleur de la flèche (auto, bleu, vert, orange, violet) ;
-    - [ ] forme de la flèche, icône camion ;
+    - forme de la flèche, icône camion : déplacé dans le Bloc Guidage ;
     - [x] voix : choix parmi les voix françaises installées, vitesse, volume, bouton « Tester ».
   - [x] Musique pendant les consignes : Chrome (Android compris) n'a pas l'Audio Session API (Safari seulement) ;
     Réglages l'explique (réglage appliqué automatiquement si un navigateur la propose).
   - [x] Partager Gabarit avec un guide d'installation pas à pas pour un autre téléphone (ouvrir le lien, installer,
     créer sa clé gratuite, la coller dans Réglages).
 
-- [ ] **Phase 8 — Destinations et étapes**
-  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
-    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
-    tournée multi-arrêts de la phase 3.)
+- [x] **Phase 8 — Destinations et étapes** (reste déplacé dans le Bloc Guidage)
+  - Étapes : déplacé dans le Bloc Guidage.
   - [x] Destination (ou départ) par appui long sur la carte, hors guidage : « Aller ici » / « Partir d'ici ».
   - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
     (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
+
+## Bloc 1 — Aires PL (en cours)
+
+- [ ] **Bloc 1 — Aires PL** : ajout et suivi des aires de repos, aires de service et parkings poids lourds, autoroutes
+  d'abord, puis nationales.
+  - [x] **Phase 9 — Aires et parkings PL** (priorité ; reprend la partie parkings de la phase 6)
+    - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
+      (`amenity=parking` + `hgv=yes/designated`, `capacity:hgv`, services) d'OpenStreetMap via Overpass ; jeu officiel
+      des aires de stationnement PL du point d'accès national (Bison Futé, transféré sur transport.data.gouv.fr par
+      l'arrêté du 24 mars 2026), copié dans `data/` par une GitHub Action hebdomadaire s'il n'est pas lisible depuis le
+      navigateur. Doublons entre sources fusionnés.
+    - Au calcul : aires le long de l'itinéraire choisi, dans le bon sens de circulation quand c'est connu ; une seule
+      requête Overpass par calcul, résultat gardé sur l'appareil (jamais dans le cache du service worker).
+    - Avant de partir : liste des aires du trajet (km depuis le départ, heure d'arrivée estimée, places PL, services,
+      sécurisé / payant), repères sur la carte, toucher une aire = sa fiche.
+    - En guidage : encart « Prochaines aires » (les 3 suivantes : nom, distance, heure d'arrivée, places PL), mis à jour
+      à chaque position, ouvert ou fermé d'un seul appui, aucune saisie. Annonce vocale optionnelle (Réglages) vers
+      10 km avant une aire PL.
+    - Mon avis : à l'arrêt seulement (sous 10 km/h), sur la fiche d'une aire, 3 gros boutons « Plein »,
+      « Quelques places », « OK » + heure, gardés sur l'appareil, inclus dans l'export / import, affichés sur la fiche et
+      dans la liste (« Plein il y a 2 j, 21h »).
+    - Occupation en temps réel : vérifier s'il existe une source gratuite pour la France. **Pour plus tard (non codé) :**
+      Allemagne, places libres des aires d'autoroute publiées par Toll Collect / SID sur Mobilithek (DATEX II).
+    Fait : une requête Overpass par calcul pour tous les itinéraires proposés (tracés mis bout à bout, simplifiés),
+    aires de repos / de service à 400 m, parkings PL à 800 m, serveur de secours (overpass.private.coffee) si le premier
+    échoue ou dépasse 30 s, résultat gardé 7 jours sur l'appareil (5 trajets) ; jeu officiel (xlsx du réseau concédé 2025,
+    ods du réseau non concédé 2018, Licence Ouverte) converti chaque lundi dans `data/aires-pl.json` par l'Action
+    « Aires PL officielles » (journal : en-têtes lus, colonnes retenues, nombre d'aires ; échec clair si le nom ou la
+    position manquent ; Lambert 93 accepté) ; doublons fusionnés à 300 m ; aire à gauche du tracé en gris « autre sens ? ».
+    Liste, repères, fiche, encart « Prochaines aires », annonce vocale (Réglages), « Mon avis » (sous 10 km/h en guidage).
+    **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
+    Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
+    ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
+
+## Bloc 2 — Guidage
+
+- [ ] **Bloc 2 — Guidage** (une seule conversation)
+  Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
+  `sw.js` pour tout le bloc.
+  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
+    phase 2b), choix en un toucher. (Reste de la phase 7c.)
+  - [ ] Personnalisation : forme de la flèche, icône camion. (Reste de la phase 7c.)
+  - [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
+    Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
+    via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
+    alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
+    bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
+    itinéraire pour ménager les quotas.
+  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
+    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
+    tournée multi-arrêts de la phase 3.) (Reste de la phase 8.)
+    **À faire en dernier dans le bloc, en mode plan obligatoire** : touche à la logique (trajet par tronçons, recalcul,
+    quota ORS).
+
+## Bloc 3 — Réglementation
+
+- [ ] **Bloc 3 — Réglementation** (une seule conversation)
+  Les phases 5, 5b, 5c et 5d partagent les mêmes données de restrictions : chercher et citer chaque règle officielle
+  une seule fois, en commentaire, avant de coder.
+  - [ ] **Phase 5 — Réglementation**
+    ZFE (`aires.geojson` de la Base nationale BNZFE sur transport.data.gouv.fr, copié dans `data/` par une GitHub Action
+    hebdomadaire) avec alerte selon ma vignette Crit'Air ; interdictions PL les week-ends et jours fériés ; temps de
+    conduite et pauses (règlement CE 561/2006, affiché comme une aide : le chronotachygraphe fait foi) ; alerte vent fort
+    (Open-Meteo). Vérifier chaque règle sur une source officielle avant de coder et la citer en commentaire.
+    - [x] **ZFE** (PR A) : base nationale (aires + tronçons spéciaux, licence ODbL d'après data.gouv.fr) copiée chaque
+      lundi dans `data/zfe.json` par l'Action « ZFE (base nationale) » ; seuil Crit'Air du schéma etalab (V3 = Crit'Air
+      3, 4, 5 et non classés interdits), règles PL au-delà de 3,5 t, horaires (« 24/7 », « Mo-Fr 07:00-9:00 », « PH off »),
+      dates d'entrée en vigueur, tronçons spéciaux prioritaires sur la zone ; fiche d'itinéraire et notes (lien vers
+      l'arrêté), contours sur la carte, bouton « Éviter la ZFE » à l'arrêt (options.avoid_polygons d'ORS, zones découpées
+      en carrés de 12 km ; message clair au-delà de 150 km à vol d'oiseau, limite de l'API publique) ; en guidage,
+      bandeau sous 20 km et annonce vers 5 km. Les ZFE restent en vigueur (suppression censurée, décision 2026-903 DC).
+    - [x] **Interdictions PL week-ends et jours fériés** (PR A) : arrêté du 16 avril 2021 (l'arrêté du 2 mars 2015 est
+      abrogé) : plus de 7,5 t, samedi et veille de jour férié 22 h → dimanche et jour férié 22 h ; samedis d'été et
+      d'hiver (Auvergne-Rhône-Alpes) de l'arrêté annuel (2026 : arrêté du 26 décembre 2025) ; Île-de-France (art. 3, A6,
+      A10, A12, A13, A106, selon le sens) ; jours fériés calculés ; profil : « Concerné », « Transport de l'article 4 »
+      ou « Véhicule spécialisé / agricole ». Fiche : « Interdiction PL samedi 22 h → dimanche 22 h : vous y seriez vers
+      km 412 » ; guidage : annonces 1 h et 15 min avant si l'arrivée est après le début, bandeau. Vérifié avec le
+      calendrier 2026 de la brochure Bison Futé (écarts du 4 avril et du 9 mai en Île-de-France : l'appli suit l'arrêté).
+    - [ ] Temps de conduite et pauses (PR B).
+    - [ ] Alerte vent fort (PR B).
+  - [ ] **Phase 5b — ADR (matières dangereuses)**
+    Option ADR dans le profil véhicule : en plus de `hazmat` (déjà envoyé à ORS), code de restriction en tunnel (B, C, D
+    ou E). Repérer les tunnels du trajet et leur catégorie (données OpenStreetMap, via Overpass), alerter avant le calcul
+    si un tunnel est interdit à mon code et proposer un autre itinéraire. Rappel des interdictions de circulation propres
+    au transport ADR. ORS ne gère que `hazmat` oui/non : vérifier dans la doc ce qui est possible et l'écrire. Sources
+    officielles citées (accord ADR, arrêtés français). Classe ADR (1 à 9) et numéro ONU facultatif dans le profil,
+    pour distinguer les règles qui en dépendent.
+  - [ ] **Phase 5c — Passage de frontière : réglementation PL du pays**
+    Repérer les changements de pays sur l'itinéraire (`extra_info: ["countryinfo"]` d'ORS). Avant le départ : liste des
+    pays traversés avec une fiche par pays (vitesses PL, interdictions week-end et jours fériés, péage PL et son système,
+    zones à faibles émissions ou vignettes, particularités ADR). Pendant le guidage : annonce vocale courte à l'approche
+    de la frontière, sans saisie. Fiches dans `data/pays/*.json`, avec la source officielle et la date de vérification
+    de chaque règle ; d'abord les pays voisins (BE, LU, DE, CH, IT, ES).
+  - [ ] **Phase 5d — Accès : tranches horaires et desserte locale**
+    Interdictions PL par tranches horaires (tags OpenStreetMap conditionnels, par exemple `hgv:conditional`) : vérifier
+    si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
+    livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
+    `delivery` / `goods` d'ORS et sa gestion de `hgv=destination` / `delivery`). Sources officielles citées.
+
+## Ensuite
+
+- [ ] **Phase 7d — Satellite hors de France**
+  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
+  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
@@ -188,6 +211,8 @@ Ordre de priorité : 5 → 5b → 5c → 5d → 11 → 7d
   national (Bison Futé / DIR, événements DATEX II sur transport.data.gouv.fr), offres gratuites avec clé (TomTom,
   HERE…) et leurs quotas. Commencer par afficher bouchons et événements sur le trajet ; recalcul selon le trafic
   seulement si une source le permet. Présenter les options avant de coder.
+
+## Tout à la fin
 
 - [ ] **Phase 3 — Mes signalements + Ma journée** (reportée : à faire en dernier)
   Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
