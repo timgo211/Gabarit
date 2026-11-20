@@ -16,7 +16,9 @@
 // - Tunnels OpenStreetMap (wiki « Key:hazmat », section « ADR tunnel restriction key suffixes ») : hazmat:B=no …
 //   hazmat:E=no = interdit aux chargements de ce code ; un tunnel de catégorie C porte hazmat:C=no (et souvent
 //   hazmat:B=no) : catégorie = plus haute lettre marquée « no » (même lecture que GraphHopper, OSMHazmatTunnelParser) ;
-//   hazmat:adr_tunnel_cat=A…E (rare) ; hazmat=no : toutes matières dangereuses interdites (panneau sans lettre).
+//   hazmat:adr_tunnel_cat=A…E (rare) ; hazmat=B…E (lettre en valeur, rare) ; hazmat=no : toutes matières
+//   dangereuses interdites (panneau sans lettre). Nom du tunnel : tunnel:name d'abord (le name d'une voie en tunnel
+//   est souvent celui de la route : « Autoroute du Soleil » pour Fourvière).
 // - OpenRouteService (code source, HazmatAccessParser / HeavyVehicleEdgeFilter) : avec restrictions.hazmat=true, toute
 //   voie hazmat=no ou hazmat:B…E=no est évitée, QUELLE QUE SOIT la lettre ; hazmat:adr_tunnel_cat n'est pas lu.
 //   L'itinéraire peut donc être plus long que nécessaire pour un code D ou E, et un tunnel marqué seulement par sa
@@ -108,7 +110,10 @@ export function codeText(code) {
 /** Catégorie de tunnel lue dans les étiquettes OSM, ou null (pas de restriction connue, catégorie A). */
 export function categoryFromTags(tags) {
   const t = tags && typeof tags === 'object' ? tags : {};
-  if (/^no$/i.test(String(t.hazmat ?? '').trim())) return CATEGORY_ALL;
+  const h = String(t.hazmat ?? '').trim();
+  if (/^no$/i.test(h)) return CATEGORY_ALL;
+  // hazmat=E (lettre en valeur, rare : tunnel du Mont-Blanc côté français) : catégorie de cette lettre.
+  if (/^[B-E]$/i.test(h)) return h.toUpperCase();
   for (const key of ['hazmat:adr_tunnel_cat', 'hazmat:tunnel_cat']) {
     const v = String(t[key] ?? '').trim().toUpperCase();
     if (/^[A-E]$/.test(v)) return v === 'A' ? null : v;

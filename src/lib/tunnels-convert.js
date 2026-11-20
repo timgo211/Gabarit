@@ -96,7 +96,7 @@ export function convertTunnels(json, { updated = null } = {}) {
     if (!cat || g.length < 2) { skipped += 1; continue; }
     counts[cat] = (counts[cat] ?? 0) + 1;
     const t = e.tags ?? {};
-    const name = String(t.name ?? t['tunnel:name'] ?? t['name:fr'] ?? '').trim().slice(0, 80);
+    const name = String(t['tunnel:name'] ?? t.name ?? t['name:fr'] ?? '').trim().slice(0, 80);
     const out = { id: `w${e.id}`, cat, g: shrink(g) };
     if (name) out.name = name;
     if (typeof t.ref === 'string' && t.ref.trim()) out.ref = t.ref.trim().slice(0, 30);
@@ -127,7 +127,7 @@ export function crossCheck(json, probes) {
     for (const e of Array.isArray(json?.elements) ? json.elements : []) {
       if (e?.type !== 'way' || !Array.isArray(e.geometry) || e.geometry.length < 2) continue;
       const g = e.geometry.map((p) => [p.lon, p.lat]);
-      const name = String(e.tags?.name ?? e.tags?.['tunnel:name'] ?? '');
+      const name = String(e.tags?.['tunnel:name'] ?? e.tags?.name ?? '');
       const mid = checkPoints(g, 3)[1];
       if (!probe.name.test(name) && haversine(mid, probe.near) > 2000) continue;
       hits.push(`w${e.id} « ${name} » catégorie OSM ${categoryFromTags(e.tags) ?? '?'} ; tracé ${JSON.stringify(shrink(g))}`);
@@ -149,8 +149,8 @@ export function knownTubesFromMap(json, nameRe) {
   const out = [];
   for (const e of Array.isArray(json?.elements) ? json.elements : []) {
     if (e?.type !== 'way' || !e.tags?.highway || !e.tags.tunnel || e.tags.tunnel === 'no') continue;
-    const name = String(e.tags.name ?? e.tags['tunnel:name'] ?? '');
-    if (!nameRe.test(name)) continue;
+    const name = String(e.tags['tunnel:name'] ?? e.tags.name ?? '');
+    if (!nameRe.test(`${name} ${e.tags.name ?? ''} ${e.tags['name:fr'] ?? ''}`)) continue;
     const g = (e.nodes ?? []).map((id) => nodes.get(id)).filter(Boolean);
     if (g.length < 2) continue;
     out.push({ id: `w${e.id}`, name, cat: categoryFromTags(e.tags), g: shrink(g) });

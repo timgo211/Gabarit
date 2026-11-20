@@ -42,6 +42,7 @@ test('catégorie lue dans les étiquettes OSM (wiki Key:hazmat), catégorie A et
   assert.equal(categoryFromTags({ 'hazmat:D': 'yes', 'hazmat:E': 'no' }), 'E');
   assert.equal(categoryFromTags({ 'hazmat:adr_tunnel_cat': 'd' }), 'D');
   assert.equal(categoryFromTags({ 'hazmat:tunnel_cat': 'E' }), 'E');
+  assert.equal(categoryFromTags({ hazmat: 'E', 'hazmat:conditional': 'no @ (UN2919)' }), 'E', 'Mont-Blanc côté français (OSM)');
   assert.equal(categoryFromTags({ 'hazmat:adr_tunnel_cat': 'A' }), null);
   assert.equal(categoryFromTags({ hazmat: 'no', 'hazmat:C': 'no' }), CATEGORY_ALL, 'hazmat=no : tout interdit');
   assert.equal(categoryFromTags({ 'hazmat:E': 'yes' }), null);
@@ -123,9 +124,14 @@ test('recoupement des tunnels en dur : tubes lus dans une réponse de l\'API OSM
       { type: 'way', id: 9, nodes: [1, 2, 3], tags: { highway: 'trunk', tunnel: 'yes', name: 'Tunnel du Fréjus', 'hazmat:C': 'no' } },
       { type: 'way', id: 10, nodes: [1, 2], tags: { highway: 'service', name: 'Tunnel du Fréjus' } },
       { type: 'way', id: 11, nodes: [2, 3], tags: { highway: 'trunk', tunnel: 'yes', name: 'Autre' } },
+      // Fourvière (étiquettes réelles lues le 20/11/2026) : nom du tunnel dans tunnel:name, hazmat=no.
+      { type: 'way', id: 12, nodes: [3, 1], tags: { highway: 'trunk', tunnel: 'yes', name: 'Autoroute du Soleil', 'tunnel:name': 'Tunnel de Fourvière', hazmat: 'no', ref: 'M 6' } },
     ],
   };
   assert.deepEqual(knownTubesFromMap(map, /fr[ée]jus/i), [{ id: 'w9', name: 'Tunnel du Fréjus', cat: 'C', g: [[6.67, 45.18], [6.685, 45.13], [6.7, 45.09]] }]);
+  assert.deepEqual(knownTubesFromMap(map, /fourvi[eè]re/i).map((t) => [t.id, t.name, t.cat]), [['w12', 'Tunnel de Fourvière', 'X']]);
+  const conv = convertTunnels({ elements: [{ type: 'way', id: 5, geometry: [{ lon: 1, lat: 2 }, { lon: 1.01, lat: 2 }], tags: map.elements.at(-1).tags }] });
+  assert.equal(conv.data.tunnels[0].name, 'Tunnel de Fourvière', 'nom affiché : tunnel:name, pas le nom de la route');
 });
 
 test('fichier absent, vide ou illisible : données indisponibles (jamais un silence)', () => {
