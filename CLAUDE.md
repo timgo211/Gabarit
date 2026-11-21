@@ -435,7 +435,11 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   nom (« - ») de plus de 5 km, jamais à moins de 1 km du départ ou de l'arrivée. Calcul en échec :
   `map.showRoutes([])` retire tracés et repères de départ / d'arrivée. Code 2009 (`computeRouteOptions`) : une
   requête sans `profile_params.restrictions` (`noRestrictions`), dans le budget de 3, si le profil a des
-  restrictions ; elle passe → `RESTRICTION_HINT_TEXT` ajouté au message (jamais affichée, guidée ni dite). Cause
+  restrictions ; elle passe → `RESTRICTION_HINT_TEXT` ajouté au message (jamais affichée, guidée ni dite) ; elle
+  échoue aussi (2009 ou sans tracé) ou profil sans restriction → `DEAD_END_HINT_TEXT` (« rue sans sortie possible pour
+  le camion », constat tablette : Metz rue Coislin → Nancy / Toul en 2009, Nancy → Metz y arrive) ; autre échec du
+  diagnostic (quota, réseau) → message d'origine. Version du diagnostic : `requestVersionLabel` (même demande au
+  service worker que Réglages ; avant, #app-version vide tant que Réglages n'était pas ouvert → « version inconnue »). Cause
   (ORS `ORSRouter.createSnapFilter`) : accrochage sur une voie permise au gabarit, mais test de sous-réseau sans les
   limites de poids / hauteur ; `radiuses` (400 m par défaut, `maximum_snapping_radius`) n'y change rien (2010 sinon).
   Noms d'étape ORS : GraphHopper v4.17 (`EncodingManager.applyWayTags`) écrit `name` d'OSM puis « , » et `ref`
