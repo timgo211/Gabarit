@@ -1,10 +1,16 @@
 # Phase 5h — lecture des sources bloquées depuis le conteneur de développement (R-Pass, ECPL Grand Est, Maut,
-# GO-Maut, RPLP, Viapass). Journal seulement : aucune donnée écrite, aucun commit. Lancement à la main seulement.
+# GO-Maut, RPLP, Viapass). Journal seulement : aucune donnée écrite, aucun commit. Lancé quand ce fichier change, sur
+# cette branche seulement (un lancement à la main exige le workflow sur main : GitHub répond 404).
 # À RETIRER AVANT LE MERGE de la PR de la phase 5h.
 name: Sources taxes PL (lecture, phase 5h)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - ccr-fdafe3a9-5ipepl
+    paths:
+      - .github/workflows/sources-taxes.yml
 
 permissions:
   contents: read
