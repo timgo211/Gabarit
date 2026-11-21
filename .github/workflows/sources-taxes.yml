@@ -1,0 +1,130 @@
+# Phase 5h — lecture des sources bloquées depuis le conteneur de développement (R-Pass, ECPL Grand Est, Maut,
+# GO-Maut, RPLP, Viapass). Journal seulement : aucune donnée écrite, aucun commit. Lancement à la main seulement.
+# À RETIRER AVANT LE MERGE de la PR de la phase 5h.
+name: Sources taxes PL (lecture, phase 5h)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Outils
+        run: sudo apt-get install -y poppler-utils > /dev/null
+      - name: Lire les pages
+        shell: python3 {0}
+        run: |
+          import re, html, subprocess, urllib.request, urllib.parse, datetime
+          UA = {'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Gabarit-sources/1.0'}
+          KEY = re.compile(r'(?i)r-pass|1er janvier 2027|01/01/2027|janvier 2027|avril 2027|2027|tarif|bar[èe]me|centimes|€\s*/\s*km|'
+                           r'euro\s*[0-6ivx]|essieu|ptac|tonnes?|recours|suspens|r[ée]f[ée]r[ée]|d[ée]lib[ée]ration|tron[çc]on|portique|'
+                           r'M35|A35|A36|RN\s?83|Mautsatz|Mautsätze|Achs|Tarif|tarieven|indexering|indexation|Lkw-Maut|Grundkilometer')
+          print('Lecture du', datetime.datetime.utcnow().isoformat(timespec='minutes'), 'UTC')
+
+          def get(url, data=None, headers=None):
+            try:
+              h = dict(UA); h.update(headers or {})
+              with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=h), timeout=40) as r:
+                return r.read(), r.headers.get_content_type()
+            except Exception as e:
+              print('  ÉCHEC', url, e)
+              return None, None
+
+          def text_of(data, ctype):
+            if ctype == 'application/pdf' or data[:4] == b'%PDF':
+              open('/tmp/p.pdf', 'wb').write(data)
+              return subprocess.run(['pdftotext', '-layout', '/tmp/p.pdf', '-'], capture_output=True, text=True).stdout
+            t = data.decode('utf-8', 'ignore')
+            t = re.sub(r'(?s)<script.*?</script>|<style.*?</style>', ' ', t)
+            return re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', t)))
+
+          def snippets(t, width=350, limit=30):
+            n, last = 0, -10**9
+            for m in KEY.finditer(t):
+              if n >= limit: break
+              if m.start() - last < width: continue
+              last = m.start(); n += 1
+              print('   …', t[max(0, m.start() - width):m.end() + width].replace('\n', ' '), '…')
+            if n == 0: print('   (aucun mot-clé)')
+
+          def full(url, limit=15000):
+            print('\n=====', url)
+            data, ctype = get(url)
+            if data is None: return
+            t = text_of(data, ctype)
+            print('(' + str(ctype) + ', ' + str(len(t)) + ' caractères)')
+            print(t[:limit])
+
+          def crawl(start, words, maxpages=25):
+            print('\n##########', start)
+            data, ctype = get(start)
+            if data is None: return
+            host = urllib.parse.urlparse(start).netloc
+            raw = data.decode('utf-8', 'ignore')
+            links = []
+            for h in re.findall(r'href="([^"#]+)"', raw):
+              u = urllib.parse.urljoin(start, html.unescape(h))
+              if urllib.parse.urlparse(u).netloc != host and not u.lower().endswith('.pdf'): continue
+              if any(w in u.lower() for w in words) and u not in links: links.append(u)
+            print('Liens retenus :', len(links))
+            for u in links: print('   lien', u)
+            for u in [start] + links[:maxpages]:
+              d, c = get(u)
+              if d is None: continue
+              t = text_of(d, c)
+              print('\n=====', u, '(' + str(c) + ', ' + str(len(t)) + ' caractères)')
+              snippets(t)
+
+          FR = ['r-pass', 'rpass', 'tarif', 'reseau', 'réseau', 'carte', 'faq', 'deliberation', 'délibération', 'calendrier',
+                'pdf', 'reglement', 'règlement', 'exoner', 'exonér', 'reduction', 'réduction', 'actualit', 'presse', 'taxe', 'ecpl',
+                'contribution', 'poids-lourds', 'transport']
+
+          # R-Pass (Collectivité européenne d'Alsace) : site officiel r-pass.eu et alsace.eu.
+          crawl('https://www.r-pass.eu/', FR)
+          crawl('https://r-pass.eu/', FR)
+          crawl('https://www.alsace.eu/', FR)
+          full('https://www.alsace.eu/r-pass/')
+          # Recours devant le tribunal administratif de Strasbourg.
+          crawl('https://strasbourg.tribunal-administratif.fr/', ['actualit', 'decision', 'décision', 'communique', 'pass', 'taxe', 'transport'])
+
+          # Écocontribution poids lourds du Grand Est.
+          crawl('https://ecpl.fr/fr', FR)
+          crawl('https://www.grandest.fr/', FR)
+
+          # Allemagne : BFStrMG (Mautsätze, annexes), Toll Collect, BALM / BMV.
+          for a in ['', 'anlage_1.html', 'anlage_2.html', 'anlage_3.html', 'anlage_4.html', 'anlage_5.html']:
+            full('https://www.gesetze-im-internet.de/bfstrmg/' + a, 6000)
+          crawl('https://www.toll-collect.de/de/toll_collect/bezahlen/maut_tarife/maut_tarife.html', ['tarif', 'maut', 'pdf', '2027'])
+          crawl('https://www.toll-collect.de/de/toll_collect/service/aktuelles/aktuelles.html', ['2027', 'maut', 'aenderung', 'änderung'])
+          crawl('https://www.recht.bund.de/', ['bgbl', 'maut'])
+
+          # Autriche : ASFINAG (tarifs, Mautordnung), RIS (Mauttarifverordnung).
+          crawl('https://www.asfinag.at/maut-vignette/lkw-bus/', ['tarif', 'maut', 'pdf', '2027', 'mautordnung'])
+          crawl('https://www.asfinag.at/maut-vignette/mautordnung/', ['mautordnung', 'pdf'])
+          full('https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=20004016', 8000)
+          full('https://www.ris.bka.gv.at/Ergebnis.wxe?Abfrage=BgblAuth&Titel=Mauttarifverordnung&VonDatum=01.01.2026&BisDatum=21.12.2026', 8000)
+
+          # Suisse : actes qui modifient l'ORPL (RS 641.811), versions consolidées et entrée en vigueur.
+          q = ('PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#> '
+               'SELECT ?cons ?app ?end WHERE { ?cons jolux:isMemberOf <https://fedlex.data.admin.ch/eli/cc/2000/192> . '
+               'OPTIONAL { ?cons jolux:dateApplicability ?app } OPTIONAL { ?cons jolux:dateEndApplicability ?end } } ORDER BY DESC(?app) LIMIT 8')
+          print('\n===== Fedlex SPARQL : versions de l\'ORPL')
+          d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q}).encode(), {'Accept': 'text/csv'})
+          if d is not None: print(d.decode('utf-8', 'ignore'))
+          q2 = ('PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#> '
+                'SELECT DISTINCT ?act ?eif WHERE { ?impact jolux:impactToLegalResource <https://fedlex.data.admin.ch/eli/cc/2000/192> . '
+                '?act jolux:impactFromLegalResource ?impact . OPTIONAL { ?act jolux:dateEntryInForce ?eif } } ORDER BY DESC(?eif) LIMIT 8')
+          print('\n===== Fedlex SPARQL : actes modifiant l\'ORPL')
+          d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q2}).encode(), {'Accept': 'text/csv'})
+          if d is not None: print(d.decode('utf-8', 'ignore'))
+          crawl('https://www.bazg.admin.ch/fr/la-rplp-en-bref', ['rplp', 'tarif', 'redevance', '2027'])
+
+          # Belgique : Viapass (tarifs 2027, actualités), Moniteur belge.
+          crawl('https://www.viapass.be/fr/tarifs/', ['tarif', '2027', 'pdf'])
+          crawl('https://www.viapass.be/nl/tarieven/', ['tarie', '2027', 'pdf'])
+          crawl('https://www.viapass.be/fr/', ['actualit', 'nouvelles', '2027', 'news'])
