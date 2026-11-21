@@ -16,3 +16,33 @@ export function versionLabel(reply) {
   const v = reply && reply.type === 'VERSION' ? reply.version : null;
   return typeof v === 'string' && /^v\d+$/.test(v) ? `Gabarit ${v}` : UNKNOWN_VERSION_TEXT;
 }
+
+/**
+ * Demande la version au service worker `controller` (navigator.serviceWorker.controller) par un MessageChannel ;
+ * résout le texte de la ligne (versionLabel), « version inconnue » sans contrôleur, sans réponse dans `timeoutMs` ou
+ * en cas d'erreur. Jamais rejetée. Utilisée par Réglages et par le diagnostic du trajet (phase 5h ter : le diagnostic
+ * lisait #app-version, rempli seulement à l'ouverture de Réglages → « Gabarit, version inconnue »).
+ */
+export function requestVersionLabel(controller, timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    if (!controller || typeof controller.postMessage !== 'function' || typeof MessageChannel !== 'function') {
+      resolve(UNKNOWN_VERSION_TEXT);
+      return;
+    }
+    const channel = new MessageChannel();
+    let timer = null;
+    const done = (label) => {
+      clearTimeout(timer);
+      channel.port1.onmessage = null;
+      channel.port1.close();
+      resolve(label);
+    };
+    timer = setTimeout(() => done(UNKNOWN_VERSION_TEXT), timeoutMs);
+    channel.port1.onmessage = (e) => done(versionLabel(e.data));
+    try {
+      controller.postMessage({ type: VERSION_REQUEST }, [channel.port2]);
+    } catch {
+      done(UNKNOWN_VERSION_TEXT);
+    }
+  });
+}

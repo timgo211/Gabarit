@@ -113,12 +113,12 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
-  tollsFile = undefined, tollsNetwork = null,
+  tollsFile = undefined, tollsNetwork = null, sw = false,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
     geolocation: { latitude: START[1], longitude: START[0], accuracy: 8 }, permissions: ['geolocation'],
-    serviceWorkers: 'block', locale: 'fr-FR', timezoneId: 'Europe/Paris',
+    serviceWorkers: sw ? 'allow' : 'block', locale: 'fr-FR', timezoneId: 'Europe/Paris',
   });
   // Heure de la tablette (phase 5 : interdictions PL) : Date décalée, les minuteries restent réelles.
   if (now) {
@@ -269,6 +269,12 @@ async function open(browser, base, {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto(base);
+  if (sw) {
+    // Vrai service worker (sw.js) : la page doit être contrôlée, comme sur la tablette après la première ouverture.
+    await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.reload();
+    await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
+  }
   await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
   await page.waitForTimeout(800);
   return { page, ctx, stats, errors };
@@ -1742,6 +1748,24 @@ async function tollsCheck(browser, base) {
     check(dg.errors.length === 0, `${width} px diagnostic : aucune erreur JavaScript`, dg.errors.join(' | '));
     await dg.ctx.close();
   }
+  // Phase 5h ter : vrai service worker, Réglages jamais ouverts : le diagnostic commence par VERSION de sw.js
+  // (constat tablette v30 : « Gabarit, version inconnue »).
+  {
+    const swVersion = readFileSync(join(ROOT, 'sw.js'), 'utf8').match(/const VERSION = '([^']+)';/)[1];
+    const sv = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), sw: true });
+    await computeRoute(sv.page);
+    await sv.page.waitForSelector('.route-diag', { timeout: 10000 });
+    await sv.page.click('.route-diag summary');
+    await sv.page.click('.btn-diag-copy');
+    await sv.page.waitForTimeout(500);
+    const txt = await sv.page.textContent('.route-diag-text');
+    check(txt.startsWith(`Gabarit ${swVersion} — diagnostic du trajet`), `vrai service worker : diagnostic « Gabarit ${swVersion} » sans ouvrir Réglages`, txt.slice(0, 80));
+    await sv.page.click('#btn-settings');
+    await sv.page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check(await sv.page.textContent('#app-version') === `Gabarit ${swVersion}`, 'vrai service worker : même version en bas de Réglages');
+    check(sv.errors.length === 0, 'vrai service worker : aucune erreur JavaScript', sv.errors.join(' | '));
+    await sv.ctx.close();
+  }
   // Phase 5h bis : échec d'ORS (404, code 2009) : message clair et, en petit, code et message du service.
   const er = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'),
     directions: () => ({ __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } }) });
@@ -2139,6 +2163,7 @@ async function failedCheck(browser, base) {
       directions: (body) => {
         sent.push(body);
         if (!failing) return body.alternative_routes ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json');
+        if (failing === 'all') return err2009;
         return body.options?.profile_params ? err2009 : fixture('ors-directions.json');
       },
     });
@@ -2165,6 +2190,14 @@ async function failedCheck(browser, base) {
     check(/^Aucun itinéraire autorisé pour ce gabarit\..*Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil\. Essaie un point plus accessible \(appui long\)\. La signalisation fait foi\..*code 2009/.test(msg),
       `${width} px : message du diagnostic 2009`, msg);
     check(sent.length <= 3 && sent.filter((b) => !b.options?.profile_params).length === 1, `${width} px : une seule requête sans restrictions, budget de 3`, String(sent.length));
+    // Même échec sans restrictions (Metz, rue Coislin) : « rue sans sortie possible pour le camion ».
+    failing = 'all';
+    await page.click('#btn-route');
+    await page.waitForFunction(() => /sans sortie possible/.test(document.querySelector('#message')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+    const dead = await page.textContent('#message');
+    check(/^Aucun itinéraire autorisé pour ce gabarit\..*Départ ou arrivée peut-être dans une rue sans sortie possible pour le camion \(sens unique, zone piétonne\)\. Essaie un point plus accessible \(appui long\)\. La signalisation fait foi\..*code 2009/.test(dead) && !/franchissant une limite/.test(dead),
+      `${width} px : échec aussi sans restrictions, message « rue sans sortie »`, dead);
+    check(!(await routeShown()).source, `${width} px : toujours aucun tracé`);
     const spoken = await page.evaluate(() => window.__spoken ?? []);
     check(!spoken.some((x) => /joignable|limite/.test(x)), `${width} px : rien en voix`, spoken.join(' | '));
     await noHorizontalScroll(page, `${width} px message 2009`);

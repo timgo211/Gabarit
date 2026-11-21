@@ -357,7 +357,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     → noms d'étape (« au moins »). Journal de l'Action : km gardés et exclus toll=yes par référence, total ECPL (environ
     525 km annoncés). Diagnostic : méthode, points tous les 10 km sur les étapes sans nom. Calcul en échec : ancien
     tracé et repères effacés. Code 2009 : une requête de diagnostic sans les restrictions du profil (budget de 3),
-    message « peut-être joignable seulement en franchissant une limite… », jamais affichée ni guidée.
+    message « peut-être joignable seulement en franchissant une limite… », jamais affichée ni guidée ; échec aussi sans
+    restrictions → « rue sans sortie possible pour le camion ». Diagnostic : version demandée au service worker.
   - [ ] **Contours Admin Express à jour** (millésime récent, site IGN) : remplacer les contours COG 2018 de
     `data/taxes-pl.json` (Alsace, Eurométropole, Grand Est, Meurthe-et-Moselle).
   - [ ] **Taxes PL : montants Maut (DE) et péage autrichien** : champ « Essieux » du profil (non précisé par défaut :

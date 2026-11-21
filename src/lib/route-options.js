@@ -25,6 +25,12 @@ import {
 
 /** Message ajouté après un code 2009 quand le même trajet passe sans les restrictions du profil (jamais en voix). */
 export const RESTRICTION_HINT_TEXT = 'Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil. Essaie un point plus accessible (appui long). La signalisation fait foi.';
+/**
+ * Message ajouté après un code 2009 quand le trajet échoue aussi sans les restrictions (ou que le profil n'en a pas) :
+ * constat tablette v30, Metz (rue Coislin) → Nancy / Toul en 2009 alors que Nancy → Metz y arrive : point d'où le
+ * camion ne peut pas repartir (sens unique, zone piétonne, sortie interdite, à vérifier). Jamais en voix.
+ */
+export const DEAD_END_HINT_TEXT = 'Départ ou arrivée peut-être dans une rue sans sortie possible pour le camion (sens unique, zone piétonne). Essaie un point plus accessible (appui long). La signalisation fait foi.';
 
 export const ROUTE_OPTIONS = Object.freeze({
   /** Itinéraires demandés à alternative_routes (principal compris). */
@@ -202,16 +208,25 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     // ORS accroche les points sur une voie permise au gabarit (ORSRouter.createSnapFilter), mais son test de
     // sous-réseau ignore les limites de poids, hauteur ou largeur : un point de centre-ville peut n'être relié au
     // reste qu'au-delà d'une limite. Le résultat n'est jamais affiché ni guidé ; seul le message change.
-    if (err?.code === 2009 && requests < ROUTE_OPTIONS.MAX_REQUESTS && Object.keys(buildRestrictions(vehicle)).length) {
-      requests += 1;
-      try {
-        const probe = parseAllDirections(await send(buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, noRestrictions: true })));
-        if (probe.length) {
-          err.restrictionHint = true;
-          err.message = `${err.message ? `${err.message} ` : ''}${RESTRICTION_HINT_TEXT}`;
+    // Échec aussi sans restrictions (code 2009 ou réponse sans tracé), ou profil sans restriction (la requête
+    // d'origine valait déjà ce diagnostic) : point sans sortie possible pour le camion. Autre échec du diagnostic
+    // (réseau, quota) : message d'origine.
+    const hint = (kind, text) => {
+      err.hint = kind;
+      err.restrictionHint = kind === 'restrictions';
+      err.message = `${err.message ? `${err.message} ` : ''}${text}`;
+    };
+    if (err?.code === 2009) {
+      if (!Object.keys(buildRestrictions(vehicle)).length) hint('dead-end', DEAD_END_HINT_TEXT);
+      else if (requests < ROUTE_OPTIONS.MAX_REQUESTS) {
+        requests += 1;
+        try {
+          const probe = parseAllDirections(await send(buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, noRestrictions: true })));
+          if (probe.length) hint('restrictions', RESTRICTION_HINT_TEXT);
+          else hint('dead-end', DEAD_END_HINT_TEXT);
+        } catch (probeErr) {
+          if (probeErr?.code === 2009 || probeErr instanceof NoRouteError) hint('dead-end', DEAD_END_HINT_TEXT);
         }
-      } catch {
-        // Diagnostic en échec : message d'origine.
       }
     }
     throw err;
