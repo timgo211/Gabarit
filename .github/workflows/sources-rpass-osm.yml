@@ -24,7 +24,9 @@ jobs:
         run: sudo apt-get install -y osmium-tool > /dev/null
       - name: Extrait Alsace
         run: |
-          curl -fsSL -o alsace.osm.pbf https://download.geofabrik.de/europe/france/alsace-latest.osm.pbf
+          # IPv4 forcé (IPv6 du runner injoignable le 21/11/2026) ; miroir OpenStreetMap France en secours.
+          curl -4 -fsSL --retry 3 --retry-delay 10 -o alsace.osm.pbf https://download.geofabrik.de/europe/france/alsace-latest.osm.pbf \
+            || curl -4 -fsSL --retry 3 --retry-delay 10 -o alsace.osm.pbf https://download.openstreetmap.fr/extracts/europe/france/alsace-latest.osm.pbf
           ls -la alsace.osm.pbf
           osmium tags-filter alsace.osm.pbf w/highway=motorway,trunk,primary,secondary,motorway_link,trunk_link,primary_link -o routes.osm.pbf
           osmium export routes.osm.pbf -f geojsonseq --geometry-types=linestring -a type,id -o routes.geojsonseq
