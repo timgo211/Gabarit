@@ -1308,7 +1308,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v24', 'vrai service worker : « Gabarit v24 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v25', 'vrai service worker : « Gabarit v25 » en bas de Réglages', ver);
   await ctx.close();
 }
 
