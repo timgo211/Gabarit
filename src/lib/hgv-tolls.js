@@ -11,8 +11,10 @@
 //   alerte, jamais un montant.
 // Un montant (`rates`, `grid`) n'est écrit que s'il a une source officielle datée ; jamais d'estimation ni de total
 // du trajet (sections exactes, réductions et exonérations inconnues) : seulement le taux de la catégorie du profil.
-// Périmètre : références de route des étapes ORS (comme l'Île-de-France et le réseau AURA, hgv-bans.js) dans le
-// cadre géographique de la taxe, en France d'après countryinfo (sinon cadre seul, « à vérifier »).
+// Périmètre (phase 5h ter) : réseau taxé en géométrie (data/taxes-pl-osm.json, copie OSM de l'Action mensuelle,
+// comparée au tracé : hgv-tolls-geo.js) ; copie absente ou sans la taxe → repli sur les références de route des
+// étapes ORS (comme l'Île-de-France et le réseau AURA, hgv-bans.js), « au moins de km X à km Y ». Toujours dans le
+// cadre, le contour de la collectivité et hors zones exclues, en France d'après countryinfo (sinon « à vérifier »).
 
 //
 // Sources lues le 21/11/2026 (Action GitHub temporaire : sites refusés au conteneur) :
@@ -33,6 +35,7 @@
 
 import { sampleRoute } from './route-samples.js';
 import { countriesAlongRoute } from './countries.js';
+import { matchTollNetwork, pointInTax } from './hgv-tolls-geo.js';
 
 export const TOLLS = Object.freeze({
   PATH: 'data/taxes-pl.json',
@@ -84,6 +87,17 @@ export function parseTollData(json) {
     const rings = Array.isArray(t.area?.rings)
       ? t.area.rings.filter((r) => Array.isArray(r) && r.length >= 4 && r.every((p) => Array.isArray(p) && p.length === 2 && p.every(isNum)))
       : [];
+    // Zones exclues (Eurométropole de Strasbourg pour le R-Pass, Alsace pour l'ECPL) et contour propre à une route
+    // (RN52 : Meurthe-et-Moselle seulement).
+    const ringsOf = (x) => (Array.isArray(x?.rings)
+      ? x.rings.filter((r) => Array.isArray(r) && r.length >= 4 && r.every((p) => Array.isArray(p) && p.length === 2 && p.every(isNum)))
+      : []);
+    const excludeRings = ringsOf(t.exclude);
+    const roadAreas = {};
+    for (const [r, a] of Object.entries(t.roadAreas && typeof t.roadAreas === 'object' ? t.roadAreas : {})) {
+      const rr = ringsOf(a);
+      if (rr.length) roadAreas[r] = rr;
+    }
     const roadBoxes = {};
     for (const [r, b] of Object.entries(t.roadBoxes && typeof t.roadBoxes === 'object' ? t.roadBoxes : {})) {
       if (Array.isArray(b) && b.length === 4 && b.every(isNum)) roadBoxes[r] = b;
@@ -97,6 +111,7 @@ export function parseTollData(json) {
     const grid = status !== 'check' ? parseGrid(t.grid, sources) : null;
     taxes.push({
       id, name, short: str(t.short) ?? name, start: t.start, bbox, roads, roadBoxes, rings, areaSource: str(t.area?.source),
+      excludeRings, roadAreas,
       status, basis: str(t.basis), source, verified, url: str(t.url),
       scope: str(t.scope), note: str(t.note), rates: rates?.length ? rates : null, grid,
     });
@@ -161,46 +176,60 @@ export function gridText(grid, vehicle, sources = {}) {
   return `Tarif annoncé, ${head} (${src}, lu le ${shortDate(grid.verified)})${grid.reduction ? ` ; ${grid.reduction}` : ''}. Aucun total calculé pour le trajet.`;
 }
 
-const inBox = ([lon, lat], [w, s, e, n]) => lon >= w && lon <= e && lat >= s && lat <= n;
-
-/** Point dans un anneau (règle pair-impair). */
-function inRing([x, y], ring) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
-    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
-    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
-  }
-  return inside;
-}
-
-/** Point dans le contour de la taxe (un des anneaux) ; sans contour : vrai (cadre `bbox` seul). */
+/** Point dans le périmètre général de la taxe (cadre, contour, hors zones exclues ; sans contour : cadre seul). */
 export function inTaxArea(point, tax) {
-  return !tax.rings?.length || tax.rings.some((r) => inRing(point, r));
+  return pointInTax(point, null, tax);
 }
 
 /**
- * Passages du tracé sur chaque taxe : points sur une route de la liste, dans le cadre, en France.
- * @returns {{ tax:object, enter:number, exit:number, enterTime:Date, roads:string[], countryKnown:boolean }[]}
+ * Passages du tracé sur chaque taxe, en France. Réseau en géométrie (`network`, parseTollNetwork) quand la copie
+ * contient la taxe : method 'osm' ; sinon références des étapes ORS : method 'names'.
+ * @returns {{ tax:object, enter:number, exit:number, enterTime:Date, roads:string[], countryKnown:boolean,
+ *   method:'osm'|'names', networkDate:string|null }[]}
  */
-export function tollsAlongRoute(route, { data, departure = new Date(), elapsed = (t) => t } = {}) {
+export function tollsAlongRoute(route, { data, network = null, departure = new Date(), elapsed = (t) => t } = {}) {
   if (!data?.taxes?.length) return [];
   const samples = sampleRoute(route, TOLLS.STEP_M);
   if (!samples.length) return [];
   const ctry = countriesAlongRoute(route, { departure, elapsed });
   const inFrance = (along) => !ctry.ok || ctry.segments.some((s) => s.code === 'FR' && along >= s.enter && along <= s.exit);
+  const timeAt = (along) => {
+    let best = samples[0];
+    for (const s of samples) { if (s.along > along) break; best = s; }
+    return best.time;
+  };
   const out = [];
   for (const tax of data.taxes) {
+    const net = network?.taxes?.[tax.id] ?? null;
+    if (net) {
+      // Géométrie : séries réunies à moins de 2 km, seulement en France (la copie est déjà découpée au périmètre).
+      let cur = null;
+      for (const run of matchTollNetwork(route, net, tax)) {
+        if (!inFrance(run.enter) && !inFrance(run.exit)) continue;
+        if (cur && run.enter - cur.exit <= TOLLS.GAP_M) {
+          cur.exit = run.exit;
+          for (const r of run.roads) if (!cur.roads.includes(r)) cur.roads.push(r);
+          continue;
+        }
+        cur = {
+          tax, enter: run.enter, exit: run.exit, roads: [...run.roads], countryKnown: ctry.ok, method: 'osm',
+          networkDate: network.updated ?? null, enterTime: new Date(departure.getTime() + elapsed(timeAt(run.enter)) * 1000),
+        };
+        out.push(cur);
+      }
+      continue;
+    }
     let cur = null;
     for (const s of samples) {
-      const hit = s.roads.filter((r) => tax.roads.includes(r) && (!tax.roadBoxes?.[r] || inBox(s.lonlat, tax.roadBoxes[r])));
-      if (!hit.length || !inBox(s.lonlat, tax.bbox) || !inTaxArea(s.lonlat, tax) || !inFrance(s.along)) continue;
+      const hit = s.roads.filter((r) => tax.roads.includes(r) && pointInTax(s.lonlat, r, tax));
+      if (!hit.length || !inFrance(s.along)) continue;
       if (cur && s.along - cur.exit <= TOLLS.GAP_M) {
         cur.exit = s.along;
         for (const r of hit) if (!cur.roads.includes(r)) cur.roads.push(r);
         continue;
       }
       cur = {
-        tax, enter: s.along, exit: s.along, roads: [...hit], countryKnown: ctry.ok,
+        tax, enter: s.along, exit: s.along, roads: [...hit], countryKnown: ctry.ok, method: 'names', networkDate: null,
         enterTime: new Date(departure.getTime() + elapsed(s.time) * 1000),
       };
       out.push(cur);
@@ -209,13 +238,23 @@ export function tollsAlongRoute(route, { data, departure = new Date(), elapsed =
   return out.sort((a, b) => a.enter - b.enter);
 }
 
+/** Méthode de repérage, pour le texte et le diagnostic. */
+export function methodText(p) {
+  if (p.method === 'osm') {
+    return `repérage sur la carte OpenStreetMap${p.networkDate ? ` du ${shortDate(p.networkDate)}` : ''} (ODbL) et les contours IGN Admin Express (Licence Ouverte), limites exactes à vérifier`;
+  }
+  return 'repérage par les noms d\'étape, carte OpenStreetMap du réseau non chargée';
+}
+
 /** Texte d'un passage. `inForce` : l'heure de passage tombe après la date de début. */
 export function describeToll(p) {
   const { tax } = p;
   // Repérage par les noms d'étape ORS : une partie du réseau peut manquer (étape sans référence, données plus
-  // anciennes) → « au moins », jamais une section présentée comme complète.
-  const km = `au moins de km ${Math.round(p.enter / 1000)} à km ${Math.max(Math.round(p.exit / 1000), Math.round(p.enter / 1000))}`;
-  const roads = p.roads.join(', ');
+  // anciennes) → « au moins », jamais une section présentée comme complète. Géométrie OSM : « de km X à km Y ».
+  const a = Math.round(p.enter / 1000);
+  const b = Math.max(Math.round(p.exit / 1000), a);
+  const km = p.method === 'osm' ? `de km ${a} à km ${b}` : `au moins de km ${a} à km ${b}`;
+  const roads = `${p.roads.join(', ')} ; ${methodText(p)}`;
   const inForce = p.enterTime.getTime() >= startOf(tax.start).getTime();
   const when = inForce ? `annoncée depuis le ${longDate(tax.start)}` : `annoncée à partir du ${longDate(tax.start)}`;
   const where = p.countryKnown ? '' : ' Pays traversés non lus : à vérifier.';
@@ -246,11 +285,11 @@ export function describeToll(p) {
 
 /**
  * Lignes des notes et des fiches. Véhicule de 3,5 t ou moins : rien. Statut « à vérifier » : information seulement.
- * @param {{ status:'loading'|'ok'|'failed', data:object|null }|null} tolls
+ * @param {{ status:'loading'|'ok'|'failed', data:object|null, network?:object|null }|null} tolls network : parseTollNetwork
  * @returns {{ passages:object[], lines:{ level:'warn'|'info', text:string, url?:string|null }[], short:string[] }}
  */
 export function tollRules(route, { vehicle, tolls = null, departure = new Date(), elapsed = (t) => t } = {}) {
-  const out = { passages: [], lines: [], short: [] };
+  const out = { passages: [], lines: [], short: [], method: null };
   const ptac = isNum(vehicle?.weight) ? vehicle.weight : null;
   if (ptac !== null && ptac <= TOLLS.MIN_WEIGHT_T) return out;
   if (!tolls || tolls.status === 'loading') return out;
@@ -261,7 +300,11 @@ export function tollRules(route, { vehicle, tolls = null, departure = new Date()
     return out;
   }
   const data = { ...tolls.data, taxes: tolls.data.taxes.map((t) => ({ ...t, sources: tolls.data.sources })) };
-  out.passages = tollsAlongRoute(route, { data, departure, elapsed });
+  const network = tolls.network ?? null;
+  out.method = data.taxes.map((t) => ({
+    id: t.id, short: t.short, method: network?.taxes?.[t.id] ? 'osm' : 'names', networkDate: network?.updated ?? null,
+  }));
+  out.passages = tollsAlongRoute(route, { data, network, departure, elapsed });
   for (const p of out.passages) {
     const d = describeToll({ ...p, vehicle });
     const alert = p.tax.status === 'confirmed' && d.inForce;

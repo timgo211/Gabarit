@@ -21,6 +21,9 @@ import { buildCoverage, convertAreas, parsePoly, parseGeojsonLine } from '../src
 import { accessElementFromFeature, convertAccess } from '../src/lib/access-convert.js';
 import { parseXlsxSheet } from '../src/lib/areas-official.js';
 import { parseCommuneList, buildTiles, buildIndex } from '../src/lib/winter-convert.js';
+import { tollWayFromFeature } from '../src/lib/hgv-tolls-geo.js';
+import { convertTollNetwork } from '../src/lib/hgv-tolls-convert.js';
+import { parseTollData } from '../src/lib/hgv-tolls.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -110,7 +113,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
-  tollsFile = undefined,
+  tollsFile = undefined, tollsNetwork = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -255,6 +258,13 @@ async function open(browser, base, {
   });
   // Phase 5h : data/taxes-pl.json (null : fichier absent, réponse 404 ; undefined : fichier du dépôt).
   if (tollsFile === null) await ctx.route(/\/data\/taxes-pl\.json(\?.*)?$/, (route) => route.fulfill({ status: 404, body: '' }));
+  // Phase 5h ter : data/taxes-pl-osm.json (null, par défaut : absent, 404 ; 'fixture' : voies de
+  // tests/fixtures/osm-tolls.geojsonseq passées par les fonctions de l'Action).
+  const tollNet = tollsNetwork === 'fixture' ? tollNetworkFixture() : null;
+  await ctx.route(/\/data\/taxes-pl-osm\.json(\?.*)?$/, (route) => {
+    stats.tollsNetwork = (stats.tollsNetwork ?? 0) + 1;
+    return tollNet ? route.fulfill({ json: tollNet }) : route.fulfill({ status: 404, body: '' });
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -292,6 +302,14 @@ function winterCopyFiles(kind) {
   const built = buildTiles(list.communes, contours);
   const index = buildIndex({ updated: '2026-10-15', communes: list.communes, ...built });
   return new Map([['index.json', index], ...Object.entries(built.tiles).map(([k, t]) => [`${k}.json`, { communes: t }])]);
+}
+
+/** Copie du réseau des taxes PL construite comme dans l'Action, à partir de la fixture osm-tolls.geojsonseq. */
+function tollNetworkFixture() {
+  const data = parseTollData(JSON.parse(readFileSync(join(ROOT, 'data', 'taxes-pl.json'), 'utf8')));
+  const ways = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-tolls.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).map(tollWayFromFeature).filter(Boolean);
+  return convertTollNetwork(ways, data, { updated: '2026-12-01' }).json;
 }
 
 async function computeRoute(page) {
@@ -1671,7 +1689,7 @@ async function tollsCheck(browser, base) {
     await page.waitForSelector('.rules-notes', { timeout: 10000 });
     const notes = await notesOf(page);
     const r = rpass(notes);
-    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
+    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km 9\d \(A36, A35 ; repérage par les noms d'étape, carte OpenStreetMap du réseau non chargée\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
       `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
     check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
     await noHorizontalScroll(page, `${width} px notes taxes PL`);
@@ -1737,6 +1755,32 @@ async function tollsCheck(browser, base) {
   await noHorizontalScroll(er.page, '360 px message d\'erreur');
   check(er.errors.length === 0, 'échec 2009 : aucune erreur JavaScript', er.errors.join(' | '));
   await er.ctx.close();
+  // Phase 5h ter : étapes sans nom ni référence (diagnostics v30) + copie OSM du réseau : R-Pass trouvé sur l'A35
+  // par la géométrie, « de km X à km Y », méthode et attributions, information seulement ; diagnostic : méthode et
+  // points tous les 10 km sur l'étape sans nom.
+  const blind = JSON.parse(JSON.stringify(als));
+  for (const seg of blind.features[0].properties.segments) for (const st of seg.steps) st.name = '-';
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    const g = await open(browser, base, { width, height, now: nov, vehicle: veh('6'), directions: () => blind, overpass: () => ({ elements: [] }), tollsNetwork: 'fixture' });
+    await computeRoute(g.page);
+    await g.page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const r = rpass(await notesOf(g.page));
+    check(r && r.cls !== 'warn' && /prévue à partir du 1er janvier 2027, de km 0 à km [89]\d \(A3[56], A3[56] ; repérage sur la carte OpenStreetMap du 01\/12\/2026 \(ODbL\) et les contours IGN Admin Express \(Licence Ouverte\), limites exactes à vérifier\)\..*La signalisation fait foi\./.test(r.text) && !/au moins/.test(r.text),
+      `${width} px : étapes sans nom, R-Pass repéré par la géométrie (information)`, r?.text);
+    await g.page.click('.route-diag summary');
+    await g.page.click('.btn-diag-copy');
+    await g.page.waitForTimeout(300);
+    const txt = await g.page.textContent('.route-diag-text');
+    check(/Méthode taxes PL : R-Pass : géométrie OSM \(copie du 01\/12\/2026\)/.test(txt) && /R-Pass : km 0,0–[89]\d,\d .*— géométrie OSM/.test(txt) && /\n {4}point km 14,5 : 4\d\.\d{3}, 7\.\d{3}\n/.test(txt),
+      `${width} px : diagnostic, méthode et points tous les 10 km`, JSON.stringify(txt.slice(0, 1500)));
+    await noHorizontalScroll(g.page, `${width} px R-Pass par la géométrie`);
+    if (width === 360) {
+      await g.page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+      await g.page.screenshot({ path: join(SHOTS, `${width}-tolls-geo.png`) });
+    }
+    check(g.errors.length === 0, `${width} px géométrie : aucune erreur JavaScript`, g.errors.join(' | '));
+    await g.ctx.close();
+  }
   // A36 et D 83 de Belfort (Besançon → Belfort, faux positif v28) : hors du réseau R-Pass, aucune ligne.
   const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(bb.page);
@@ -1749,7 +1793,7 @@ async function tollsCheck(browser, base) {
   await computeRoute(ge.page);
   await ge.page.waitForSelector('.rules-notes', { timeout: 10000 });
   const gn = await notesOf(ge.page);
-  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km 0 à km \d+ \(A31\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
+  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km 0 à km \d+ \(A31 ; repérage par les noms d'étape, carte OpenStreetMap du réseau non chargée\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
     'Grand Est : écocontribution sur l\'A31, réseau officiel, aucun montant, pas de R-Pass', gn.map((n) => n.text).join(' | '));
   await ge.ctx.close();
   const ab = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), tollsFile: null });
@@ -2080,13 +2124,63 @@ async function drawCheck(browser, base) {
   await ctx.close();
 }
 
+/**
+ * Phase 5h ter : un calcul réussi puis un calcul en échec (404, code 2009) : ancien tracé et repères de départ /
+ * d'arrivée effacés ; même trajet possible sans les restrictions du profil (requête de diagnostic) → message
+ * « peut-être joignable seulement en franchissant une limite », rien en voix, aucun tracé.
+ */
+async function failedCheck(browser, base) {
+  const err2009 = { __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } };
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    let failing = false;
+    const sent = [];
+    const { page, errors } = await open(browser, base, {
+      width, height, voice: true, overpass: () => ({ elements: [] }),
+      directions: (body) => {
+        sent.push(body);
+        if (!failing) return body.alternative_routes ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json');
+        return body.options?.profile_params ? err2009 : fixture('ors-directions.json');
+      },
+    });
+    await computeRoute(page);
+    const routeShown = () => page.evaluate(() => {
+      const m = window.__maps.at(-1);
+      return { source: !!m.getSource('route'), layer: !!m.getLayer('route-line') };
+    });
+    const markersOf = () => page.evaluate(() => document.querySelectorAll('.maplibregl-marker:not(.me-marker)').length);
+    const before = await routeShown();
+    const mBefore = await markersOf();
+    check(before.source && before.layer && mBefore >= 2, `${width} px : premier calcul, tracé et repères affichés`, JSON.stringify({ before, mBefore }));
+    failing = true;
+    sent.length = 0;
+    await page.click('#btn-route');
+    await page.waitForSelector('#message:not([hidden]) .message-detail', { timeout: 10000 });
+    await page.waitForTimeout(500);
+    const after = await routeShown();
+    const mAfter = await markersOf();
+    check(!after.source && !after.layer, `${width} px : calcul en échec, ancien tracé effacé`, JSON.stringify(after));
+    check(mAfter <= mBefore - 2, `${width} px : repères de départ et d'arrivée retirés`, `${mBefore} → ${mAfter}`);
+    check(await page.locator('.route-card:visible').count() === 0, `${width} px : aucune fiche d'itinéraire visible`);
+    const msg = await page.textContent('#message');
+    check(/^Aucun itinéraire autorisé pour ce gabarit\..*Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil\. Essaie un point plus accessible \(appui long\)\. La signalisation fait foi\..*code 2009/.test(msg),
+      `${width} px : message du diagnostic 2009`, msg);
+    check(sent.length <= 3 && sent.filter((b) => !b.options?.profile_params).length === 1, `${width} px : une seule requête sans restrictions, budget de 3`, String(sent.length));
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((x) => /joignable|limite/.test(x)), `${width} px : rien en voix`, spoken.join(' | '));
+    await noHorizontalScroll(page, `${width} px message 2009`);
+    if (width === 360) await page.screenshot({ path: join(SHOTS, `${width}-failed.png`) });
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await page.context().close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
-    tolls: tollsCheck };
+    tolls: tollsCheck, failed: failedCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

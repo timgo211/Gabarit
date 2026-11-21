@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import {
   computeRouteOptions, planVariants, wantsAlternatives, sharedShare, isNearDuplicate, dedupeOptions, nameAlternatives,
   describeOption, deltaText, failureText, guidanceParams, reroutedOption, noZfeOption, routesBbox, pickRouteAt, requestFor,
-  VARIANTS, ROUTE_OPTIONS,
+  VARIANTS, ROUTE_OPTIONS, RESTRICTION_HINT_TEXT,
 } from '../src/lib/route-options.js';
 import { destinationPoint } from '../src/lib/nav-geo.js';
-import { ERROR_KINDS } from '../src/lib/ors-errors.js';
+import { ERROR_KINDS, classifyError } from '../src/lib/ors-errors.js';
 import { defaultVehicle } from '../src/lib/vehicle.js';
 import { fixture } from './helpers.js';
 
@@ -301,4 +301,42 @@ test('carte : emprise commune et tracé touché', () => {
   assert.equal(pickRouteAt([0, 1, 2], 0), 1, 'tronçon commun : on passe au suivant');
   assert.equal(pickRouteAt([0, 1, 2], 2), 0);
   assert.equal(pickRouteAt([1, 1, 0], 1), 0);
+});
+
+// Phase 5h ter : code 2009 (Metz → Nancy, 404) → une seule requête de diagnostic sans les restrictions du profil.
+const error2009 = () => {
+  const c = classifyError({ status: 404, body: fixture('ors-error-2009.json') });
+  return Object.assign(new Error(c.message), { kind: c.kind, code: c.code, status: 404, detail: c.detail });
+};
+
+test('code 2009 : diagnostic sans restrictions (une requête, dans le budget, jamais proposée), message ajouté', async () => {
+  for (const end of [VILLEFRANCHE, CLERMONT]) {
+    const ors = fakeOrs((b) => (b.options.profile_params ? error2009() : fixture('ors-variant-recommended.json')));
+    await assert.rejects(computeRouteOptions({ start: LYON, end, vehicle, send: ors.send }), (err) => {
+      assert.equal(err.code, 2009);
+      assert.equal(err.restrictionHint, true);
+      assert.ok(err.message.endsWith(RESTRICTION_HINT_TEXT));
+      return true;
+    });
+    assert.equal(ors.sent.length, 2, 'Recommandé + diagnostic');
+    assert.ok(ors.sent.length <= ROUTE_OPTIONS.MAX_REQUESTS);
+    const probe = ors.sent[1].body;
+    assert.equal(probe.options.profile_params, undefined);
+    assert.equal(probe.options.vehicle_type, 'hgv');
+    assert.equal(probe.alternative_routes, undefined);
+  }
+  assert.equal(RESTRICTION_HINT_TEXT, 'Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil. Essaie un point plus accessible (appui long). La signalisation fait foi.');
+});
+
+test('code 2009 : diagnostic aussi en échec, profil sans restriction ou autre erreur → message d\'origine', async () => {
+  const both = fakeOrs(() => error2009());
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: both.send }), (err) => !err.restrictionHint && !err.message.includes('appui long'));
+  assert.equal(both.sent.length, 2);
+  const bare = { ...vehicle, height: null, width: null, length: null, weight: null, axleload: null, hazmat: false };
+  const none = fakeOrs(() => error2009());
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle: bare, send: none.send }), (err) => err.code === 2009);
+  assert.equal(none.sent.length, 1, 'rien à retirer : pas de diagnostic');
+  const other = fakeOrs((b) => (b.options.profile_params ? apiError(ERROR_KINDS.NO_ROUTE) : fixture('ors-variant-recommended.json')));
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: other.send }), (err) => !err.restrictionHint);
+  assert.equal(other.sent.length, 1, 'sans code 2009 (404 sans code, réponse vide) : pas de diagnostic');
 });

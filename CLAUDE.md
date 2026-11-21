@@ -34,6 +34,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     références de route dans le cadre de la région, heure de passage, statuts confirmé / annoncé / à vérifier, taux
     de la grille officielle pour la classe du profil) ; lignes « Changements au 1er janvier 2027 » des fiches pays
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
+  - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
+    comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -100,6 +102,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   « name, ref » des étiquettes OSM du 21/11/2026), `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
   `ors-directions-besancon-belfort.json` (A 36 puis D 83 dans Belfort), `ors-directions-metz-nancy.json`
   (A 31), `ors-directions-muenchen-innsbruck.json` (countryinfo DE 74 / AT 11), écrites d'après la doc ORS
+- fixture phase 5h ter : `osm-tolls.geojsonseq` (voies au format de l'export osmium sur les tracés Alsace et
+  Metz–Nancy : deux chaussées de l'A35 dont une à rebours à 20 m, M35 et ancienne « A 35 » dans l'Eurométropole,
+  bretelle, A36 et A31 toll=yes, route sans référence)
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
@@ -123,7 +128,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls
+                                   #   | euro | tolls | failed
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -412,6 +417,27 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   intermédiaire (TeleSec Business TLS-CA 2022, lu par l'adresse AIA, vérification gardée). Pas de champ « Essieux »
   tant qu'aucun montant n'en dépend. alsace.eu, toll-collect.de, gesetze-im-internet.de, asfinag.at et
   ris.bka.gv.at ne répondent pas non plus à l'Action ; tous refusent le conteneur.
+  Phase 5h ter (`hgv-tolls-geo.js`) : réseau en géométrie, la bbox ne décide plus seule. `data/taxes-pl-osm.json`
+  (Action mensuelle, extrait France découpé au cadre des taxes, `w/highway=motorway,trunk,primary,secondary,tertiary`,
+  hors `APP_FILES`) : voies dont une référence normalisée (`normalizeRefs` : majuscules, espaces, « A 35;E 25 ») est
+  dans `roads`, hors `*_link`, toll ≠ yes (sections concédées exclues sans liste à la main : A355, A36 vers Belfort,
+  A31 au sud de Toul) ; segments gardés si leur milieu est dans le périmètre (`pointInTax` : `bbox`, `area`,
+  `exclude` — Eurométropole de Strasbourg, 33 communes ; Alsace pour l'ECPL —, `roadBoxes`, `roadAreas` — RN52 en
+  Meurthe-et-Moselle) ; contours IGN Admin Express COG 2018 (Licence Ouverte, gregoiredavid/france-geojson) dans
+  `data/taxes-pl.json`. Journal : km gardés et exclus toll=yes par référence (sens unique compté pour moitié), total
+  ECPL comparé aux 525 km annoncés. Appli : point du tracé tous les 50 m, ≤ 15 m d'un segment (graphe ORS = nœuds OSM ;
+  simplification 3 m, retouches OSM, autre chaussée ; même écart que les accès conditionnels), écart de cap ≤ 30°
+  modulo 180°, veto si l'étape ORS nomme une autre route, séries ≥ 300 m réunies à 2 km ; texte « de km X à km Y
+  (repérage sur la carte OpenStreetMap du JJ/MM/AAAA (ODbL) et les contours IGN Admin Express (Licence Ouverte),
+  limites exactes à vérifier) » ; copie absente ou sans la taxe → noms d'étape, « au moins … (repérage par les noms
+  d'étape, carte OpenStreetMap du réseau non chargée) ». Crédits `#tolls-credit` dans Réglages. Diagnostic :
+  « Méthode taxes PL », méthode de chaque passage, `point km X : lat, lon` (0,001°) tous les 10 km sur les étapes sans
+  nom (« - ») de plus de 5 km, jamais à moins de 1 km du départ ou de l'arrivée. Calcul en échec :
+  `map.showRoutes([])` retire tracés et repères de départ / d'arrivée. Code 2009 (`computeRouteOptions`) : une
+  requête sans `profile_params.restrictions` (`noRestrictions`), dans le budget de 3, si le profil a des
+  restrictions ; elle passe → `RESTRICTION_HINT_TEXT` ajouté au message (jamais affichée, guidée ni dite). Cause
+  (ORS `ORSRouter.createSnapFilter`) : accrochage sur une voie permise au gabarit, mais test de sous-réseau sans les
+  limites de poids / hauteur ; `radiuses` (400 m par défaut, `maximum_snapping_radius`) n'y change rien (2010 sinon).
   Noms d'étape ORS : GraphHopper v4.17 (`EncodingManager.applyWayTags`) écrit `name` d'OSM puis « , » et `ref`
   (ref seule sans nom) → `roadRefs` lit les références dans le nom. Références OSM lues le 21/11/2026 (extrait Alsace,
   miroir download.openstreetmap.fr : Geofabrik et Overpass injoignables depuis l'Action, IPv6) : Colmar–Sélestat =

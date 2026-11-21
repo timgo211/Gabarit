@@ -73,6 +73,8 @@ const APP_FILES = [
   './src/lib/euro.js',
   './src/lib/winter.js',
   './src/lib/hgv-tolls.js',
+  './src/lib/hgv-tolls-convert.js',
+  './src/lib/hgv-tolls-geo.js',
   './src/lib/route-diagnostic.js',
   './src/lib/winter-convert.js',
   './src/ui/winter.js',

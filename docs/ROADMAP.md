@@ -348,6 +348,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     CO2 absente du profil). Recours devant le tribunal administratif de Strasbourg mentionné (effet suspensif non
     établi). Fiches pays : « Changements au 1er janvier 2027 » (BE Viapass lu ; DE, AT, CH « à vérifier », version de
     l'ORPL en vigueur citée). Autriche ajoutée à la recherche d'adresse.
+  - [x] **Phase 5h ter — R-Pass / ECPL repérés par la géométrie**
+    Fait : ORS renvoie de longues étapes sans nom ni référence (90 km entre Mulhouse et Strasbourg, 83 km d'A31 entre
+    Thionville et Toul, diagnostics v30). Réseau taxé copié d'OSM par l'Action mensuelle (`data/taxes-pl-osm.json`,
+    hors `APP_FILES` ; voies portant une référence de la taxe, hors bretelles et hors toll=yes, découpées par les
+    contours IGN Admin Express : Alsace, Grand Est sans l'Alsace, Eurométropole exclue, RN52 en Meurthe-et-Moselle),
+    comparé au tracé (`hgv-tolls-geo.js` : 15 m, cap modulo 180°, veto du nom d'étape, séries de 300 m) ; copie absente
+    → noms d'étape (« au moins »). Journal de l'Action : km gardés et exclus toll=yes par référence, total ECPL (environ
+    525 km annoncés). Diagnostic : méthode, points tous les 10 km sur les étapes sans nom. Calcul en échec : ancien
+    tracé et repères effacés. Code 2009 : une requête de diagnostic sans les restrictions du profil (budget de 3),
+    message « peut-être joignable seulement en franchissant une limite… », jamais affichée ni guidée.
   - [ ] **Taxes PL : montants Maut (DE) et péage autrichien** : champ « Essieux » du profil (non précisé par défaut :
     les deux cas ; 2, 3, 4, 5 et plus) seulement quand un montant qui en dépend est affiché, grilles officielles lues
     (BFStrMG annexe 1, Mauttarifverordnung).

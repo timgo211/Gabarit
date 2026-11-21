@@ -37,10 +37,12 @@ export function buildRestrictions(vehicle) {
  *   preference?:'recommended'|'fastest'|'shortest'|null, alternatives?:number, avoidPolygons?:object|null }} p
  *   start/end en [longitude, latitude] ; preference absente → défaut ORS (« recommended ») ;
  *   alternatives = nombre d'itinéraires voulus (2 ou 3, itinéraire principal compris) → alternative_routes.target_count.
+ *   noRestrictions = sans profile_params.restrictions (diagnostic d'un code 2009 seulement).
  * @returns {{ url:string, method:'POST', body:object }}
  */
 export function buildDirectionsRequest({
   start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, alternatives = 0, avoidPolygons = null,
+  noRestrictions = false,
 }) {
   if (!isLonLat(start)) throw new TypeError('Point de départ invalide.');
   if (!isLonLat(end)) throw new TypeError("Point d'arrivée invalide.");
@@ -63,7 +65,8 @@ export function buildDirectionsRequest({
     && Array.isArray(avoidPolygons.coordinates) && avoidPolygons.coordinates.length) {
     options.avoid_polygons = { type: avoidPolygons.type, coordinates: avoidPolygons.coordinates };
   }
-  const restrictions = buildRestrictions(vehicle);
+  // noRestrictions : requête de diagnostic après un code 2009 (route-options.js), jamais affichée ni guidée.
+  const restrictions = noRestrictions ? {} : buildRestrictions(vehicle);
   if (Object.keys(restrictions).length) options.profile_params = { restrictions };
 
   const body = {
