@@ -1,6 +1,6 @@
 # Feuille de route Gabarit
 
-Ordre : Bloc 1 Aires PL → Bloc 2 Guidage → Bloc 3 Réglementation → 7d → (4, 6, 10) → 3
+Ordre : Bloc 1 Aires PL → Bloc 3 Réglementation → Bloc 4 Compléments réglementaires → Bloc 2 Guidage → 7d → (4, 6, 10) → 3
 
 **Règle de travail : prendre le prochain bloc non coché. Un bloc = une seule conversation** (toutes ses cases dans
 la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, comme un bloc.
@@ -92,9 +92,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
     (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
 
-## Bloc 1 — Aires PL (en cours)
+## Bloc 1 — Aires PL
 
-- [ ] **Bloc 1 — Aires PL** : ajout et suivi des aires de repos, aires de service et parkings poids lourds, autoroutes
+- [x] **Bloc 1 — Aires PL** : ajout et suivi des aires de repos, aires de service et parkings poids lourds, autoroutes
   d'abord, puis nationales.
   - [x] **Phase 9 — Aires et parkings PL** (priorité ; reprend la partie parkings de la phase 6)
     - Données : aires de repos (`highway=rest_area`), aires de service (`highway=services`) et parkings PL
@@ -112,8 +112,6 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     - Mon avis : à l'arrêt seulement (sous 10 km/h), sur la fiche d'une aire, 3 gros boutons « Plein »,
       « Quelques places », « OK » + heure, gardés sur l'appareil, inclus dans l'export / import, affichés sur la fiche et
       dans la liste (« Plein il y a 2 j, 21h »).
-    - Occupation en temps réel : vérifier s'il existe une source gratuite pour la France. **Pour plus tard (non codé) :**
-      Allemagne, places libres des aires d'autoroute publiées par Toll Collect / SID sur Mobilithek (DATEX II).
     Fait : une requête Overpass par calcul pour tous les itinéraires proposés (tracés mis bout à bout, simplifiés),
     aires de repos / de service à 400 m, parkings PL à 800 m, serveur de secours (overpass.private.coffee) si le premier
     échoue ou dépasse 30 s, résultat gardé 7 jours sur l'appareil (5 trajets) ; jeu officiel (xlsx du réseau concédé 2025,
@@ -121,8 +119,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     « Aires PL officielles » (journal : en-têtes lus, colonnes retenues, nombre d'aires ; échec clair si le nom ou la
     position manquent ; Lambert 93 accepté) ; doublons fusionnés à 300 m ; aire à gauche du tracé en gris « autre sens ? ».
     Liste, repères, fiche, encart « Prochaines aires », annonce vocale (Réglages), « Mon avis » (sous 10 km/h en guidage).
-    **Occupation en temps réel en France : aucune source gratuite trouvée** (seulement des parkings urbains : Lille,
-    Strasbourg, Aix-Marseille…). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
+    Occupation en temps réel : abandonnée (aucune source gratuite en France). Premier passage de l'Action en échec sur le vrai xlsx concédé (titres anglais en
     ligne 2, « Location », « 46°01821 ») : lecture corrigée d'après ses lignes réelles ; xlsx et ods traités à part.
 
 ## Bloc 2 — Guidage
@@ -273,6 +270,33 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     **3,12 Mo** en 245 cases + `index.json` (24 Ko), plus grosse case 4_51 (196 Ko) ; Overpass +0, ORS +0 par calcul.
     Code de la route art. R411-8 : Légifrance refuse aussi l'Action (403) ; lu dans le PDF du code de codes.droit.org
     (édition du 27/10/2026) par le job `r411` le 21/11/2026, texte cité dans `access-conditional.js`.
+
+## Bloc 4 — Compléments réglementaires
+
+- [ ] **Bloc 4 — Compléments réglementaires** (une PR par phase, dans l'ordre 5e → 5f → 5g → 5h)
+  Chaque règle vérifiée sur une source officielle (citée avec sa date) ; une règle non confirmée est « à vérifier »
+  et n'est jamais annoncée ; « La signalisation fait foi » sur chaque alerte.
+  - [ ] **Phase 5e — Poids et frontières** (priorité)
+    En trafic international : 40 t maximum pour un ensemble de 5 essieux ou plus (directive 96/53/CE), même entre deux
+    pays qui autorisent 44 t chez eux ; 44 t seulement en transport combiné. PTAC du profil actif au-delà de 40 t et
+    itinéraire qui passe une frontière : alerte avant le départ (« Au-delà de 40 t, trajet international interdit sauf
+    transport combiné : vérifiez votre poids réel »), sans voix ; case « Transport combiné » dans le profil.
+    `data/pays` : poids total maximal national et hauteur maximale de chaque pays, avec source, sur la fiche pays.
+  - [ ] **Phase 5f — Équipements d'hiver**
+    France, loi Montagne : du 1er novembre au 31 mars, communes de 34 départements (liste officielle copiée dans
+    `data/`, Action annuelle si besoin) ; ensemble avec semi-remorque : chaînes à bord même avec des pneus hiver ;
+    alerte quand le trajet traverse une commune concernée pendant la période. Pays voisins : obligations d'hiver sur la
+    fiche pays. Panneau B26 : simple rappel.
+  - [ ] **Phase 5g — Normes Euro et tunnels**
+    Champ « Norme Euro » (0 à 6), facultatif, dans le profil. Mont-Blanc, Fréjus : normes interdites d'après le
+    règlement en vigueur ; alerte sur la fiche si le tracé passe le tunnel avec une norme interdite, rappel si la norme
+    est vide ; tunnels repérés avec `data/tunnels-adr.json`.
+  - [ ] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
+    R-Pass (Collectivité européenne d'Alsace) au 1er janvier 2027 : axes, tarif officiel, lien, affiché dès l'entrée
+    en vigueur avec la mention des recours ; coût estimé seulement si la grille officielle est lue. Écocontribution PL
+    de la Région Grand Est (projet) : note « projet, à vérifier », rien de calculé tant qu'elle n'est pas adoptée.
+  - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
+    pollution, fermetures de tunnels et de cols.
 
 ## Ensuite
 
