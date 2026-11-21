@@ -83,7 +83,7 @@ function card(d, { checked, onSelect, rules }) {
  * Réglementation de l'itinéraire choisi (phase 5) : une ligne par ZFE et par interdiction, lien vers l'arrêté (texte
  * et adresse venant de data/zfe.json : textContent, adresse http(s) vérifiée par safeUrl), bouton « Éviter la ZFE ».
  */
-function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy }) {
+function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, onAvoidLocal, localBusy }) {
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
@@ -99,6 +99,11 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
     onAvoidTunnel && rules.forbiddenTunnels?.length ? el('button', {
       type: 'button', class: 'btn btn-avoid-tunnel', disabled: !!tunnelBusy, onclick: onAvoidTunnel,
       text: tunnelBusy ? 'Calcul du contournement…' : '⛔ Éviter le tunnel',
+    }) : null,
+    // Phase 5d : route réservée à la desserte locale traversée en transit (une requête ORS sur appui, à l'arrêt).
+    onAvoidLocal && rules.localTransit?.length ? el('button', {
+      type: 'button', class: 'btn btn-avoid-local', disabled: !!localBusy, onclick: onAvoidLocal,
+      text: localBusy ? 'Calcul du contournement…' : '⛔ Éviter la desserte locale',
     }) : null,
     source ? el('p', { class: 'rules-source', text: source }) : null,
     // Licence CC BY 4.0 des données Open-Meteo : attribution avec un lien (open-meteo.com/en/licence).
@@ -122,7 +127,7 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
  */
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
-  windCredit = false, onAvoidTunnel = null, tunnelBusy = false,
+  windCredit = false, onAvoidTunnel = null, tunnelBusy = false, onAvoidLocal = null, localBusy = false,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -156,6 +161,7 @@ export function renderRouteChoice(node, notesNode, {
   notesNode.replaceChildren(
     ...rulesBlock(rules?.[selected], {
       source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy,
+      onAvoidLocal, localBusy,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
   );

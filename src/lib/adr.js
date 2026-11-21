@@ -188,7 +188,7 @@ const CELL = 0.01; // ≈ 1 km
 const cellKey = (x, y) => `${Math.floor(x / CELL)}:${Math.floor(y / CELL)}`;
 
 /** Index des segments du tracé par cases de 0,01° (recherche rapide des tunnels proches). */
-function indexLine(line) {
+export function indexLine(line) {
   const grid = new Map();
   const c = line.coords;
   for (let i = 0; i < c.length - 1; i += 1) {
@@ -209,7 +209,7 @@ function indexLine(line) {
 }
 
 /** Point du tracé le plus proche de p (cases voisines seulement), ou null au-delà d'environ 1 km. */
-function nearest(line, grid, p) {
+export function nearest(line, grid, p) {
   const RAD = Math.PI / 180;
   const kx = Math.cos(p[1] * RAD) * 111320;
   const ky = 110540;

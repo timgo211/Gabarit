@@ -11,6 +11,49 @@ import {
   ADR, effectiveCode, tunnelsAlongRoute, describeForbidden, describeAllowed, noTunnelText, tunnelName,
 } from './adr.js';
 import { countryRules } from './country-rules.js';
+import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
+import {
+  ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
+} from './access-conditional.js';
+import { countriesAlongRoute } from './countries.js';
+
+/**
+ * Accès (phase 5d) : routes réservées à la desserte locale (extra roadaccessrestrictions d'ORS) et voies à accès
+ * conditionnel de la copie data/acces-osm/ (tranches horaires, poids limité par tranche), à l'heure de passage.
+ * @param {{ status:'idle'|'loading'|'ok'|'failed', ways:object[], updated:string|null, uncovered?:boolean }|null} access
+ * @returns {{ lines:object[], short:string[], localTransit:object[], local:object[], conditional:object[] }}
+ */
+export function accessRules(route, { vehicle, access = null, departure = new Date(), elapsed = (t) => t } = {}) {
+  const out = { lines: [], short: [], localTransit: [], local: [], conditional: [] };
+  const loc = localAlongRoute(route, { departure, elapsed });
+  out.local = loc.passages;
+  if (!loc.ok) out.lines.push({ level: 'info', text: LOCAL.UNAVAILABLE_TEXT });
+  for (const p of loc.passages) {
+    if (p.accepted) { out.lines.push({ level: 'info', text: describeLocalAccepted(p) }); continue; }
+    out.localTransit.push(p);
+    out.lines.push({ level: 'warn', text: describeLocal(p) });
+    out.short.push(`Desserte locale km ${Math.round(p.enter / 1000)}`);
+  }
+  if (access?.status !== 'ok') {
+    out.lines.push(access?.status === 'loading' || access?.status === 'idle'
+      ? { level: 'info', text: ACCESS.LOADING_TEXT }
+      : { level: 'warn', text: ACCESS.UNAVAILABLE_TEXT });
+    return out;
+  }
+  const ctry = countriesAlongRoute(route, { departure, elapsed });
+  const countryAt = ctry.ok ? (al) => ctry.segments.find((s) => al >= s.enter && al <= s.exit)?.code ?? null : null;
+  const cond = conditionalAlongRoute(route, { ways: access.ways, vehicle, departure, elapsed, countryAt });
+  out.conditional = cond.passages;
+  for (const p of cond.passages) {
+    const active = p.state === 'no' || p.state === 'local';
+    out.lines.push({ level: active ? 'warn' : 'info', text: describeConditional(p) });
+    if (active) out.short.push(`Accès PL limité km ${Math.round(p.enter / 1000)}`);
+  }
+  if (!cond.passages.length) out.lines.push({ level: 'info', text: noConditionalText(access.updated) });
+  if (cond.unknown) out.lines.push({ level: 'info', text: unknownText(cond.unknown) });
+  if (access.uncovered) out.lines.push({ level: 'info', text: UNCOVERED_TEXT });
+  return out;
+}
 
 /**
  * Tunnels du trajet (phase 5b) pour un véhicule ADR. Code tunnel vide : aucune alerte. Données absentes ou vides :
@@ -56,6 +99,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
  */
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
+  access = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -74,6 +118,10 @@ export function routeRules(route, {
       short.push(`ZFE ${p.name} interdite`);
     } else lines.push({ level: 'info', text: describeZfeAllowed(p), url: p.url });
   }
+  // Accès (phase 5d) : desserte locale traversée, voie interdite à l'heure de passage.
+  const acc = accessRules(route, { vehicle, access, departure, elapsed });
+  lines.push(...acc.lines.filter((l) => l.level === 'warn'));
+  short.push(...acc.short);
   for (const c of bans.conflicts) {
     lines.push({ level: 'warn', text: describeBanConflict(c) });
     short.push(`Interdiction PL ${dayTime(c.start)}`);
@@ -89,6 +137,7 @@ export function routeRules(route, {
     else if (w.checked) lines.push({ level: 'info', text: windCalmText(threshold) });
   } else if (wind?.status === 'failed') lines.push({ level: 'info', text: WIND.UNAVAILABLE_TEXT });
   lines.push(...tun.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...acc.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
@@ -102,12 +151,13 @@ export function routeRules(route, {
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
     countries: ctry,
+    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional,
   };
 }
 
 /** Note de source, sous les règles (données ZFE et date de la copie). */
-export function rulesSourceText(zfe, { hazmat = false, tunnelsUpdated = null } = {}) {
+export function rulesSourceText(zfe, { hazmat = false, tunnelsUpdated = null, accessUpdated = null } = {}) {
   const date = zfe?.updated ? ` (copie du ${zfe.updated.split('-').reverse().join('/')})` : '';
   const tun = hazmat ? ` ${ADR.SOURCE}${tunnelsUpdated ? ` Copie OSM du ${tunnelsUpdated.split('-').reverse().join('/')}.` : ''}` : '';
-  return `Réglementation : ${ZFE.SOURCE}${date} ; interdictions PL : arrêté du 16 avril 2021 et calendrier annuel. Temps de conduite : règlement (CE) 561/2006, aide seulement, le chronotachygraphe fait foi. Heures estimées avec les pauses conseillées. La signalisation et les arrêtés font foi.${tun}`;
+  return `Réglementation : ${ZFE.SOURCE}${date} ; interdictions PL : arrêté du 16 avril 2021 et calendrier annuel. Temps de conduite : règlement (CE) 561/2006, aide seulement, le chronotachygraphe fait foi. Heures estimées avec les pauses conseillées. La signalisation et les arrêtés font foi. ${ACCESS.SOURCE}${accessUpdated ? ` Copie OSM du ${accessUpdated.split('-').reverse().join('/')}.` : ''} ${POLICE_TEXT}${tun}`;
 }

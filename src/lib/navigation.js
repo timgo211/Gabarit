@@ -19,6 +19,9 @@ import { emptyDriving, trackDriving, drivingView, drivingAnnouncements, toggleSt
 import { prepareGuidanceWind, guidanceWind, placeWind } from './wind.js';
 import { tunnelsAlongRoute, guidanceTunnel } from './adr.js';
 import { prepareGuidanceBorders, guidanceBorder } from './country-rules.js';
+import { localAlongRoute, guidanceLocal } from './access-local.js';
+import { conditionalAlongRoute, guidanceConditional } from './access-conditional.js';
+import { countriesAlongRoute } from './countries.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -155,6 +158,22 @@ function placeTunnels(rules, route) {
   return tunnelsAlongRoute(route, { data: rules.tunnels ?? null, vehicle: rules.vehicle }).filter((p) => p.forbidden);
 }
 
+/** Routes réservées à la desserte locale traversées en transit (phase 5d, extra roadaccessrestrictions d'ORS). */
+function placeLocal(rules, route) {
+  if (!rules?.vehicle) return [];
+  return localAlongRoute(route).passages.filter((p) => !p.accepted);
+}
+
+/** Voies à accès conditionnel suivies par l'itinéraire (phase 5d, copie data/acces-osm/ des cases du trajet). */
+function placeAccess(rules, route, now) {
+  if (!rules?.vehicle || !rules.access?.length) return [];
+  const ctry = countriesAlongRoute(route);
+  const countryAt = ctry.ok ? (al) => ctry.segments.find((x) => al >= x.enter && al <= x.exit)?.code ?? null : null;
+  return conditionalAlongRoute(route, {
+    ways: rules.access, vehicle: rules.vehicle, departure: new Date(now || Date.now()), countryAt,
+  }).passages;
+}
+
 /**
  * Démarre le guidage.
  * @param {object} route itinéraire lu par parseDirections
@@ -178,8 +197,12 @@ export function startNavigation(route, {
     windVoice: windVoice !== false,
     rules: rules?.vehicle ? {
       vehicle: rules.vehicle, zfe: rules.zfe ?? null, voice: rules.voice !== false, tunnels: rules.tunnels ?? null,
-      countries: rules.countries ?? null,
+      countries: rules.countries ?? null, access: rules.access ?? null,
     } : null,
+    local: placeLocal(rules, route),
+    localAnnounced: {},
+    access: placeAccess(rules, route, now),
+    accessAnnounced: {},
     borders: placeBorders(rules, route),
     bordersAnnounced: {},
     zfe: placeZfe(rules, route, now),
@@ -327,7 +350,7 @@ export function updateNavigation(state, fix) {
 
   // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
   // seulement, rien à toucher.
-  const rules = { zfe: null, ban: null, wind: null, tunnel: null, border: null };
+  const rules = { zfe: null, ban: null, wind: null, tunnel: null, border: null, access: null };
   if (s.rules && !s.arrived) {
     // Frontière (phase 5c) : bandeau de 20 km avant à 1 km après, voix une fois vers 3 km (règles confirmées seulement).
     const bd = guidanceBorder(s.borders, s.bordersAnnounced, {
@@ -342,6 +365,20 @@ export function updateNavigation(state, fix) {
     s.tunnelsAnnounced = tn.announced;
     rules.tunnel = tn.view;
     if (s.rules.voice && tn.speak && onRoute && !s.rerouting) events.push({ type: 'speak', text: tn.speak });
+    // Accès (phase 5d) : desserte locale traversée, voie à accès conditionnel ; bandeau sous 10 km (la plus proche),
+    // voix une fois vers 3 km seulement si la voie est interdite à l'heure où on y sera.
+    const lc = guidanceLocal(s.local, loc.along, s.localAnnounced);
+    s.localAnnounced = lc.announced;
+    const ac = guidanceConditional(s.access, s.accessAnnounced, {
+      along: loc.along, now: t, vehicle: s.rules.vehicle,
+      timeTo: (al) => remainingDuration(s.route, loc.along) - remainingDuration(s.route, al),
+    });
+    s.accessAnnounced = ac.announced;
+    rules.access = [lc.view, ac.view].filter(Boolean).sort((a, b) => a.distance - b.distance)[0] ?? null;
+    if (s.rules.voice && onRoute && !s.rerouting) {
+      if (lc.speak) events.push({ type: 'speak', text: lc.speak });
+      if (ac.speak) events.push({ type: 'speak', text: ac.speak });
+    }
     const z = guidanceZfe(s.zfe, loc.along, s.zfeAnnounced);
     s.zfeAnnounced = z.announced;
     rules.zfe = z.view;
@@ -397,7 +434,7 @@ export function updateNavigation(state, fix) {
     /**
      * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,
      * wind:{ gust, distance, text }|null, tunnel:{ name, distance, text }|null (phase 5b),
-     * border:{ code, name, distance, text }|null (phase 5c) }.
+     * border:{ code, name, distance, text }|null (phase 5c), access:{ distance, text }|null (phase 5d) }.
      */
     rules,
     /** Temps de conduite (drivingView) : lignes du bandeau, niveau, bouton « Pas une pause (travail) ». */
@@ -513,6 +550,13 @@ export function setNavigationTunnels(state, data) {
   return { ...state, rules, tunnels: placeTunnels(rules, state.source) };
 }
 
+/** Voies à accès conditionnel arrivées après « Démarrer » (phase 5d) : replacées sur le tracé suivi, annonces gardées. */
+export function setNavigationAccess(state, ways) {
+  if (!state?.rules) return state;
+  const rules = { ...state.rules, access: Array.isArray(ways) ? ways : null };
+  return { ...state, rules, access: placeAccess(rules, state.source, state.lastFixAt ?? state.startedAt) };
+}
+
 /** Fichiers des pays voisins arrivés après « Démarrer » (phase 5c) : frontières replacées, annonces gardées. */
 export function setNavigationCountries(state, countries) {
   if (!state?.rules) return state;
@@ -548,6 +592,8 @@ export function rerouteDone(state, route) {
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
     tunnels: placeTunnels(state.rules, route),
     borders: placeBorders(state.rules, route),
+    local: placeLocal(state.rules, route),
+    access: placeAccess(state.rules, route, state.lastFixAt ?? state.startedAt),
     wind: state.wind ? { ...state.wind, placed: placeWind(state.wind.forecast, route) } : state.wind,
     segIndex: null,
     along: 0,

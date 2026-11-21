@@ -288,6 +288,17 @@ export function noTunnelOption(option, route, avoidPolygons, names) {
   };
 }
 
+/**
+ * Itinéraire « Sans desserte » (phase 5d) : mêmes réglages que l'itinéraire choisi, routes réservées à la desserte
+ * locale traversées en transit évitées (petits carrés options.avoid_polygons, ajoutés aux zones déjà évitées).
+ */
+export function noLocalOption(option, route, avoidPolygons) {
+  return {
+    key: 'nolocal', label: 'Sans desserte', note: 'Évite les routes réservées à la desserte locale traversées. La signalisation fait foi.',
+    also: [], route, request: { ...option.request, avoidPolygons },
+  };
+}
+
 /** Après un recalcul en route, les alternatives (parties de l'ancien départ) sont dépassées : il ne reste que lui. */
 export function reroutedOption(option, route) {
   return { key: 'rerouted', label: 'Recalculé en route', note: '', also: [], route, request: option.request };

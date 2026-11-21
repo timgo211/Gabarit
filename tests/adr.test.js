@@ -277,7 +277,7 @@ test('code tunnel vide : aucune alerte ; pas d\'ADR : rien ; rappel ADR et sourc
   assert.deepEqual(rules.short.slice(0, 1), ['Tunnel de Test C interdit']);
   assert.ok(!routeRules(route, { vehicle: defaultVehicle(), departure: new Date(2026, 10, 18, 10) }).lines.some((l) => l.text === ADR.REMINDER_TEXT));
   assert.match(rulesSourceText(null, { hazmat: true, tunnelsUpdated: '2026-11-17' }), /OpenStreetMap \(ODbL\).*Bison Futé.*Copie OSM du 17\/11\/2026\.$/);
-  assert.doesNotMatch(rulesSourceText(null), /OpenStreetMap/);
+  assert.doesNotMatch(rulesSourceText(null), /Tunnels/, 'pas d\'ADR : pas de source des tunnels');
   assert.match(ADR.ORS_TEXT, /plus long que nécessaire/);
 });
 

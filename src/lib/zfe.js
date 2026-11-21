@@ -90,18 +90,27 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 function parseDays(text) {
   const days = new Set();
+  let ph = false;
   for (const part of text.split(',')) {
-    const m = /^(Mo|Tu|We|Th|Fr|Sa|Su)(?:-(Mo|Tu|We|Th|Fr|Sa|Su))?$/.exec(part.trim());
+    const t = part.trim();
+    if (t === 'PH') { ph = true; continue; }
+    const m = /^(Mo|Tu|We|Th|Fr|Sa|Su)(?:-(Mo|Tu|We|Th|Fr|Sa|Su))?$/.exec(t);
     if (!m) return null;
     const a = DAY_CODES.indexOf(m[1]);
     const b = m[2] ? DAY_CODES.indexOf(m[2]) : a;
     for (let d = a, k = 0; k < 7; d = (d + 1) % 7, k += 1) { days.add(d); if (d === b) break; }
   }
-  return days;
+  return { days, ph };
 }
 
+/**
+ * Plages horaires « 07:00-19:00,22:00-06:00 ». Une plage qui passe minuit (22:00-06:00) commence le jour indiqué et
+ * se termine le lendemain matin (opening_hours d'OpenStreetMap : « Mo 22:00-06:00 » = lundi 22 h → mardi 6 h).
+ * @returns {{ ranges:number[][], spill:number[][], show:number[][] }|null} ranges : minutes du jour même ;
+ *   spill : minutes du lendemain ; show : plages telles qu'écrites (texte)
+ */
 function parseRanges(text) {
-  const out = [];
+  const out = { ranges: [], spill: [], show: [] };
   for (const part of text.split(',')) {
     const m = /^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/.exec(part.trim());
     if (!m) return null;
@@ -110,16 +119,22 @@ function parseRanges(text) {
     if (to === 0 && from === 0) to = 1440; // « 00:00-00:00 » : toute la journée
     if (to === 23 * 60 + 59) to = 1440; // « 00:00-23:59 » : toute la journée
     if (from > 1440 || to > 1440) return null;
-    if (to > from) out.push([from, to]);
-    else out.push([from, 1440], [0, to]); // plage qui passe minuit
+    out.show.push([from, to]);
+    if (to > from) out.ranges.push([from, to]);
+    else { out.ranges.push([from, 1440]); if (to > 0) out.spill.push([0, to]); } // plage qui passe minuit
   }
   return out;
 }
 
+const ALL_DAYS = () => new Set([0, 1, 2, 3, 4, 5, 6]);
+
 /**
  * Lit les horaires d'une restriction. Formats vus dans la BNZFE : « 24/7 », « Mo-Su 00:00-24:00; PH off »,
- * « Mo-Su : 00:00-00:00 », « Mo-Fr 07:00-9:00,16:00-19:00 », « Mo-Su 00:00-24:00; May 1 off ».
- * @returns {{ always:boolean, rules:{ days:Set<number>, ranges:number[][] }[], holidaysOff:boolean, datesOff:string[] }|null}
+ * « Mo-Su : 00:00-00:00 », « Mo-Fr 07:00-9:00,16:00-19:00 », « Mo-Su 00:00-24:00; May 1 off ». Phase 5d (conditions
+ * des voies OpenStreetMap, même format opening_hours) : plages sans jours (« 22:00-06:00 » = tous les jours), jours
+ * sans plage (« Sa,Su » = toute la journée), jours fériés dans la liste (« Su,PH 00:00-24:00 », « PH »).
+ * @returns {{ always:boolean, rules:{ days:Set<number>, ph:boolean, ranges:number[][], spill:number[][],
+ *   show:number[][] }[], holidaysOff:boolean, datesOff:string[] }|null}
  *   null : horaires illisibles ou absents (restriction supposée permanente, texte brut affiché « à vérifier »)
  */
 export function parseHours(text) {
@@ -132,26 +147,37 @@ export function parseHours(text) {
     if (/^PH off$/i.test(part)) { out.holidaysOff = true; continue; }
     const off = /^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}) off$/.exec(part);
     if (off) { out.datesOff.push(`${String(MONTHS.indexOf(off[1]) + 1).padStart(2, '0')}-${off[2].padStart(2, '0')}`); continue; }
-    const m = /^([A-Za-z,-]+)\s+([\d:,\s-]+)$/.exec(part);
-    if (!m) return null;
-    const days = parseDays(m[1]);
-    const ranges = parseRanges(m[2].replace(/\s/g, ''));
-    if (!days || !ranges) return null;
-    out.rules.push({ days, ranges });
+    let daysText = null;
+    let rangesText = null;
+    let m = /^([A-Za-z,-]+)\s+([\d:,\s-]+)$/.exec(part);
+    if (m) { daysText = m[1]; rangesText = m[2]; }
+    else if ((m = /^([\d:,\s-]+)$/.exec(part))) rangesText = m[1];
+    else if ((m = /^([A-Za-z,-]+)$/.exec(part))) daysText = m[1];
+    else return null;
+    const d = daysText === null ? { days: ALL_DAYS(), ph: false } : parseDays(daysText);
+    const r = rangesText === null ? { ranges: [[0, 1440]], spill: [], show: [[0, 1440]] } : parseRanges(rangesText.replace(/\s/g, ''));
+    if (!d || !r) return null;
+    out.rules.push({ days: d.days, ph: d.ph, ...r });
   }
   if (!out.always && !out.rules.length) return null;
   return out;
 }
 
-/** La restriction s'applique-t-elle à cet instant ? (horaires illisibles : oui, par prudence) */
-export function hoursActive(hours, date) {
+/**
+ * La restriction s'applique-t-elle à cet instant ? (horaires illisibles : oui, par prudence)
+ * @param {{ holiday?:(date:Date)=>boolean }} opts holiday : jour férié du pays traversé (phase 5d) ; France par défaut
+ */
+export function hoursActive(hours, date, { holiday = isHoliday } = {}) {
   if (!hours) return true;
   const md = `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   if (hours.datesOff.includes(md)) return false;
-  if (hours.holidaysOff && isHoliday(date)) return false;
+  if (hours.holidaysOff && holiday(date)) return false;
   if (hours.always) return true;
   const min = date.getHours() * 60 + date.getMinutes();
-  return hours.rules.some((r) => r.days.has(date.getDay()) && r.ranges.some(([a, b]) => min >= a && min < b));
+  const prev = new Date(date.getFullYear(), date.getMonth(), date.getDate() - 1, 12);
+  const dayOk = (r, d) => r.days.has(d.getDay()) || (r.ph && holiday(d));
+  return hours.rules.some((r) => (dayOk(r, date) && r.ranges.some(([a, b]) => min >= a && min < b))
+    || (r.spill?.length && dayOk(r, prev) && r.spill.some(([a, b]) => min >= a && min < b)));
 }
 
 /** Horaires en français : « tous les jours, 24 h/24 », « lun.–ven. 7 h–9 h, 16 h–19 h, sauf jours fériés ». */
@@ -163,8 +189,10 @@ export function hoursText(hours, raw) {
   if (hours.always) parts.push('tous les jours, 24 h/24');
   for (const r of hours.rules) {
     const all = r.ranges.length === 1 && r.ranges[0][0] === 0 && r.ranges[0][1] === 1440;
-    const days = r.days.size === 7 ? 'tous les jours' : [1, 2, 3, 4, 5, 6, 0].filter((d) => r.days.has(d)).map((d) => FR[d]).join(' ');
-    parts.push(`${days}${all ? ', 24 h/24' : ` ${r.ranges.map(([a, b]) => `${hm(a)}–${hm(b)}`).join(', ')}`}`);
+    const list = [1, 2, 3, 4, 5, 6, 0].filter((d) => r.days.has(d)).map((d) => FR[d]);
+    if (r.ph) list.push('jours fériés');
+    const days = r.days.size === 7 ? 'tous les jours' : list.join(' ');
+    parts.push(`${days}${all ? ', 24 h/24' : ` ${(r.show ?? r.ranges).map(([a, b]) => `${hm(a)}–${hm(b)}`).join(', ')}`}`);
   }
   let t = parts.join(' ; ');
   if (hours.holidaysOff) t += ', sauf jours fériés';

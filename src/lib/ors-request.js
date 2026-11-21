@@ -71,8 +71,9 @@ export function buildDirectionsRequest({
     instructions: true,
     language: 'fr',
     units: 'm',
-    // countryinfo (phase 5c) : pays traversés, dans la même requête (variantes et recalcul compris).
-    extra_info: ['tollways', 'countryinfo'],
+    // countryinfo (phase 5c) : pays traversés ; roadaccessrestrictions (phase 5d) : routes réservées à la desserte
+    // locale ou aux livraisons. Dans la même requête (variantes et recalcul compris).
+    extra_info: ['tollways', 'countryinfo', 'roadaccessrestrictions'],
     options,
   };
   const speed = clampMaxSpeed(vehicle.maxSpeed);

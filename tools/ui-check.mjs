@@ -17,7 +17,8 @@ import { createRequire } from 'node:module';
 import { deflateSync, crc32 } from 'node:zlib';
 
 import { emptyDriving, trackDriving } from '../src/lib/driving-time.js';
-import { buildCoverage, convertAreas, parsePoly } from '../src/lib/areas-osm-data.js';
+import { buildCoverage, convertAreas, parsePoly, parseGeojsonLine } from '../src/lib/areas-osm-data.js';
+import { accessElementFromFeature, convertAccess } from '../src/lib/access-convert.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -106,7 +107,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
-  slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null,
+  slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture',
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -229,6 +230,15 @@ async function open(browser, base, {
     const json = copy?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 5d : copie data/acces-osm/ (null : absente, 404). 'fixture' : voies de tests/fixtures/osm-access.geojsonseq
+  // passées par convertAccess (comme l'Action), zone couverte autour des trajets de test.
+  const access = accessCopyFiles(accessCopy);
+  await ctx.route(/\/data\/acces-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.access = [...(stats.access ?? []), name];
+    const json = access?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -244,6 +254,16 @@ function osmCopyFiles(kind) {
   const box = kind === 'uncovered' ? [20, 55, 22, 57] : [-5, 42, 8.3, 51.2];
   const poly = parsePoly(`zone\n1\n   ${box[0]} ${box[1]}\n   ${box[2]} ${box[1]}\n   ${box[2]} ${box[3]}\n   ${box[0]} ${box[3]}\nEND\nEND\n`);
   const { index, tiles } = convertAreas(fixture('overpass-aires.json').elements, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/** Fichiers de la copie des voies à accès conditionnel simulée (nom → JSON), d'après les fonctions de l'Action. */
+function accessCopyFiles(kind) {
+  if (!kind) return null;
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const ways = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-access.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).filter(Boolean).map(accessElementFromFeature).filter(Boolean);
+  const { index, tiles } = convertAccess(ways, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
 }
 
@@ -1266,7 +1286,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v22', 'vrai service worker : « Gabarit v22 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v23', 'vrai service worker : « Gabarit v23 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1349,6 +1369,101 @@ async function borderCheck(browser, base) {
   check(/Règles PL en Suisse non chargées : à vérifier\./.test(await noFile.page.textContent('.country-card')), 'fichier data/pays/CH.json absent → « à vérifier »');
   check(noFile.errors.length === 0, 'fichier absent : aucune erreur JavaScript', noFile.errors.join(' | '));
   await noFile.ctx.close();
+}
+
+/**
+ * Phase 5d : accès. Trajet de 31 km (tests/fixtures/ors-directions-access.json) un mercredi à 8 h : desserte locale
+ * traversée vers km 16 (extra roadaccessrestrictions), Rue des Écoles interdite aux PL de 7 h à 19 h, condition non
+ * lue, « Éviter la desserte locale » (une requête ORS), guidage avec le GPS émulé (bandeau, une annonce vers 3 km),
+ * copie absente.
+ */
+async function accessCheck(browser, base) {
+  const acc = fixture('ors-directions-access.json');
+  const line = acc.features[0].geometry.coordinates;
+  const now = new Date('2026-11-18T08:00:00+01:00').getTime(); // mercredi 8 h à Paris
+  const bodies = [];
+  const directions = (body) => {
+    bodies.push(body);
+    if (!body.options?.avoid_polygons) return acc;
+    const alt = JSON.parse(JSON.stringify(acc));
+    alt.features[0].properties.extras.roadaccessrestrictions.values = alt.features[0].properties.extras.roadaccessrestrictions.values
+      .map((v) => (v[0] === 20 ? [20, 21, 0] : v));
+    return alt;
+  };
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    bodies.length = 0;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, now, voice: true, directions, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForFunction(() => /Rue des Écoles/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 10000 });
+    check(bodies.every((b) => b.extra_info?.includes('roadaccessrestrictions')), `${width} px : roadaccessrestrictions dans chaque requête ORS (${bodies.length})`);
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    check(notes.some((n) => n.cls === 'warn' && n.text === 'Route réservée à la desserte locale vers km 16 (D 306) : vous la traversez. La signalisation fait foi.'),
+      `${width} px : desserte locale traversée vers km 16`, notes.map((n) => n.text).join(' | '));
+    check(notes.some((n) => n.cls === 'warn' && /^Rue des Écoles interdite aux PL .*7 h–19 h : vous y seriez vers km 8 \(vers 8 h 06\), en vigueur à votre passage\. La signalisation fait foi\.$/.test(n.text)),
+      `${width} px : voie interdite à l'heure de passage`);
+    check(notes.some((n) => n.cls === 'info' && /^Avenue du Port interdite aux PL tous les jours 22 h–6 h : .*pas en vigueur à votre passage\. La signalisation fait foi\.$/.test(n.text)),
+      `${width} px : voie autorisée à l'heure de passage (22 h → 6 h)`);
+    check(notes.some((n) => n.text === '1 voie avec conditions non lues, à vérifier.') && !notes.some((n) => /Route des Crues|Rue Parallèle|Pont de la Gare|Autre Chaussée/.test(n.text)),
+      `${width} px : condition non lue sur une seule ligne, route parallèle / pont / autre chaussée absents`);
+    check(notes.some((n) => /près du départ : acceptée/.test(n.text)) && notes.some((n) => /près de l'arrivée : acceptée/.test(n.text)),
+      `${width} px : desserte près du départ et de l'arrivée acceptée`);
+    check(/Desserte locale km 16/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire, desserte locale`);
+    check(/R411-8/.test(await page.textContent('.rules-source')), `${width} px : source, pouvoir de police R411-8`);
+    check((stats.access ?? []).includes('index.json') && (stats.access ?? []).includes('4_45.json') && stats.overpass.every((h) => !/acces/.test(h)),
+      `${width} px : copie data/acces-osm/ lue (index + case du trajet)`, (stats.access ?? []).join(','));
+    await noHorizontalScroll(page, `${width} px notes d'accès`);
+    await page.locator('.btn-avoid-local').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-acces.png`) });
+    // « Éviter la desserte locale » : une seule requête ORS, avec avoid_polygons.
+    const before = stats.directions;
+    await page.click('.btn-avoid-local');
+    await page.waitForFunction(() => /Sans desserte/.test(document.querySelector('.route-card[aria-checked="true"]')?.textContent ?? ''), null, { timeout: 10000 });
+    check(stats.directions - before === 1 && bodies.at(-1).options?.avoid_polygons?.type === 'MultiPolygon', `${width} px : « Éviter » = une requête ORS avec avoid_polygons`, `${stats.directions - before}`);
+    const after = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    check(!after.some((t) => /vous la traversez/.test(t)) && !(await page.isVisible('.btn-avoid-local')), `${width} px : « Sans desserte » ne traverse plus la desserte`);
+    await noHorizontalScroll(page, `${width} px après « Éviter »`);
+
+    if (width === 360 || width === 1280) {
+      // Guidage, GPS émulé depuis le km 3,1 : bandeau sous 10 km, annonce une fois vers 3 km (Rue des Écoles, km 8).
+      await page.click('.route-card >> nth=0');
+      await page.waitForTimeout(500);
+      await setGeo(page, { lon: line[4][0], lat: line[4][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await page.waitForTimeout(1500);
+      const first = await page.textContent('#nav-rule');
+      check(await page.isVisible('#nav-rule') && /Rue des Écoles dans [\d,]+ km : interdite à votre passage · la signalisation fait foi/.test(first),
+        `${width} px : bandeau de la voie interdite à l'heure de passage (sous 10 km)`, first);
+      check(await page.locator('#nav input, #nav textarea, #nav select').count() === 0, `${width} px : aucune saisie pendant le guidage`);
+      await drive(ctx, page, line.slice(4), 90, 85);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      const ann = spoken.filter((t) => /interdite aux poids lourds à cette heure/.test(t));
+      check(ann.length === 1 && ann[0] === 'Attention, dans 3 kilomètres, rue des écoles interdite aux poids lourds à cette heure. Suivez la signalisation.',
+        `${width} px : une annonce vers 3 km`, ann.join(' | ') || spoken.join(' | '));
+      const rule = await page.textContent('#nav-rule');
+      check(/Rue des Écoles dans [\d,]+ (km|m) : interdite à votre passage · la signalisation fait foi/.test(rule), `${width} px : bandeau « interdite à votre passage »`, rule);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+      const foot = await footOverlaps(page);
+      check(foot.out.length === 0, `${width} px : boutons de carte hors du bandeau`, foot.out.join(' ; '));
+      await noHorizontalScroll(page, `${width} px guidage accès`);
+      await page.screenshot({ path: join(SHOTS, `${width}-acces-guidage.png`) });
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+
+  // Copie absente : message, jamais un silence ; aucune alerte horaire.
+  const none = await open(browser, base, { width: 412, height: 900, now, directions: () => acc, accessCopy: null, overpass: () => ({ elements: [] }) });
+  await computeRoute(none.page);
+  await none.page.waitForFunction(() => /Restrictions horaires indisponibles/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+  const text = await none.page.textContent('#route-notes');
+  check(/Restrictions horaires indisponibles \(données non chargées\)\./.test(text) && !/Rue des Écoles/.test(text), 'copie absente → « Restrictions horaires indisponibles (données non chargées) »');
+  check(/vous la traversez/.test(text), 'copie absente : desserte locale (ORS) toujours signalée');
+  check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
+  await none.ctx.close();
 }
 
 /** Éléments visibles du bandeau du haut qui passent sous la barre du bas (ou sortent du bandeau borné). */
@@ -1566,7 +1681,7 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

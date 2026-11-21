@@ -254,7 +254,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .country-footer { margin: 8px 0 0; font-weight: 600; font-size: .85rem; }
 .cbadge { display: inline-block; font-size: .75rem; padding: 1px 6px; border-radius: 8px; margin-right: 6px; border: 1px solid currentColor; font-style: normal; }
 .cbadge-warn { background: var(--danger); color: #fff; border-color: var(--danger); }
-.btn-avoid-zfe, .btn-avoid-tunnel { margin-top: 10px; }
+.btn-avoid-zfe, .btn-avoid-tunnel, .btn-avoid-local { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 
 /* Dialogues */

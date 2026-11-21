@@ -3,6 +3,7 @@
 // properties.{summary, segments, extras, way_points}, geometry LineString [lon, lat]. extras.tollways = { values:[[début,fin,valeur]], summary:[{value,distance,amount}] }
 // (valeur 1 = tronçon à péage, 0 = sans péage).
 
+import { parseAccessExtra } from './access-local.js';
 import { parseCountryInfo } from './countries.js';
 
 const EARTH_RADIUS_M = 6371008.8;
@@ -107,6 +108,8 @@ function parseFeature(feature, fallbackBbox) {
     tollDistance: tollDistance(props.extras, coords),
     // Pays traversés (phase 5c, extra « countryinfo ») : [{ from, to, code }] ou null (→ « Pays traversés indisponibles »).
     countries: parseCountryInfo(props.extras),
+    // Routes réservées à la desserte locale (phase 5d, extra « roadaccessrestrictions ») : [{ from, to, value }] ou null.
+    local: parseAccessExtra(props.extras),
     steps,
     warnings,
   };
