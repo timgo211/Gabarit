@@ -80,7 +80,10 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   Nominatim) ; job `r411` (à la main seulement, case « r411 », groupe de concurrence à part : n'annule jamais une
   copie) : texte du Code de la route art. R411-8 dans le journal ; lancée aussi à chaque envoi qui modifie l'outil,
   `tunnels-convert.js`, `areas-osm-data.js` ou `access-convert.js` (toute branche) et à la main ;
-  `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé)
+  `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé) ; téléchargements : délai par essai
+  (60 s pour un `.poly`, 20 min pour un `.pbf`), 5 essais (attentes 30 s, 1 min, 2 min, 4 min) ; contours `.poly`
+  gardés dans `data/osm-poly/` (hors `APP_FILES`, dates dans `dates.json`, écrits à chaque copie réussie) et utilisés
+  si leur téléchargement échoue (journal : « copie du dépôt utilisée », avec la date) ; attribution ODbL dans Réglages
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
   branche) de la liste Sécurité routière (xlsx du 22/10/2022) et des contours 2022 (2021 en secours) dans
@@ -131,7 +134,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v30 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v31 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
