@@ -293,11 +293,23 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     Codice della strada art. 62 / 61 (44 t, 4 m), ES Orden PJC/780/2025 (44 t depuis le 23/10/2025, citernes le
     23/01/2026, 4,00 m) ; BE et LU « à vérifier » (textes non lisibles depuis le conteneur). Profil plus haut que la
     hauteur maximale : alerte sur la fiche et dans les notes.
-  - [ ] **Phase 5f — Équipements d'hiver**
+  - [x] **Phase 5f — Équipements d'hiver**
     France, loi Montagne : du 1er novembre au 31 mars, communes de 34 départements (liste officielle copiée dans
     `data/`, Action annuelle si besoin) ; ensemble avec semi-remorque : chaînes à bord même avec des pneus hiver ;
     alerte quand le trajet traverse une commune concernée pendant la période. Pays voisins : obligations d'hiver sur la
     fiche pays. Panneau B26 : simple rappel.
+    Fait : sources lues le 21/11/2026 — réponses ministérielles AN n° 3489 (JO du 21/03/2023 : décret n° 2020-1264,
+    1er novembre – 31 mars, communes fixées par arrêté préfectoral ; PL avec remorque ou semi-remorque : chaînes pour
+    deux roues motrices à bord même avec pneus hiver ; sans remorque : chaînes ou pneus hiver ; B26 : chaînes montées,
+    3PMSF admis sauf panonceau) et n° 10745 (JO du 17/02/2026 : pas encore de sanction). Liste officielle de la
+    Sécurité routière (xlsx du 22/10/2022, 4 173 communes dont 156 en partie, 34 départements) + contours des communes
+    2022 (data.gouv.fr, ODbL) copiés dans `data/hiver/` par l'Action « Équipements d'hiver » (15 octobre, à la main, à
+    chaque envoi de l'outil ; échec si plus de 2 % des codes INSEE sans contour). Tracé coupé exactement par les
+    contours (aucun échantillonnage). Alerte avant le départ si le passage tombe dans la période, date de la liste,
+    arrêtés plus récents « à vérifier », profil « Remorque » (non précisé, sans, avec) ; rien dans le guidage. Fiches
+    pays « Équipements d'hiver » toute l'année : DE StVO § 2 (3a) / StVZO § 36 (4), LU art. 156 et 160, CH OSR art. 29,
+    ES RGC (panneaux), BE art. 81.4.4 ; IT Codice della strada art. 6 (ordonnance), période 15/11 – 15/04 « à
+    vérifier » ; AT (KFG § 102, RIS refusé au conteneur) « à vérifier », texte lu dans le journal de l'Action.
   - [ ] **Phase 5g — Normes Euro et tunnels**
     Champ « Norme Euro » (0 à 6), facultatif, dans le profil. Mont-Blanc, Fréjus : normes interdites d'après le
     règlement en vigueur ; alerte sur la fiche si le tracé passe le tunnel avec une norme interdite, rappel si la norme

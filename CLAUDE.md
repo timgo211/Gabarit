@@ -24,6 +24,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
   - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
     poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
+  - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,
+    consigne selon la remorque), `winter-convert.js` (liste Sécurité routière + contours → `data/hiver/`) ; UI
+    `src/ui/winter.js` ; bloc `winter` des fiches pays
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -71,11 +74,18 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   copie) : texte du Code de la route art. R411-8 dans le journal ; lancée aussi à chaque envoi qui modifie l'outil,
   `tunnels-convert.js`, `areas-osm-data.js` ou `access-convert.js` (toute branche) et à la main ;
   `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé)
+- `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
+  annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
+  branche) de la liste Sécurité routière (xlsx du 22/10/2022) et des contours 2022 (2021 en secours) dans
+  `data/hiver/` ; échec (job rouge, rien d'écrit) si plus de 2 % des codes INSEE sans contour ; job `austria` : KFG
+  § 102 (RIS) dans le journal ; `node tools/hiver-update.mjs liste.xlsx contours.geojson.gz` en local
 - `tools/zfe-update.mjs` + `.github/workflows/zfe.yml` : copie hebdomadaire de la BNZFE dans `data/zfe.json` (adresses
   lues dans l'API data.gouv.fr ; `node tools/zfe-update.mjs aires.geojson voies.geojson ids.csv AAAA-MM-JJ` en local)
 - fixtures phase 5 : `bnzfe-aires.json` / `bnzfe-voies.json` / `bnzfe-ids.csv` (extraits réels de la BNZFE du 26/03/2026)
 - fixture phase 5b : `overpass-tunnels.json` (voies au format « out tags geom » écrites d'après la doc : tunnels C, E, D double,
   hazmat=no à côté, catégorie A, hazmat:E=yes, le long de la ligne de test à 45,05° N)
+- fixtures phase 5f : `hiver-liste-sheet.xml` (lignes réelles de la liste du 22/10/2022), `hiver-contours.geojson`
+  (contours écrits autour de `ors-directions-nav.json` : petite commune sur 155 m sans point du tracé, trou, en partie)
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
@@ -98,7 +108,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 ```
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
-                                   #   | overview | press | areas | foot | rules | drive | adr | draw | border
+                                   #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -106,7 +116,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v24 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v25 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -114,7 +124,9 @@ rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 5
 countryinfo absent, fichier pays absent), accès (`access` : desserte traversée vers km 16, desserte près du départ et
 de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8 h, condition non lue sur une ligne,
 « Éviter la desserte locale » = une requête ORS, 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé à 360 et
-1280 px : bandeau et une annonce vers 3 km captée, copie absente). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+1280 px : bandeau et une annonce vers 3 km captée, copie absente), équipements d'hiver (`winter` : mercredi de
+novembre, alerte, date de la liste, B26, profil « Remorque » rechargé, crédits, juillet, copie absente, fiches Suisse /
+Italie en juillet, guidage avec le GPS émulé à 360 et 1280 px : rien d'hiver dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -324,6 +336,22 @@ de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8
   DE / CH 44 t) et `limits.height` (`max` en m), source nationale obligatoire, sinon « à vérifier » sans valeur (BE, LU :
   eJustice demande un captcha, Legilux en JavaScript) ; profil au-delà : `warn` sur la fiche, hauteur dépassée aussi
   dans les notes (« Hauteur max Pays »). Sites officiels à ajouter à l'environnement cloud « Gabarit ».
+- Équipements d'hiver (phase 5f, `winter.js`) : réponses ministérielles AN n° 3489 (JO 21/03/2023) et n° 10745 (JO
+  17/02/2026), décret n° 2020-1264 (Légifrance 403 au conteneur). Période 1er novembre – 31 mars (heure de la tablette,
+  heure de passage recalée par les pauses : `inWinterPeriod` sur l'entrée ou la sortie de zone). Communes : copie
+  `data/hiver/` (`index.json` : `listDate`, `tiles` ; case `E_N.json` : `{ communes: [{ c, n, d, p, b, r }] }`, anneaux
+  en entiers 1e-5° en écarts, commune dans chaque case que son cadre touche), hors `APP_FILES`, cases lues si le tracé
+  les traverse (`routeTiles`, parcours exact de la grille) ; intersection exacte segment / côtés (règle pair-impair,
+  trous compris), jamais d'échantillonnage. Passages réunis à 50 m, zones à 2 km ; texte « Équipements d'hiver exigés
+  du 1er novembre au 31 mars de km X à km Y (communes — département), vers … : consigne. Liste nationale du
+  22/10/2022 : arrêtés préfectoraux plus récents et routes exclues à vérifier. La signalisation fait foi. » ; commune
+  « en partie, à vérifier » ; `vehicle.trailer` ('' non précisé : deux consignes, 'none', 'with') ; rappel B26 et
+  sanctions « à vérifier » ; copie absente en période → « Équipements d'hiver indisponibles (données non chargées) » ;
+  aucune commune → « Aucune commune … signalée » (seulement si aucune commune sur le tracé). Jamais de voix, de bandeau
+  ni d'annonce. Fiches pays : bloc `winter` (rubrique « Équipements d'hiver », toute l'année, « selon la météo / les
+  panneaux, pas de période légale ») ; IT période « à vérifier » ; `data/pays/AT.json` minimal (tout « à vérifier »).
+  Crédits dans Réglages (`#winter-credit` : liste du 22/10/2022, contours ODbL). Hôtes de l'Action :
+  securite-routiere.gouv.fr, contours-administratifs.s3.rbx.io.cloud.ovh.net (bloqué au conteneur), ris.bka.gv.at.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

@@ -19,6 +19,8 @@ import { deflateSync, crc32 } from 'node:zlib';
 import { emptyDriving, trackDriving } from '../src/lib/driving-time.js';
 import { buildCoverage, convertAreas, parsePoly, parseGeojsonLine } from '../src/lib/areas-osm-data.js';
 import { accessElementFromFeature, convertAccess } from '../src/lib/access-convert.js';
+import { parseXlsxSheet } from '../src/lib/areas-official.js';
+import { parseCommuneList, buildTiles, buildIndex } from '../src/lib/winter-convert.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -107,7 +109,7 @@ const START = [4.8357, 45.764]; // départ des fixtures (Lyon)
 async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
-  slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture',
+  slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -239,6 +241,15 @@ async function open(browser, base, {
     const json = access?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 5f : copie data/hiver/ (null, par défaut : absente, 404). 'fixture' : liste et contours de tests/fixtures
+  // passés par les fonctions de l'Action.
+  const winter = winterCopyFiles(winterCopy);
+  await ctx.route(/\/data\/hiver\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.winter = [...(stats.winter ?? []), name];
+    const json = winter?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -265,6 +276,17 @@ function accessCopyFiles(kind) {
     .map(parseGeojsonLine).filter(Boolean).map(accessElementFromFeature).filter(Boolean);
   const { index, tiles } = convertAccess(ways, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/** Fichiers de la copie des communes soumises aux équipements d'hiver simulée (nom → JSON). */
+function winterCopyFiles(kind) {
+  if (!kind) return null;
+  const list = parseCommuneList(parseXlsxSheet(readFileSync(join(ROOT, 'tests', 'fixtures', 'hiver-liste-sheet.xml'), 'utf8')));
+  const gj = fixture('hiver-contours.geojson');
+  const contours = new Map(gj.features.map((f) => [f.properties.code, { name: f.properties.nom, geometry: f.geometry }]));
+  const built = buildTiles(list.communes, contours);
+  const index = buildIndex({ updated: '2026-10-15', communes: list.communes, ...built });
+  return new Map([['index.json', index], ...Object.entries(built.tiles).map(([k, t]) => [`${k}.json`, { communes: t }])]);
 }
 
 async function computeRoute(page) {
@@ -1405,6 +1427,104 @@ async function borderCheck(browser, base) {
 }
 
 /**
+ * Phase 5f : équipements d'hiver. Trajet de tests/fixtures/ors-directions-nav.json un mercredi de novembre 8 h, copie
+ * data/hiver/ simulée (liste réelle + contours de test) : alerte dans les notes, fiche d'itinéraire, rappel B26, date
+ * de la liste, profil « Remorque » (3 états), juillet (rien), copie absente, crédits de Réglages, fiche Suisse
+ * (« Équipements d'hiver » toute l'année), guidage avec le GPS émulé à 360 et 1280 px : rien d'hiver dit ni affiché.
+ */
+async function winterCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const now = new Date('2026-11-18T08:00:00+01:00').getTime(); // mercredi 8 h
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, stats, errors } = await open(browser, base, {
+      width, height, now, voice: true, directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await page.waitForTimeout(500);
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    const w = notes.filter((n) => /^Équipements d'hiver exigés du 1er novembre au 31 mars/.test(n.text));
+    check(w.length >= 1 && w.every((n) => n.cls === 'warn' && /Liste nationale du 22\/10\/2022/.test(n.text) && /La signalisation fait foi\.Liste des communes$/.test(n.text)),
+      `${width} px : alerte équipements d'hiver, date de la liste, signalisation`, notes.map((n) => n.text).join(' | '));
+    check(/Avec remorque ou semi-remorque : chaînes à neige .* ; sans remorque : chaînes à bord ou pneus hiver \(3PMSF\)/.test(w[0]?.text ?? ''),
+      `${width} px : remorque non précisée → les deux consignes`);
+    check(notes.some((n) => /^Panneau B26 :/.test(n.text)) && notes.some((n) => /^Sanctions du défaut d'équipement d'hiver/.test(n.text)),
+      `${width} px : rappel B26 et sanctions « à vérifier »`);
+    check(/Équipements d'hiver/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire « Équipements d'hiver »`);
+    check((stats.winter ?? []).includes('index.json') && (stats.winter ?? []).includes('4_45.json') && !(stats.winter ?? []).includes('6_45.json'),
+      `${width} px : copie data/hiver/ lue (index + case du trajet seulement)`, (stats.winter ?? []).join(','));
+    await noHorizontalScroll(page, `${width} px notes équipements d'hiver`);
+    await page.locator('.rules-notes').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-hiver.png`) });
+    if (width === 360) {
+      // Profil : « Remorque » à 3 états, enregistré, consigne unique.
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      const opts = await page.$$eval('#veh-trailer option', (o) => o.map((x) => x.textContent));
+      check(opts.join('|') === 'Non précisé|Sans remorque|Avec remorque ou semi-remorque', '360 px : « Remorque » à 3 états', opts.join('|'));
+      await noHorizontalScroll(page, '360 px profil avec « Remorque »');
+      await page.selectOption('#veh-trailer', 'with');
+      await page.click('#vehicles-body button[type="submit"]');
+      check(/avec remorque/.test(await page.textContent('#vehicles-body .vehicle-card.active .dims')), '360 px : profil « avec remorque » enregistré');
+      await page.keyboard.press('Escape');
+      await page.reload();
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+      await computeRoute(page);
+      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      await page.waitForTimeout(500);
+      const t = await page.textContent('#route-notes');
+      check(/PL avec remorque ou semi-remorque : chaînes à neige pour au moins deux roues motrices à bord, même avec des pneus hiver\./.test(t) && !/sans remorque : chaînes/.test(t),
+        '360 px : après rechargement, consigne « avec remorque » seule');
+      // Crédits de Réglages : liste du 22/10/2022, contours ODbL.
+      await page.click('#btn-settings');
+      const credit = await page.textContent('#winter-credit');
+      check(/22\/10\/2022/.test(credit) && /Contours administratifs/.test(credit) && /ODbL/.test(credit), '360 px : crédits ODbL des contours et date de la liste', credit);
+      await page.click('#dlg-settings [data-close]');
+    }
+    // Guidage, GPS émulé : rien d'hiver ni dit ni affiché.
+    if (width === 360 || width === 1280) {
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await drive(ctx, page, line, 50, 40);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /hiver|chaîne|pneu/i.test(x)), `${width} px : guidage, rien d'hiver dit`, spoken.join(' | '));
+      const banner = (await page.isVisible('#nav-rule')) ? await page.textContent('#nav-rule') : '';
+      check(!/hiver|chaîne|pneu/i.test(banner), `${width} px : guidage, rien d'hiver dans le bandeau`, banner);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Juillet : rien.
+  const july = await open(browser, base, { width: 412, height: 900, now: new Date('2026-07-08T08:00:00+02:00').getTime(), directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: 'fixture' });
+  await computeRoute(july.page);
+  await july.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  check(!/Équipements d'hiver|Panneau B26/.test(await july.page.textContent('#route-notes')), 'juillet : aucune ligne d\'hiver');
+  await july.ctx.close();
+  // Copie absente en novembre : « indisponibles », jamais un silence.
+  const none = await open(browser, base, { width: 412, height: 900, now, directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: null });
+  await computeRoute(none.page);
+  await none.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await none.page.waitForTimeout(500);
+  check(/Équipements d'hiver indisponibles \(données non chargées\)/.test(await none.page.textContent('#route-notes')), 'copie absente → « Équipements d\'hiver indisponibles »');
+  check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
+  await none.ctx.close();
+  // Fiche Suisse en juillet : rubrique « Équipements d'hiver » affichée toute l'année.
+  const ch = await open(browser, base, { width: 412, height: 900, now: new Date('2026-07-08T08:00:00+02:00').getTime(), directions: () => fixture('ors-directions-fr-ch-it.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(ch.page);
+  await ch.page.waitForSelector('.country-card', { timeout: 10000 });
+  const cards = await ch.page.$$eval('.country-card', (n) => n.map((c) => ({ sections: [...c.querySelectorAll('h4')].map((h) => h.textContent), text: c.textContent })));
+  check(cards[0].sections.includes("Équipements d'hiver") && /Chaînes à neige obligatoires.*Selon la météo \/ les panneaux, pas de période légale\./.test(cards[0].text),
+    'fiche Suisse : « Équipements d\'hiver » en juillet, sans période légale');
+  check(/15 novembre au 15 avril.*à vérifier/.test(cards[1].text), 'fiche Italie : période 15/11 – 15/04 « à vérifier »');
+  await noHorizontalScroll(ch.page, '412 px fiches pays avec équipements d\'hiver');
+  await ch.ctx.close();
+}
+
+/**
  * Phase 5d : accès. Trajet de 31 km (tests/fixtures/ors-directions-access.json) un mercredi à 8 h : desserte locale
  * traversée vers km 16 (extra roadaccessrestrictions), Rue des Écoles interdite aux PL de 7 h à 19 h, condition non
  * lue, « Éviter la desserte locale » (une requête ORS), guidage avec le GPS émulé (bandeau, une annonce vers 3 km),
@@ -1714,7 +1834,7 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

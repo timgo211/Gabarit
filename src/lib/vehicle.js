@@ -16,6 +16,13 @@ export const BAN_STATUS_VALUES = ['concerned', 'art4', 'exempt'];
  */
 export const COMBINED_LABEL = 'Transport combiné (conteneurs ou caisses mobiles, opération intermodale)';
 
+/**
+ * Remorque (phase 5f, équipements d'hiver) : non précisée (défaut, les deux consignes sont données), sans remorque,
+ * avec remorque ou semi-remorque (chaînes à bord même avec des pneus hiver). Voir winter.js.
+ */
+export const TRAILER_VALUES = Object.freeze(['', 'none', 'with']);
+export const TRAILER_LABELS = Object.freeze({ '': 'Non précisé', none: 'Sans remorque', with: 'Avec remorque ou semi-remorque' });
+
 // Matières dangereuses (phase 5b) : réglage global (Réglages, settings.adr), plus dans le profil depuis la v19.
 // Voir src/lib/adr-settings.js (reprise des anciens profils, withAdr).
 
@@ -55,6 +62,7 @@ export function defaultVehicle() {
     critair: '1',
     banStatus: 'concerned',
     combined: false,
+    trailer: '',
   };
 }
 
@@ -77,6 +85,7 @@ export function normalizeVehicle(raw) {
     banStatus: BAN_STATUS_VALUES.includes(raw?.banStatus) ? raw.banStatus : 'concerned',
     // Case du formulaire (« on ») ou booléen d'un export ; anciens profils : non.
     combined: raw?.combined === true || raw?.combined === 'on',
+    trailer: TRAILER_VALUES.includes(raw?.trailer) ? raw.trailer : '',
   };
   // Anciens champs ADR (hazmat, tunnelCode, adrClass, unNumber) : non gardés, repris dans settings.adr (store.js).
   for (const key of Object.keys(NUMERIC_FIELDS)) {

@@ -1,0 +1,61 @@
+name: Équipements d'hiver (loi Montagne)
+
+# Copie annuelle des communes de montagne soumises à l'obligation d'équipements d'hiver (liste de la Sécurité
+# routière + contours des communes de data.gouv.fr, ODbL) dans data/hiver/, lue sans réseau par l'appli (phase 5f).
+# Échec (liste illisible, plus de 2 % des codes INSEE sans contour) : job en rouge, rien n'est enregistré.
+# Lancée aussi à la main (onglet Actions › Équipements d'hiver › Run workflow) et à chaque envoi qui modifie l'outil,
+# sur n'importe quelle branche (la première copie est créée sur la branche de la phase 5f, dans sa PR).
+# Job `austria` : lecture seule du KFG § 102 (Autriche, RIS) dans le journal, jamais bloquant.
+
+on:
+  schedule:
+    - cron: '23 5 15 10 *' # le 15 octobre, 5 h 23 (UTC), avant la période du 1er novembre
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/hiver-update.mjs
+      - src/lib/winter-convert.js
+      - .github/workflows/hiver.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hiver-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  austria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - run: node tools/hiver-update.mjs --austria
+
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Copier la liste et les contours
+        run: node tools/hiver-update.mjs
+      - name: Enregistrer data/hiver/
+        run: |
+          git add -A -N data/hiver
+          if git diff --quiet -- data/hiver; then
+            echo "Aucun changement."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A data/hiver
+          git commit -m "Données : communes soumises aux équipements d'hiver (mise à jour automatique)"
+          git pull --rebase
+          git push

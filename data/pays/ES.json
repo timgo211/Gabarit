@@ -27,6 +27,9 @@
     "weight": {"max": 44, "text": "Poids total maximal national : 44 t pour un ensemble de 5 essieux ou plus, depuis le 23/10/2025 (citernes : depuis le 23/01/2026). En international : 40 t sauf transport combiné.", "source": "rgv", "verified": "2026-11-21"},
     "height": {"max": 4, "text": "Hauteur maximale : 4,00 m, chargement compris (4,50 m pour les porte-voitures, conteneurs fermés en transport combiné, animaux vivants, paille et fourrage, livraisons d'industries à moins de 50 km).", "source": "rgv", "verified": "2026-11-21"}
   },
+  "winter": [
+    {"text": "Chaînes ou pneus d'hiver quand les panneaux l'exigent (« Obligatorio el uso de cadenas o neumáticos de invierno »). Selon la météo / les panneaux, pas de période légale.", "source": "rgc", "verified": "2026-11-21"}
+  ],
   "bans": [
     { "id": "sections", "kind": "info", "calendarYears": [2026], "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2026-1255",
       "text": "Pas d'interdiction générale le week-end : plus de 7,5 t interdits sur certains tronçons, certains jours et à certaines heures (annexe II de la résolution annuelle de la DGT) ; Catalogne et Pays basque : résolutions propres. Tronçons à vérifier.",

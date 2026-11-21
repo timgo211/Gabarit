@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Lignes réelles de la feuille « liste communes » du fichier Sécurité routière du 22/10/2022 (cellules recopiées en texte), plus une ligne illisible. -->
+<worksheet><sheetData>
+<row r="1"><c r="A1" t="inlineStr"><is><t>Nom Commune</t></is></c><c r="B1" t="inlineStr"><is><t>Code INSEE Commune</t></is></c><c r="C1" t="inlineStr"><is><t>obligation équipements hivernaux (1 : toute la commune, 5 : une partie de la commune)</t></is></c><c r="D1" t="inlineStr"><is><t>Département</t></is></c><c r="E1" t="inlineStr"><is><t>Massif</t></is></c></row>
+<row r="2"><c r="A2" t="inlineStr"><is><t>L’ABERGEMENT-DE-VAREY</t></is></c><c r="B2" t="inlineStr"><is><t>01002</t></is></c><c r="C2" t="inlineStr"><is><t>1</t></is></c><c r="D2" t="inlineStr"><is><t>Ain</t></is></c><c r="E2" t="inlineStr"><is><t>Jura</t></is></c></row>
+<row r="3"><c r="A3" t="inlineStr"><is><t>AMBLEON</t></is></c><c r="B3" t="inlineStr"><is><t>01006</t></is></c><c r="C3" t="inlineStr"><is><t>1</t></is></c><c r="D3" t="inlineStr"><is><t>Ain</t></is></c><c r="E3" t="inlineStr"><is><t>Jura</t></is></c></row>
+<row r="4"><c r="A4" t="inlineStr"><is><t>ANDERT-ET-CONDON</t></is></c><c r="B4" t="inlineStr"><is><t>01009</t></is></c><c r="C4" t="inlineStr"><is><t>1</t></is></c><c r="D4" t="inlineStr"><is><t>Ain</t></is></c><c r="E4" t="inlineStr"><is><t>Jura</t></is></c></row>
+<row r="5"><c r="A5" t="inlineStr"><is><t>ANGLEFORT</t></is></c><c r="B5" t="inlineStr"><is><t>01010</t></is></c><c r="C5" t="inlineStr"><is><t>1</t></is></c><c r="D5" t="inlineStr"><is><t>Ain</t></is></c><c r="E5" t="inlineStr"><is><t>Jura</t></is></c></row>
+<row r="6"><c r="A6" t="inlineStr"><is><t>Albiès</t></is></c><c r="B6" t="inlineStr"><is><t>09004</t></is></c><c r="C6" t="inlineStr"><is><t>5</t></is></c><c r="D6" t="inlineStr"><is><t>Ariège</t></is></c><c r="E6" t="inlineStr"><is><t>Pyrénées</t></is></c></row>
+<row r="7"><c r="A7" t="inlineStr"><is><t>Artigues</t></is></c><c r="B7" t="inlineStr"><is><t>11017</t></is></c><c r="C7" t="inlineStr"><is><t>1</t></is></c><c r="D7" t="inlineStr"><is><t>Aude</t></is></c><c r="E7" t="inlineStr"><is><t>Massif Central</t></is></c></row>
+<row r="8"><c r="A8" t="inlineStr"><is><t>Ligne illisible</t></is></c><c r="B8" t="inlineStr"><is><t>x12</t></is></c><c r="C8" t="inlineStr"><is><t>1</t></is></c><c r="D8" t="inlineStr"><is><t></t></is></c><c r="E8" t="inlineStr"><is><t></t></is></c></row>
+</sheetData></worksheet>

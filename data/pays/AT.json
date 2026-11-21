@@ -1,0 +1,22 @@
+{
+  "code": "AT",
+  "name": "Autriche",
+  "orsIds": [11],
+  "verified": "2026-11-21",
+  "sources": {
+    "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
+  },
+  "limits": {
+    "weight": {"text": "Poids total maximal national : à vérifier (texte officiel non lu). En international : 40 t sauf transport combiné.", "source": null, "verified": null},
+    "height": {"text": "Hauteur maximale : à vérifier (texte officiel non lu).", "source": null, "verified": null}
+  },
+  "winter": [
+    {"text": "Équipements d'hiver des PL (KFG 1967, § 102 : pneus d'hiver et chaînes à bord, période) : texte officiel non lu, à vérifier.", "url": "https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=10011384", "source": null, "verified": null}
+  ],
+  "bans": [],
+  "toll": [
+    {"text": "Vitesses PL, interdictions de circulation et péage PL en Autriche : à vérifier (fiche non encore rédigée).", "url": "https://www.ris.bka.gv.at/", "source": null, "verified": null}
+  ],
+  "lez": [],
+  "adr": []
+}
