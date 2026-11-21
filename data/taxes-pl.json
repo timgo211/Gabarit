@@ -12,7 +12,7 @@
       "kind": "official"
     },
     "rpassDepliant": {
-      "name": "dépliant officiel R-Pass (grille tarifaire, version V02)",
+      "name": "dépliant officiel V02 du R-Pass (grille tarifaire)",
       "url": "https://cms.r-pass.eu/uploads/R_PASS_Depliant_A5_FR_V02_BD_8318e739a4.pdf",
       "kind": "official"
     }
@@ -43,7 +43,7 @@
         "D504"
       ],
       "rates": null,
-      "scope": "Réseau officiel : A35 et A36 (parties non concédées, hors Eurométropole de Strasbourg), RD83 entre Colmar et Sélestat, RD1363, RD502 et RD504 ; limites exactes des sections à vérifier sur la carte officielle.",
+      "scope": "Réseau officiel : A35 et A36 (parties non concédées, hors Eurométropole de Strasbourg), RD83 entre Colmar et Sélestat, RD1363, RD502 et RD504 ; A36 comptée seulement dans le Haut-Rhin (jamais vers Belfort), limite de la partie concédée à vérifier ; limites exactes des sections à vérifier sur la carte officielle.",
       "basis": "Délibération du Conseil d'Alsace n° CD-2025-4-7-1 du 20 octobre 2025 (code des impositions sur les biens et services, art. L.421-189) : PTAC de plus de 3,5 t, catégorie N ; tarif selon le poids total roulant autorisé (PTRA) et la classe Euro.",
       "grid": {
         "source": "rpassDepliant",
@@ -125,6 +125,14 @@
           ]
         },
         "reduction": "réduction automatique à partir de 20 trajets par mois pour les abonnés"
+      },
+      "roadBoxes": {
+        "A36": [
+          7.05,
+          47.55,
+          7.62,
+          47.9
+        ]
       }
     },
     {

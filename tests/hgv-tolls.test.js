@@ -66,7 +66,7 @@ test('R-Pass annoncé : avant le 1er janvier 2027, « prévue à partir du », i
   assert.match(line.text, /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km \d+ \(A36, A35\)\./);
   assert.match(line.text, /délibération du Conseil d'Alsace n° CD-2025-4-7-1 du 20 octobre 2025/i);
   assert.match(line.text, /Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)/);
-  assert.match(line.text, /Tarif prévu, poids du profil 19 t, Euro VI \(classe C \(PTRA de 18 à 32 t\)\) : 11,5 centimes par km \(dépliant officiel R-Pass \(grille tarifaire, version V02\), lu le 21\/11\/2026\)/);
+  assert.match(line.text, /Tarif annoncé, poids du profil 19 t, Euro VI \(classe C \(PTRA de 18 à 32 t\)\) : 11,5 centimes par km \(dépliant officiel V02 du R-Pass \(grille tarifaire\), lu le 21\/11\/2026\)/);
   assert.match(line.text, /Aucun total calculé pour le trajet\./);
   assert.match(line.text, /lue le 21\/11\/2026/);
   assert.match(line.text, /La signalisation fait foi\.$/);
@@ -196,4 +196,25 @@ test('routeRules : lignes dans les notes, rien dans le résumé pour un statut �
 test('dates longues', () => {
   assert.equal(longDate('2027-01-01'), '1er janvier 2027');
   assert.equal(longDate('2027-04-02'), '2 avril 2027');
+});
+
+test('A36 : rien vers Belfort (Besançon → Belfort), comptée seulement dans le Haut-Rhin (Belfort → Mulhouse)', () => {
+  const dep = new Date(2026, 10, 25, 9, 0);
+  const bes = routeOf('ors-directions-besancon-belfort.json');
+  assert.equal(tollsAlongRoute(bes, { data: real, departure: dep }).length, 0);
+  assert.equal(tollRules(bes, { vehicle: truck, tolls: ok(real), departure: dep }).lines.length, 0, 'aucune ligne R-Pass hors du réseau');
+  const bm = routeOf('ors-directions-belfort-mulhouse.json');
+  const [p, ...rest] = tollsAlongRoute(bm, { data: real, departure: dep });
+  assert.equal(rest.length, 0);
+  // Le passage commence à 7,05° E (Haut-Rhin), pas à Belfort (6,86° E) : environ 15 km après le départ.
+  assert.ok(p.enter > 12000, `entrée à ${Math.round(p.enter)} m`);
+  const line = tollRules(bm, { vehicle: truck, tolls: ok(real), departure: dep }).lines[0];
+  assert.match(line.text, /A36 comptée seulement dans le Haut-Rhin \(jamais vers Belfort\), limite de la partie concédée à vérifier/);
+  assert.match(line.text, /annoncé|prévue à partir du 1er janvier 2027/);
+});
+
+test('cadre propre à une route : illisible → ignoré, cadre général gardé', () => {
+  const t = JSON.parse(readFileSync(new URL('../data/taxes-pl.json', import.meta.url), 'utf8'));
+  t.taxes[0].roadBoxes = { A36: [7, 'x'] };
+  assert.deepEqual(parseTollData(t).taxes[0].roadBoxes, {});
 });

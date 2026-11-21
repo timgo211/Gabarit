@@ -95,7 +95,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - fixtures phase 5g : `ors-directions-mont-blanc.json` (Le Fayet → tunnel du Mont-Blanc → Courmayeur) et
   `ors-directions-frejus.json` (Modane → tunnel du Fréjus → Bardonecchia), countryinfo FR 70 / IT 97, tubes de
   `KNOWN_TUNNELS`, écrites d'après la doc ORS
-- fixtures phase 5h : `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-metz-nancy.json`
+- fixtures phase 5h : `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
+  `ors-directions-besancon-belfort.json` (A 36), `ors-directions-metz-nancy.json`
   (A 31), `ors-directions-muenchen-innsbruck.json` (countryinfo DE 74 / AT 11), écrites d'après la doc ORS
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
@@ -128,7 +129,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v27 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v28 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -381,12 +382,13 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
   tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
 - Taxes PL régionales (phase 5h, `hgv-tolls.js`) : `data/taxes-pl.json` dans `APP_FILES` ; chaque taxe a `start`,
-  `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `scope` (réseau officiel),
+  `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `roadBoxes` (cadre propre à une route : A36 dans le Haut-Rhin
+  seulement, 7,05° E et plus, jamais vers Belfort ; limite de la concession à vérifier), `scope` (réseau officiel),
   `basis`, `note`. Statuts : 'confirmed' (texte officiel lu : alerte en vigueur, ligne sur la fiche), 'announced'
   (site officiel lu, date « prévue », information seulement), 'check' (rien lu : « Taxe possible : … périmètre
   officiel non lu, à vérifier », aucun montant) ; 'confirmed' / 'announced' exigent `source` et `verified`, sinon
   'check'. Montants : `grid` (classes de poids `max` / `maxIncluded` true, false ou null = les deux, lignes par classe
-  Euro '0'–'7', source et date) seulement hors 'check' ; texte « Tarif prévu, poids du profil X t, Euro VI (classe …) :
+  Euro '0'–'7', source et date) seulement hors 'check' ; texte « Tarif annoncé, poids du profil X t, Euro VI (classe …) :
   N centimes par km (source, lu le …) … Aucun total calculé pour le trajet. » ; classe Euro non précisée ou EEV
   (absent de la grille) → fourchette ; jamais de total ni d'estimation. Au-delà de 3,5 t (poids non précisé :
   signalé) ; en France d'après countryinfo (absent : cadre seul, « Pays traversés non lus : à vérifier ») ; heure de

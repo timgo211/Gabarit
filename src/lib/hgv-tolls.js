@@ -78,6 +78,11 @@ export function parseTollData(json) {
     const bbox = Array.isArray(t?.bbox) && t.bbox.length === 4 && t.bbox.every(isNum) ? t.bbox : null;
     const roads = Array.isArray(t?.roads) ? t.roads.filter((r) => typeof r === 'string' && r) : [];
     if (!id || !name || !isDate(t?.start) || !bbox || !roads.length) continue;
+    // Cadre propre à une route (ex. A36 : partie alsacienne seulement, jamais vers Belfort), en plus du cadre général.
+    const roadBoxes = {};
+    for (const [r, b] of Object.entries(t.roadBoxes && typeof t.roadBoxes === 'object' ? t.roadBoxes : {})) {
+      if (Array.isArray(b) && b.length === 4 && b.every(isNum)) roadBoxes[r] = b;
+    }
     const source = str(t.source) && sources[t.source] ? t.source : null;
     const verified = isDate(t.verified) ? t.verified : null;
     const sourced = !!source && !!verified;
@@ -86,7 +91,7 @@ export function parseTollData(json) {
     const rates = confirmed && Array.isArray(t.rates) ? t.rates.filter((r) => str(r?.text)) : null;
     const grid = status !== 'check' ? parseGrid(t.grid, sources) : null;
     taxes.push({
-      id, name, short: str(t.short) ?? name, start: t.start, bbox, roads,
+      id, name, short: str(t.short) ?? name, start: t.start, bbox, roads, roadBoxes,
       status, basis: str(t.basis), source, verified, url: str(t.url),
       scope: str(t.scope), note: str(t.note), rates: rates?.length ? rates : null, grid,
     });
@@ -148,7 +153,7 @@ export function gridText(grid, vehicle, sources = {}) {
     const v = idx.map((i) => fr(grid.euro[e][i]));
     head = `poids du profil ${fr(w)} t, ${EURO_NAMES[e] ?? `Euro ${e}`} (${cls}${edge}) : ${[...new Set(v)].join(' ou ')} ${grid.unit}`;
   }
-  return `Tarif prévu, ${head} (${src}, lu le ${shortDate(grid.verified)})${grid.reduction ? ` ; ${grid.reduction}` : ''}. Aucun total calculé pour le trajet.`;
+  return `Tarif annoncé, ${head} (${src}, lu le ${shortDate(grid.verified)})${grid.reduction ? ` ; ${grid.reduction}` : ''}. Aucun total calculé pour le trajet.`;
 }
 
 const inBox = ([lon, lat], [w, s, e, n]) => lon >= w && lon <= e && lat >= s && lat <= n;
@@ -167,7 +172,7 @@ export function tollsAlongRoute(route, { data, departure = new Date(), elapsed =
   for (const tax of data.taxes) {
     let cur = null;
     for (const s of samples) {
-      const hit = s.roads.filter((r) => tax.roads.includes(r));
+      const hit = s.roads.filter((r) => tax.roads.includes(r) && (!tax.roadBoxes?.[r] || inBox(s.lonlat, tax.roadBoxes[r])));
       if (!hit.length || !inBox(s.lonlat, tax.bbox) || !inFrance(s.along)) continue;
       if (cur && s.along - cur.exit <= TOLLS.GAP_M) {
         cur.exit = s.along;

@@ -1311,7 +1311,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v27', 'vrai service worker : « Gabarit v27 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v28', 'vrai service worker : « Gabarit v28 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1669,7 +1669,7 @@ async function tollsCheck(browser, base) {
     await page.waitForSelector('.rules-notes', { timeout: 10000 });
     const notes = await notesOf(page);
     const r = rpass(notes);
-    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif prévu, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
+    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
       `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
     check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
     await noHorizontalScroll(page, `${width} px notes taxes PL`);
@@ -1704,6 +1704,13 @@ async function tollsCheck(browser, base) {
     check(c.errors.length === 0, `${label} : aucune erreur JavaScript`, c.errors.join(' | '));
     await c.ctx.close();
   }
+  // A36 vers Belfort (Besançon → Belfort) : hors du réseau R-Pass, aucune ligne.
+  const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(bb.page);
+  await bb.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const bn = await notesOf(bb.page);
+  check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort par l\'A36 : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
+  await bb.ctx.close();
   // Grand Est : A31, 2 avril 2027, réseau officiel, aucun montant ; fichier absent.
   const ge = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-metz-nancy.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(ge.page);
