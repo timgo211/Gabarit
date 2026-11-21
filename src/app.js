@@ -14,6 +14,7 @@ import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
 import { createWinter } from './ui/winter.js';
 import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
+import { TOLLS_GEO, parseTollNetwork } from './lib/hgv-tolls-geo.js';
 import { serviceDetailText } from './lib/ors-errors.js';
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
@@ -225,13 +226,16 @@ for (const code of COUNTRY_RULES.FILES) {
 }
 
 // ───────── Taxes PL régionales (phase 5h) : data/taxes-pl.json, petit fichier mis en cache (lisible hors ligne) ─────────
-let tolls = { status: 'loading', data: null };
-fetch(TOLLS.PATH, { cache: 'no-cache' })
+// Phase 5h ter : réseau taxé en géométrie (data/taxes-pl-osm.json, copie OSM de l'Action, hors APP_FILES) ; absent ou
+// illisible → network null, repérage par les noms d'étape.
+let tolls = { status: 'loading', data: null, network: null };
+const readJson = (path, parse) => fetch(path, { cache: 'no-cache' })
   .then((r) => (r.ok ? r.json() : null))
-  .then((j) => parseTollData(j))
-  .catch(() => null)
-  .then((d) => {
-    tolls = d ? { status: 'ok', data: d } : { status: 'failed', data: null };
+  .then((j) => parse(j))
+  .catch(() => null);
+Promise.all([readJson(TOLLS.PATH, parseTollData), readJson(TOLLS_GEO.PATH, parseTollNetwork)])
+  .then(([d, network]) => {
+    tolls = d ? { status: 'ok', data: d, network } : { status: 'failed', data: null, network: null };
     renderChoice();
   });
 
@@ -562,6 +566,7 @@ const form = createRouteForm({
       access.clear();
       winter.clear();
       map.showZfe([]);
+      map.showRoutes([]); // ancien tracé et repères de départ / d'arrivée effacés : rien ne laisse croire à un itinéraire
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.', 'error', serviceDetailText(err, store.getApiKey() ?? ''));
     } finally {
       form.setBusy(false);

@@ -15,13 +15,16 @@
 //    (« Plus rapide » à la place de « Sans péage » quand les péages sont déjà évités ou que le Recommandé n'en a pas) ;
 // 3. doublons (tracés quasi identiques) supprimés ; le Recommandé reste toujours la référence des écarts.
 
-import { buildDirectionsRequest } from './ors-request.js';
+import { buildDirectionsRequest, buildRestrictions } from './ors-request.js';
 import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bboxOf } from './ors-response.js';
 import { ERROR_KINDS } from './ors-errors.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
 } from './format.js';
+
+/** Message ajouté après un code 2009 quand le même trajet passe sans les restrictions du profil (jamais en voix). */
+export const RESTRICTION_HINT_TEXT = 'Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil. Essaie un point plus accessible (appui long). La signalisation fait foi.';
 
 export const ROUTE_OPTIONS = Object.freeze({
   /** Itinéraires demandés à alternative_routes (principal compris). */
@@ -185,14 +188,34 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
   };
 
   let main = null;
-  if (wantsAlternatives(start, end)) {
-    try {
-      main = await ask(VARIANTS.recommended, ROUTE_OPTIONS.TARGET_COUNT);
-    } catch (err) {
-      if (!ALTERNATIVES_FALLBACK_KINDS.has(errorKind(err))) throw err;
+  try {
+    if (wantsAlternatives(start, end)) {
+      try {
+        main = await ask(VARIANTS.recommended, ROUTE_OPTIONS.TARGET_COUNT);
+      } catch (err) {
+        if (!ALTERNATIVES_FALLBACK_KINDS.has(errorKind(err))) throw err;
+      }
     }
+    if (!main) main = await ask(VARIANTS.recommended);
+  } catch (err) {
+    // Code 2009 (aucun itinéraire) : une seule requête de diagnostic sans les restrictions du profil, dans le budget.
+    // ORS accroche les points sur une voie permise au gabarit (ORSRouter.createSnapFilter), mais son test de
+    // sous-réseau ignore les limites de poids, hauteur ou largeur : un point de centre-ville peut n'être relié au
+    // reste qu'au-delà d'une limite. Le résultat n'est jamais affiché ni guidé ; seul le message change.
+    if (err?.code === 2009 && requests < ROUTE_OPTIONS.MAX_REQUESTS && Object.keys(buildRestrictions(vehicle)).length) {
+      requests += 1;
+      try {
+        const probe = parseAllDirections(await send(buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, noRestrictions: true })));
+        if (probe.length) {
+          err.restrictionHint = true;
+          err.message = `${err.message ? `${err.message} ` : ''}${RESTRICTION_HINT_TEXT}`;
+        }
+      } catch {
+        // Diagnostic en échec : message d'origine.
+      }
+    }
+    throw err;
   }
-  if (!main) main = await ask(VARIANTS.recommended);
 
   let options = dedupeOptions(
     main.routes.map((route, i) => makeOption(i === 0 ? VARIANTS.recommended : VARIANTS.alternative, route, main.request)),
