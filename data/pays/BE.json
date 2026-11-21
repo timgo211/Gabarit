@@ -5,6 +5,7 @@
   "verified": "2026-11-20",
   "sources": {
     "cdr": { "name": "Code de la route belge, arrêté royal du 1er décembre 1975, art. 11 (texte publié par l'institut Vias)", "url": "https://www.codedelaroute.be/fr/reglementation/1975120109~hra8v386pu#art-11", "kind": "national" },
+    "viapass2027": {"name": "Viapass, Prélèvement kilométrique : les modifications prévues à partir du 1er janvier 2027 (octobre 2026)", "url": "https://www.viapass.be/actualites/prelevement-kilometrique-les-modifications-prevues-a-partir-du-1er-janvier-2027.html", "kind": "national"},
     "viapass": { "name": "Viapass (entité interrégionale du prélèvement kilométrique)", "url": "https://www.viapass.be/fr/", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
@@ -31,7 +32,8 @@
     { "id": "none", "kind": "none", "text": "Pas d'interdiction de circuler pour les poids lourds les week-ends et les jours fériés.", "source": "bf", "verified": "2026-11-20" }
   ],
   "toll": [
-    { "text": "Prélèvement kilométrique des véhicules de plus de 3,5 t transportant des marchandises (boîtier embarqué OBU), géré par Viapass.", "source": "viapass", "verified": "2026-11-20" }
+    { "text": "Prélèvement kilométrique des véhicules de plus de 3,5 t transportant des marchandises (boîtier embarqué OBU), géré par Viapass.", "source": "viapass", "verified": "2026-11-20" },
+    { "text": "Changements au 1er janvier 2027 : nouveaux tarifs (Flandre : indexation, désormais au 1er janvier ; Wallonie : indexation sur l'indice des prix d'août 2026 ; Bruxelles : pas d'indexation) ; véhicules à émissions nulles en Flandre et à Bruxelles : réduction de la part infrastructure ramenée à 60 % ; aucune route ajoutée. Tarif selon la région, la masse maximale autorisée, la classe Euro et la classe CO2.", "source": "viapass2027", "verified": "2026-11-21" }
   ],
   "lez": [
     { "text": "Zones de basses émissions (LEZ) de Bruxelles, Anvers et Gand : conditions pour les camions étrangers à vérifier.", "url": "https://lez.brussels/", "source": null, "verified": null }

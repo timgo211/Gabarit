@@ -30,6 +30,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5g : `euro.js` (classe Euro du profil : tunnels du Mont-Blanc et du Fréjus par les tubes de `KNOWN_TUNNELS`,
     statuts confirmé / exploitant / à vérifier, tableau EEV `EURO_EEV`, lignes « Normes Euro » des fiches pays, bloc
     `euro` de `data/pays/*.json`)
+  - phase 5h : `hgv-tolls.js` (taxes PL régionales de `data/taxes-pl.json` : R-Pass, écocontribution Grand Est ;
+    références de route dans le cadre de la région, heure de passage, statuts confirmé / annoncé / à vérifier, taux
+    de la grille officielle pour la classe du profil) ; lignes « Changements au 1er janvier 2027 » des fiches pays
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -92,6 +95,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - fixtures phase 5g : `ors-directions-mont-blanc.json` (Le Fayet → tunnel du Mont-Blanc → Courmayeur) et
   `ors-directions-frejus.json` (Modane → tunnel du Fréjus → Bardonecchia), countryinfo FR 70 / IT 97, tubes de
   `KNOWN_TUNNELS`, écrites d'après la doc ORS
+- fixtures phase 5h : `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
+  `ors-directions-besancon-belfort.json` (A 36), `ors-directions-metz-nancy.json`
+  (A 31), `ors-directions-muenchen-innsbruck.json` (countryinfo DE 74 / AT 11), écrites d'après la doc ORS
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
@@ -115,7 +121,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro
+                                   #   | euro | tolls
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -123,7 +129,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v27 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v28 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -375,6 +381,29 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   classe absente de `mine` → « à vérifier ») ; CH (ORPL), DE (BFStrMG annexe 1, 35. BImSchV) ; AT et IT « à
   vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
   tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
+- Taxes PL régionales (phase 5h, `hgv-tolls.js`) : `data/taxes-pl.json` dans `APP_FILES` ; chaque taxe a `start`,
+  `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `roadBoxes` (cadre propre à une route : A36 dans le Haut-Rhin
+  seulement, 7,05° E et plus, jamais vers Belfort ; limite de la concession à vérifier), `scope` (réseau officiel),
+  `basis`, `note`. Statuts : 'confirmed' (texte officiel lu : alerte en vigueur, ligne sur la fiche), 'announced'
+  (site officiel lu, date « prévue », information seulement), 'check' (rien lu : « Taxe possible : … périmètre
+  officiel non lu, à vérifier », aucun montant) ; 'confirmed' / 'announced' exigent `source` et `verified`, sinon
+  'check'. Montants : `grid` (classes de poids `max` / `maxIncluded` true, false ou null = les deux, lignes par classe
+  Euro '0'–'7', source et date) seulement hors 'check' ; texte « Tarif annoncé, poids du profil X t, Euro VI (classe …) :
+  N centimes par km (source, lu le …) … Aucun total calculé pour le trajet. » ; classe Euro non précisée ou EEV
+  (absent de la grille) → fourchette ; jamais de total ni d'estimation. Au-delà de 3,5 t (poids non précisé :
+  signalé) ; en France d'après countryinfo (absent : cadre seul, « Pays traversés non lus : à vérifier ») ; heure de
+  passage recalée par `elapsed`, journée de début à l'heure de la tablette (« prévue à partir du 1er janvier 2027 »
+  avant, « prévue depuis » après). Fichier absent → « Taxes PL régionales indisponibles (données non chargées) »
+  (trajet en France). Jamais de voix, de bandeau ni d'annonce ; lien « Site officiel ». Sources lues le 21/11/2026
+  par une Action temporaire (retirée) : r-pass.eu (réseau : A35 et A36 non concédées hors Eurométropole — la M35 de
+  l'Eurométropole n'est pas taxée —, RD83 Colmar–Sélestat, RD1363, RD502, RD504 ; délibération n° CD-2025-4-7-1 du
+  20/10/2025 ; dépliant V02 : grille A < 12 t, B 12–18 t, C 18–32 t, D > 32 t de PTRA × Euro 0 à VII) ; recours devant
+  le tribunal administratif de Strasbourg (aucune décision publiée au 21/11/2026, effet suspensif non établi) ;
+  ecpl.fr (2 avril 2027 « prévue », réseau A30, A31 jusqu'au sud de Toul, A33, A313, RN4, RN44, RN431, RN52 ;
+  grille selon la classe CO2, absente du profil → aucun montant). r-pass.eu n'envoie pas son certificat
+  intermédiaire (TeleSec Business TLS-CA 2022, lu par l'adresse AIA, vérification gardée). Pas de champ « Essieux »
+  tant qu'aucun montant n'en dépend. alsace.eu, toll-collect.de, gesetze-im-internet.de, asfinag.at et
+  ris.bka.gv.at ne répondent pas non plus à l'Action ; tous refusent le conteneur.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

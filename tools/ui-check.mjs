@@ -110,6 +110,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
+  tollsFile = undefined,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -250,6 +251,8 @@ async function open(browser, base, {
     const json = winter?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 5h : data/taxes-pl.json (null : fichier absent, réponse 404 ; undefined : fichier du dépôt).
+  if (tollsFile === null) await ctx.route(/\/data\/taxes-pl\.json(\?.*)?$/, (route) => route.fulfill({ status: 404, body: '' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -1308,7 +1311,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v27', 'vrai service worker : « Gabarit v27 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v28', 'vrai service worker : « Gabarit v28 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1424,6 +1427,16 @@ async function borderCheck(browser, base) {
   check(/Règles PL en Suisse non chargées : à vérifier\./.test(await noFile.page.textContent('.country-card')), 'fichier data/pays/CH.json absent → « à vérifier »');
   check(noFile.errors.length === 0, 'fichier absent : aucune erreur JavaScript', noFile.errors.join(' | '));
   await noFile.ctx.close();
+  // Phase 5h : München → Innsbruck (Allemagne puis Autriche), fiche Autriche « à vérifier ».
+  const mi = await open(browser, base, { width: 412, height: 900, now, directions: () => fixture('ors-directions-muenchen-innsbruck.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(mi.page);
+  await mi.page.waitForSelector('.country-card', { timeout: 10000 });
+  const cards = await mi.page.$$eval('.country-card', (d) => d.map((x) => { x.open = true; return x.textContent; }));
+  const at = cards.find((t) => /Autriche/.test(t));
+  check(cards.some((t) => /Allemagne/.test(t)) && at && /à vérifier/.test(at), 'München → Innsbruck : fiches Allemagne et Autriche, Autriche « à vérifier »', cards.map((t) => t.slice(0, 120)).join(' | '));
+  await noHorizontalScroll(mi.page, '412 px fiche Autriche');
+  check(mi.errors.length === 0, 'München → Innsbruck : aucune erreur JavaScript', mi.errors.join(' | '));
+  await mi.ctx.close();
 }
 
 /**
@@ -1630,6 +1643,103 @@ async function euroCheck(browser, base) {
       await c.ctx.close();
     }
   }
+}
+
+/**
+ * Phase 5h : taxes PL régionales. Mulhouse → Strasbourg par l'A36 et l'A35 (tests/fixtures/ors-directions-alsace.json,
+ * fin sur la M35 de l'Eurométropole, non taxée) et Metz → Nancy par l'A31 : R-Pass et écocontribution du Grand Est
+ * « prévue à partir du … » (information, jamais sur la fiche d'itinéraire), taux R-Pass de la classe du profil
+ * (dépliant officiel, aucun total), un mercredi de novembre 2026 puis en janvier 2027, profil Euro 6 puis classe non
+ * précisée, fichier absent, 360 / 412 / 800 / 1280 px ; guidage avec le GPS émulé : rien de dit ni affiché ; fiche
+ * Belgique « Changements au 1er janvier 2027 ».
+ */
+async function tollsCheck(browser, base) {
+  const als = fixture('ors-directions-alsace.json');
+  const line = als.features[0].geometry.coordinates;
+  const nov = new Date('2026-11-25T10:00:00+01:00').getTime(); // mercredi 10 h
+  const jan = new Date('2027-01-06T10:00:00+01:00').getTime(); // mercredi 10 h
+  const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
+  const notesOf = (page) => page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+  const rpass = (n) => n.find((x) => /R-Pass/.test(x.text));
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, now: nov, voice: true, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const notes = await notesOf(page);
+    const r = rpass(notes);
+    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
+      `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
+    check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
+    await noHorizontalScroll(page, `${width} px notes taxes PL`);
+    await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-tolls.png`) });
+    if (width === 360 || width === 1280) {
+      // Guidage, GPS émulé sur l'A35 : rien de la taxe dit ni affiché.
+      await setGeo(page, { lon: line[3][0], lat: line[3][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await drive(ctx, page, line.slice(3, 12), 80, 20);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /taxe|R-Pass|écocontribution|ECPL/i.test(x)), `${width} px : guidage, rien de la taxe dit`, spoken.join(' | '));
+      check(!/taxe|R-Pass|écocontribution|ECPL/i.test(await page.textContent('#nav')), `${width} px : guidage, rien de la taxe affiché`);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Janvier 2027 : « prévue depuis », information ; classe Euro non précisée : fourchette de la classe D.
+  for (const [label, now, euro, re] of [
+    ['janvier 2027', jan, '6', /prévue depuis le 1er janvier 2027.*: 14,6 centimes par km/],
+    ['classe non précisée', nov, '', /prévue à partir du 1er janvier 2027.*classe Euro non précisée : de 13,8 à 34,5 centimes par km/],
+  ]) {
+    const c = await open(browser, base, { width: 412, height: 900, now, vehicle: veh(euro), directions: () => als, overpass: () => ({ elements: [] }) });
+    await computeRoute(c.page);
+    await c.page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const r = rpass(await notesOf(c.page));
+    check(r && r.cls !== 'warn' && re.test(r.text), `${label} : R-Pass en information`, r?.text);
+    check(!/R-Pass/.test(await c.page.textContent('.route-card[aria-checked="true"]')), `${label} : rien sur la fiche d'itinéraire`);
+    check(c.errors.length === 0, `${label} : aucune erreur JavaScript`, c.errors.join(' | '));
+    await c.ctx.close();
+  }
+  // A36 vers Belfort (Besançon → Belfort) : hors du réseau R-Pass, aucune ligne.
+  const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(bb.page);
+  await bb.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const bn = await notesOf(bb.page);
+  check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort par l\'A36 : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
+  await bb.ctx.close();
+  // Grand Est : A31, 2 avril 2027, réseau officiel, aucun montant ; fichier absent.
+  const ge = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-metz-nancy.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(ge.page);
+  await ge.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const gn = await notesOf(ge.page);
+  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, de km 0 à km \d+ \(A31\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
+    'Grand Est : écocontribution sur l\'A31, réseau officiel, aucun montant, pas de R-Pass', gn.map((n) => n.text).join(' | '));
+  await ge.ctx.close();
+  const ab = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), tollsFile: null });
+  await computeRoute(ab.page);
+  await ab.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const an = await notesOf(ab.page);
+  check(an.some((n) => /^Taxes PL régionales indisponibles \(données non chargées\)/.test(n.text)), 'fichier absent : « Taxes PL régionales indisponibles »', an.map((n) => n.text).join(' | '));
+  check(ab.errors.length === 0, 'fichier absent : aucune erreur JavaScript', ab.errors.join(' | '));
+  await ab.ctx.close();
+  // Fiche Belgique (Saint-Julien → … relu comme FR → BE) : changements Viapass au 1er janvier 2027, source nommée.
+  const be = JSON.parse(JSON.stringify(fixture('ors-directions-fr-ch-it.json')));
+  const ci = be.features[0].properties.extras.countryinfo;
+  ci.values = ci.values.map(([a, b, v]) => [a, b, v === 70 ? 70 : 17]);
+  ci.summary = [{ value: 70, distance: 3803.5, amount: 2 }, { value: 17, distance: 165515.9, amount: 98 }];
+  const bp = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'), directions: () => be, overpass: () => ({ elements: [] }) });
+  await computeRoute(bp.page);
+  await bp.page.waitForSelector('.country-card', { timeout: 10000 });
+  const bt = await bp.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
+  check(/Belgique/.test(bt) && /Changements au 1er janvier 2027 : nouveaux tarifs.*aucune route ajoutée.*Viapass, Prélèvement kilométrique : les modifications prévues à partir du 1er janvier 2027/.test(bt),
+    '360 px : fiche Belgique, changements Viapass au 1er janvier 2027 avec la source', bt.slice(0, 400));
+  await noHorizontalScroll(bp.page, '360 px fiche Belgique');
+  check(bp.errors.length === 0, 'fiche Belgique : aucune erreur JavaScript', bp.errors.join(' | '));
+  await bp.ctx.close();
 }
 
 /**
@@ -1942,7 +2052,8 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
+    tolls: tollsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

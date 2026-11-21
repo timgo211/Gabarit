@@ -1,0 +1,169 @@
+{
+  "verified": "2026-11-21",
+  "sources": {
+    "rpass": {
+      "name": "R-Pass, site officiel de la taxe PL de la Collectivité européenne d'Alsace (opérateur désigné par la CeA)",
+      "url": "https://www.r-pass.eu/fr/network",
+      "kind": "official"
+    },
+    "ecpl": {
+      "name": "ECPL, site officiel de l'écocontribution poids lourds de la Région Grand Est",
+      "url": "https://ecpl.fr/fr/network",
+      "kind": "official"
+    },
+    "rpassDepliant": {
+      "name": "dépliant officiel V02 du R-Pass (grille tarifaire)",
+      "url": "https://cms.r-pass.eu/uploads/R_PASS_Depliant_A5_FR_V02_BD_8318e739a4.pdf",
+      "kind": "official"
+    }
+  },
+  "taxes": [
+    {
+      "id": "r-pass",
+      "name": "R-Pass (taxe PL de la Collectivité européenne d'Alsace)",
+      "short": "R-Pass",
+      "start": "2027-01-01",
+      "status": "announced",
+      "source": "rpass",
+      "verified": "2026-11-21",
+      "url": "https://www.r-pass.eu/fr/network",
+      "note": "Recours en cours devant le tribunal administratif de Strasbourg (effet suspensif non établi).",
+      "bbox": [
+        6.84,
+        47.42,
+        8.24,
+        49.08
+      ],
+      "roads": [
+        "A35",
+        "A36",
+        "D83",
+        "D1363",
+        "D502",
+        "D504"
+      ],
+      "rates": null,
+      "scope": "Réseau officiel : A35 et A36 (parties non concédées, hors Eurométropole de Strasbourg), RD83 entre Colmar et Sélestat, RD1363, RD502 et RD504 ; A36 comptée seulement dans le Haut-Rhin (jamais vers Belfort), limite de la partie concédée à vérifier ; limites exactes des sections à vérifier sur la carte officielle.",
+      "basis": "Délibération du Conseil d'Alsace n° CD-2025-4-7-1 du 20 octobre 2025 (code des impositions sur les biens et services, art. L.421-189) : PTAC de plus de 3,5 t, catégorie N ; tarif selon le poids total roulant autorisé (PTRA) et la classe Euro.",
+      "grid": {
+        "source": "rpassDepliant",
+        "verified": "2026-11-21",
+        "unit": "centimes par km",
+        "classes": [
+          {
+            "code": "A",
+            "label": "PTRA de moins de 12 t",
+            "max": 12,
+            "maxIncluded": false
+          },
+          {
+            "code": "B",
+            "label": "PTRA de 12 à 18 t",
+            "max": 18,
+            "maxIncluded": null
+          },
+          {
+            "code": "C",
+            "label": "PTRA de 18 à 32 t",
+            "max": 32,
+            "maxIncluded": true
+          },
+          {
+            "code": "D",
+            "label": "PTRA de plus de 32 t",
+            "max": null
+          }
+        ],
+        "euro": {
+          "0": [
+            17.5,
+            22.4,
+            27.7,
+            34.5
+          ],
+          "1": [
+            13.9,
+            17,
+            23.1,
+            29.1
+          ],
+          "2": [
+            13.6,
+            16.9,
+            22.9,
+            28.8
+          ],
+          "3": [
+            12,
+            15,
+            20.5,
+            25.5
+          ],
+          "4": [
+            10.5,
+            12.8,
+            17.3,
+            21.8
+          ],
+          "5": [
+            8.8,
+            10.9,
+            14.5,
+            17.9
+          ],
+          "6": [
+            7.4,
+            8.8,
+            11.5,
+            14.6
+          ],
+          "7": [
+            7.1,
+            8.3,
+            10.6,
+            13.8
+          ]
+        },
+        "reduction": "réduction automatique à partir de 20 trajets par mois pour les abonnés"
+      },
+      "roadBoxes": {
+        "A36": [
+          7.05,
+          47.55,
+          7.62,
+          47.9
+        ]
+      }
+    },
+    {
+      "id": "ecpl",
+      "name": "écocontribution poids lourds (ECPL) de la Région Grand Est",
+      "short": "Écocontribution PL",
+      "start": "2027-04-02",
+      "status": "announced",
+      "source": "ecpl",
+      "verified": "2026-11-21",
+      "url": "https://ecpl.fr/fr/network",
+      "note": "Délibération régionale non lue.",
+      "bbox": [
+        4.6,
+        48.55,
+        7.1,
+        49.6
+      ],
+      "roads": [
+        "A30",
+        "A31",
+        "A33",
+        "A313",
+        "N4",
+        "N44",
+        "N431",
+        "N52"
+      ],
+      "rates": null,
+      "scope": "Réseau officiel : A30, A31 (de la frontière luxembourgeoise au sud de Toul), A33, A313, RN4, RN44, RN431 et RN52 (section de Meurthe-et-Moselle) ; autoroutes à péage concédées exclues ; limites exactes des sections à vérifier sur la carte officielle.",
+      "basis": "Tarif au km selon le PTAC (moins de 12 t, 12 à 18 t, 18 à 32 t, plus de 32 t), la classe Euro et la classe d'émissions de CO2 (absente du profil) : grille sur le site officiel."
+    }
+  ]
+}

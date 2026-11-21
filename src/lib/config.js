@@ -28,8 +28,8 @@ export const ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M = 100000;
 /** Valeurs de « preference » acceptées par ORS (APIEnums.RoutePreference ; « recommended » par défaut). */
 export const ORS_PREFERENCES = ['recommended', 'fastest', 'shortest'];
 
-/** Pays proposés par l'autocomplétion (France + voisins). */
-export const GEOCODE_COUNTRIES = ['FR', 'BE', 'LU', 'DE', 'CH', 'IT', 'ES', 'AD', 'MC'];
+/** Pays proposés par l'autocomplétion (France + voisins, Autriche : trajets par l'Allemagne ou la Suisse). */
+export const GEOCODE_COUNTRIES = ['FR', 'BE', 'LU', 'DE', 'CH', 'IT', 'ES', 'AT', 'AD', 'MC'];
 
 /** Fonds de carte gratuits sans clé, dans l'ordre d'essai. */
 export const MAP_STYLES = {
