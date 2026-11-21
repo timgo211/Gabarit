@@ -44,11 +44,46 @@ jobs:
               if len(hits) >= 3: break
             DIGEST.append((url, 'OK ' + str(len(t or '')) + ' car.', hits))
 
+          import ssl, socket, os
+          EXTRA = {}
+
+          def aia_context(host):
+            # Serveur qui n'envoie pas son certificat intermédiaire : on le télécharge à l'adresse « CA Issuers » (AIA)
+            # du certificat, on l'ajoute aux autorités du système, et la vérification reste active.
+            if host in EXTRA: return EXTRA[host]
+            ctx = None
+            try:
+              pem = ssl.get_server_certificate((host, 443))
+              open('/tmp/leaf.pem', 'w').write(pem)
+              txt = subprocess.run(['openssl', 'x509', '-in', '/tmp/leaf.pem', '-noout', '-text'], capture_output=True, text=True).stdout
+              m = re.search(r'CA Issuers - URI:(\S+)', txt)
+              print('  AIA', host, m.group(1) if m else '(aucune)')
+              if m:
+                der = urllib.request.urlopen(m.group(1), timeout=30).read()
+                open('/tmp/inter.der', 'wb').write(der)
+                fmt = 'PEM' if der.startswith(b'-----') else 'DER'
+                inter = subprocess.run(['openssl', 'x509', '-inform', fmt, '-in', '/tmp/inter.der'], capture_output=True, text=True).stdout
+                ctx = ssl.create_default_context()
+                ctx.load_verify_locations(cadata=inter)
+            except Exception as e:
+              print('  AIA ÉCHEC', host, e)
+            EXTRA[host] = ctx
+            return ctx
+
           def get(url, data=None, headers=None):
             try:
               h = dict(UA); h.update(headers or {})
-              with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=h), timeout=40) as r:
-                return r.read(), r.headers.get_content_type()
+              host = urllib.parse.urlparse(url).netloc
+              ctx = EXTRA.get(host)
+              try:
+                with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=h), timeout=90, context=ctx) as r:
+                  return r.read(), r.headers.get_content_type()
+              except urllib.error.URLError as e:
+                if 'CERTIFICATE_VERIFY_FAILED' not in str(e) or host in EXTRA: raise
+                ctx = aia_context(host)
+                if ctx is None: raise
+                with urllib.request.urlopen(urllib.request.Request(url, data=data, headers=h), timeout=90, context=ctx) as r:
+                  return r.read(), r.headers.get_content_type()
             except Exception as e:
               print('  ÉCHEC', url, e)
               DIGEST.append((url, 'ÉCHEC ' + str(e)[:120], []))
@@ -101,57 +136,44 @@ jobs:
               print('\n=====', u, '(' + str(c) + ', ' + str(len(t)) + ' caractères)')
               snippets(t)
 
-          FR = ['r-pass', 'rpass', 'tarif', 'reseau', 'réseau', 'carte', 'faq', 'deliberation', 'délibération', 'calendrier',
-                'pdf', 'reglement', 'règlement', 'exoner', 'exonér', 'reduction', 'réduction', 'actualit', 'presse', 'taxe', 'ecpl',
-                'contribution', 'poids-lourds', 'transport']
+          def links(start, words):
+            d, c = get(start)
+            if d is None: return []
+            host = urllib.parse.urlparse(start).netloc
+            out = []
+            for h in re.findall(r'href="([^"#]+)"', d.decode('utf-8', 'ignore')):
+              u = urllib.parse.urljoin(start, html.unescape(h))
+              if (urllib.parse.urlparse(u).netloc == host or u.lower().endswith('.pdf')) and any(w in u.lower() for w in words) and u not in out: out.append(u)
+            print('\n##### liens de', start); [print('   lien', u) for u in out]
+            return out
 
-          # R-Pass (Collectivité européenne d'Alsace) : site officiel r-pass.eu et alsace.eu.
-          crawl('https://www.r-pass.eu/', FR)
-          crawl('https://r-pass.eu/', FR)
-          crawl('https://www.alsace.eu/', FR)
-          full('https://www.alsace.eu/r-pass/')
-          # Recours devant le tribunal administratif de Strasbourg.
-          crawl('https://strasbourg.tribunal-administratif.fr/', ['actualit', 'decision', 'décision', 'communique', 'pass', 'taxe', 'transport'])
+          # R-Pass : site officiel r-pass.eu (chaîne de certificat incomplète : intermédiaire lu par AIA).
+          for u in ['https://www.r-pass.eu/', 'https://r-pass.eu/']:
+            full(u, 12000)
+          for u in links('https://www.r-pass.eu/', ['r-pass', 'tarif', 'reseau', 'réseau', 'carte', 'faq', 'deliberation', 'délibération', 'pdf', 'exoner', 'exonér', 'actualit', 'vehicule', 'véhicule', 'propos', 'about', '/fr'])[:25]:
+            full(u, 12000)
+          full('https://www.alsace.eu/', 4000)
+          for u in links('https://www.alsace.eu/', ['r-pass', 'rpass', 'deliber', 'délibér', 'poids-lourds', 'transport'])[:10]:
+            full(u, 12000)
 
-          # Écocontribution poids lourds du Grand Est.
-          crawl('https://ecpl.fr/fr', FR)
-          crawl('https://www.grandest.fr/', FR)
+          # Écocontribution Grand Est : textes complets.
+          for u in ['https://ecpl.fr/fr/network', 'https://ecpl.fr/fr/rates-and-network', 'https://ecpl.fr/fr/about', 'https://ecpl.fr/fr/faq', 'https://ecpl.fr/fr/news', 'https://ecpl.fr/fr/exemptions']:
+            full(u, 12000)
+          for u in links('https://ecpl.fr/fr/rates-and-network', ['tarif', 'grille', 'rate', 'pdf', 'network', 'reseau', 'carte', 'map', 'annonce', 'news', 'actualit'])[:15]:
+            full(u, 12000)
+          for u in links('https://ecpl.fr/fr/about', ['annonce', 'news', 'actualit', 'deliber', 'pdf', 'grandest'])[:10]:
+            full(u, 8000)
 
-          # Allemagne : BFStrMG (Mautsätze, annexes), Toll Collect, BALM / BMV.
-          for a in ['', 'anlage_1.html', 'anlage_2.html', 'anlage_3.html', 'anlage_4.html', 'anlage_5.html']:
-            full('https://www.gesetze-im-internet.de/bfstrmg/' + a, 6000)
-          crawl('https://www.toll-collect.de/de/toll_collect/bezahlen/maut_tarife/maut_tarife.html', ['tarif', 'maut', 'pdf', '2027'])
-          crawl('https://www.toll-collect.de/de/toll_collect/service/aktuelles/aktuelles.html', ['2027', 'maut', 'aenderung', 'änderung'])
-          crawl('https://www.recht.bund.de/', ['bgbl', 'maut'])
+          # Viapass : modifications au 1er janvier 2027 (texte complet).
+          full('https://www.viapass.be/actualites/prelevement-kilometrique-les-modifications-prevues-a-partir-du-1er-janvier-2027.html', 12000)
 
-          # Autriche : ASFINAG (tarifs, Mautordnung), RIS (Mauttarifverordnung).
-          crawl('https://www.asfinag.at/maut-vignette/lkw-bus/', ['tarif', 'maut', 'pdf', '2027', 'mautordnung'])
-          crawl('https://www.asfinag.at/maut-vignette/mautordnung/', ['mautordnung', 'pdf'])
+          # Toll Collect, BFStrMG, ASFINAG, RIS : nouvel essai.
+          full('https://www.toll-collect.de/de/toll_collect/bezahlen/maut_tarife/maut_tarife.html', 6000)
+          for a in ['', 'anlage_1.html']:
+            full('https://www.gesetze-im-internet.de/bfstrmg/' + a, 12000)
           full('https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=20004016', 8000)
-          full('https://www.ris.bka.gv.at/Ergebnis.wxe?Abfrage=BgblAuth&Titel=Mauttarifverordnung&VonDatum=01.01.2026&BisDatum=21.12.2026', 8000)
+          full('https://www.asfinag.at/maut-vignette/lkw-bus/', 6000)
 
-          # Suisse : actes qui modifient l'ORPL (RS 641.811), versions consolidées et entrée en vigueur.
-          q = ('PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#> '
-               'SELECT ?cons ?app ?end WHERE { ?cons jolux:isMemberOf <https://fedlex.data.admin.ch/eli/cc/2000/192> . '
-               'OPTIONAL { ?cons jolux:dateApplicability ?app } OPTIONAL { ?cons jolux:dateEndApplicability ?end } } ORDER BY DESC(?app) LIMIT 8')
-          print('\n===== Fedlex SPARQL : versions de l\'ORPL')
-          d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q}).encode(), {'Accept': 'text/csv'})
-          if d is not None: print(d.decode('utf-8', 'ignore')); DIGEST.append(('fedlex versions', 'OK', [d.decode('utf-8', 'ignore')[:900]]))
-          q2 = ('PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#> '
-                'SELECT DISTINCT ?act ?eif WHERE { ?impact jolux:impactToLegalResource <https://fedlex.data.admin.ch/eli/cc/2000/192> . '
-                '?act jolux:impactFromLegalResource ?impact . OPTIONAL { ?act jolux:dateEntryInForce ?eif } } ORDER BY DESC(?eif) LIMIT 8')
-          print('\n===== Fedlex SPARQL : actes modifiant l\'ORPL')
-          d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q2}).encode(), {'Accept': 'text/csv'})
-          if d is not None: print(d.decode('utf-8', 'ignore')); DIGEST.append(('fedlex actes', 'OK', [d.decode('utf-8', 'ignore')[:900]]))
-          crawl('https://www.bazg.admin.ch/fr/la-rplp-en-bref', ['rplp', 'tarif', 'redevance', '2027'])
-
-          # Belgique : Viapass (tarifs 2027, actualités), Moniteur belge.
-          crawl('https://www.viapass.be/fr/tarifs/', ['tarif', '2027', 'pdf'])
-          crawl('https://www.viapass.be/nl/tarieven/', ['tarie', '2027', 'pdf'])
-          crawl('https://www.viapass.be/fr/', ['actualit', 'nouvelles', '2027', 'news'])
-
-          # Résumé compact (lu par la fin du journal) : état de chaque adresse et quelques extraits.
           print('\n\n################ RÉSUMÉ ################')
           for url, st, hits in DIGEST:
             print('@@', url, '→', st)
-            for h in hits: print('   »', h)
