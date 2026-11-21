@@ -24,6 +24,9 @@
     "weight": {"text": "Poids total maximal national : à vérifier (texte officiel non lu). En international : 40 t sauf transport combiné.", "source": null, "verified": null},
     "height": {"text": "Hauteur maximale : à vérifier (texte officiel non lu).", "source": null, "verified": null}
   },
+  "winter": [
+    {"text": "Chaînes à neige permises seulement en cas de neige ou de verglas (art. 81.4.4) ; pneus d'hiver : à vérifier.", "source": "cdr", "verified": "2026-11-21"}
+  ],
   "bans": [
     { "id": "none", "kind": "none", "text": "Pas d'interdiction de circuler pour les poids lourds les week-ends et les jours fériés.", "source": "bf", "verified": "2026-11-20" }
   ],

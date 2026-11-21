@@ -2,7 +2,7 @@
 
 import { $, el, wireDialog } from './dom.js';
 import {
-  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, COMBINED_LABEL, normalizeVehicle, validateVehicle, defaultVehicle,
+  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, COMBINED_LABEL, TRAILER_VALUES, TRAILER_LABELS, normalizeVehicle, validateVehicle, defaultVehicle,
 } from '../lib/vehicle.js';
 import { BAN_STATUS } from '../lib/hgv-bans.js';
 import { adrSummary } from '../lib/adr-settings.js';
@@ -20,6 +20,8 @@ function dims(v, adr = null) {
   if (v.banStatus === 'art4') p.push('art. 4');
   if (v.banStatus === 'exempt') p.push('spécialisé');
   if (v.combined) p.push('transport combiné');
+  if (v.trailer === 'with') p.push('avec remorque');
+  if (v.trailer === 'none') p.push('sans remorque');
   return p.join(' · ');
 }
 
@@ -96,6 +98,12 @@ export function createVehicles(ctx) {
           BAN_STATUS_VALUES.map((c) => el('option', { value: c, text: BAN_STATUS[c], selected: c === (v.banStatus ?? 'concerned') }))),
         el('p', { class: 'hint', text: 'Article 4 : au moins la moitié du chargement en denrées périssables ou animaux vivants, presse, fret aérien… (arrêté du 16 avril 2021). Justificatifs à bord.' }),
         el('p', { class: 'err', 'data-err': 'banStatus' }),
+      ]),
+      el('div', { class: 'full' }, [
+        el('label', { for: 'veh-trailer', text: "Remorque ou semi-remorque (équipements d'hiver)" }),
+        el('select', { id: 'veh-trailer', name: 'trailer' },
+          TRAILER_VALUES.map((c) => el('option', { value: c, text: TRAILER_LABELS[c], selected: c === (v.trailer ?? '') }))),
+        el('p', { class: 'hint', text: "Avec remorque ou semi-remorque : chaînes à bord même avec des pneus hiver dans les communes de montagne (1er novembre – 31 mars). Non précisé : les deux consignes sont données." }),
       ]),
       el('div', { class: 'full' }, [
         el('label', { class: 'toggle' }, [

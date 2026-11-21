@@ -87,7 +87,7 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
-    l.url ? el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer', text: 'Arrêté' }) : null,
+    l.url ? el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer', text: l.linkText ?? 'Arrêté' }) : null,
   ]));
   return [
     items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,

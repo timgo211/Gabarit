@@ -79,13 +79,19 @@ test('fichiers data/pays : lisibles, chaque règle a sa source connue et sa date
     assert.ok(d, code);
     assert.equal(d.code, code);
     assert.ok(sw.includes(`'./data/pays/${code}.json'`), `${code} absent d'APP_FILES`);
-    const rules = [d.speeds, ...(d.speeds?.notes ?? []), ...(d.speeds?.adr ?? []), ...d.bans, ...d.toll, ...d.lez, ...d.adr, d.holidays];
+    const rules = [...(d.speeds ? [d.speeds] : []), ...(d.speeds?.notes ?? []), ...(d.speeds?.adr ?? []), ...d.bans, ...d.toll, ...d.lez, ...d.adr, ...(d.holidays ? [d.holidays] : [])];
     for (const r of rules) {
       if (r.source === null) { assert.equal(r.verified, null, `${code} : règle sans source mais datée`); continue; }
       assert.ok(d.sources[r.source]?.url?.startsWith('https://'), `${code} : source ${r.source} inconnue`);
       assert.match(r.verified, /^\d{4}-\d{2}-\d{2}$/);
     }
-    assert.ok(isConfirmed(d.speeds, d, { national: true }), `${code} : vitesses sans source nationale`);
+    // Autriche (phase 5f) : fiche minimale, tout « à vérifier » (RIS non lu) ; les autres pays ont leurs vitesses.
+    if (code === 'AT') assert.equal(d.speeds, null);
+    else assert.ok(isConfirmed(d.speeds, d, { national: true }), `${code} : vitesses sans source nationale`);
+    for (const w of d.winter) {
+      if (w.source === null) { assert.equal(w.verified, null); assert.match(w.text, /à vérifier/); continue; }
+      assert.ok(d.sources[w.source]?.url?.startsWith('https://'), `${code} : source hiver ${w.source} inconnue`);
+    }
     for (const b of d.bans) if (b.voice) assert.ok(isConfirmed(b, d), `${code} : ${b.id} dit à voix haute sans source`);
   }
 });

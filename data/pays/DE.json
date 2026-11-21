@@ -11,6 +11,8 @@
     "bfstrmg": { "name": "Bundesfernstraßenmautgesetz (BFStrMG) § 1", "url": "https://www.gesetze-im-internet.de/bfstrmg/__1.html", "kind": "national" },
     "stvzo34": { "name": "StVZO § 34 (masses et charges par essieu)", "url": "https://www.gesetze-im-internet.de/stvzo_2012/__34.html", "kind": "national" },
     "stvzo32": { "name": "StVZO § 32 (dimensions)", "url": "https://www.gesetze-im-internet.de/stvzo_2012/__32.html", "kind": "national" },
+    "stvo2": { "name": "StVO § 2 al. 3a (pneus par conditions hivernales)", "url": "https://www.gesetze-im-internet.de/stvo_2013/__2.html", "kind": "national" },
+    "stvzo36": { "name": "StVZO § 36 al. 4 (pneus pour conditions hivernales, symbole Alpine)", "url": "https://www.gesetze-im-internet.de/stvzo_2012/__36.html", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "DE", "source": "stvo30", "verified": "2026-11-20" },
@@ -29,6 +31,10 @@
     "weight": {"max": 40, "combinedMax": 44, "text": "Poids total maximal national : 40 t (ensembles de plus de 4 essieux) ; 42 t (tracteur à 2 essieux) ou 44 t (tracteur à 3 essieux) en transport intermodal de conteneurs ou caisses mobiles. En international : 40 t sauf transport combiné.", "source": "stvzo34", "verified": "2026-11-21"},
     "height": {"max": 4, "text": "Hauteur maximale : 4,00 m, chargement compris.", "source": "stvzo32", "verified": "2026-11-21"}
   },
+  "winter": [
+    {"text": "Par verglas, neige, neige fondante ou givre : pneus d'hiver (symbole Alpine, 3PMSF) exigés ; PL (N2, N3) : au moins sur les essieux moteurs et les essieux directeurs avant. Selon la météo / les panneaux, pas de période légale.", "source": "stvo2", "verified": "2026-11-21"},
+    {"text": "Pneus d'hiver : marquage « Alpine » (montagne à trois pics et flocon) exigé.", "source": "stvzo36", "verified": "2026-11-21"}
+  ],
   "bans": [
     { "id": "sunday", "kind": "weekly", "over": 7.5, "days": [0], "holidays": "DE", "from": "00:00", "to": "22:00",
       "label": "Dimanche et jours fériés", "text": "Plus de 7,5 t (et remorques derrière un camion) : interdiction les dimanches et jours fériés de 0 h à 22 h sur tout le réseau. Exceptions : denrées périssables, transport combiné…",

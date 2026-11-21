@@ -24,6 +24,19 @@
 //   certains transports).
 // - BE, LU : textes non lisibles depuis le conteneur (captcha eJustice, Legilux en JavaScript) → « à vérifier ».
 // En trafic international : 40 t quel que soit le maximum national (weights.js).
+// Équipements d'hiver (phase 5f, bloc "winter", lus le 21/11/2026) :
+// - DE : StVO § 2 al. 3a (pneus d'hiver par verglas, neige, neige fondante ; M2, M3, N2, N3 : au moins les essieux
+//   moteurs permanents et les essieux directeurs avant) et StVZO § 36 al. 4 (symbole Alpine, 3PMSF).
+// - LU : code de la route art. 160 par. 4 (pneus M+S ou 3PMSF par verglas, neige ; N2, N3 : tous les essieux moteurs),
+//   signal D,9 « Chaînes à neige obligatoires », art. 156 par. 2 (PL de plus de 7,5 t interdits sur autoroute par
+//   verglas ou neige quand les panneaux l'affichent) — texte coordonné du 12/06/2026, Legilux (PDF).
+// - CH : OSR (RS 741.21) art. 29, signal 2.48 « Chaînes à neige obligatoires » (Fedlex, version du 1/10/2026).
+// - IT : Codice della strada art. 6 al. 4 e (ordonnance : pneus hiver ou chaînes à bord) ; période 15/11 – 15/04
+//   (directive du MIT) non lue : mit.gov.it refuse le conteneur → « à vérifier ».
+// - ES : Reglamento General de Circulación (BOE-A-2003-23514), messages « Obligatorio el uso de cadenas o neumáticos
+//   de invierno » des panneaux.
+// - BE : code de la route art. 81.4.4 (chaînes seulement en cas de neige ou de verglas), codedelaroute.be.
+// - AT : KFG 1967 § 102 non lu (RIS refuse le conteneur ; lu dans le journal de l'Action « Équipements d'hiver »).
 // Heures : heure locale de la tablette (les six pays sont à l'heure de Paris, Canaries exceptées).
 
 import { countryHolidays, countryHolidayName, REGIONAL_HOLIDAYS, dayKey, addDays } from './holidays.js';
@@ -32,7 +45,7 @@ import { dayTime } from './hgv-bans.js';
 import { tunnelName } from './adr.js';
 
 export const COUNTRY_RULES = Object.freeze({
-  FILES: Object.freeze(['BE', 'LU', 'DE', 'CH', 'IT', 'ES']),
+  FILES: Object.freeze(['BE', 'LU', 'DE', 'CH', 'IT', 'ES', 'AT']),
   /** Bandeau du guidage : de 20 km avant la frontière à 1 km après. */
   BANNER_M: 20000,
   BANNER_AFTER_M: 1000,
@@ -71,6 +84,7 @@ export function parseCountryData(json) {
     holidays: json.holidays && isStr(json.holidays.list) ? json.holidays : null,
     toll: items(json.toll), lez: items(json.lez), adr: items(json.adr),
     limits: parseLimits(json.limits),
+    winter: items(json.winter),
   };
 }
 
@@ -378,6 +392,9 @@ export function countryCard(data, segment, { vehicle, now = new Date(), tunnels 
     if (seen.length) push('Jours fériés', data.holidays, `Jour férié national à votre passage : ${seen.join(', ')}.`);
     if (REGIONAL_HOLIDAYS[data.code]) push('Jours fériés', null, REGIONAL_HOLIDAYS[data.code]);
   }
+
+  // Équipements d'hiver (phase 5f) : affichés toute l'année, jamais dits ; IT : période « à vérifier », sans alerte.
+  for (const t of data.winter) push("Équipements d'hiver", t, t.text, { url: t.url });
 
   for (const t of data.toll) push('Péage PL', t, t.text, { url: t.url });
   for (const t of data.lez) push('ZFE et vignettes', t, t.text, { url: t.url });

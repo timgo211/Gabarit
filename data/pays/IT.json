@@ -8,6 +8,7 @@
     "dm2026": { "name": "Décret du ministère des infrastructures (MIT) du 12 décembre 2025, calendrier 2026 (Gazzetta Ufficiale n. 302 du 31/12/2025)", "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaDettaglioAtto/originario?atto.dataPubblicazioneGazzetta=2025-12-31&atto.codiceRedazionale=25A07055", "kind": "national" },
     "cds62": { "name": "Codice della strada, art. 62 (massa limite)", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art62", "kind": "national" },
     "cds61": { "name": "Codice della strada, art. 61 (sagoma limite)", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art61", "kind": "national" },
+    "cds6": { "name": "Codice della strada, art. 6 al. 4 e", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art6", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "IT", "source": "bf", "verified": "2026-11-20" },
@@ -29,6 +30,10 @@
     "weight": {"max": 44, "text": "Poids total maximal national : 44 t pour un ensemble de 5 essieux ou plus (40 t à 4 essieux). En international : 40 t sauf transport combiné.", "source": "cds62", "verified": "2026-11-21"},
     "height": {"max": 4, "text": "Hauteur maximale : 4 m.", "source": "cds61", "verified": "2026-11-21"}
   },
+  "winter": [
+    {"text": "Sur les routes où une ordonnance l'exige (panneaux) : pneus hiver ou chaînes à bord.", "source": "cds6", "verified": "2026-11-21"},
+    {"text": "Période habituelle des ordonnances : du 15 novembre au 15 avril (directive du ministère des infrastructures non lue), à vérifier.", "url": "https://www.mit.gov.it/", "source": null, "verified": null}
+  ],
   "bans": [
     { "id": "calendar", "kind": "calendar", "over": 7.5,
       "label": "Calendrier des interdictions", "text": "Plus de 7,5 t (transport de marchandises) : interdiction hors agglomération les dimanches, jours fériés et jours du calendrier annuel (horaires du jour). Venant de l'étranger avec les documents du voyage : début décalé de 4 h ; vers l'étranger : fin avancée de 2 h (art. 3).",

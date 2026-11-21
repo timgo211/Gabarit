@@ -12,6 +12,7 @@ import {
 } from './adr.js';
 import { countryRules } from './country-rules.js';
 import { weightRules } from './weights.js';
+import { winterRules } from './winter.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
@@ -100,7 +101,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
  */
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
-  access = null,
+  access = null, winter = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -116,6 +117,10 @@ export function routeRules(route, {
   // Poids en trafic international (phase 5e) : alerte avant le départ, jamais dite.
   const weight = weightRules(route, { vehicle });
   lines.push(...weight.lines.filter((l) => l.level === 'warn'));
+  // Équipements d'hiver en France (phase 5f) : communes de data/hiver/ traversées du 1er novembre au 31 mars.
+  const win = winterRules(route, { vehicle, winter, departure, elapsed });
+  lines.push(...win.lines.filter((l) => l.level === 'warn'));
+  short.push(...win.short);
   short.push(...weight.short);
   for (const p of passages) {
     if (p.banned) {
@@ -144,6 +149,7 @@ export function routeRules(route, {
   lines.push(...tun.lines.filter((l) => l.level !== 'warn'));
   lines.push(...acc.lines.filter((l) => l.level !== 'warn'));
   lines.push(...weight.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...win.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
@@ -156,7 +162,7 @@ export function routeRules(route, {
   }
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
-    countries: ctry, weight,
+    countries: ctry, weight, winter: win,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional,
   };
 }
