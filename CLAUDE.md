@@ -22,6 +22,8 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
     partage / copie / téléchargement, guide d'installation `INSTALL_STEPS`)
   - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
+  - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
+    poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -104,7 +106,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v23 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v24 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -312,6 +314,16 @@ de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8
   fois vers 3 km seulement si interdite à l'heure de passage (`settings.ruleVoice`). Pouvoir de police : Code de la
   route art. R411-8 (`POLICE_TEXT`, texte cité dans `access-conditional.js`) ; Légifrance répond 403 au conteneur et à
   l'Action → lu dans le PDF du code de codes.droit.org par le job `r411` (texte imprimé dans le journal).
+- Poids et frontières (phase 5e, `weights.js`) : directive 96/53/CE (annexe I 2.2.2, modifiée par 2015/719, lue dans
+  l'édition du JO reproduite par boe.es : EUR-Lex répond 202 vide aux lectures automatiques) et réponse ministérielle
+  AN n° 1666 (JO du 7/02/2023) : 40 t en trafic international pour 5 essieux et plus, même entre deux pays à 44 t ;
+  intermodal 42 t (tracteur 2 essieux) / 44 t (3 essieux). Trajet international = au moins deux pays dans
+  `countryinfo` ; PTAC du profil > 40 t → alerte (texte : « Votre profil indique X t (PTAC, pas le poids réel) : … »),
+  jamais de voix ; `vehicle.combined` (case « Transport combiné », anciens profils : non) → information jusqu'à 44 t,
+  alerte au-delà ; countryinfo absent → ligne « à vérifier ». Fiches pays : `limits.weight` (`max`, `combinedMax`
+  DE / CH 44 t) et `limits.height` (`max` en m), source nationale obligatoire, sinon « à vérifier » sans valeur (BE, LU :
+  eJustice demande un captcha, Legilux en JavaScript) ; profil au-delà : `warn` sur la fiche, hauteur dépassée aussi
+  dans les notes (« Hauteur max Pays »). Sites officiels à ajouter à l'environnement cloud « Gabarit ».
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

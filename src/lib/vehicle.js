@@ -9,6 +9,13 @@ export const CRITAIR_VALUES = ['0', '1', '2', '3', '4', '5', 'NC'];
  */
 export const BAN_STATUS_VALUES = ['concerned', 'art4', 'exempt'];
 
+/**
+ * Transport combiné (phase 5e) : conteneurs ou caisses mobiles en opération de transport intermodal (directive
+ * 96/53/CE art. 2, annexe I 2.2.2 c et d, modifiée par la directive (UE) 2015/719). Seul cas où l'on peut dépasser
+ * 40 t en trafic international (42 t avec un tracteur à 2 essieux, 44 t avec un tracteur à 3 essieux). Voir weights.js.
+ */
+export const COMBINED_LABEL = 'Transport combiné (conteneurs ou caisses mobiles, opération intermodale)';
+
 // Matières dangereuses (phase 5b) : réglage global (Réglages, settings.adr), plus dans le profil depuis la v19.
 // Voir src/lib/adr-settings.js (reprise des anciens profils, withAdr).
 
@@ -47,6 +54,7 @@ export function defaultVehicle() {
     consumption: 32,
     critair: '1',
     banStatus: 'concerned',
+    combined: false,
   };
 }
 
@@ -67,6 +75,8 @@ export function normalizeVehicle(raw) {
     name: typeof raw?.name === 'string' ? raw.name.trim() : '',
     critair: CRITAIR_VALUES.includes(String(raw?.critair)) ? String(raw.critair) : 'NC',
     banStatus: BAN_STATUS_VALUES.includes(raw?.banStatus) ? raw.banStatus : 'concerned',
+    // Case du formulaire (« on ») ou booléen d'un export ; anciens profils : non.
+    combined: raw?.combined === true || raw?.combined === 'on',
   };
   // Anciens champs ADR (hazmat, tunnelCode, adrClass, unNumber) : non gardés, repris dans settings.adr (store.js).
   for (const key of Object.keys(NUMERIC_FIELDS)) {

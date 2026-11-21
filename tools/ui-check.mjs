@@ -1286,7 +1286,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v23', 'vrai service worker : « Gabarit v23 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v24', 'vrai service worker : « Gabarit v24 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1329,6 +1329,38 @@ async function borderCheck(browser, base) {
     check(notes.some((n) => n.cls === 'warn' && /^Suisse, interdiction PL \(Nuit\) mercredi 22 h → jeudi 5 h pendant votre passage.*La signalisation fait foi\.$/.test(n.text)),
       `${width} px : alerte de la nuit suisse dans les notes`);
     check(/Interdiction PL Suisse/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire, interdiction PL Suisse`);
+    // Phase 5e : profil de 44 t sur un trajet international → alerte avant le départ ; poids et hauteur sur la fiche.
+    check(notes.some((n) => n.cls === 'warn' && /^Votre profil indique 44 t \(PTAC, pas le poids réel\) : en international, poids réel limité à 40 t sauf transport combiné.*La signalisation fait foi\.$/.test(n.text)),
+      `${width} px : alerte 40 t en international`, notes.map((n) => n.text).join(' | '));
+    check(/International : 40 t/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire, « International : 40 t »`);
+    check(ch.sections.includes('Poids et hauteur') && /Poids total maximal : 40 t, ou 44 t en transport combiné/.test(ch.text)
+      && /Votre profil indique 44 t : au-delà du maximum national \(40 t\)/.test(ch.text) && /Hauteur maximale : 4 m\./.test(ch.text)
+      && /source officielle : Loi sur la circulation routière/.test(ch.text), `${width} px : Suisse, poids et hauteur avec la source`);
+    check(/Poids total maximal national : 44 t pour un ensemble de 5 essieux/.test(cards[1].text), `${width} px : Italie, 44 t en national`);
+    if (width === 360) {
+      // Case « Transport combiné » du profil : enregistrée, l'alerte devient une information.
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      check(await page.isVisible('#veh-combined'), '360 px : case « Transport combiné » dans le profil');
+      await noHorizontalScroll(page, '360 px profil avec la case transport combiné');
+      await page.check('#veh-combined');
+      await page.click('#vehicles-body button[type="submit"]');
+      check(/transport combiné/.test(await page.textContent('#vehicles-body .vehicle-card.active .dims')), '360 px : profil « transport combiné »');
+      await page.keyboard.press('Escape');
+      await computeRoute(page);
+      await page.waitForSelector('.country-card', { timeout: 10000 });
+      const n2 = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+      check(n2.some((n) => n.cls !== 'warn' && /transport combiné : en international, 44 t seulement avec un tracteur à 3 essieux/.test(n.text))
+        && !n2.some((n) => /limité à 40 t sauf transport combiné/.test(n.text)), '360 px : transport combiné → information, plus d\'alerte 40 t',
+        n2.map((n) => n.text).join(' | '));
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      await page.uncheck('#veh-combined');
+      await page.click('#vehicles-body button[type="submit"]');
+      await page.keyboard.press('Escape');
+      await computeRoute(page);
+      await page.waitForSelector('.country-card', { timeout: 10000 });
+    }
     await noHorizontalScroll(page, `${width} px fiches des pays`);
     await page.locator('.country-card').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-pays.png`) });
@@ -1347,6 +1379,7 @@ async function borderCheck(browser, base) {
     const border = spoken.filter((t) => /entrée en Suisse/.test(t));
     check(border.length === 1 && /^Dans 3 kilomètres, entrée en Suisse\. Poids lourds : 80 kilomètres heure\..*La signalisation fait foi\.$/.test(border[0])
       && !/vérifier|vignette|ZFE/i.test(border[0]), `${width} px : une annonce vers 3 km, règles confirmées seulement`, border.join(' | ') || spoken.join(' | '));
+    check(!spoken.some((t) => /40 tonnes|poids réel|hauteur/i.test(t)), `${width} px : poids et hauteur jamais dits`, spoken.join(' | '));
     const over = await overflowingNavText(page);
     check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
     const foot = await footOverlaps(page);

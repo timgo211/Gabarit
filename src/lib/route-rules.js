@@ -11,6 +11,7 @@ import {
   ADR, effectiveCode, tunnelsAlongRoute, describeForbidden, describeAllowed, noTunnelText, tunnelName,
 } from './adr.js';
 import { countryRules } from './country-rules.js';
+import { weightRules } from './weights.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
@@ -112,6 +113,10 @@ export function routeRules(route, {
   const tun = tunnelRules(route, { vehicle, tunnels, departure, elapsed });
   lines.push(...tun.lines.filter((l) => l.level === 'warn'));
   short.push(...tun.short);
+  // Poids en trafic international (phase 5e) : alerte avant le départ, jamais dite.
+  const weight = weightRules(route, { vehicle });
+  lines.push(...weight.lines.filter((l) => l.level === 'warn'));
+  short.push(...weight.short);
   for (const p of passages) {
     if (p.banned) {
       lines.push({ level: 'warn', text: describeZfePassage(p, vehicle), url: p.url });
@@ -138,6 +143,7 @@ export function routeRules(route, {
   } else if (wind?.status === 'failed') lines.push({ level: 'info', text: WIND.UNAVAILABLE_TEXT });
   lines.push(...tun.lines.filter((l) => l.level !== 'warn'));
   lines.push(...acc.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...weight.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
@@ -150,7 +156,7 @@ export function routeRules(route, {
   }
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
-    countries: ctry,
+    countries: ctry, weight,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional,
   };
 }

@@ -276,12 +276,23 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 - [ ] **Bloc 4 — Compléments réglementaires** (une PR par phase, dans l'ordre 5e → 5f → 5g → 5h)
   Chaque règle vérifiée sur une source officielle (citée avec sa date) ; une règle non confirmée est « à vérifier »
   et n'est jamais annoncée ; « La signalisation fait foi » sur chaque alerte.
-  - [ ] **Phase 5e — Poids et frontières** (priorité)
+  - [x] **Phase 5e — Poids et frontières** (priorité)
     En trafic international : 40 t maximum pour un ensemble de 5 essieux ou plus (directive 96/53/CE), même entre deux
     pays qui autorisent 44 t chez eux ; 44 t seulement en transport combiné. PTAC du profil actif au-delà de 40 t et
     itinéraire qui passe une frontière : alerte avant le départ (« Au-delà de 40 t, trajet international interdit sauf
     transport combiné : vérifiez votre poids réel »), sans voix ; case « Transport combiné » dans le profil.
     `data/pays` : poids total maximal national et hauteur maximale de chaque pays, avec source, sur la fiche pays.
+    Fait : sources lues le 21/11/2026 — directive 96/53/CE annexe I 2.2.2 modifiée par la directive (UE) 2015/719
+    (JO UE L 115 du 6/05/2015 ; intermodal : 42 t avec un tracteur à 2 essieux, 44 t avec un tracteur à 3 essieux,
+    conteneurs ou caisses mobiles de 45 pieds au plus), réponse ministérielle à la question écrite AN n° 1666 (JO du
+    7/02/2023 : une dérogation nationale ne peut pas devenir transfrontalière, Conseil d'État du 27/09/2022) ;
+    révision de la directive pas adoptée. Alerte « Votre profil indique 44 t (PTAC, pas le poids réel) : en
+    international, poids réel limité à 40 t sauf transport combiné… » avant le départ, jamais dite ; case
+    « Transport combiné » du profil (44 t : information, au-delà : alerte à 44 t) ; pays inconnus : « à vérifier ».
+    Fiches : DE StVZO § 34 / § 32 (40 t, intermodal 44 t, 4,00 m), CH LCR art. 9 (40 t, 44 t combiné, 4 m), IT
+    Codice della strada art. 62 / 61 (44 t, 4 m), ES Orden PJC/780/2025 (44 t depuis le 23/10/2025, citernes le
+    23/01/2026, 4,00 m) ; BE et LU « à vérifier » (textes non lisibles depuis le conteneur). Profil plus haut que la
+    hauteur maximale : alerte sur la fiche et dans les notes.
   - [ ] **Phase 5f — Équipements d'hiver**
     France, loi Montagne : du 1er novembre au 31 mars, communes de 34 départements (liste officielle copiée dans
     `data/`, Action annuelle si besoin) ; ensemble avec semi-remorque : chaînes à bord même avec des pneus hiver ;

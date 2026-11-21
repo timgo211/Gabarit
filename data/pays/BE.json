@@ -20,6 +20,10 @@
       { "text": "Autoroutes et routes à 2 × 2 voies séparées autrement que par des marques : 90 km/h au-delà de 3,5 t (art. 11.2.1°).", "source": "cdr", "verified": "2026-11-20" }
     ]
   },
+  "limits": {
+    "weight": {"text": "Poids total maximal national : à vérifier (texte officiel non lu). En international : 40 t sauf transport combiné.", "source": null, "verified": null},
+    "height": {"text": "Hauteur maximale : à vérifier (texte officiel non lu).", "source": null, "verified": null}
+  },
   "bans": [
     { "id": "none", "kind": "none", "text": "Pas d'interdiction de circuler pour les poids lourds les week-ends et les jours fériés.", "source": "bf", "verified": "2026-11-20" }
   ],

@@ -9,6 +9,8 @@
     "stvo30": { "name": "StVO § 30 (interdiction du dimanche et des jours fériés)", "url": "https://www.gesetze-im-internet.de/stvo_2013/__30.html", "kind": "national" },
     "ferreisev": { "name": "Ferienreiseverordnung (FerReiseV) § 1", "url": "https://www.gesetze-im-internet.de/ferreisev_1985/__1.html", "kind": "national" },
     "bfstrmg": { "name": "Bundesfernstraßenmautgesetz (BFStrMG) § 1", "url": "https://www.gesetze-im-internet.de/bfstrmg/__1.html", "kind": "national" },
+    "stvzo34": { "name": "StVZO § 34 (masses et charges par essieu)", "url": "https://www.gesetze-im-internet.de/stvzo_2012/__34.html", "kind": "national" },
+    "stvzo32": { "name": "StVZO § 32 (dimensions)", "url": "https://www.gesetze-im-internet.de/stvzo_2012/__32.html", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "DE", "source": "stvo30", "verified": "2026-11-20" },
@@ -22,6 +24,10 @@
     "notes": [
       { "text": "Autoroutes et voies rapides à chaussées séparées : 80 km/h au-delà de 3,5 t (§ 18) ; hors agglomération : 80 km/h jusqu'à 7,5 t, 60 km/h au-delà et avec remorque (§ 3) ; agglomération 50 km/h.", "source": "stvo3", "verified": "2026-11-20" }
     ]
+  },
+  "limits": {
+    "weight": {"max": 40, "combinedMax": 44, "text": "Poids total maximal national : 40 t (ensembles de plus de 4 essieux) ; 42 t (tracteur à 2 essieux) ou 44 t (tracteur à 3 essieux) en transport intermodal de conteneurs ou caisses mobiles. En international : 40 t sauf transport combiné.", "source": "stvzo34", "verified": "2026-11-21"},
+    "height": {"max": 4, "text": "Hauteur maximale : 4,00 m, chargement compris.", "source": "stvzo32", "verified": "2026-11-21"}
   },
   "bans": [
     { "id": "sunday", "kind": "weekly", "over": 7.5, "days": [0], "holidays": "DE", "from": "00:00", "to": "22:00",

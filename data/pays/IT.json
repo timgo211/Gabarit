@@ -6,6 +6,8 @@
   "sources": {
     "cds": { "name": "Codice della strada (D.Lgs. 285/1992), art. 142", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art142", "kind": "national" },
     "dm2026": { "name": "Décret du ministère des infrastructures (MIT) du 12 décembre 2025, calendrier 2026 (Gazzetta Ufficiale n. 302 du 31/12/2025)", "url": "https://www.gazzettaufficiale.it/atto/serie_generale/caricaDettaglioAtto/originario?atto.dataPubblicazioneGazzetta=2025-12-31&atto.codiceRedazionale=25A07055", "kind": "national" },
+    "cds62": { "name": "Codice della strada, art. 62 (massa limite)", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art62", "kind": "national" },
+    "cds61": { "name": "Codice della strada, art. 61 (sagoma limite)", "url": "https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:1992-04-30;285~art61", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "IT", "source": "bf", "verified": "2026-11-20" },
@@ -22,6 +24,10 @@
     "adr": [
       { "classes": ["1"], "text": "ADR classe 1 (explosibles) chargé : 50 km/h hors agglomération, 30 km/h en agglomération (art. 142 al. 3 b).", "voice": "explosibles chargés : 50 kilomètres heure", "source": "cds", "verified": "2026-11-20" }
     ]
+  },
+  "limits": {
+    "weight": {"max": 44, "text": "Poids total maximal national : 44 t pour un ensemble de 5 essieux ou plus (40 t à 4 essieux). En international : 40 t sauf transport combiné.", "source": "cds62", "verified": "2026-11-21"},
+    "height": {"max": 4, "text": "Hauteur maximale : 4 m.", "source": "cds61", "verified": "2026-11-21"}
   },
   "bans": [
     { "id": "calendar", "kind": "calendar", "over": 7.5,
