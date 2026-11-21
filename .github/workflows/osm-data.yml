@@ -110,14 +110,14 @@ jobs:
         run: node tools/osm-update.mjs
       - name: Enregistrer si changé
         run: |
-          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm
-          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm; then
+          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly
+          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly; then
             echo "Aucun changement."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm
+          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly
           git commit -m "Données : tunnels ADR, aires PL et accès conditionnels OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push
