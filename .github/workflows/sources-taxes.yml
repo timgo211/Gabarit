@@ -32,6 +32,18 @@ jobs:
                            r'M35|A35|A36|RN\s?83|Mautsatz|Mautsätze|Achs|Tarif|tarieven|indexering|indexation|Lkw-Maut|Grundkilometer')
           print('Lecture du', datetime.datetime.utcnow().isoformat(timespec='minutes'), 'UTC')
 
+          DIGEST = []
+          STRICT = re.compile(r'(?i)r-pass|ecpl|[ée]cocontribution|2027|centimes|€\s*/\s*km|cts?/km|c€|euro\s*(?:[0-6]|vi?|iv|eev)|essieux|recours|suspen|r[ée]f[ée]r[ée]|d[ée]lib[ée]ration|portique|tron[çc]on|Mautsatz|Mautsätze|Mauttarif|Grundkilometer|Achsen|indexering|indexation|tarif')
+
+          def note(url, t):
+            hits, last = [], -10**9
+            for m in STRICT.finditer(t or ''):
+              if m.start() - last < 500: continue
+              last = m.start()
+              hits.append(t[max(0, m.start() - 170):m.end() + 170].replace('\n', ' '))
+              if len(hits) >= 3: break
+            DIGEST.append((url, 'OK ' + str(len(t or '')) + ' car.', hits))
+
           def get(url, data=None, headers=None):
             try:
               h = dict(UA); h.update(headers or {})
@@ -39,6 +51,7 @@ jobs:
                 return r.read(), r.headers.get_content_type()
             except Exception as e:
               print('  ÉCHEC', url, e)
+              DIGEST.append((url, 'ÉCHEC ' + str(e)[:120], []))
               return None, None
 
           def text_of(data, ctype):
@@ -63,6 +76,7 @@ jobs:
             data, ctype = get(url)
             if data is None: return
             t = text_of(data, ctype)
+            note(url, t)
             print('(' + str(ctype) + ', ' + str(len(t)) + ' caractères)')
             print(t[:limit])
 
@@ -83,6 +97,7 @@ jobs:
               d, c = get(u)
               if d is None: continue
               t = text_of(d, c)
+              note(u, t)
               print('\n=====', u, '(' + str(c) + ', ' + str(len(t)) + ' caractères)')
               snippets(t)
 
@@ -121,16 +136,22 @@ jobs:
                'OPTIONAL { ?cons jolux:dateApplicability ?app } OPTIONAL { ?cons jolux:dateEndApplicability ?end } } ORDER BY DESC(?app) LIMIT 8')
           print('\n===== Fedlex SPARQL : versions de l\'ORPL')
           d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q}).encode(), {'Accept': 'text/csv'})
-          if d is not None: print(d.decode('utf-8', 'ignore'))
+          if d is not None: print(d.decode('utf-8', 'ignore')); DIGEST.append(('fedlex versions', 'OK', [d.decode('utf-8', 'ignore')[:900]]))
           q2 = ('PREFIX jolux: <http://data.legilux.public.lu/resource/ontology/jolux#> '
                 'SELECT DISTINCT ?act ?eif WHERE { ?impact jolux:impactToLegalResource <https://fedlex.data.admin.ch/eli/cc/2000/192> . '
                 '?act jolux:impactFromLegalResource ?impact . OPTIONAL { ?act jolux:dateEntryInForce ?eif } } ORDER BY DESC(?eif) LIMIT 8')
           print('\n===== Fedlex SPARQL : actes modifiant l\'ORPL')
           d, c = get('https://fedlex.data.admin.ch/sparqlendpoint', urllib.parse.urlencode({'query': q2}).encode(), {'Accept': 'text/csv'})
-          if d is not None: print(d.decode('utf-8', 'ignore'))
+          if d is not None: print(d.decode('utf-8', 'ignore')); DIGEST.append(('fedlex actes', 'OK', [d.decode('utf-8', 'ignore')[:900]]))
           crawl('https://www.bazg.admin.ch/fr/la-rplp-en-bref', ['rplp', 'tarif', 'redevance', '2027'])
 
           # Belgique : Viapass (tarifs 2027, actualités), Moniteur belge.
           crawl('https://www.viapass.be/fr/tarifs/', ['tarif', '2027', 'pdf'])
           crawl('https://www.viapass.be/nl/tarieven/', ['tarie', '2027', 'pdf'])
           crawl('https://www.viapass.be/fr/', ['actualit', 'nouvelles', '2027', 'news'])
+
+          # Résumé compact (lu par la fin du journal) : état de chaque adresse et quelques extraits.
+          print('\n\n################ RÉSUMÉ ################')
+          for url, st, hits in DIGEST:
+            print('@@', url, '→', st)
+            for h in hits: print('   »', h)
