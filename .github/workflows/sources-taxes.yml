@@ -147,33 +147,21 @@ jobs:
             print('\n##### liens de', start); [print('   lien', u) for u in out]
             return out
 
-          # R-Pass : site officiel r-pass.eu (chaîne de certificat incomplète : intermédiaire lu par AIA).
-          for u in ['https://www.r-pass.eu/', 'https://r-pass.eu/']:
-            full(u, 12000)
-          for u in links('https://www.r-pass.eu/', ['r-pass', 'tarif', 'reseau', 'réseau', 'carte', 'faq', 'deliberation', 'délibération', 'pdf', 'exoner', 'exonér', 'actualit', 'vehicule', 'véhicule', 'propos', 'about', '/fr'])[:25]:
-            full(u, 12000)
-          full('https://www.alsace.eu/', 4000)
-          for u in links('https://www.alsace.eu/', ['r-pass', 'rpass', 'deliber', 'délibér', 'poids-lourds', 'transport'])[:10]:
-            full(u, 12000)
+          def hrefs(url):
+            d, c = get(url)
+            if d is None: return
+            print('\n##### liens externes et PDF de', url)
+            for h in sorted(set(re.findall(r'href="([^"#]+)"', d.decode('utf-8', 'ignore')))):
+              u = urllib.parse.urljoin(url, html.unescape(h))
+              if '_next' in u or 'favicon' in u: continue
+              if not u.startswith(url.split('/fr')[0] + '/fr') or u.lower().endswith('.pdf'): print('   lien', u)
 
-          # Écocontribution Grand Est : textes complets.
-          for u in ['https://ecpl.fr/fr/network', 'https://ecpl.fr/fr/rates-and-network', 'https://ecpl.fr/fr/about', 'https://ecpl.fr/fr/faq', 'https://ecpl.fr/fr/news', 'https://ecpl.fr/fr/exemptions']:
-            full(u, 12000)
-          for u in links('https://ecpl.fr/fr/rates-and-network', ['tarif', 'grille', 'rate', 'pdf', 'network', 'reseau', 'carte', 'map', 'annonce', 'news', 'actualit'])[:15]:
-            full(u, 12000)
-          for u in links('https://ecpl.fr/fr/about', ['annonce', 'news', 'actualit', 'deliber', 'pdf', 'grandest'])[:10]:
-            full(u, 8000)
-
-          # Viapass : modifications au 1er janvier 2027 (texte complet).
-          full('https://www.viapass.be/actualites/prelevement-kilometrique-les-modifications-prevues-a-partir-du-1er-janvier-2027.html', 12000)
-
-          # Toll Collect, BFStrMG, ASFINAG, RIS : nouvel essai.
-          full('https://www.toll-collect.de/de/toll_collect/bezahlen/maut_tarife/maut_tarife.html', 6000)
-          for a in ['', 'anlage_1.html']:
-            full('https://www.gesetze-im-internet.de/bfstrmg/' + a, 12000)
-          full('https://www.ris.bka.gv.at/GeltendeFassung.wxe?Abfrage=Bundesnormen&Gesetzesnummer=20004016', 8000)
-          full('https://www.asfinag.at/maut-vignette/lkw-bus/', 6000)
-
-          print('\n\n################ RÉSUMÉ ################')
-          for url, st, hits in DIGEST:
-            print('@@', url, '→', st)
+          # R-Pass : sous-pages du site officiel (le texte des pages est rendu côté serveur).
+          for u in ['tax', 'network', 'faqs', 'downloads', 'about', 'pay-the-tax', 'tax-exemption', 'eets']:
+            full('https://www.r-pass.eu/fr/' + u, 20000)
+          for u in ['tax', 'network', 'downloads', 'about']:
+            hrefs('https://www.r-pass.eu/fr/' + u)
+          # ECPL : base légale et annonce officielle (liens externes).
+          for u in ['https://ecpl.fr/fr/about', 'https://ecpl.fr/fr/rates', 'https://ecpl.fr/fr/network']:
+            hrefs(u)
+          full('https://ecpl.fr/fr/faq', 14000)

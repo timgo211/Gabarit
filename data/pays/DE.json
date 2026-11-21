@@ -52,7 +52,8 @@
   ],
   "toll": [
     { "text": "Péage (Maut) sur les autoroutes et les routes fédérales (Bundesstraßen) pour les véhicules de transport de marchandises de plus de 3,5 t (poids technique).", "source": "bfstrmg", "verified": "2026-11-20" },
-    { "text": "Système de perception (Toll Collect : boîtier embarqué ou réservation) : à vérifier.", "url": "https://www.toll-collect.de/", "source": null, "verified": null }
+    { "text": "Système de perception (Toll Collect : boîtier embarqué ou réservation) : à vérifier.", "url": "https://www.toll-collect.de/", "source": null, "verified": null },
+    { "text": "Changements au 1er janvier 2027 (Maut : taux, classes CO2, seuil de poids) : aucun texte officiel lu (Toll Collect et la loi BFStrMG non lisibles le 21/11/2026), à vérifier.", "url": "https://www.toll-collect.de/", "source": null, "verified": null }
   ],
   "lez": [
     { "text": "Zones environnementales (Umweltzonen, vignette verte) : liste et conditions pour les camions étrangers à vérifier.", "source": null, "verified": null }
