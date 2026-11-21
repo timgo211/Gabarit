@@ -338,10 +338,25 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     (lu par reconnaissance de texte (OCR) dans l'Action « Sources Euro » le 21/11/2026) ne cite que 2919, 3291, 3331,
     3359 et 3373 : à vérifier dans les arrêtés des rampes (préfectoral n° DDT-2010-60 du 29/01/2010, décret n° 33 du
     26/01/2010 de la Vallée d'Aoste) avant de coder.
-  - [ ] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
-    R-Pass (Collectivité européenne d'Alsace) au 1er janvier 2027 : axes, tarif officiel, lien, affiché dès l'entrée
-    en vigueur avec la mention des recours ; coût estimé seulement si la grille officielle est lue. Écocontribution PL
-    de la Région Grand Est (projet) : note « projet, à vérifier », rien de calculé tant qu'elle n'est pas adoptée.
+  - [x] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
+    Fait : `data/taxes-pl.json` (dans `APP_FILES`) et `hgv-tolls.js`. R-Pass (Collectivité européenne d'Alsace,
+    prévue au 1er janvier 2027, réseau et grille du site officiel r-pass.eu) et écocontribution PL du Grand Est
+    (prévue au 2 avril 2027, réseau officiel d'ecpl.fr) repérées par les références de route des étapes ORS dans le
+    cadre de la région, en France (countryinfo), au-delà de 3,5 t ; heure de passage recalée par les pauses. Statut
+    « annoncée » : information seulement, jamais sur la fiche d'itinéraire, jamais de voix ni de bandeau ; R-Pass :
+    taux de la classe du profil (PTRA × classe Euro, dépliant officiel), aucun total ; ECPL : aucun montant (classe
+    CO2 absente du profil). Recours devant le tribunal administratif de Strasbourg mentionné (effet suspensif non
+    établi). Fiches pays : « Changements au 1er janvier 2027 » (BE Viapass lu ; DE, AT, CH « à vérifier », version de
+    l'ORPL en vigueur citée). Autriche ajoutée à la recherche d'adresse.
+  - [ ] **Taxes PL : montants Maut (DE) et péage autrichien** : champ « Essieux » du profil (non précisé par défaut :
+    les deux cas ; 2, 3, 4, 5 et plus) seulement quand un montant qui en dépend est affiché, grilles officielles lues
+    (BFStrMG annexe 1, Mauttarifverordnung).
+  - [ ] **Péage PL sur les routes régionales du Burgenland (Autriche, 2027)** : routes, date et base légale à lire
+    (RIS, Landesgesetzblatt) avant de coder.
+  - [ ] **R-Pass / écocontribution Grand Est confirmés** : passer `status` à 'confirmed' dans `data/taxes-pl.json`
+    après lecture des délibérations (R-Pass n° CD-2025-4-7-1 du 20/10/2025 ; ECPL : non retrouvée) et de l'issue du
+    recours ; carte détaillée des sections (PDF « Réseau taxable » de r-pass.eu illisible en texte) ; ECPL : grille
+    avec la classe CO2 du profil (nouveau champ, non précisé par défaut).
   - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
     pollution, fermetures de tunnels et de cols.
 
