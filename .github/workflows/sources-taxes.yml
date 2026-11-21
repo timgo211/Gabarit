@@ -147,21 +147,16 @@ jobs:
             print('\n##### liens de', start); [print('   lien', u) for u in out]
             return out
 
-          def hrefs(url):
-            d, c = get(url)
-            if d is None: return
-            print('\n##### liens externes et PDF de', url)
-            for h in sorted(set(re.findall(r'href="([^"#]+)"', d.decode('utf-8', 'ignore')))):
-              u = urllib.parse.urljoin(url, html.unescape(h))
-              if '_next' in u or 'favicon' in u: continue
-              if not u.startswith(url.split('/fr')[0] + '/fr') or u.lower().endswith('.pdf'): print('   lien', u)
-
-          # R-Pass : sous-pages du site officiel (le texte des pages est rendu côté serveur).
-          for u in ['tax', 'network', 'faqs', 'downloads', 'about', 'pay-the-tax', 'tax-exemption', 'eets']:
-            full('https://www.r-pass.eu/fr/' + u, 20000)
-          for u in ['tax', 'network', 'downloads', 'about']:
-            hrefs('https://www.r-pass.eu/fr/' + u)
-          # ECPL : base légale et annonce officielle (liens externes).
-          for u in ['https://ecpl.fr/fr/about', 'https://ecpl.fr/fr/rates', 'https://ecpl.fr/fr/network']:
-            hrefs(u)
-          full('https://ecpl.fr/fr/faq', 14000)
+          # R-Pass : documents officiels (PDF : dépliant avec la grille, réseau taxable, flyer).
+          for u in ['https://cms.r-pass.eu/uploads/R_PASS_Depliant_A5_FR_V02_BD_8318e739a4.pdf',
+                    'https://cms.r-pass.eu/uploads/Reseau_Taxable_7ed12b5e2e.pdf',
+                    'https://cms.r-pass.eu/uploads/R_PASS_Flyer_A5_FR_BD_497c529bd3.pdf']:
+            full(u, 30000)
+          # ECPL : tous les liens de la page « À propos » (base légale, annonce officielle), puis la page de la Région.
+          d, c = get('https://ecpl.fr/fr/about')
+          if d is not None:
+            raw = d.decode('utf-8', 'ignore')
+            print('\n##### liens de https://ecpl.fr/fr/about')
+            for m in re.finditer(r'<a[^>]+href="([^"#]+)"[^>]*>(.*?)</a>', raw, re.S):
+              print('   lien', urllib.parse.urljoin('https://ecpl.fr/fr/about', html.unescape(m.group(1))), '|', re.sub(r'<[^>]+>|\s+', ' ', m.group(2)).strip()[:80])
+          full('https://www.grandest.fr/grands-projets/transports-deplacements-projets/reseau-routier-national/', 15000)
