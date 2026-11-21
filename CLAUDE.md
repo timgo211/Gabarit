@@ -310,7 +310,8 @@ de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8
   (données non chargées) » ; chaque alerte finit par « La signalisation fait foi. ». Guidage : `view.rules.access`,
   bandeau sous 10 km (voie interdite à l'heure de passage d'abord, sinon la plus proche ; desserte comprise), voix une
   fois vers 3 km seulement si interdite à l'heure de passage (`settings.ruleVoice`). Pouvoir de police : Code de la
-  route art. R411-8 (`POLICE_TEXT`), légifrance bloqué depuis le conteneur → job `r411` de l'Action.
+  route art. R411-8 (`POLICE_TEXT`, texte cité dans `access-conditional.js`) ; Légifrance répond 403 au conteneur et à
+  l'Action → lu dans le PDF du code de codes.droit.org par le job `r411` (texte imprimé dans le journal).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

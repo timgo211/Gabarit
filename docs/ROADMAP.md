@@ -147,7 +147,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Bloc 3 — Réglementation
 
-- [ ] **Bloc 3 — Réglementation** (une seule conversation)
+- [x] **Bloc 3 — Réglementation** (une seule conversation)
   Les phases 5, 5b, 5c et 5d partagent les mêmes données de restrictions : chercher et citer chaque règle officielle
   une seule fois, en commentaire, avant de coder.
   - [x] **Phase 5 — Réglementation**
@@ -245,7 +245,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     péages IT et ES, système Toll Collect, fêtes régionales, tronçons ES et samedis d'été DE. Calendriers IT et ES :
     rappel avec le lien dès le 1er janvier d'une année absente (à ajouter chaque année dans `data/pays/IT.json`,
     `ES.json`).
-  - [ ] **Phase 5d — Accès : tranches horaires et desserte locale**
+  - [x] **Phase 5d — Accès : tranches horaires et desserte locale**
     Interdictions PL par tranches horaires (tags OpenStreetMap conditionnels, par exemple `hgv:conditional`) : vérifier
     si ORS les applique avec une heure de départ et l'utiliser, sinon alerter sur le trajet. « Sauf desserte locale /
     livraisons » : autoriser ces routes quand l'arrivée ou une étape est dans le secteur (vérifier `vehicle_type`
@@ -255,6 +255,24 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     conditionnelles d'OpenStreetMap (`hgv:conditional`, `maxweight:conditional`, `access:conditional`,
     `hgv=destination` / `delivery`) en France et pays voisins, découpée en cases de 1° (un fichier par case, lu
     seulement pour les cases touchées par le tracé), avant de vérifier ce qu'ORS en fait.
+    Fait : doc et code d'ORS lus le 20/11/2026 (GIScience/openrouteservice) : `departure` caché, accès conditionnels
+    pris en compte seulement avec `conditional_access` à la construction du graphe (faux par défaut) → alerte, jamais
+    `departure` ; profil camion : `hgv=destination` et `delivery` acceptés partout, `vehicle_type` reste `hgv` ;
+    extra `roadaccessrestrictions` (valeurs cumulées : 4 Destination, 8 Delivery) dans la même requête, variantes et
+    recalcul compris. Desserte : acceptée si elle part du départ ou mène à l'arrivée ou s'en trouve à moins de 3 km,
+    sinon « Route réservée à la desserte locale vers km X : vous la traversez » et « Éviter la desserte locale » à
+    l'arrêt (une requête ORS sur appui, avoid_polygons, 150 km au plus). Tranches horaires : `hgv`, `motor_vehicle`,
+    `vehicle`, `access`, `maxweight:conditional` (et `:forward` / `:backward`) ajoutés à l'Action « Données OSM »
+    (même téléchargement, même filtre osmium), routes carrossables seulement, `data/acces-osm/` en cases de 1° lues
+    si le tracé les touche ; priorité hgv > motor_vehicle > vehicle > access ; voie retenue si 80 % de sa longueur
+    suit le tracé à moins de 15 m, dans le même sens ; horaires du lecteur des ZFE (plages passant minuit, PH avec
+    les fériés du pays traversé), heure de passage recalée par les pauses ; saisons, météo, pays sans calendrier :
+    une ligne « N voies avec conditions non lues, à vérifier », jamais d'alerte. Guidage : bandeau sous 10 km, voix
+    une fois vers 3 km si interdite à l'heure de passage. Premier passage (20/11/2026, extraits du 19/11) : 44 min,
+    45 770 voies (maxweight:conditional 23 857, motor_vehicle 8 027, access 5 960, hgv 4 628, vehicle 2 620),
+    **3,12 Mo** en 245 cases + `index.json` (24 Ko), plus grosse case 4_51 (196 Ko) ; Overpass +0, ORS +0 par calcul.
+    Code de la route art. R411-8 : Légifrance refuse aussi l'Action (403) ; lu dans le PDF du code de codes.droit.org
+    (édition du 27/10/2026) par le job `r411` le 21/11/2026, texte cité dans `access-conditional.js`.
 
 ## Ensuite
 

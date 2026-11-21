@@ -14,7 +14,7 @@
 // (AccessRestrictionsParser : hgvTags = hgv, motor_vehicle, vehicle, access). Pour un moyen de transport, une
 // condition vraie l'emporte sur l'étiquette sans condition ; plusieurs conditions vraies : la dernière écrite.
 //
-// Pouvoir de police : voir POLICE_TEXT (Code de la route, art. R411-8).
+// Pouvoir de police : voir POLICE_TEXT (Code de la route, art. R411-8, texte cité plus bas).
 
 import { prepareLine, pointAt } from './nav-geo.js';
 import { timeAt } from './areas-route.js';
@@ -44,10 +44,19 @@ export const ACCESS = Object.freeze({
 });
 
 /**
- * Code de la route, art. R411-8 (pouvoir de police du maire et du préfet) : voir POLICE_SOURCE ; texte cité après
- * lecture (Action « Données OSM », étape lancée à la main), sinon « à vérifier ».
+ * Code de la route, art. R411-8 (rédaction du décret n° 2013-938 du 18 octobre 2013, art. 1), texte lu le 21/11/2026
+ * dans le PDF du code de codes.droit.org (édition du 27/10/2026, « droit positif », recalculé d'après Légifrance ;
+ * Légifrance refuse le conteneur et l'Action GitHub, HTTP 403) par le job r411 de l'Action « Données OSM » :
+ * « Les dispositions du présent code ne font pas obstacle au droit conféré par les lois et règlements aux préfets,
+ * au président du Conseil exécutif de Corse, aux présidents de conseil départemental et aux maires de prescrire,
+ * dans la limite de leurs pouvoirs, des mesures plus rigoureuses dès lors que la sécurité de la circulation routière
+ * l'exige. Pour ce qui les concerne, les préfets et les maires peuvent également fonder leurs décisions sur l'intérêt
+ * de l'ordre public.
+ * Lorsqu'ils intéressent la police de la circulation sur les voies classées à grande circulation, les arrêtés du
+ * président du conseil départemental ou du maire fondés sur le premier alinéa sont pris après avis du préfet. »
+ * D'où les interdictions locales par tranches horaires et « sauf desserte » : arrêtés locaux, la signalisation fait foi.
  */
-export const POLICE_TEXT = 'Restrictions locales (tranches horaires, desserte) : arrêtés du maire ou du préfet (Code de la route, art. R411-8), la signalisation fait foi.';
+export const POLICE_TEXT = 'Restrictions locales (tranches horaires, desserte) : arrêtés du maire, du président du conseil départemental ou du préfet (Code de la route, art. R411-8), la signalisation fait foi.';
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const RAD = Math.PI / 180;
