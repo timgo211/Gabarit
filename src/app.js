@@ -13,6 +13,8 @@ import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOpt
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
 import { createWinter } from './ui/winter.js';
+import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
+import { serviceDetailText } from './lib/ors-errors.js';
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText } from './lib/route-rules.js';
@@ -222,6 +224,17 @@ for (const code of COUNTRY_RULES.FILES) {
     });
 }
 
+// ───────── Taxes PL régionales (phase 5h) : data/taxes-pl.json, petit fichier mis en cache (lisible hors ligne) ─────────
+let tolls = { status: 'loading', data: null };
+fetch(TOLLS.PATH, { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((j) => parseTollData(j))
+  .catch(() => null)
+  .then((d) => {
+    tolls = d ? { status: 'ok', data: d } : { status: 'failed', data: null };
+    renderChoice();
+  });
+
 /** Vent : prévisions, état de la requête et seuil de Réglages. */
 function windCtx() {
   return { status: weather.status, forecast: weather.forecast, threshold: data.settings.windGust };
@@ -244,14 +257,15 @@ function rulesOf(route, vehicle, departure) {
   const ctry = countries;
   const acc = access.state;
   const win = winter.state;
+  const tol = tolls;
   if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
-    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win) return hit.rules;
+    && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
-    vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win,
+    vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
   });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, rules });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, rules });
   return rules;
 }
 
@@ -548,7 +562,7 @@ const form = createRouteForm({
       access.clear();
       winter.clear();
       map.showZfe([]);
-      showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
+      showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.', 'error', serviceDetailText(err, store.getApiKey() ?? ''));
     } finally {
       form.setBusy(false);
     }

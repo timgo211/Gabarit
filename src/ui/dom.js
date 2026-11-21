@@ -19,8 +19,10 @@ export function el(tag, attrs = {}, children = []) {
 }
 
 /** Affiche un message dans un bloc (type 'error' par défaut, ou 'info'). Message vide → masqué. */
-export function showMessage(node, text, type = 'error') {
+export function showMessage(node, text, type = 'error', detail = '') {
   node.textContent = text ?? '';
+  // Phase 5h bis : réponse technique du service (code, message), en petit sous le message.
+  if (text && detail) node.append(Object.assign(document.createElement('small'), { className: 'message-detail', textContent: detail }));
   node.classList.toggle('info', type === 'info');
   node.hidden = !text;
 }

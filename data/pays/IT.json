@@ -128,6 +128,9 @@
       "missing": { "text": "Calendrier italien des interdictions ADR {year} absent de l'appli : lire le décret annuel du ministère (MIT) publié dans la Gazzetta Ufficiale.", "url": "https://www.gazzettaufficiale.it/" },
       "extra": { "2026": { "from": "05-23", "to": "09-06", "windows": [[6, "08:00", "24:00"], [0, "00:00", "24:00"]] } } }
   ],
+  "euro": [
+    {"text": "Interdictions de circuler selon la classe Euro décidées par les régions (bassin du Pô notamment) : à vérifier.", "source": null, "verified": null}
+  ],
   "toll": [
     { "text": "Autoroutes à péage, tarif selon la classe du véhicule (nombre d'essieux) ; télépéage : à vérifier.", "source": null, "verified": null }
   ],

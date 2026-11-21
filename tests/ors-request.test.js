@@ -86,6 +86,8 @@ test('URL d\'autocomplétion Pelias', () => {
   assert.equal(url.searchParams.get('focus.point.lon'), '4.83570');
   assert.equal(url.searchParams.get('lang'), 'fr');
   assert.match(url.searchParams.get('boundary.country'), /^FR,/);
+  // Phase 5h : Autriche proposée (trajets München → Innsbruck).
+  assert.ok(url.searchParams.get('boundary.country').split(',').includes('AT'));
 });
 
 test('lecture des suggestions Pelias (points invalides ignorés)', () => {

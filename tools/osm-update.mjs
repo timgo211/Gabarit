@@ -104,7 +104,9 @@ async function download(url, file, { timeoutMs = TIMEOUT_PBF_MS } = {}) {
       await pipeline(Readable.fromWeb(res.body), createWriteStream(file), { signal });
       return;
     } catch (err) {
-      const why = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? `délai de ${Math.round(timeoutMs / 1000)} s dépassé` : err.message;
+      // « fetch failed » cache la vraie raison (connexion refusée, coupée, nom introuvable…) : err.cause l'écrit.
+      const cause = err?.cause ? ` (${[err.cause.code, err.cause.message].filter(Boolean).join(' : ')})` : '';
+      const why = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? `délai de ${Math.round(timeoutMs / 1000)} s dépassé` : `${err.message}${cause}`;
       console.log(`⚠ téléchargement ${url} (essai ${i + 1}/${RETRY_WAITS_MS.length + 1}) : ${why}`);
     }
   }

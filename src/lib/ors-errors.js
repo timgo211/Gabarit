@@ -64,7 +64,7 @@ export function classify403(text) {
  * @returns {{ kind:string, message:string, detail:string }}
  */
 export function classifyError({ status, body, offline = false, networkError = false, timeout = false, noKey = false } = {}) {
-  const make = (kind, detail = '') => ({ kind, message: MESSAGES[kind], detail });
+  const make = (kind, detail = '') => ({ kind, message: MESSAGES[kind], detail, code: readBody(body).code });
   if (noKey) return make(ERROR_KINDS.NO_KEY);
   if (offline) return make(ERROR_KINDS.OFFLINE);
   if (timeout) return make(ERROR_KINDS.TIMEOUT);
@@ -82,6 +82,23 @@ export function classifyError({ status, body, offline = false, networkError = fa
   if (status === 400 || code === 2003) return make(ERROR_KINDS.BAD_REQUEST, text);
   if (typeof status === 'number' && status >= 500) return make(ERROR_KINDS.SERVER, text);
   return make(ERROR_KINDS.UNKNOWN, text);
+}
+
+/**
+ * Ligne technique sous le message d'échec (phase 5h bis) : statut HTTP, code et message renvoyés par le service
+ * d'itinéraire, pour distinguer un itinéraire introuvable (2009), un point non routable (2010), une distance trop
+ * grande (2004) ou un quota (429). Jamais la clé. Rien si aucun statut ni code (réseau, hors ligne).
+ * @param {{ status?:number|null, code?:number|null, detail?:string }} err
+ */
+export function serviceDetailText(err, apiKey = '') {
+  const parts = [];
+  if (typeof err?.status === 'number' && err.status > 0) parts.push(`HTTP ${err.status}`);
+  if (typeof err?.code === 'number' && err.code > 0) parts.push(`code ${err.code}`);
+  if (!parts.length) return '';
+  let detail = String(err?.detail ?? '').replace(/\s+/g, ' ').trim();
+  if (apiKey && apiKey.length >= 8) detail = detail.split(apiKey).join('•••');
+  if (detail.length > 160) detail = `${detail.slice(0, 159)}…`;
+  return `Réponse du service d'itinéraire : ${parts.join(', ')}${detail ? ` — « ${detail} »` : ''}.`;
 }
 
 export function messageFor(kind) {

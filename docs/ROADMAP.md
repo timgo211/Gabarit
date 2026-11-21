@@ -130,6 +130,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
     phase 2b), choix en un toucher. (Reste de la phase 7c.)
   - [ ] Personnalisation : forme de la flèche, icône camion. (Reste de la phase 7c.)
+  - [ ] « Éviter le tunnel » pour une classe Euro interdite (Mont-Blanc, Fréjus, phase 5g) : à l'arrêt, une requête
+    ORS sur appui (comme le bouton ADR de la phase 5b : carré de 80 m, avoid_polygons, 150 km au plus). La phase 5g
+    n'affiche qu'une alerte.
   - [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
     Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
     via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
@@ -310,14 +313,50 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     pays « Équipements d'hiver » toute l'année : DE StVO § 2 (3a) / StVZO § 36 (4), LU art. 156 et 160, CH OSR art. 29,
     ES RGC (panneaux), BE art. 81.4.4 ; IT Codice della strada art. 6 (ordonnance), période 15/11 – 15/04 « à
     vérifier » ; AT (KFG § 102, RIS refusé au conteneur) « à vérifier », texte lu dans le journal de l'Action.
-  - [ ] **Phase 5g — Normes Euro et tunnels**
+  - [x] **Phase 5g — Normes Euro et tunnels**
     Champ « Norme Euro » (0 à 6), facultatif, dans le profil. Mont-Blanc, Fréjus : normes interdites d'après le
     règlement en vigueur ; alerte sur la fiche si le tracé passe le tunnel avec une norme interdite, rappel si la norme
     est vide ; tunnels repérés avec `data/tunnels-adr.json`.
-  - [ ] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
-    R-Pass (Collectivité européenne d'Alsace) au 1er janvier 2027 : axes, tarif officiel, lien, affiché dès l'entrée
-    en vigueur avec la mention des recours ; coût estimé seulement si la grille officielle est lue. Écocontribution PL
-    de la Région Grand Est (projet) : note « projet, à vérifier », rien de calculé tant qu'elle n'est pas adoptée.
+    Fait : profil « Classe Euro (moteur) » (non précisé par défaut, 0 à 6, EEV ; servira à la 5h). Tunnels repérés
+    avec les tubes en dur de `KNOWN_TUNNELS` (phase 5b, sans fichier ni Overpass), au-delà de 3,5 t de PTAC, textes
+    « PL de marchandises » (le profil n'a pas de type de véhicule). Sources lues le 21/11/2026 : Mont-Blanc, arrêté
+    préfectoral n° 2020-0825 du 18/06/2020 (PDF de Bison Futé : Euro 0 à 4 interdits depuis le 1/07/2020, 1re mise en
+    circulation avant le 1/10/2006 sauf preuve Euro 5 ; EEV absent de la liste : admis) ; Fréjus, arrêté du 7/07/2017
+    (page Bison Futé : Euro 0 à 2) et SFTRF, page « Classification tunnel » lue par l'Action « Sources Euro » (Euro 3
+    et 4 : « confirmé par l'exploitant », arrêté préfectoral non retrouvé) ; aucun péage PL selon la classe Euro aux
+    deux tunnels (SITAF 2026 : une seule classe PL Euro 5-6 ; ATMB). Alerte sur la fiche d'itinéraire et dans les
+    notes (classe interdite), information (classe admise), les deux cas si la classe n'est pas précisée ; chaque
+    alerte finit par « La signalisation fait foi. » ; rien dans le guidage. Fiches pays, rubrique « Normes Euro » :
+    CH RPLP (ORPL art. 14 et annexe 1, version du 1/01/2025 : catégorie 1 Euro 0 à V et EEV 3,26 ct/t·km,
+    catégorie 3 Euro VI 2,39 ct) ; DE Maut (BFStrMG annexe 1 ch. 2, catégories A à F) et vignette verte
+    (35. BImSchV annexe 2 : Euro IV, V, EEV ; Euro VI « à vérifier ») ; AT (Tyrol, A12 : RIS en erreur 503 pour le
+    conteneur et l'Action) et IT (interdictions régionales) « à vérifier ». ZFE / Crit'Air des PL : déjà couverts
+    (phase 5) ; correspondance Euro → Crit'Air (arrêté du 21/06/2016, Légifrance 403) non faite, vignette saisie.
+  - [ ] **Phase 5b bis — ONU 3077 et 3082 au Mont-Blanc**
+    Bison Futé : ONU 2919, 3077, 3082, 3291, 3331, 3359, 3373 refusés (interdiction de transit sur les rampes d'accès,
+    préfectures française et italienne) ; `KNOWN_TUNNELS` (phase 5b) n'a pas 3077 ni 3082. L'arrêté n° 2009-3425
+    (lu par reconnaissance de texte (OCR) dans l'Action « Sources Euro » le 21/11/2026) ne cite que 2919, 3291, 3331,
+    3359 et 3373 : à vérifier dans les arrêtés des rampes (préfectoral n° DDT-2010-60 du 29/01/2010, décret n° 33 du
+    26/01/2010 de la Vallée d'Aoste) avant de coder.
+  - [x] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
+    Fait : `data/taxes-pl.json` (dans `APP_FILES`) et `hgv-tolls.js`. R-Pass (Collectivité européenne d'Alsace,
+    prévue au 1er janvier 2027, réseau et grille du site officiel r-pass.eu) et écocontribution PL du Grand Est
+    (prévue au 2 avril 2027, réseau officiel d'ecpl.fr) repérées par les références de route des étapes ORS dans le
+    cadre de la région, en France (countryinfo), au-delà de 3,5 t ; heure de passage recalée par les pauses. Statut
+    « annoncée » : information seulement, jamais sur la fiche d'itinéraire, jamais de voix ni de bandeau ; R-Pass :
+    taux de la classe du profil (PTRA × classe Euro, dépliant officiel), aucun total ; ECPL : aucun montant (classe
+    CO2 absente du profil). Recours devant le tribunal administratif de Strasbourg mentionné (effet suspensif non
+    établi). Fiches pays : « Changements au 1er janvier 2027 » (BE Viapass lu ; DE, AT, CH « à vérifier », version de
+    l'ORPL en vigueur citée). Autriche ajoutée à la recherche d'adresse.
+  - [ ] **Taxes PL : montants Maut (DE) et péage autrichien** : champ « Essieux » du profil (non précisé par défaut :
+    les deux cas ; 2, 3, 4, 5 et plus) seulement quand un montant qui en dépend est affiché, grilles officielles lues
+    (BFStrMG annexe 1, Mauttarifverordnung).
+  - [ ] **Péage PL sur les routes régionales du Burgenland (Autriche, 2027)** : routes, date et base légale à lire
+    (RIS, Landesgesetzblatt) avant de coder.
+  - [ ] **R-Pass / écocontribution Grand Est confirmés** : passer `status` à 'confirmed' dans `data/taxes-pl.json`
+    après lecture des délibérations (R-Pass n° CD-2025-4-7-1 du 20/10/2025 ; ECPL : non retrouvée) et de l'issue du
+    recours ; carte détaillée des sections (PDF « Réseau taxable » de r-pass.eu illisible en texte) ; ECPL : grille
+    avec la classe CO2 du profil (nouveau champ, non précisé par défaut).
   - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
     pollution, fermetures de tunnels et de cols.
 

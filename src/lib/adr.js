@@ -235,8 +235,8 @@ export function nearest(line, grid, p) {
   return best;
 }
 
-/** Passage du tracé dans un tube : { enter, exit } (m depuis le départ), ou null. */
-function tubePassage(line, grid, g) {
+/** Passage du tracé dans un tube : { enter, exit } (m depuis le départ), ou null. Repris par euro.js (phase 5g). */
+export function tubePassage(line, grid, g) {
   const pts = checkPoints(g);
   const alongs = [];
   for (const p of pts) {

@@ -110,6 +110,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
+  tollsFile = undefined,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -206,6 +207,8 @@ async function open(browser, base, {
       const body = JSON.parse(route.request().postData() || '{}');
       const json = directions ? directions(body) : (body.alternative_routes
         ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json'));
+      // Phase 5h bis : { __status, ...corps } simule une réponse d'erreur d'ORS (statut HTTP et corps).
+      if (json && json.__status) { const { __status, ...rest } = json; return route.fulfill({ status: __status, json: rest }); }
       return route.fulfill({ json });
     }
     return route.abort();
@@ -250,6 +253,8 @@ async function open(browser, base, {
     const json = winter?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 5h : data/taxes-pl.json (null : fichier absent, réponse 404 ; undefined : fichier du dépôt).
+  if (tollsFile === null) await ctx.route(/\/data\/taxes-pl\.json(\?.*)?$/, (route) => route.fulfill({ status: 404, body: '' }));
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -1308,7 +1313,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v26', 'vrai service worker : « Gabarit v26 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v31', 'vrai service worker : « Gabarit v31 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1424,6 +1429,16 @@ async function borderCheck(browser, base) {
   check(/Règles PL en Suisse non chargées : à vérifier\./.test(await noFile.page.textContent('.country-card')), 'fichier data/pays/CH.json absent → « à vérifier »');
   check(noFile.errors.length === 0, 'fichier absent : aucune erreur JavaScript', noFile.errors.join(' | '));
   await noFile.ctx.close();
+  // Phase 5h : München → Innsbruck (Allemagne puis Autriche), fiche Autriche « à vérifier ».
+  const mi = await open(browser, base, { width: 412, height: 900, now, directions: () => fixture('ors-directions-muenchen-innsbruck.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(mi.page);
+  await mi.page.waitForSelector('.country-card', { timeout: 10000 });
+  const cards = await mi.page.$$eval('.country-card', (d) => d.map((x) => { x.open = true; return x.textContent; }));
+  const at = cards.find((t) => /Autriche/.test(t));
+  check(cards.some((t) => /Allemagne/.test(t)) && at && /à vérifier/.test(at), 'München → Innsbruck : fiches Allemagne et Autriche, Autriche « à vérifier »', cards.map((t) => t.slice(0, 120)).join(' | '));
+  await noHorizontalScroll(mi.page, '412 px fiche Autriche');
+  check(mi.errors.length === 0, 'München → Innsbruck : aucune erreur JavaScript', mi.errors.join(' | '));
+  await mi.ctx.close();
 }
 
 /**
@@ -1522,6 +1537,242 @@ async function winterCheck(browser, base) {
   check(/15 novembre au 15 avril.*à vérifier/.test(cards[1].text), 'fiche Italie : période 15/11 – 15/04 « à vérifier »');
   await noHorizontalScroll(ch.page, '412 px fiches pays avec équipements d\'hiver');
   await ch.ctx.close();
+}
+
+/**
+ * Phase 5g : normes Euro. Tunnel du Mont-Blanc (tests/fixtures/ors-directions-mont-blanc.json) avec un profil Euro 3
+ * (alerte, fiche d'itinéraire), Euro 6 (admis), non précisé (les deux cas) ; profil enregistré puis rechargé ; Fréjus
+ * Euro 4 (confirmé par l'exploitant) ; fiches Suisse (RPLP) et Allemagne (Maut, vignette verte) ; 360 / 412 / 800 /
+ * 1280 px ; guidage avec le GPS émulé dans le tunnel à 360 et 1280 px : rien d'Euro dit ni affiché.
+ */
+async function euroCheck(browser, base) {
+  const mb = fixture('ors-directions-mont-blanc.json');
+  const line = mb.features[0].geometry.coordinates;
+  const now = new Date('2026-11-18T10:00:00+01:00').getTime(); // mercredi 10 h
+  const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
+  const notesOf = (page) => page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, now, voice: true, vehicle: veh('3'), directions: () => mb, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const notes = await notesOf(page);
+    check(notes.some((n) => n.cls === 'warn' && /^Tunnel du Mont-Blanc interdit à votre véhicule \(Euro 3\), vers km 13 : PL de marchandises de plus de 3,5 t Euro 0 à 4 interdits depuis le 1er juillet 2020 \(arrêté préfectoral n° 2020-0825 du 18 juin 2020\).*lu le 21\/11\/2026\. La signalisation fait foi\.Texte$/.test(n.text)),
+      `${width} px : alerte Mont-Blanc Euro 3, source et date, lien`, notes.map((n) => n.text).join(' | '));
+    check(/Mont-Blanc interdit \(Euro 3\)/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire « Mont-Blanc interdit (Euro 3) »`);
+    await noHorizontalScroll(page, `${width} px notes Euro`);
+    await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-euro.png`) });
+    if (width === 360) {
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      const opts = await page.$$eval('#veh-euro option', (o) => o.map((x) => x.textContent));
+      check(opts[0] === 'Non précisé' && opts.includes('EEV') && opts.length === 9, '360 px : liste « Classe Euro » (non précisé, 0 à 6, EEV)', opts.join('|'));
+      await noHorizontalScroll(page, '360 px profil avec « Classe Euro »');
+      await page.selectOption('#veh-euro', '6');
+      await page.click('#vehicles-body button[type="submit"]');
+      check(/Euro 6/.test(await page.textContent('#vehicles-body .vehicle-card.active .dims')), '360 px : profil « Euro 6 » enregistré');
+      await page.keyboard.press('Escape');
+      await page.reload();
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+      await computeRoute(page);
+      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      const n6 = await notesOf(page);
+      check(n6.some((n) => n.cls !== 'warn' && /^Tunnel du Mont-Blanc, vers km 13 : votre classe \(Euro 6\) est admise/.test(n.text)) && !n6.some((n) => /interdit à votre véhicule/.test(n.text)),
+        '360 px : après rechargement, Euro 6 admis', n6.map((n) => n.text).join(' | '));
+      check(!/Mont-Blanc/.test(await page.textContent('.route-card[aria-checked="true"]')), '360 px : Euro 6, rien sur la fiche d\'itinéraire');
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      await page.selectOption('#veh-euro', '');
+      await page.click('#vehicles-body button[type="submit"]');
+      await page.keyboard.press('Escape');
+      await computeRoute(page);
+      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      const n0 = await notesOf(page);
+      check(n0.some((n) => n.cls === 'warn' && /Classe Euro non précisée dans le profil : vérifiez-la\./.test(n.text))
+        && n0.some((n) => /^Tunnel du Mont-Blanc : Euro 5, EEV et Euro 6 admis/.test(n.text)), '360 px : non précisé, les deux cas affichés', n0.map((n) => n.text).join(' | '));
+      check(/Mont-Blanc : Euro 0 à 4 interdits, classe Euro \?/.test(await page.textContent('.route-card[aria-checked="true"]')), '360 px : fiche « classe Euro ? »');
+    }
+    if (width === 360 || width === 1280) {
+      // Guidage, GPS émulé : départ à l'entrée du tunnel, traversée en partie ; rien d'Euro dit ni affiché.
+      const entry = line.findIndex((c) => c[0] >= 6.86);
+      await setGeo(page, { lon: line[entry][0], lat: line[entry][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await drive(ctx, page, line.slice(entry), 70, 25);
+      const remaining = await page.textContent('#nav');
+      check(/Tunnel du Mont-Blanc|SS 26/.test(remaining), `${width} px : guidage dans le tunnel (consigne du tunnel ou de la sortie)`, remaining.replace(/\s+/g, " ").trim().slice(0, 200));
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /euro|Mont-Blanc interdit/i.test(x.replace(/europ/gi, ''))), `${width} px : guidage, rien d'Euro dit`, spoken.join(' | '));
+      const navText = await page.textContent('#nav');
+      check(!/Euro [0-6]|classe Euro/.test(navText), `${width} px : guidage, rien d'Euro affiché`);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Fréjus, Euro 4 : confirmé par l'exploitant (nom, date), sur la fiche d'itinéraire.
+  const fr = await open(browser, base, { width: 412, height: 900, now, vehicle: veh('4'), directions: () => fixture('ors-directions-frejus.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(fr.page);
+  await fr.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const fn = await notesOf(fr.page);
+  check(fn.some((n) => n.cls === 'warn' && /^Tunnel du Fréjus interdit à votre véhicule \(Euro 4\).*Confirmé par l'exploitant : SFTRF .*lu le 21\/11\/2026 ; arrêté préfectoral non retrouvé\. La signalisation fait foi\./.test(n.text)),
+    'Fréjus Euro 4 : confirmé par l\'exploitant, arrêté non retrouvé', fn.map((n) => n.text).join(' | '));
+  check(/Fréjus interdit \(Euro 4, exploitant\)/.test(await fr.page.textContent('.route-card[aria-checked="true"]')), 'Fréjus Euro 4 : ligne sur la fiche d\'itinéraire');
+  check(fr.errors.length === 0, 'Fréjus : aucune erreur JavaScript', fr.errors.join(' | '));
+  await fr.ctx.close();
+  // Fiches Suisse (RPLP) et Allemagne (Maut, vignette verte) : rubrique « Normes Euro », catégorie de la classe.
+  const frChIt = fixture('ors-directions-fr-ch-it.json');
+  const asDe = JSON.parse(JSON.stringify(frChIt));
+  asDe.features[0].properties.extras.countryinfo.values = asDe.features[0].properties.extras.countryinfo.values.map(([a, b, v]) => [a, b, v === 193 ? 74 : v]);
+  asDe.features[0].properties.extras.countryinfo.summary = asDe.features[0].properties.extras.countryinfo.summary.map((x) => ({ ...x, value: x.value === 193 ? 74 : x.value }));
+  for (const [label, json, re] of [
+    ['Suisse', frChIt, /Normes Euro.*RPLP selon la classe Euro.*Votre profil \(Euro 3\) : catégorie de redevance 1 \(3,26 centimes par tonne et par km\)\..*source officielle : Ordonnance relative à une redevance sur le trafic des poids lourds/],
+    ['Allemagne', asDe, /Normes Euro.*Votre profil \(Euro 3\) : catégorie D\..*Votre profil \(Euro 3\) : groupe 3, pas de vignette verte\..*Euro VI.*à vérifier/],
+  ]) {
+    for (const [width, height] of [[360, 760], [1280, 800]]) {
+      const c = await open(browser, base, { width, height, now, vehicle: veh('3'), directions: () => json, overpass: () => ({ elements: [] }) });
+      await computeRoute(c.page);
+      await c.page.waitForSelector('.country-card', { timeout: 10000 });
+      const text = await c.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
+      const sections = await c.page.$$eval('.country-card:first-child h4', (h) => h.map((x) => x.textContent));
+      check(sections.includes('Normes Euro') && re.test(text), `${width} px : fiche ${label}, rubrique « Normes Euro »`, text.slice(0, 300));
+      await noHorizontalScroll(c.page, `${width} px fiche ${label} Normes Euro`);
+      if (width === 360) await c.page.screenshot({ path: join(SHOTS, `${width}-euro-${label}.png`) });
+      check(c.errors.length === 0, `${width} px fiche ${label} : aucune erreur JavaScript`, c.errors.join(' | '));
+      await c.ctx.close();
+    }
+  }
+}
+
+/**
+ * Phase 5h : taxes PL régionales. Mulhouse → Strasbourg par l'A36 et l'A35 (tests/fixtures/ors-directions-alsace.json,
+ * fin sur la M35 de l'Eurométropole, non taxée) et Metz → Nancy par l'A31 : R-Pass et écocontribution du Grand Est
+ * « prévue à partir du … » (information, jamais sur la fiche d'itinéraire), taux R-Pass de la classe du profil
+ * (dépliant officiel, aucun total), un mercredi de novembre 2026 puis en janvier 2027, profil Euro 6 puis classe non
+ * précisée, fichier absent, 360 / 412 / 800 / 1280 px ; guidage avec le GPS émulé : rien de dit ni affiché ; fiche
+ * Belgique « Changements au 1er janvier 2027 ».
+ */
+async function tollsCheck(browser, base) {
+  const als = fixture('ors-directions-alsace.json');
+  const line = als.features[0].geometry.coordinates;
+  const nov = new Date('2026-11-25T10:00:00+01:00').getTime(); // mercredi 10 h
+  const jan = new Date('2027-01-06T10:00:00+01:00').getTime(); // mercredi 10 h
+  const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
+  const notesOf = (page) => page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+  const rpass = (n) => n.find((x) => /R-Pass/.test(x.text));
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, now: nov, voice: true, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const notes = await notesOf(page);
+    const r = rpass(notes);
+    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
+      `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
+    check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
+    await noHorizontalScroll(page, `${width} px notes taxes PL`);
+    await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-tolls.png`) });
+    if (width === 360 || width === 1280) {
+      // Guidage, GPS émulé sur l'A35 : rien de la taxe dit ni affiché.
+      await setGeo(page, { lon: line[3][0], lat: line[3][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await drive(ctx, page, line.slice(3, 12), 80, 20);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /taxe|R-Pass|écocontribution|ECPL/i.test(x)), `${width} px : guidage, rien de la taxe dit`, spoken.join(' | '));
+      check(!/taxe|R-Pass|écocontribution|ECPL/i.test(await page.textContent('#nav')), `${width} px : guidage, rien de la taxe affiché`);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Janvier 2027 : « prévue depuis », information ; classe Euro non précisée : fourchette de la classe D.
+  for (const [label, now, euro, re] of [
+    ['janvier 2027', jan, '6', /prévue depuis le 1er janvier 2027.*: 14,6 centimes par km/],
+    ['classe non précisée', nov, '', /prévue à partir du 1er janvier 2027.*classe Euro non précisée : de 13,8 à 34,5 centimes par km/],
+  ]) {
+    const c = await open(browser, base, { width: 412, height: 900, now, vehicle: veh(euro), directions: () => als, overpass: () => ({ elements: [] }) });
+    await computeRoute(c.page);
+    await c.page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const r = rpass(await notesOf(c.page));
+    check(r && r.cls !== 'warn' && re.test(r.text), `${label} : R-Pass en information`, r?.text);
+    check(!/R-Pass/.test(await c.page.textContent('.route-card[aria-checked="true"]')), `${label} : rien sur la fiche d'itinéraire`);
+    check(c.errors.length === 0, `${label} : aucune erreur JavaScript`, c.errors.join(' | '));
+    await c.ctx.close();
+  }
+  // Phase 5h bis : diagnostic du trajet (replié, texte à copier), 360 et 1280 px.
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    const dg = await open(browser, base, { width, height, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }) });
+    await computeRoute(dg.page);
+    await dg.page.waitForSelector('.route-diag', { timeout: 10000 });
+    check(!(await dg.page.$eval('.route-diag', (d) => d.open)), `${width} px : diagnostic replié par défaut`);
+    await dg.page.click('.route-diag summary');
+    await dg.page.click('.btn-diag-copy');
+    await dg.page.waitForTimeout(300);
+    const txt = await dg.page.textContent('.route-diag-text');
+    check(/— diagnostic du trajet/.test(txt) && /Étapes ORS/.test(txt) && /\| A 35, E 25 \| A35, E25 \|/.test(txt) && /R-Pass : km 0,0–9\d,\d \(A36, A35\)/.test(txt) && /\| M 35, E 25 \| M35, E25 \|/.test(txt) && /^Gabarit, version inconnue — diagnostic du trajet/.test(txt),
+      `${width} px : diagnostic (étapes, références, R-Pass, ZFE)`, JSON.stringify(txt.slice(0, 1500)));
+    check(/Copié\.|Texte sélectionné/.test(await dg.page.textContent('.route-diag-status')), `${width} px : bouton Copier`);
+    await noHorizontalScroll(dg.page, `${width} px diagnostic ouvert`);
+    if (width === 360) await dg.page.screenshot({ path: join(SHOTS, `${width}-diag.png`) });
+    check(dg.errors.length === 0, `${width} px diagnostic : aucune erreur JavaScript`, dg.errors.join(' | '));
+    await dg.ctx.close();
+  }
+  // Phase 5h bis : échec d'ORS (404, code 2009) : message clair et, en petit, code et message du service.
+  const er = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'),
+    directions: () => ({ __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } }) });
+  await er.page.fill('#to-input', 'Lyon');
+  await er.page.waitForSelector('#to-list li', { timeout: 5000 });
+  await er.page.dispatchEvent('#to-list li', 'pointerdown');
+  await er.page.click('#btn-route');
+  await er.page.waitForSelector('#message:not([hidden]) .message-detail', { timeout: 10000 });
+  const msg = await er.page.textContent('#message');
+  check(/^Aucun itinéraire autorisé pour ce gabarit\..*Réponse du service d'itinéraire : HTTP 404, code 2009 — « Route could not be found/.test(msg), '360 px : échec 2009, message et code du service', msg);
+  await noHorizontalScroll(er.page, '360 px message d\'erreur');
+  check(er.errors.length === 0, 'échec 2009 : aucune erreur JavaScript', er.errors.join(' | '));
+  await er.ctx.close();
+  // A36 et D 83 de Belfort (Besançon → Belfort, faux positif v28) : hors du réseau R-Pass, aucune ligne.
+  const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(bb.page);
+  await bb.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const bn = await notesOf(bb.page);
+  check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort (A36, puis D 83 dans Belfort) : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
+  await bb.ctx.close();
+  // Grand Est : A31, 2 avril 2027, réseau officiel, aucun montant ; fichier absent.
+  const ge = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-metz-nancy.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(ge.page);
+  await ge.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const gn = await notesOf(ge.page);
+  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km 0 à km \d+ \(A31\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
+    'Grand Est : écocontribution sur l\'A31, réseau officiel, aucun montant, pas de R-Pass', gn.map((n) => n.text).join(' | '));
+  await ge.ctx.close();
+  const ab = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), tollsFile: null });
+  await computeRoute(ab.page);
+  await ab.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const an = await notesOf(ab.page);
+  check(an.some((n) => /^Taxes PL régionales indisponibles \(données non chargées\)/.test(n.text)), 'fichier absent : « Taxes PL régionales indisponibles »', an.map((n) => n.text).join(' | '));
+  check(ab.errors.length === 0, 'fichier absent : aucune erreur JavaScript', ab.errors.join(' | '));
+  await ab.ctx.close();
+  // Fiche Belgique (Saint-Julien → … relu comme FR → BE) : changements Viapass au 1er janvier 2027, source nommée.
+  const be = JSON.parse(JSON.stringify(fixture('ors-directions-fr-ch-it.json')));
+  const ci = be.features[0].properties.extras.countryinfo;
+  ci.values = ci.values.map(([a, b, v]) => [a, b, v === 70 ? 70 : 17]);
+  ci.summary = [{ value: 70, distance: 3803.5, amount: 2 }, { value: 17, distance: 165515.9, amount: 98 }];
+  const bp = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'), directions: () => be, overpass: () => ({ elements: [] }) });
+  await computeRoute(bp.page);
+  await bp.page.waitForSelector('.country-card', { timeout: 10000 });
+  const bt = await bp.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
+  check(/Belgique/.test(bt) && /Changements au 1er janvier 2027 : nouveaux tarifs.*aucune route ajoutée.*Viapass, Prélèvement kilométrique : les modifications prévues à partir du 1er janvier 2027/.test(bt),
+    '360 px : fiche Belgique, changements Viapass au 1er janvier 2027 avec la source', bt.slice(0, 400));
+  await noHorizontalScroll(bp.page, '360 px fiche Belgique');
+  check(bp.errors.length === 0, 'fiche Belgique : aucune erreur JavaScript', bp.errors.join(' | '));
+  await bp.ctx.close();
 }
 
 /**
@@ -1834,7 +2085,8 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
+    tolls: tollsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

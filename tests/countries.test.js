@@ -278,3 +278,14 @@ test('ADR : tunnels du pays repris de la copie (phase 5b), sans recopier les cat
   assert.ok(card.items.some((i) => /Tunnels signalés sur ce trajet : Tunnel du Grand-Saint-Bernard \(interdit à votre code\)/.test(i.text)));
   assert.ok(!JSON.stringify(raw('CH')).includes('"category"'));
 });
+
+test('München → Innsbruck (phase 5h) : Allemagne puis Autriche, fiche Autriche « à vérifier »', () => {
+  const r = parseDirections(fixture('ors-directions-muenchen-innsbruck.json'));
+  assert.deepEqual(r.countries.map((c) => c.code), ['DE', 'AT']);
+  const rules = routeRules(r, { vehicle: semi, departure: new Date(2026, 10, 25, 9, 0), countries: loaded() });
+  const at = rules.countries.cards.find((c) => c.code === 'AT');
+  assert.ok(at, 'fiche Autriche absente');
+  assert.ok(at.items.length > 0);
+  assert.ok(at.items.every((i) => !i.confirmed), 'règle autrichienne confirmée sans source lue');
+  assert.ok(at.items.some((i) => /à vérifier/.test(i.text)));
+});
