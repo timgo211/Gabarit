@@ -17,7 +17,7 @@
 // copie partielle), code de sortie 1. Le journal donne le poids des fichiers, la durée de chaque pays et le
 // recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc (catégories Bison Futé) avec OpenStreetMap.
 
-import { createReadStream, createWriteStream, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -37,6 +37,9 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'data', 'tunnels-adr.json');
 const AREAS_DIR = join(ROOT, 'data', 'aires-osm');
 const ACCESS_DIR = join(ROOT, 'data', 'acces-osm');
+// Contours .poly de Geofabrik (© contributeurs OpenStreetMap, ODbL) : secours si leur téléchargement échoue.
+const POLY_DIR = join(ROOT, 'data', 'osm-poly');
+const POLY_DATES = join(POLY_DIR, 'dates.json');
 const UA = 'Gabarit (GitHub Action, mise a jour mensuelle)';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -85,19 +88,50 @@ function extractDate(file) {
   }
 }
 
-async function download(url, file) {
-  for (let i = 0; i < 3; i += 1) {
-    if (i) await sleep(30000 * i);
+// Téléchargements : un délai par essai (une requête bloquée sans réponse ne dure plus 5 min), 5 essais séparés par
+// 30 s, 1 min, 2 min puis 4 min (run #9 du 21/11/2026 : spain.poly refusé trois fois, serveur Geofabrik instable).
+const TIMEOUT_POLY_MS = 60 * 1000;
+const TIMEOUT_PBF_MS = 20 * 60 * 1000;
+const RETRY_WAITS_MS = [30000, 60000, 120000, 240000];
+
+async function download(url, file, { timeoutMs = TIMEOUT_PBF_MS } = {}) {
+  for (let i = 0; i <= RETRY_WAITS_MS.length; i += 1) {
+    if (i) await sleep(RETRY_WAITS_MS[i - 1]);
     try {
-      const res = await fetch(url, { headers: { 'user-agent': UA } });
+      const signal = AbortSignal.timeout(timeoutMs);
+      const res = await fetch(url, { headers: { 'user-agent': UA }, signal });
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-      await pipeline(Readable.fromWeb(res.body), createWriteStream(file));
+      await pipeline(Readable.fromWeb(res.body), createWriteStream(file), { signal });
       return;
     } catch (err) {
-      console.log(`⚠ téléchargement ${url} (essai ${i + 1}) : ${err.message}`);
+      // « fetch failed » cache la vraie raison (connexion refusée, coupée, nom introuvable…) : err.cause l'écrit.
+      const cause = err?.cause ? ` (${[err.cause.code, err.cause.message].filter(Boolean).join(' : ')})` : '';
+      const why = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? `délai de ${Math.round(timeoutMs / 1000)} s dépassé` : `${err.message}${cause}`;
+      console.log(`⚠ téléchargement ${url} (essai ${i + 1}/${RETRY_WAITS_MS.length + 1}) : ${why}`);
     }
   }
-  throw new Error(`Téléchargement impossible : ${url} — data/tunnels-adr.json et data/aires-osm/ non modifiés (pas de copie partielle).`);
+  throw new Error(`Téléchargement impossible : ${url} — data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés (pas de copie partielle).`);
+}
+
+/**
+ * Contour .poly d'un extrait : téléchargé, sinon copie du dépôt (data/osm-poly/, écrite à chaque copie réussie, avec sa
+ * date dans dates.json). Les contours téléchargés ne sont enregistrés qu'à la fin, avec les données (rien d'écrit si
+ * un pays échoue).
+ */
+async function loadPoly(region, file, fresh) {
+  const name = region.split('/').pop();
+  try {
+    await download(`https://download.geofabrik.de/${region}.poly`, file, { timeoutMs: TIMEOUT_POLY_MS });
+    const text = readFileSync(file, 'utf8');
+    fresh.set(name, text);
+    return text;
+  } catch (err) {
+    const copy = join(POLY_DIR, `${name}.poly`);
+    if (!existsSync(copy)) throw err;
+    const dates = existsSync(POLY_DATES) ? JSON.parse(readFileSync(POLY_DATES, 'utf8')) : {};
+    console.log(`⚠ contour ${region}.poly indisponible : copie du dépôt utilisée (data/osm-poly/${name}.poly, copie du ${dates[name] ?? 'date inconnue'}).`);
+    return readFileSync(copy, 'utf8');
+  }
 }
 
 /** Tubes des trois tunnels gardés en dur, lus dans l'API principale d'OSM (sans Overpass). */
@@ -186,6 +220,7 @@ async function main() {
   const areas = new Map();
   const ways = new Map();
   const polys = [];
+  const freshPolys = new Map();
   let updated = null;
   try {
     if (args.length) {
@@ -203,9 +238,8 @@ async function main() {
         const mb = statSync(file).size / 1024 / 1024;
         const t1 = Date.now();
         const polyFile = join(dir, 'pays.poly');
-        await download(`https://download.geofabrik.de/${region}.poly`, polyFile);
-        const poly = parsePoly(readFileSync(polyFile, 'utf8'));
-        if (!poly.bbox) throw new Error(`Contour illisible : ${region}.poly — rien n'est modifié.`);
+        const poly = parsePoly(await loadPoly(region, polyFile, freshPolys));
+        if (!poly.bbox) throw new Error(`Contour illisible : ${region}.poly — data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.`);
         polys.push(poly);
         const date = extractDate(file);
         if (date && (!updated || date < updated)) updated = date; // date la plus ancienne des extraits
@@ -236,14 +270,22 @@ async function main() {
   const acc = convertAccess([...ways.values()], { updated: day, grid, countries });
   for (const line of acc.log) console.log(line);
   // Rien n'est écrit si l'un des deux jeux est vide (ancienne copie gardée).
-  if (!data.tunnels.length) throw new Error('Aucun tunnel lu : data/tunnels-adr.json et data/aires-osm/ non modifiés.');
-  if (!conv.index.count || !grid.cells) throw new Error('Aucune aire ou zone couverte vide : data/tunnels-adr.json et data/aires-osm/ non modifiés.');
+  if (!data.tunnels.length) throw new Error('Aucun tunnel lu : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
+  if (!conv.index.count || !grid.cells) throw new Error('Aucune aire ou zone couverte vide : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
   if (!acc.index.count) throw new Error('Aucune voie à accès conditionnel lue : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
   const text = `${JSON.stringify(data)}\n`;
   writeFileSync(OUT, text);
   console.log(`data/tunnels-adr.json : ${data.tunnels.length} tubes, ${kb(Buffer.byteLength(text))} (extraits du ${data.updated}).`);
   writeTiles(AREAS_DIR, conv.index, conv.tiles, 'aires');
   writeTiles(ACCESS_DIR, acc.index, acc.tiles, 'voies à accès conditionnel');
+  if (freshPolys.size) {
+    mkdirSync(POLY_DIR, { recursive: true });
+    const dates = existsSync(POLY_DATES) ? JSON.parse(readFileSync(POLY_DATES, 'utf8')) : {};
+    const today = new Date().toISOString().slice(0, 10);
+    for (const [name, text] of freshPolys) { writeFileSync(join(POLY_DIR, `${name}.poly`), text); dates[name] = today; }
+    writeFileSync(POLY_DATES, `${JSON.stringify(dates, null, 1)}\n`);
+    console.log(`data/osm-poly/ : ${freshPolys.size} contours enregistrés (copie de secours du ${today}).`);
+  }
   console.log(`Durée totale : ${Math.round((Date.now() - start) / 60000)} min.`);
 }
 
