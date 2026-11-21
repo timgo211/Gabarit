@@ -1311,7 +1311,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v28', 'vrai service worker : « Gabarit v28 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v30', 'vrai service worker : « Gabarit v30 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1704,12 +1704,30 @@ async function tollsCheck(browser, base) {
     check(c.errors.length === 0, `${label} : aucune erreur JavaScript`, c.errors.join(' | '));
     await c.ctx.close();
   }
-  // A36 vers Belfort (Besançon → Belfort) : hors du réseau R-Pass, aucune ligne.
+  // Phase 5h bis : diagnostic du trajet (replié, texte à copier), 360 et 1280 px.
+  for (const [width, height] of [[360, 760], [1280, 800]]) {
+    const dg = await open(browser, base, { width, height, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }) });
+    await computeRoute(dg.page);
+    await dg.page.waitForSelector('.route-diag', { timeout: 10000 });
+    check(!(await dg.page.$eval('.route-diag', (d) => d.open)), `${width} px : diagnostic replié par défaut`);
+    await dg.page.click('.route-diag summary');
+    await dg.page.click('.btn-diag-copy');
+    await dg.page.waitForTimeout(300);
+    const txt = await dg.page.textContent('.route-diag-text');
+    check(/— diagnostic du trajet/.test(txt) && /Étapes ORS/.test(txt) && /\| A 35, E 25 \| A35, E25 \|/.test(txt) && /R-Pass : km 0,0–9\d,\d \(A36, A35\)/.test(txt) && /\| M 35, E 25 \| M35, E25 \|/.test(txt) && /^Gabarit, version inconnue — diagnostic du trajet/.test(txt),
+      `${width} px : diagnostic (étapes, références, R-Pass, ZFE)`, JSON.stringify(txt.slice(0, 1500)));
+    check(/Copié\.|Texte sélectionné/.test(await dg.page.textContent('.route-diag-status')), `${width} px : bouton Copier`);
+    await noHorizontalScroll(dg.page, `${width} px diagnostic ouvert`);
+    if (width === 360) await dg.page.screenshot({ path: join(SHOTS, `${width}-diag.png`) });
+    check(dg.errors.length === 0, `${width} px diagnostic : aucune erreur JavaScript`, dg.errors.join(' | '));
+    await dg.ctx.close();
+  }
+  // A36 et D 83 de Belfort (Besançon → Belfort, faux positif v28) : hors du réseau R-Pass, aucune ligne.
   const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(bb.page);
   await bb.page.waitForSelector('.rules-notes', { timeout: 10000 });
   const bn = await notesOf(bb.page);
-  check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort par l\'A36 : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
+  check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort (A36, puis D 83 dans Belfort) : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
   await bb.ctx.close();
   // Grand Est : A31, 2 avril 2027, réseau officiel, aucun montant ; fichier absent.
   const ge = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-metz-nancy.json'), overpass: () => ({ elements: [] }) });

@@ -79,6 +79,11 @@ export function parseTollData(json) {
     const roads = Array.isArray(t?.roads) ? t.roads.filter((r) => typeof r === 'string' && r) : [];
     if (!id || !name || !isDate(t?.start) || !bbox || !roads.length) continue;
     // Cadre propre à une route (ex. A36 : partie alsacienne seulement, jamais vers Belfort), en plus du cadre général.
+    // Contour de la collectivité (anneaux [lon, lat]) : toute route de la taxe doit être dedans (le cadre `bbox`
+    // déborde : Territoire de Belfort, Moselle). Anneau illisible → ignoré ; aucun anneau lisible → cadre seul.
+    const rings = Array.isArray(t.area?.rings)
+      ? t.area.rings.filter((r) => Array.isArray(r) && r.length >= 4 && r.every((p) => Array.isArray(p) && p.length === 2 && p.every(isNum)))
+      : [];
     const roadBoxes = {};
     for (const [r, b] of Object.entries(t.roadBoxes && typeof t.roadBoxes === 'object' ? t.roadBoxes : {})) {
       if (Array.isArray(b) && b.length === 4 && b.every(isNum)) roadBoxes[r] = b;
@@ -91,7 +96,7 @@ export function parseTollData(json) {
     const rates = confirmed && Array.isArray(t.rates) ? t.rates.filter((r) => str(r?.text)) : null;
     const grid = status !== 'check' ? parseGrid(t.grid, sources) : null;
     taxes.push({
-      id, name, short: str(t.short) ?? name, start: t.start, bbox, roads, roadBoxes,
+      id, name, short: str(t.short) ?? name, start: t.start, bbox, roads, roadBoxes, rings, areaSource: str(t.area?.source),
       status, basis: str(t.basis), source, verified, url: str(t.url),
       scope: str(t.scope), note: str(t.note), rates: rates?.length ? rates : null, grid,
     });
@@ -158,6 +163,21 @@ export function gridText(grid, vehicle, sources = {}) {
 
 const inBox = ([lon, lat], [w, s, e, n]) => lon >= w && lon <= e && lat >= s && lat <= n;
 
+/** Point dans un anneau (règle pair-impair). */
+function inRing([x, y], ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i, i += 1) {
+    const [xi, yi] = ring[i]; const [xj, yj] = ring[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** Point dans le contour de la taxe (un des anneaux) ; sans contour : vrai (cadre `bbox` seul). */
+export function inTaxArea(point, tax) {
+  return !tax.rings?.length || tax.rings.some((r) => inRing(point, r));
+}
+
 /**
  * Passages du tracé sur chaque taxe : points sur une route de la liste, dans le cadre, en France.
  * @returns {{ tax:object, enter:number, exit:number, enterTime:Date, roads:string[], countryKnown:boolean }[]}
@@ -173,7 +193,7 @@ export function tollsAlongRoute(route, { data, departure = new Date(), elapsed =
     let cur = null;
     for (const s of samples) {
       const hit = s.roads.filter((r) => tax.roads.includes(r) && (!tax.roadBoxes?.[r] || inBox(s.lonlat, tax.roadBoxes[r])));
-      if (!hit.length || !inBox(s.lonlat, tax.bbox) || !inFrance(s.along)) continue;
+      if (!hit.length || !inBox(s.lonlat, tax.bbox) || !inTaxArea(s.lonlat, tax) || !inFrance(s.along)) continue;
       if (cur && s.along - cur.exit <= TOLLS.GAP_M) {
         cur.exit = s.along;
         for (const r of hit) if (!cur.roads.includes(r)) cur.roads.push(r);

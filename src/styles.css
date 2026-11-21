@@ -214,6 +214,12 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .summary { margin-top: 12px; }
 .route-to { margin: 0 0 8px; }
 .summary-notes { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: .9rem; }
+/* Phase 5h bis : diagnostic du trajet (replié, texte à copier). */
+.route-diag { margin: 12px 0 0; color: var(--muted); font-size: .9rem; min-width: 0; }
+.route-diag summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; }
+.route-diag-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+.route-diag-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .8rem; max-height: 50vh; overflow: auto; margin: 0;
+  padding: 8px; border: 1px solid var(--muted); border-radius: 6px; user-select: text; }
 
 /* Fiches d'itinéraire : une par itinéraire, celle choisie bordée de la couleur du tracé. */
 .route-cards { display: grid; gap: 8px; }

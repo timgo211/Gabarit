@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parseDirections } from '../src/lib/ors-response.js';
-import { TOLLS, parseTollData, tollsAlongRoute, tollRules, longDate, gridText } from '../src/lib/hgv-tolls.js';
+import { TOLLS, parseTollData, tollsAlongRoute, tollRules, longDate, gridText, inTaxArea } from '../src/lib/hgv-tolls.js';
 import { routeRules } from '../src/lib/route-rules.js';
 
 const fixture = (name) => JSON.parse(readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8'));
@@ -209,7 +209,7 @@ test('A36 : rien vers Belfort (Besançon → Belfort), comptée seulement dans l
   // Le passage commence à 7,05° E (Haut-Rhin), pas à Belfort (6,86° E) : environ 15 km après le départ.
   assert.ok(p.enter > 12000, `entrée à ${Math.round(p.enter)} m`);
   const line = tollRules(bm, { vehicle: truck, tolls: ok(real), departure: dep }).lines[0];
-  assert.match(line.text, /A36 comptée seulement dans le Haut-Rhin \(jamais vers Belfort\), limite de la partie concédée à vérifier/);
+  assert.match(line.text, /routes comptées seulement dans le Bas-Rhin et le Haut-Rhin \(jamais vers Belfort ni en Moselle\), RD83 seulement entre Colmar et Sélestat ; limite de la partie concédée de l.A36/);
   assert.match(line.text, /annoncé|prévue à partir du 1er janvier 2027/);
 });
 
@@ -217,4 +217,33 @@ test('cadre propre à une route : illisible → ignoré, cadre général gardé'
   const t = JSON.parse(readFileSync(new URL('../data/taxes-pl.json', import.meta.url), 'utf8'));
   t.taxes[0].roadBoxes = { A36: [7, 'x'] };
   assert.deepEqual(parseTollData(t).taxes[0].roadBoxes, {});
+});
+
+test('contour Bas-Rhin / Haut-Rhin : la D 83 de Belfort n\'est pas comptée (sans contour, elle l\'était : v28)', () => {
+  const dep = new Date(2026, 10, 25, 9, 0);
+  const bes = routeOf('ors-directions-besancon-belfort.json');
+  const raw = JSON.parse(readFileSync(new URL('../data/taxes-pl.json', import.meta.url), 'utf8'));
+  const noArea = parseTollData({ ...raw, taxes: raw.taxes.map((t) => ({ ...t, area: undefined, roadBoxes: undefined })) });
+  const before = tollsAlongRoute(bes, { data: noArea, departure: dep });
+  assert.equal(before.length, 1, 'la fixture reproduit le faux positif de la tablette');
+  assert.deepEqual(before[0].roads, ['D83']);
+  assert.equal(tollsAlongRoute(bes, { data: real, departure: dep }).length, 0);
+  const tax = real.taxes.find((t) => t.id === 'r-pass');
+  assert.equal(tax.rings.length, 2);
+  for (const p of [[6.863, 47.638], [7.0, 47.64], [7.43, 49.05]]) assert.equal(inTaxArea(p, tax), false, `${p} hors Alsace`);
+  for (const p of [[7.15, 47.73], [7.36, 48.08], [7.45, 48.26], [7.75, 48.58], [8.18, 48.97]]) assert.equal(inTaxArea(p, tax), true, `${p} en Alsace`);
+  // ECPL : pas de contour, cadre seul.
+  assert.equal(inTaxArea([5, 49], real.taxes.find((t) => t.id === 'ecpl')), true);
+});
+
+test('RD83 comptée seulement entre Colmar et Sélestat (noms ORS « name, ref », références OSM du 21/11/2026)', () => {
+  const dep = new Date(2026, 10, 25, 9, 0);
+  const r = routeOf('ors-directions-cernay-erstein.json');
+  const ps = tollsAlongRoute(r, { data: real, departure: dep });
+  assert.equal(ps.length, 1, ps.map((p) => `${p.enter}-${p.exit}`).join(' ; '));
+  const [p] = ps;
+  assert.deepEqual(p.roads, ['D83', 'N83']);
+  // Cernay → Colmar (environ 30 km) et Sélestat → Erstein (environ 25 km) ne comptent pas.
+  assert.ok(p.enter > 25000 && p.enter < 33000, `entrée à ${Math.round(p.enter)} m`);
+  assert.ok(r.coordinates.length > 0 && p.exit < 62000, `sortie à ${Math.round(p.exit)} m`);
 });

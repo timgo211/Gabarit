@@ -33,6 +33,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5h : `hgv-tolls.js` (taxes PL régionales de `data/taxes-pl.json` : R-Pass, écocontribution Grand Est ;
     références de route dans le cadre de la région, heure de passage, statuts confirmé / annoncé / à vérifier, taux
     de la grille officielle pour la classe du profil) ; lignes « Changements au 1er janvier 2027 » des fiches pays
+  - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -95,8 +96,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 - fixtures phase 5g : `ors-directions-mont-blanc.json` (Le Fayet → tunnel du Mont-Blanc → Courmayeur) et
   `ors-directions-frejus.json` (Modane → tunnel du Fréjus → Bardonecchia), countryinfo FR 70 / IT 97, tubes de
   `KNOWN_TUNNELS`, écrites d'après la doc ORS
-- fixtures phase 5h : `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
-  `ors-directions-besancon-belfort.json` (A 36), `ors-directions-metz-nancy.json`
+- fixtures phase 5h : `ors-directions-cernay-erstein.json` (D 83 Cernay → Colmar → Sélestat → Erstein, noms
+  « name, ref » des étiquettes OSM du 21/11/2026), `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
+  `ors-directions-besancon-belfort.json` (A 36 puis D 83 dans Belfort), `ors-directions-metz-nancy.json`
   (A 31), `ors-directions-muenchen-innsbruck.json` (countryinfo DE 74 / AT 11), écrites d'après la doc ORS
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
@@ -129,7 +131,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v28 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v30 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -382,8 +384,11 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
   tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
 - Taxes PL régionales (phase 5h, `hgv-tolls.js`) : `data/taxes-pl.json` dans `APP_FILES` ; chaque taxe a `start`,
-  `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `roadBoxes` (cadre propre à une route : A36 dans le Haut-Rhin
-  seulement, 7,05° E et plus, jamais vers Belfort ; limite de la concession à vérifier), `scope` (réseau officiel),
+  `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `area` (contour de la collectivité : Bas-Rhin et Haut-Rhin, IGN Admin
+  Express COG 2018, Licence Ouverte, via gregoiredavid/france-geojson, simplifié à 150 m ; toute route de la taxe doit
+  y être : plus de D 83 de Belfort, v28), `roadBoxes` (cadre propre à une route : D83 et N83 entre Colmar et Sélestat
+  seulement, la D 83 d'OSM allant de Cernay à Erstein ; limite de la concession de l'A36 à vérifier), `scope` (réseau
+  officiel),
   `basis`, `note`. Statuts : 'confirmed' (texte officiel lu : alerte en vigueur, ligne sur la fiche), 'announced'
   (site officiel lu, date « prévue », information seulement), 'check' (rien lu : « Taxe possible : … périmètre
   officiel non lu, à vérifier », aucun montant) ; 'confirmed' / 'announced' exigent `source` et `verified`, sinon
@@ -404,6 +409,13 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   intermédiaire (TeleSec Business TLS-CA 2022, lu par l'adresse AIA, vérification gardée). Pas de champ « Essieux »
   tant qu'aucun montant n'en dépend. alsace.eu, toll-collect.de, gesetze-im-internet.de, asfinag.at et
   ris.bka.gv.at ne répondent pas non plus à l'Action ; tous refusent le conteneur.
+  Noms d'étape ORS : GraphHopper v4.17 (`EncodingManager.applyWayTags`) écrit `name` d'OSM puis « , » et `ref`
+  (ref seule sans nom) → `roadRefs` lit les références dans le nom. Références OSM lues le 21/11/2026 (extrait Alsace,
+  miroir download.openstreetmap.fr : Geofabrik et Overpass injoignables depuis l'Action, IPv6) : Colmar–Sélestat =
+  `A 35` « Autoroute des Cigognes » et `D 83` sans nom, quelques `N 83` ; `D 1363` (Lauterbourg), `D 502`
+  (Gambsheim), `D 504` (Seltz) ; `M 35` = Eurométropole. Diagnostic du trajet (phase 5h bis, `route-diagnostic.js`) :
+  bloc replié sous les notes de la fiche, texte à copier (étapes ORS : km, nom renvoyé, références lues, point de
+  début arrondi à 0,01° ; pays ; ZFE et taxes PL avec leurs km), jamais de clé ni de profil complet.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
