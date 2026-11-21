@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyError, formatDiagnostic, summarizeKeyTest } from '../src/lib/ors-errors.js';
+import { classifyError, formatDiagnostic, summarizeKeyTest, serviceDetailText, ERROR_KINDS } from '../src/lib/ors-errors.js';
 import { fixture } from './helpers.js';
 
 test('aucun itinéraire autorisé (2009)', () => {
@@ -110,4 +110,28 @@ test('bouton Tester : clé refusée → non enregistrée, code HTTP affiché', (
 test('bouton Tester : quota dépassé → clé gardée', () => {
   const r = summarizeKeyTest({ directions: { ok: false, kind: 'quota', status: 429 }, geocode: { ok: true } });
   assert.equal(r.saveKey, true);
+});
+
+test('phase 5h bis : codes rangés sous « Aucun itinéraire autorisé » (2009, 404 sans code) ; 429 jamais', () => {
+  const noRoute = classifyError({ status: 404, body: { error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 (6.17 49.12) and 2 (6.18 48.69).' } } });
+  assert.equal(noRoute.kind, ERROR_KINDS.NO_ROUTE);
+  assert.equal(noRoute.code, 2009);
+  assert.equal(classifyError({ status: 404, body: null }).kind, ERROR_KINDS.NO_ROUTE);
+  const quota = classifyError({ status: 429, body: { error: 'Rate limit exceeded' } });
+  assert.equal(quota.kind, ERROR_KINDS.QUOTA);
+  assert.doesNotMatch(quota.message, /profil|gabarit/);
+  assert.equal(classifyError({ status: 404, body: { error: { code: 2010, message: 'Could not find point 1' } } }).kind, ERROR_KINDS.POINT_NOT_FOUND);
+  assert.equal(classifyError({ status: 400, body: { error: { code: 2004, message: 'Request parameters exceed the server configuration limits.' } } }).kind, ERROR_KINDS.TOO_FAR);
+});
+
+test('phase 5h bis : ligne technique sous le message (statut, code, message ; jamais la clé)', () => {
+  const e = { ...classifyError({ status: 404, body: { error: { code: 2009, message: 'Route could not be found' } } }), status: 404 };
+  assert.equal(serviceDetailText(e), "Réponse du service d'itinéraire : HTTP 404, code 2009 — « Route could not be found ».");
+  assert.equal(serviceDetailText({ ...classifyError({ status: 429, body: { error: 'Rate limit exceeded' } }), status: 429 }),
+    "Réponse du service d'itinéraire : HTTP 429 — « Rate limit exceeded ».");
+  assert.equal(serviceDetailText({ status: 403, detail: 'key CLE-FACTICE-123 refused' }, 'CLE-FACTICE-123'),
+    "Réponse du service d'itinéraire : HTTP 403 — « key ••• refused ».");
+  assert.equal(serviceDetailText(classifyError({ networkError: true })), '');
+  assert.equal(serviceDetailText(null), '');
+  assert.ok(serviceDetailText({ status: 500, detail: 'x'.repeat(300) }).length < 220);
 });

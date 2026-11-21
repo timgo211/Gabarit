@@ -8,6 +8,7 @@ import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
 import { dayTime } from '../lib/hgv-bans.js';
+import { routeDiagnosticText } from '../lib/route-diagnostic.js';
 
 const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', text });
 
@@ -118,6 +119,44 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
 }
 
 /**
+ * Diagnostic du trajet (phase 5h bis) : bloc replié, texte calculé à l'ouverture, bouton « Copier » (presse-papiers,
+ * sinon texte sélectionné pour une copie à la main). Version lue dans Réglages (#app-version).
+ */
+function diagnosticBlock(route, rules, label) {
+  const pre = el('pre', { class: 'route-diag-text' });
+  const status = el('span', { class: 'route-diag-status', 'aria-live': 'polite' });
+  const text = () => routeDiagnosticText(route, {
+    rules, label, version: document.querySelector('#app-version')?.textContent?.trim() ?? '',
+  });
+  const fill = () => { if (!pre.textContent) pre.textContent = text(); };
+  const copy = async () => {
+    fill();
+    try {
+      await navigator.clipboard.writeText(pre.textContent);
+      status.textContent = 'Copié.';
+    } catch {
+      const r = document.createRange();
+      r.selectNodeContents(pre);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(r);
+      status.textContent = 'Texte sélectionné : copiez-le avec le menu du navigateur.';
+    }
+  };
+  const d = el('details', { class: 'route-diag' }, [
+    el('summary', { text: 'Diagnostic du trajet (routes lues, à copier)' }),
+    el('p', { class: 'hint', text: 'Noms et références de route renvoyés par OpenRouteService, km, ZFE et taxes PL. Aucune clé ni profil complet.' }),
+    el('div', { class: 'route-diag-actions' }, [
+      el('button', { type: 'button', class: 'btn btn-diag-copy', onclick: copy, text: 'Copier' }),
+      status,
+    ]),
+    pre,
+  ]);
+  d.addEventListener('toggle', () => { if (d.open) fill(); });
+  return d;
+}
+
+/**
  * @param {HTMLElement} node bloc des fiches
  * @param {HTMLElement} notesNode bloc des notes (véhicule, avertissements), placé sous le bouton « Démarrer »
  * @param {{ choice:{ options:object[], failures:object[], selected:number, vehicle:object, toLabel?:string,
@@ -164,6 +203,7 @@ export function renderRouteChoice(node, notesNode, {
       onAvoidLocal, localBusy,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
+    diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : ''),
   );
   notesNode.hidden = false;
 }
