@@ -1,5 +1,6 @@
-# Phase 5h bis — références OSM des routes du réseau R-Pass (Colmar–Sélestat, RD1363, RD502, RD504, A35, A36, M35) et
-# de la D83 près de Belfort. ORS (GraphHopper 4.17) nomme une étape « name, ref » d'OSM : on lit ces étiquettes.
+# Phase 5h bis — références OSM des routes du réseau R-Pass (Colmar–Sélestat, RD1363, RD502, RD504, A35, A36, M35).
+# ORS (GraphHopper 4.17, EncodingManager.applyWayTags) nomme une étape « name, ref » d'OSM : on lit ces étiquettes dans
+# l'extrait Geofabrik de l'Alsace (Overpass injoignable depuis l'Action le 21/11/2026).
 # Journal seulement : aucune donnée écrite, aucun commit. À RETIRER AVANT LE MERGE de la PR « 5h bis ».
 name: Sources R-Pass OSM (lecture, phase 5h bis)
 
@@ -17,44 +18,38 @@ permissions:
 jobs:
   read:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
-      - name: Lire Overpass
+      - name: Outils
+        run: sudo apt-get install -y osmium-tool > /dev/null
+      - name: Extrait Alsace
+        run: |
+          curl -fsSL -o alsace.osm.pbf https://download.geofabrik.de/europe/france/alsace-latest.osm.pbf
+          ls -la alsace.osm.pbf
+          osmium tags-filter alsace.osm.pbf w/highway=motorway,trunk,primary,secondary,motorway_link,trunk_link,primary_link -o routes.osm.pbf
+          osmium export routes.osm.pbf -f geojsonseq --geometry-types=linestring -a type,id -o routes.geojsonseq
+          wc -l routes.geojsonseq
+      - name: Lire les références
         shell: python3 {0}
         run: |
-          import json, urllib.request, urllib.parse, collections
-          EP = ['https://overpass-api.de/api/interpreter', 'https://overpass.private.coffee/api/interpreter']
-          def q(query):
-            for ep in EP:
-              try:
-                req = urllib.request.Request(ep, data=urllib.parse.urlencode({'data': query}).encode(), headers={'User-Agent': 'Gabarit-sources/1.0'})
-                with urllib.request.urlopen(req, timeout=120) as r:
-                  return json.load(r)
-              except Exception as e:
-                print('  ÉCHEC', ep, e)
-            return None
-          def show(title, query):
-            print('\n#####', title)
-            d = q(query)
-            if not d: return
-            agg = collections.OrderedDict()
-            for el in d.get('elements', []):
-              t = el.get('tags', {})
-              key = (t.get('ref', ''), t.get('name', ''), t.get('highway', ''))
-              g = el.get('geometry') or []
-              lons = [p['lon'] for p in g]; lats = [p['lat'] for p in g]
-              box = agg.setdefault(key, [999, 999, -999, -999, 0])
-              if lons:
-                box[0] = min(box[0], min(lons)); box[1] = min(box[1], min(lats)); box[2] = max(box[2], max(lons)); box[3] = max(box[3], max(lats))
-              box[4] += 1
-            for (ref, name, hw), b in agg.items():
-              print(f'   ref={ref!r} name={name!r} highway={hw} voies={b[4]} cadre=[{b[0]:.3f},{b[1]:.3f},{b[2]:.3f},{b[3]:.3f}]')
-          base = '[out:json][timeout:100];'
-          # Colmar – Sélestat : routes principales du couloir (ex-RN83).
-          show('Couloir Colmar – Sélestat (routes principales)', base + 'way(48.06,7.30,48.28,7.50)[highway~"^(motorway|trunk|primary|motorway_link|trunk_link)$"];out tags geom;')
-          # Références 83 / 1083 / 1363 / 502 / 504 en Alsace (cadre des deux départements).
-          show('Refs 83, 1083, 1363, 502, 504 en Alsace', base + 'way(47.42,6.84,49.08,8.24)[highway][ref~"(^|;) *(RD|D|M|N|RN) ?(83|1083|1363|502|504)($|;| )"];out tags geom;')
-          # A35, A36, M35 en Alsace.
-          show('A35 / A36 / M35 en Alsace', base + 'way(47.42,6.84,49.08,8.24)[highway~"^(motorway|trunk)$"][ref~"A ?35|A ?36|M ?35"];out tags geom;')
-          # Références 83 près de Belfort (faux positif Besançon → Belfort).
-          show('Refs 83 près de Belfort', base + 'way(47.45,6.6,47.8,7.1)[highway][ref~"83"];out tags geom;')
+          import json, re, collections
+          agg = collections.OrderedDict()
+          WANT = re.compile(r'\b(A ?3[56]|M ?35|R?D ?(83|1083|1363|502|504)|N ?83|RN ?83)\b')
+          for line in open('routes.geojsonseq', encoding='utf-8'):
+            line = line.strip().lstrip('\x1e')
+            if not line: continue
+            f = json.loads(line)
+            p = f['properties']
+            ref = p.get('ref', ''); name = p.get('name', ''); hw = p.get('highway', '')
+            coords = f['geometry']['coordinates']
+            lons = [c[0] for c in coords]; lats = [c[1] for c in coords]
+            corridor = any(7.30 <= x <= 7.50 and 48.06 <= y <= 48.28 for x, y in coords) and hw in ('motorway', 'trunk', 'primary')
+            if not (WANT.search(ref) or corridor): continue
+            key = (ref, name if corridor else '', hw)
+            b = agg.setdefault(key, [999, 999, -999, -999, 0, set()])
+            b[0] = min(b[0], min(lons)); b[1] = min(b[1], min(lats)); b[2] = max(b[2], max(lons)); b[3] = max(b[3], max(lats)); b[4] += 1
+            if name: b[5].add(name)
+          print('ref | nom (couloir Colmar–Sélestat) | highway | voies | cadre | quelques noms')
+          for (ref, name, hw), b in sorted(agg.items(), key=lambda kv: (kv[0][0], kv[0][2])):
+            names = '; '.join(sorted(b[5])[:4])
+            print(f'{ref!r} | {name!r} | {hw} | {b[4]} | [{b[0]:.3f},{b[1]:.3f},{b[2]:.3f},{b[3]:.3f}] | {names}')
