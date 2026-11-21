@@ -1308,7 +1308,7 @@ async function adrCheck(browser, base) {
   await page.click('#btn-settings');
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
-  check(ver === `Gabarit ${swVersion}` && swVersion === 'v25', 'vrai service worker : « Gabarit v25 » en bas de Réglages', ver);
+  check(ver === `Gabarit ${swVersion}` && swVersion === 'v27', 'vrai service worker : « Gabarit v27 » en bas de Réglages', ver);
   await ctx.close();
 }
 
@@ -1522,6 +1522,114 @@ async function winterCheck(browser, base) {
   check(/15 novembre au 15 avril.*à vérifier/.test(cards[1].text), 'fiche Italie : période 15/11 – 15/04 « à vérifier »');
   await noHorizontalScroll(ch.page, '412 px fiches pays avec équipements d\'hiver');
   await ch.ctx.close();
+}
+
+/**
+ * Phase 5g : normes Euro. Tunnel du Mont-Blanc (tests/fixtures/ors-directions-mont-blanc.json) avec un profil Euro 3
+ * (alerte, fiche d'itinéraire), Euro 6 (admis), non précisé (les deux cas) ; profil enregistré puis rechargé ; Fréjus
+ * Euro 4 (confirmé par l'exploitant) ; fiches Suisse (RPLP) et Allemagne (Maut, vignette verte) ; 360 / 412 / 800 /
+ * 1280 px ; guidage avec le GPS émulé dans le tunnel à 360 et 1280 px : rien d'Euro dit ni affiché.
+ */
+async function euroCheck(browser, base) {
+  const mb = fixture('ors-directions-mont-blanc.json');
+  const line = mb.features[0].geometry.coordinates;
+  const now = new Date('2026-11-18T10:00:00+01:00').getTime(); // mercredi 10 h
+  const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
+  const notesOf = (page) => page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+  for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, now, voice: true, vehicle: veh('3'), directions: () => mb, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    const notes = await notesOf(page);
+    check(notes.some((n) => n.cls === 'warn' && /^Tunnel du Mont-Blanc interdit à votre véhicule \(Euro 3\), vers km 13 : PL de marchandises de plus de 3,5 t Euro 0 à 4 interdits depuis le 1er juillet 2020 \(arrêté préfectoral n° 2020-0825 du 18 juin 2020\).*lu le 21\/11\/2026\. La signalisation fait foi\.Texte$/.test(n.text)),
+      `${width} px : alerte Mont-Blanc Euro 3, source et date, lien`, notes.map((n) => n.text).join(' | '));
+    check(/Mont-Blanc interdit \(Euro 3\)/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire « Mont-Blanc interdit (Euro 3) »`);
+    await noHorizontalScroll(page, `${width} px notes Euro`);
+    await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${width}-euro.png`) });
+    if (width === 360) {
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      const opts = await page.$$eval('#veh-euro option', (o) => o.map((x) => x.textContent));
+      check(opts[0] === 'Non précisé' && opts.includes('EEV') && opts.length === 9, '360 px : liste « Classe Euro » (non précisé, 0 à 6, EEV)', opts.join('|'));
+      await noHorizontalScroll(page, '360 px profil avec « Classe Euro »');
+      await page.selectOption('#veh-euro', '6');
+      await page.click('#vehicles-body button[type="submit"]');
+      check(/Euro 6/.test(await page.textContent('#vehicles-body .vehicle-card.active .dims')), '360 px : profil « Euro 6 » enregistré');
+      await page.keyboard.press('Escape');
+      await page.reload();
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+      await computeRoute(page);
+      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      const n6 = await notesOf(page);
+      check(n6.some((n) => n.cls !== 'warn' && /^Tunnel du Mont-Blanc, vers km 13 : votre classe \(Euro 6\) est admise/.test(n.text)) && !n6.some((n) => /interdit à votre véhicule/.test(n.text)),
+        '360 px : après rechargement, Euro 6 admis', n6.map((n) => n.text).join(' | '));
+      check(!/Mont-Blanc/.test(await page.textContent('.route-card[aria-checked="true"]')), '360 px : Euro 6, rien sur la fiche d\'itinéraire');
+      await page.click('#btn-vehicles');
+      await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+      await page.selectOption('#veh-euro', '');
+      await page.click('#vehicles-body button[type="submit"]');
+      await page.keyboard.press('Escape');
+      await computeRoute(page);
+      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      const n0 = await notesOf(page);
+      check(n0.some((n) => n.cls === 'warn' && /Classe Euro non précisée dans le profil : vérifiez-la\./.test(n.text))
+        && n0.some((n) => /^Tunnel du Mont-Blanc : Euro 5, EEV et Euro 6 admis/.test(n.text)), '360 px : non précisé, les deux cas affichés', n0.map((n) => n.text).join(' | '));
+      check(/Mont-Blanc : Euro 0 à 4 interdits, classe Euro \?/.test(await page.textContent('.route-card[aria-checked="true"]')), '360 px : fiche « classe Euro ? »');
+    }
+    if (width === 360 || width === 1280) {
+      // Guidage, GPS émulé : départ à l'entrée du tunnel, traversée en partie ; rien d'Euro dit ni affiché.
+      const entry = line.findIndex((c) => c[0] >= 6.86);
+      await setGeo(page, { lon: line[entry][0], lat: line[entry][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await drive(ctx, page, line.slice(entry), 70, 25);
+      const remaining = await page.textContent('#nav');
+      check(/Tunnel du Mont-Blanc|SS 26/.test(remaining), `${width} px : guidage dans le tunnel (consigne du tunnel ou de la sortie)`, remaining.replace(/\s+/g, " ").trim().slice(0, 200));
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /euro|Mont-Blanc interdit/i.test(x.replace(/europ/gi, ''))), `${width} px : guidage, rien d'Euro dit`, spoken.join(' | '));
+      const navText = await page.textContent('#nav');
+      check(!/Euro [0-6]|classe Euro/.test(navText), `${width} px : guidage, rien d'Euro affiché`);
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${width} px : textes du guidage dans leurs cases`, over.join(' ; '));
+    }
+    check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Fréjus, Euro 4 : confirmé par l'exploitant (nom, date), sur la fiche d'itinéraire.
+  const fr = await open(browser, base, { width: 412, height: 900, now, vehicle: veh('4'), directions: () => fixture('ors-directions-frejus.json'), overpass: () => ({ elements: [] }) });
+  await computeRoute(fr.page);
+  await fr.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  const fn = await notesOf(fr.page);
+  check(fn.some((n) => n.cls === 'warn' && /^Tunnel du Fréjus interdit à votre véhicule \(Euro 4\).*Confirmé par l'exploitant : SFTRF .*lu le 21\/11\/2026 ; arrêté préfectoral non retrouvé\. La signalisation fait foi\./.test(n.text)),
+    'Fréjus Euro 4 : confirmé par l\'exploitant, arrêté non retrouvé', fn.map((n) => n.text).join(' | '));
+  check(/Fréjus interdit \(Euro 4, exploitant\)/.test(await fr.page.textContent('.route-card[aria-checked="true"]')), 'Fréjus Euro 4 : ligne sur la fiche d\'itinéraire');
+  check(fr.errors.length === 0, 'Fréjus : aucune erreur JavaScript', fr.errors.join(' | '));
+  await fr.ctx.close();
+  // Fiches Suisse (RPLP) et Allemagne (Maut, vignette verte) : rubrique « Normes Euro », catégorie de la classe.
+  const frChIt = fixture('ors-directions-fr-ch-it.json');
+  const asDe = JSON.parse(JSON.stringify(frChIt));
+  asDe.features[0].properties.extras.countryinfo.values = asDe.features[0].properties.extras.countryinfo.values.map(([a, b, v]) => [a, b, v === 193 ? 74 : v]);
+  asDe.features[0].properties.extras.countryinfo.summary = asDe.features[0].properties.extras.countryinfo.summary.map((x) => ({ ...x, value: x.value === 193 ? 74 : x.value }));
+  for (const [label, json, re] of [
+    ['Suisse', frChIt, /Normes Euro.*RPLP selon la classe Euro.*Votre profil \(Euro 3\) : catégorie de redevance 1 \(3,26 centimes par tonne et par km\)\..*source officielle : Ordonnance relative à une redevance sur le trafic des poids lourds/],
+    ['Allemagne', asDe, /Normes Euro.*Votre profil \(Euro 3\) : catégorie D\..*Votre profil \(Euro 3\) : groupe 3, pas de vignette verte\..*Euro VI.*à vérifier/],
+  ]) {
+    for (const [width, height] of [[360, 760], [1280, 800]]) {
+      const c = await open(browser, base, { width, height, now, vehicle: veh('3'), directions: () => json, overpass: () => ({ elements: [] }) });
+      await computeRoute(c.page);
+      await c.page.waitForSelector('.country-card', { timeout: 10000 });
+      const text = await c.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
+      const sections = await c.page.$$eval('.country-card:first-child h4', (h) => h.map((x) => x.textContent));
+      check(sections.includes('Normes Euro') && re.test(text), `${width} px : fiche ${label}, rubrique « Normes Euro »`, text.slice(0, 300));
+      await noHorizontalScroll(c.page, `${width} px fiche ${label} Normes Euro`);
+      if (width === 360) await c.page.screenshot({ path: join(SHOTS, `${width}-euro-${label}.png`) });
+      check(c.errors.length === 0, `${width} px fiche ${label} : aucune erreur JavaScript`, c.errors.join(' | '));
+      await c.ctx.close();
+    }
+  }
 }
 
 /**
@@ -1834,7 +1942,7 @@ try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
-    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck };
+    drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

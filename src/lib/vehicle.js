@@ -23,6 +23,17 @@ export const COMBINED_LABEL = 'Transport combiné (conteneurs ou caisses mobiles
 export const TRAILER_VALUES = Object.freeze(['', 'none', 'with']);
 export const TRAILER_LABELS = Object.freeze({ '': 'Non précisé', none: 'Sans remorque', with: 'Avec remorque ou semi-remorque' });
 
+/**
+ * Classe d'émissions Euro du moteur (phase 5g, servira aussi à la phase 5h) : '' = non précisée (défaut, les deux cas
+ * sont affichés), 0 à 6, ou EEV (« véhicule plus respectueux de l'environnement », directive 2005/55/CE, valeurs
+ * limites de la ligne C). Correspondances par règle et sources : EURO_EEV dans euro.js.
+ */
+export const EURO_VALUES = Object.freeze(['', '0', '1', '2', '3', '4', '5', 'EEV', '6']);
+export const EURO_LABELS = Object.freeze({
+  '': 'Non précisé', 0: 'Euro 0 (ou antérieur)', 1: 'Euro 1 (I)', 2: 'Euro 2 (II)', 3: 'Euro 3 (III)', 4: 'Euro 4 (IV)',
+  5: 'Euro 5 (V)', EEV: 'EEV', 6: 'Euro 6 (VI)',
+});
+
 // Matières dangereuses (phase 5b) : réglage global (Réglages, settings.adr), plus dans le profil depuis la v19.
 // Voir src/lib/adr-settings.js (reprise des anciens profils, withAdr).
 
@@ -63,6 +74,7 @@ export function defaultVehicle() {
     banStatus: 'concerned',
     combined: false,
     trailer: '',
+    euroClass: '',
   };
 }
 
@@ -86,6 +98,8 @@ export function normalizeVehicle(raw) {
     // Case du formulaire (« on ») ou booléen d'un export ; anciens profils : non.
     combined: raw?.combined === true || raw?.combined === 'on',
     trailer: TRAILER_VALUES.includes(raw?.trailer) ? raw.trailer : '',
+    // Anciens profils et valeur inconnue : non précisée.
+    euroClass: EURO_VALUES.includes(String(raw?.euroClass ?? '')) ? String(raw?.euroClass ?? '') : '',
   };
   // Anciens champs ADR (hazmat, tunnelCode, adrClass, unNumber) : non gardés, repris dans settings.adr (store.js).
   for (const key of Object.keys(NUMERIC_FIELDS)) {
@@ -121,5 +135,6 @@ export function validateVehicle(v) {
   }
   if (!CRITAIR_VALUES.includes(v.critair)) errors.critair = 'Vignette Crit\'Air inconnue.';
   if (!BAN_STATUS_VALUES.includes(v.banStatus)) errors.banStatus = 'Valeur invalide.';
+  if (v.euroClass !== undefined && !EURO_VALUES.includes(v.euroClass)) errors.euroClass = 'Classe Euro inconnue.';
   return { valid: Object.keys(errors).length === 0, errors };
 }

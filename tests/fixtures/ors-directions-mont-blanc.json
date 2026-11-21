@@ -1,0 +1,217 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  6.7037,
+  45.793,
+  6.9725,
+  45.923
+ ],
+ "features": [
+  {
+   "bbox": [
+    6.7037,
+    45.793,
+    6.9725,
+    45.923
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 27549.0,
+      "duration": 1486.0,
+      "steps": [
+       {
+        "distance": 12694.8,
+        "duration": 654.4,
+        "type": 11,
+        "instruction": "Prenez RN 205",
+        "name": "RN 205",
+        "way_points": [
+         0,
+         7
+        ]
+       },
+       {
+        "distance": 11619.0,
+        "duration": 598.9,
+        "type": 6,
+        "instruction": "Continuez sur Tunnel du Mont-Blanc",
+        "name": "Tunnel du Mont-Blanc",
+        "way_points": [
+         7,
+         12
+        ]
+       },
+       {
+        "distance": 3235.2,
+        "duration": 232.7,
+        "type": 6,
+        "instruction": "Continuez sur SS 26",
+        "name": "SS 26",
+        "way_points": [
+         12,
+         15
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à SS 26, sur la droite",
+        "name": "-",
+        "way_points": [
+         15,
+         15
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        15,
+        1
+       ]
+      ],
+      "summary": [
+       {
+        "value": 1,
+        "distance": 27549.0,
+        "amount": 100
+       }
+      ]
+     },
+     "countryinfo": {
+      "values": [
+       [
+        0,
+        10,
+        70
+       ],
+       [
+        10,
+        15,
+        97
+       ]
+      ],
+      "summary": [
+       {
+        "value": 70,
+        "distance": 17560.5,
+        "amount": 63.74
+       },
+       {
+        "value": 97,
+        "distance": 9988.5,
+        "amount": 36.26
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 27549.0,
+     "duration": 1486.0
+    },
+    "way_points": [
+     0,
+     15
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      6.7037,
+      45.9145
+     ],
+     [
+      6.735,
+      45.923
+     ],
+     [
+      6.77,
+      45.919
+     ],
+     [
+      6.805,
+      45.912
+     ],
+     [
+      6.835,
+      45.906
+     ],
+     [
+      6.852,
+      45.902
+     ],
+     [
+      6.859,
+      45.901
+     ],
+     [
+      6.86128,
+      45.90122
+     ],
+     [
+      6.86287,
+      45.90086
+     ],
+     [
+      6.8782,
+      45.88706
+     ],
+     [
+      6.8998,
+      45.8669
+     ],
+     [
+      6.92139,
+      45.84674
+     ],
+     [
+      6.9517,
+      45.8181
+     ],
+     [
+      6.96,
+      45.81
+     ],
+     [
+      6.969,
+      45.799
+     ],
+     [
+      6.9725,
+      45.793
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "query": {
+   "coordinates": [
+    [
+     6.7037,
+     45.9145
+    ],
+    [
+     6.9725,
+     45.793
+    ]
+   ],
+   "profile": "driving-hgv",
+   "format": "geojson",
+   "extra_info": [
+    "tollways",
+    "countryinfo"
+   ]
+  }
+ }
+}

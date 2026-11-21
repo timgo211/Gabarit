@@ -1,0 +1,225 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  6.638,
+  45.07,
+  6.727,
+  45.201
+ ],
+ "features": [
+  {
+   "bbox": [
+    6.638,
+    45.07,
+    6.727,
+    45.201
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 18120.2,
+      "duration": 934.0,
+      "steps": [
+       {
+        "distance": 3145.7,
+        "duration": 162.1,
+        "type": 11,
+        "instruction": "Prenez A 43",
+        "name": "A 43",
+        "way_points": [
+         0,
+         3
+        ]
+       },
+       {
+        "distance": 12822.9,
+        "duration": 661.0,
+        "type": 6,
+        "instruction": "Continuez sur Tunnel du Fréjus",
+        "name": "Tunnel du Fréjus",
+        "way_points": [
+         3,
+         14
+        ]
+       },
+       {
+        "distance": 2151.6,
+        "duration": 110.9,
+        "type": 6,
+        "instruction": "Continuez sur A 32",
+        "name": "A 32",
+        "way_points": [
+         14,
+         17
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivée à A 32, sur la droite",
+        "name": "-",
+        "way_points": [
+         17,
+         17
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        17,
+        1
+       ]
+      ],
+      "summary": [
+       {
+        "value": 1,
+        "distance": 18120.2,
+        "amount": 100
+       }
+      ]
+     },
+     "countryinfo": {
+      "values": [
+       [
+        0,
+        9,
+        70
+       ],
+       [
+        9,
+        17,
+        97
+       ]
+      ],
+      "summary": [
+       {
+        "value": 70,
+        "distance": 8084.1,
+        "amount": 44.61
+       },
+       {
+        "value": 97,
+        "distance": 10036.1,
+        "amount": 55.39
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 18120.2,
+     "duration": 934.0
+    },
+    "way_points": [
+     0,
+     17
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      6.638,
+      45.201
+     ],
+     [
+      6.655,
+      45.199
+     ],
+     [
+      6.67,
+      45.197
+     ],
+     [
+      6.67746,
+      45.19582
+     ],
+     [
+      6.67934,
+      45.19549
+     ],
+     [
+      6.68212,
+      45.19391
+     ],
+     [
+      6.68437,
+      45.19052
+     ],
+     [
+      6.68494,
+      45.17842
+     ],
+     [
+      6.68154,
+      45.16095
+     ],
+     [
+      6.682,
+      45.15391
+     ],
+     [
+      6.68756,
+      45.14007
+     ],
+     [
+      6.69369,
+      45.12416
+     ],
+     [
+      6.71297,
+      45.0894
+     ],
+     [
+      6.71347,
+      45.08801
+     ],
+     [
+      6.71337,
+      45.08674
+     ],
+     [
+      6.718,
+      45.08
+     ],
+     [
+      6.723,
+      45.074
+     ],
+     [
+      6.727,
+      45.07
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "query": {
+   "coordinates": [
+    [
+     6.638,
+     45.201
+    ],
+    [
+     6.727,
+     45.07
+    ]
+   ],
+   "profile": "driving-hgv",
+   "format": "geojson",
+   "extra_info": [
+    "tollways",
+    "countryinfo"
+   ]
+  }
+ }
+}
