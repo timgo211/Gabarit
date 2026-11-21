@@ -84,6 +84,8 @@
       },
       "area": {
         "source": "Contours du Bas-Rhin et du Haut-Rhin : IGN Admin Express COG 2018 (Licence Ouverte), via gregoiredavid/france-geojson, simplifiés à 150 m",
+        "read": "2026-11-21",
+        "check": "limites à vérifier (millésime 2018)",
         "rings": [
           [
             [7.6353, 49.0542],
@@ -847,6 +849,8 @@
       },
       "exclude": {
         "source": "Eurométropole de Strasbourg (33 communes, liste de l'EPCI n° 246700488, @etalab/decoupage-administratif 6.0.0) : contours des communes IGN Admin Express COG 2018 (Licence Ouverte), via gregoiredavid/france-geojson, simplifiés à 50 m",
+        "read": "2026-11-21",
+        "check": "limites à vérifier (millésime 2018)",
         "rings": [
           [
             [7.7193, 48.6861],
@@ -2460,6 +2464,8 @@
       "basis": "Tarif au km selon le PTAC (moins de 12 t, 12 à 18 t, 18 à 32 t, plus de 32 t), la classe Euro et la classe d'émissions de CO2 (absente du profil) : grille sur le site officiel.",
       "area": {
         "source": "Contour de la région Grand Est : IGN Admin Express COG 2018 (Licence Ouverte), via gregoiredavid/france-geojson, simplifié à 150 m ; Bas-Rhin et Haut-Rhin exclus (routes de la Collectivité européenne d'Alsace)",
+        "read": "2026-11-21",
+        "check": "limites à vérifier (millésime 2018)",
         "rings": [
           [
             [4.2332, 49.9577],
@@ -4305,7 +4311,9 @@
         ]
       },
       "exclude": {
-        "source": "Bas-Rhin et Haut-Rhin (même contour que le R-Pass)",
+        "source": "Bas-Rhin et Haut-Rhin (même contour que le R-Pass) : IGN Admin Express COG 2018 (Licence Ouverte), via gregoiredavid/france-geojson, simplifiés à 150 m",
+        "read": "2026-11-21",
+        "check": "limites à vérifier (millésime 2018)",
         "rings": [
           [
             [7.6353, 49.0542],
@@ -5066,6 +5074,8 @@
       "roadAreas": {
         "N52": {
           "source": "Contour de la Meurthe-et-Moselle : IGN Admin Express COG 2018 (Licence Ouverte), via gregoiredavid/france-geojson, simplifié à 150 m",
+          "read": "2026-11-21",
+          "check": "limites à vérifier (millésime 2018)",
           "rings": [
             [
               [5.4524, 49.4124],
