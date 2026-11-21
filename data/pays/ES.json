@@ -6,6 +6,7 @@
   "sources": {
     "rgc": { "name": "Reglamento General de Circulación (RD 1428/2003), art. 48 (BOE)", "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2003-23514#a48", "kind": "national" },
     "dgt2026": { "name": "Résolution de la DGT du 14 janvier 2026, mesures spéciales de régulation du trafic (BOE-A-2026-1255)", "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2026-1255", "kind": "national" },
+    "rgv": { "name": "Orden PJC/780/2025 du 21/07/2025 (BOE du 23/07/2025), Reglamento General de Vehículos, annexe IX", "url": "https://www.boe.es/diario_boe/txt.php?id=BOE-A-2025-15231", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "ES", "source": "bf", "verified": "2026-11-20" },
@@ -21,6 +22,10 @@
     "adr": [
       { "classes": null, "delta": -10, "text": "Matières dangereuses : vitesse maximale réduite de 10 km/h (80 km/h sur autoroute, 70 km/h sur route) (art. 48 b).", "voice": "matières dangereuses : 10 kilomètres heure de moins", "source": "rgc", "verified": "2026-11-20" }
     ]
+  },
+  "limits": {
+    "weight": {"max": 44, "text": "Poids total maximal national : 44 t pour un ensemble de 5 essieux ou plus, depuis le 23/10/2025 (citernes : depuis le 23/01/2026). En international : 40 t sauf transport combiné.", "source": "rgv", "verified": "2026-11-21"},
+    "height": {"max": 4, "text": "Hauteur maximale : 4,00 m, chargement compris (4,50 m pour les porte-voitures, conteneurs fermés en transport combiné, animaux vivants, paille et fourrage, livraisons d'industries à moins de 50 km).", "source": "rgv", "verified": "2026-11-21"}
   },
   "bans": [
     { "id": "sections", "kind": "info", "calendarYears": [2026], "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2026-1255",

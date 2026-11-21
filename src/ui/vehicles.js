@@ -2,7 +2,7 @@
 
 import { $, el, wireDialog } from './dom.js';
 import {
-  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, normalizeVehicle, validateVehicle, defaultVehicle,
+  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, COMBINED_LABEL, normalizeVehicle, validateVehicle, defaultVehicle,
 } from '../lib/vehicle.js';
 import { BAN_STATUS } from '../lib/hgv-bans.js';
 import { adrSummary } from '../lib/adr-settings.js';
@@ -19,6 +19,7 @@ function dims(v, adr = null) {
   p.push(`Crit'Air ${v.critair}`);
   if (v.banStatus === 'art4') p.push('art. 4');
   if (v.banStatus === 'exempt') p.push('spécialisé');
+  if (v.combined) p.push('transport combiné');
   return p.join(' · ');
 }
 
@@ -95,6 +96,13 @@ export function createVehicles(ctx) {
           BAN_STATUS_VALUES.map((c) => el('option', { value: c, text: BAN_STATUS[c], selected: c === (v.banStatus ?? 'concerned') }))),
         el('p', { class: 'hint', text: 'Article 4 : au moins la moitié du chargement en denrées périssables ou animaux vivants, presse, fret aérien… (arrêté du 16 avril 2021). Justificatifs à bord.' }),
         el('p', { class: 'err', 'data-err': 'banStatus' }),
+      ]),
+      el('div', { class: 'full' }, [
+        el('label', { class: 'toggle' }, [
+          el('input', { type: 'checkbox', id: 'veh-combined', name: 'combined', checked: !!v.combined }),
+          ` ${COMBINED_LABEL}`,
+        ]),
+        el('p', { class: 'hint', text: "Au-delà de 40 t, un trajet international n'est permis qu'en transport combiné (directive 96/53/CE). Le PTAC du profil n'est pas le poids réel : seul le poids réel compte." }),
       ]),
       el('p', { class: 'hint full', text: 'Matières dangereuses (ADR) : dans Réglages (elles dépendent du chargement, pas du camion).' }),
       el('p', { class: 'hint full', text: 'La vitesse envoyée au calcul est au minimum 80 km/h (limite OpenRouteService).' }),

@@ -14,6 +14,16 @@
 // - CH : OCR art. 5 et 91 (fedlex) ; OFROU ; OFDF (RPLP) ; LVA art. 3 al. 2 (pas de vignette pour la RPLP).
 // - IT : Codice della strada art. 142 ; décret MIT du 12/12/2025 (GU n. 302), calendrier 2026, art. 3 et 12.
 // - ES : Reglamento General de Circulación art. 48 ; résolution DGT du 14/01/2026 (BOE-A-2026-1255), annexes II, V.
+// Poids total maximal national et hauteur maximale (phase 5e, bloc "limits", lus le 21/11/2026) :
+// - DE : StVZO § 34 al. 6 (plus de 4 essieux 40 t ; intermodal 42 / 44 t) et § 32 al. 2 (4,00 m).
+// - CH : LCR art. 9 al. 1 (version du 1/07/2026, Fedlex) : « 40 t ou de 44 t en cas de transport combiné ; la
+//   hauteur maximale autorisée est de 4 m ».
+// - IT : Codice della strada art. 62 al. 4 (« 44 t se a cinque o più assi ») et art. 61 al. 1 b (4 m), Normattiva.
+// - ES : Orden PJC/780/2025 du 21/07/2025 (BOE du 23/07/2025), RGV annexe IX : articulés de 5 essieux et plus 44 t,
+//   trois mois après la publication (23/10/2025 ; citernes six mois : 23/01/2026) ; hauteur 4,00 m (4,50 m pour
+//   certains transports).
+// - BE, LU : textes non lisibles depuis le conteneur (captcha eJustice, Legilux en JavaScript) → « à vérifier ».
+// En trafic international : 40 t quel que soit le maximum national (weights.js).
 // Heures : heure locale de la tablette (les six pays sont à l'heure de Paris, Canaries exceptées).
 
 import { countryHolidays, countryHolidayName, REGIONAL_HOLIDAYS, dayKey, addDays } from './holidays.js';
@@ -60,7 +70,17 @@ export function parseCountryData(json) {
     code: json.code, name: json.name, verified: isDate(json.verified) ? json.verified : null, sources, speeds, bans,
     holidays: json.holidays && isStr(json.holidays.list) ? json.holidays : null,
     toll: items(json.toll), lez: items(json.lez), adr: items(json.adr),
+    limits: parseLimits(json.limits),
   };
+}
+
+/** Bloc "limits" : { weight, height } avec max (t, m) facultatif ; règle sans texte ignorée. */
+function parseLimits(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const pos = (x) => (isNum(x) && x > 0 ? x : null);
+  const one = (r) => (r && isStr(r.text) ? { ...r, max: pos(r.max), combinedMax: pos(r.combinedMax) } : null);
+  const out = { weight: one(raw.weight), height: one(raw.height) };
+  return out.weight || out.height ? out : null;
 }
 
 /** Source d'une règle : { name, url, kind } ou null. */
@@ -224,6 +244,30 @@ const endText = (d) => (d.getHours() === 0 && d.getMinutes() === 0
   : dayTime(d));
 const winText = (w) => `${dayTime(w.start)} → ${endText(w.end)}`;
 const kmOf = (m) => `km ${Math.round(m / 1000)}`;
+const meters = (n) => `${n.toFixed(2).replace('.', ',')} m`;
+
+function limitItems(data, vehicle, push, card, segment) {
+  const { weight, height } = data.limits ?? {};
+  if (weight) {
+    const ok = weight.max !== null && isConfirmed(weight, data, { national: true });
+    const ptac = ptacOf(vehicle);
+    // Transport combiné : maximum propre au pays s'il existe (DE, CH : 44 t).
+    const max = vehicle?.combined && weight.combinedMax ? weight.combinedMax : weight.max;
+    const over = ok && ptac !== null && ptac > max;
+    push('Poids et hauteur', weight, `${weight.text}${over ? ` Votre profil indique ${tons(ptac)} : au-delà du maximum national (${tons(max)}), vérifiez votre poids réel.` : ''}`,
+      { confirmed: ok, level: over ? 'warn' : 'info' });
+  }
+  if (height) {
+    const ok = height.max !== null && isConfirmed(height, data, { national: true });
+    const h = isNum(vehicle?.height) ? vehicle.height : null;
+    const over = ok && h !== null && h > height.max + 1e-9;
+    push('Poids et hauteur', height, `${height.text}${over ? ` Votre profil indique ${meters(h)} : au-delà de la hauteur maximale (${meters(height.max)}).` : ''}`,
+      { confirmed: ok, level: over ? 'warn' : 'info' });
+    if (over) card.heightOver = true;
+    if (over) card.warnings.push(`${segment.name} : hauteur maximale ${meters(height.max)}, votre profil indique ${meters(h)} (${kmOf(segment.enter)} → ${kmOf(segment.exit)}). ${COUNTRY_RULES.FOOTER}`);
+  }
+}
+
 
 // ───────── Fiche d'un pays ─────────
 
@@ -281,6 +325,9 @@ export function countryCard(data, segment, { vehicle, now = new Date(), tunnels 
       if (isConfirmed(n, data) && isStr(n.voice) && (!cls || cls.includes(String(vehicle.adrClass)))) card.voice.push(n.voice);
     }
   }
+
+  // Poids et hauteur (phase 5e) : maximum national, rappel des 40 t en international, comparaison avec le profil.
+  limitItems(data, vehicle, push, card, segment);
 
   // Interdictions.
   const years = [...new Set([now, segment.enterTime, segment.exitTime].map((d) => String(d.getFullYear())))];
@@ -375,7 +422,8 @@ export function countryRules(route, { vehicle, departure = new Date(), elapsed =
     });
     out.cards.push(card);
     for (const w of card.warnings) out.lines.push({ level: 'warn', text: w });
-    if (card.warnings.length) out.short.push(`Interdiction PL ${s.name}`);
+    if (card.warnings.length > (card.heightOver ? 1 : 0)) out.short.push(`Interdiction PL ${s.name}`);
+    if (card.heightOver) out.short.push(`Hauteur max ${s.name}`);
   }
   return out;
 }

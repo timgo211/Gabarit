@@ -9,6 +9,7 @@
     "rplp": { "name": "Office fédéral de la douane (OFDF), La RPLP en bref", "url": "https://www.bazg.admin.ch/fr/la-rplp-en-bref", "kind": "national" },
     "lva": { "name": "Loi sur la vignette autoroutière (LVA, RS 741.71), art. 3", "url": "https://www.fedlex.admin.ch/eli/cc/2011/577/fr", "kind": "national" },
     "astraadr": { "name": "OFROU, Transport de marchandises dangereuses dans les tunnels", "url": "https://www.astra.admin.ch/fr/transport-de-marchandises-dangereuses-dans-les-tunnels", "kind": "national" },
+    "lcr9": { "name": "Loi sur la circulation routière (LCR, RS 741.01), art. 9 al. 1", "url": "https://www.fedlex.admin.ch/eli/cc/1959/679_705_685/fr", "kind": "national" },
     "bf": { "name": "Bison Futé, Restrictions pays limitrophes", "url": "https://www.bison-fute.gouv.fr/restrictions-pays-limitrophes.html", "kind": "bisonfute" }
   },
   "holidays": { "list": "CH", "source": "ocr", "verified": "2026-11-20" },
@@ -21,6 +22,10 @@
     "notes": [
       { "text": "80 km/h pour les voitures automobiles lourdes, les trains routiers et les véhicules articulés, autoroute comprise (OCR art. 5).", "source": "ocr", "verified": "2026-11-20" }
     ]
+  },
+  "limits": {
+    "weight": {"max": 40, "combinedMax": 44, "text": "Poids total maximal : 40 t, ou 44 t en transport combiné. En international : 40 t sauf transport combiné.", "source": "lcr9", "verified": "2026-11-21"},
+    "height": {"max": 4, "text": "Hauteur maximale : 4 m.", "source": "lcr9", "verified": "2026-11-21"}
   },
   "bans": [
     { "id": "sunday", "kind": "weekly", "over": 3.5, "days": [0], "holidays": "CH", "from": "00:00", "to": "24:00",

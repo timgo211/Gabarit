@@ -21,6 +21,10 @@
       { "text": "Ensembles de véhicules couplés (avec remorque ou semi-remorque), quel que soit le poids : 90 km/h sur autoroute, 75 km/h hors agglomération ; 90 km/h dans les tunnels signalés.", "source": "cdr", "verified": "2026-11-20" }
     ]
   },
+  "limits": {
+    "weight": {"text": "Poids total maximal national : à vérifier (texte officiel non lu). En international : 40 t sauf transport combiné.", "source": null, "verified": null},
+    "height": {"text": "Hauteur maximale : à vérifier (texte officiel non lu).", "source": null, "verified": null}
+  },
   "bans": [
     { "id": "transit-fr", "kind": "weekly", "over": 7.5, "transitTo": "FR", "days": [0], "holidays": "LU_FR", "from": "00:00", "to": "21:45", "eve": { "from": "21:30" },
       "label": "Transit vers la France", "text": "Transit de plus de 7,5 t vers la France interdit du samedi (et veille de jour férié) 21 h 30 au dimanche (et jour férié) 21 h 45, stationnement sur la voie publique compris. Exceptions : animaux vivants, denrées périssables, fleurs, presse…",
