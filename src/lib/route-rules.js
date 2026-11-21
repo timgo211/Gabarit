@@ -14,6 +14,7 @@ import { countryRules } from './country-rules.js';
 import { weightRules } from './weights.js';
 import { euroRules } from './euro.js';
 import { winterRules } from './winter.js';
+import { tollRules } from './hgv-tolls.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
@@ -102,7 +103,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
  */
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
-  access = null, winter = null,
+  access = null, winter = null, tolls = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -127,6 +128,10 @@ export function routeRules(route, {
   lines.push(...win.lines.filter((l) => l.level === 'warn'));
   short.push(...win.short);
   short.push(...weight.short);
+  // Taxes PL régionales (phase 5h) : R-Pass, écocontribution du Grand Est ; « à vérifier » = information seulement.
+  const toll = tollRules(route, { vehicle, tolls, departure, elapsed });
+  lines.push(...toll.lines.filter((l) => l.level === 'warn'));
+  short.push(...toll.short);
   for (const p of passages) {
     if (p.banned) {
       lines.push({ level: 'warn', text: describeZfePassage(p, vehicle), url: p.url });
@@ -156,6 +161,7 @@ export function routeRules(route, {
   lines.push(...acc.lines.filter((l) => l.level !== 'warn'));
   lines.push(...weight.lines.filter((l) => l.level !== 'warn'));
   lines.push(...win.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...toll.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
@@ -168,7 +174,7 @@ export function routeRules(route, {
   }
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
-    countries: ctry, weight, winter: win, euro,
+    countries: ctry, weight, winter: win, euro, tolls: toll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional,
   };
 }

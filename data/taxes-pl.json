@@ -1,0 +1,37 @@
+{
+  "verified": "2026-11-21",
+  "sources": {
+    "rpass": { "name": "R-Pass, site officiel de la Collectivité européenne d'Alsace", "url": "https://www.r-pass.eu/", "kind": "official" },
+    "ecpl": { "name": "Écocontribution poids lourds, site officiel de la Région Grand Est", "url": "https://ecpl.fr/fr", "kind": "official" }
+  },
+  "taxes": [
+    {
+      "id": "r-pass",
+      "name": "R-Pass (taxe PL de la Collectivité européenne d'Alsace)",
+      "short": "R-Pass",
+      "start": "2027-01-01",
+      "status": "check",
+      "source": null,
+      "verified": null,
+      "url": "https://www.r-pass.eu/",
+      "note": "Recours en cours devant le tribunal administratif de Strasbourg (effet suspensif non établi).",
+      "bbox": [6.84, 47.42, 8.24, 49.08],
+      "roads": ["A35", "M35", "N83", "M83", "A351", "M351", "A352", "M352", "N353", "M353", "A340", "M340"],
+      "rates": null
+    },
+    {
+      "id": "ecpl",
+      "name": "écocontribution poids lourds de la Région Grand Est",
+      "short": "Écocontribution PL",
+      "start": "2027-04-02",
+      "status": "check",
+      "source": null,
+      "verified": null,
+      "url": "https://ecpl.fr/fr",
+      "note": "Date et barème non publiés dans un texte officiel lu.",
+      "bbox": [3.38, 47.42, 8.24, 50.17],
+      "roads": ["A31", "N4", "N44", "N52", "N59", "N431"],
+      "rates": null
+    }
+  ]
+}
