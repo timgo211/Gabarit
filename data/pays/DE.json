@@ -4,6 +4,8 @@
   "orsIds": [74],
   "verified": "2026-11-20",
   "sources": {
+    "bfstrmganl1": {"name": "Bundesfernstraßenmautgesetz (BFStrMG), annexe 1 ch. 2 (catégories selon la classe Euro)", "url": "https://www.gesetze-im-internet.de/bfstrmg/anlage_1.html", "kind": "national"},
+    "bimschv35": {"name": "35. BImSchV (vignettes des zones environnementales), annexe 2", "url": "https://www.gesetze-im-internet.de/bimschv_35/anhang_2.html", "kind": "national"},
     "stvo3": { "name": "StVO § 3 (vitesses hors agglomération)", "url": "https://www.gesetze-im-internet.de/stvo_2013/__3.html", "kind": "national" },
     "stvo18": { "name": "StVO § 18 (autoroutes et voies rapides)", "url": "https://www.gesetze-im-internet.de/stvo_2013/__18.html", "kind": "national" },
     "stvo30": { "name": "StVO § 30 (interdiction du dimanche et des jours fériés)", "url": "https://www.gesetze-im-internet.de/stvo_2013/__30.html", "kind": "national" },
@@ -42,6 +44,11 @@
     { "id": "summer-saturday", "kind": "info", "url": "https://www.gesetze-im-internet.de/ferreisev_1985/__1.html",
       "text": "Samedis du 1er juillet au 31 août, 7 h à 20 h : interdiction possible sur certaines autoroutes (FerReiseV) ; tronçons exacts à vérifier.",
       "source": "ferreisev", "verified": "2026-11-20" }
+  ],
+  "euro": [
+    {"text": "Maut : la part « pollution de l'air » dépend de la classe Euro (catégorie A : Euro VI ; B : Euro V et EEV ; C : Euro IV ; D : Euro III ; E : Euro II ; F : Euro I et sans classe). Montant non calculé.", "source": "bfstrmganl1", "verified": "2026-11-21", "mine": {"0": "catégorie F", "1": "catégorie F", "2": "catégorie E", "3": "catégorie D", "4": "catégorie C", "5": "catégorie B", "EEV": "catégorie B (comme Euro V)", "6": "catégorie A"}},
+    {"text": "Zones environnementales (Umweltzonen) : PL diesel Euro IV, Euro V et EEV dans le groupe 4 (vignette verte) ; Euro III dans le groupe 3.", "source": "bimschv35", "verified": "2026-11-21", "mine": {"3": "groupe 3, pas de vignette verte", "4": "groupe 4 (vignette verte)", "5": "groupe 4 (vignette verte)", "EEV": "groupe 4 (vignette verte)"}},
+    {"text": "Vignette verte des PL Euro VI : le texte ne cite pas le règlement Euro VI (CE) n° 595/2009, à vérifier.", "url": "https://www.gesetze-im-internet.de/bimschv_35/anhang_2.html", "source": null, "verified": null}
   ],
   "toll": [
     { "text": "Péage (Maut) sur les autoroutes et les routes fédérales (Bundesstraßen) pour les véhicules de transport de marchandises de plus de 3,5 t (poids technique).", "source": "bfstrmg", "verified": "2026-11-20" },

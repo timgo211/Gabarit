@@ -37,12 +37,17 @@
 //   de invierno » des panneaux.
 // - BE : code de la route art. 81.4.4 (chaînes seulement en cas de neige ou de verglas), codedelaroute.be.
 // - AT : KFG 1967 § 102 non lu (RIS refuse le conteneur ; lu dans le journal de l'Action « Équipements d'hiver »).
+// Normes Euro (phase 5g, bloc "euro", lus le 21/11/2026) : voir euro.js et chaque fichier.
+// - CH : ORPL (RS 641.811) art. 14 et annexe 1 (version du 1/01/2025, Fedlex, point SPARQL).
+// - DE : BFStrMG annexe 1 ch. 2 (catégories A à F) ; 35. BImSchV annexe 2 (vignette verte, groupe 4).
+// - AT : Tyrol (A12) texte RIS non lu → « à vérifier ». IT : interdictions régionales → « à vérifier ».
 // Heures : heure locale de la tablette (les six pays sont à l'heure de Paris, Canaries exceptées).
 
 import { countryHolidays, countryHolidayName, REGIONAL_HOLIDAYS, dayKey, addDays } from './holidays.js';
 import { countriesAlongRoute, countryName, inCountry, COUNTRIES } from './countries.js';
 import { dayTime } from './hgv-bans.js';
 import { tunnelName } from './adr.js';
+import { countryEuroText } from './euro.js';
 
 export const COUNTRY_RULES = Object.freeze({
   FILES: Object.freeze(['BE', 'LU', 'DE', 'CH', 'IT', 'ES', 'AT']),
@@ -85,6 +90,7 @@ export function parseCountryData(json) {
     toll: items(json.toll), lez: items(json.lez), adr: items(json.adr),
     limits: parseLimits(json.limits),
     winter: items(json.winter),
+    euro: items(json.euro),
   };
 }
 
@@ -395,6 +401,9 @@ export function countryCard(data, segment, { vehicle, now = new Date(), tunnels 
 
   // Équipements d'hiver (phase 5f) : affichés toute l'année, jamais dits ; IT : période « à vérifier », sans alerte.
   for (const t of data.winter) push("Équipements d'hiver", t, t.text, { url: t.url });
+
+  // Normes Euro (phase 5g) : catégorie de la classe du profil quand la règle la donne (rule.mine), jamais dit.
+  for (const t of data.euro) push('Normes Euro', t, countryEuroText(t, vehicle), { url: t.url });
 
   for (const t of data.toll) push('Péage PL', t, t.text, { url: t.url });
   for (const t of data.lez) push('ZFE et vignettes', t, t.text, { url: t.url });

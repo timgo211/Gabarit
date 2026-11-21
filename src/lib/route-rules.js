@@ -12,6 +12,7 @@ import {
 } from './adr.js';
 import { countryRules } from './country-rules.js';
 import { weightRules } from './weights.js';
+import { euroRules } from './euro.js';
 import { winterRules } from './winter.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
@@ -114,6 +115,10 @@ export function routeRules(route, {
   const tun = tunnelRules(route, { vehicle, tunnels, departure, elapsed });
   lines.push(...tun.lines.filter((l) => l.level === 'warn'));
   short.push(...tun.short);
+  // Normes Euro (phase 5g) : tunnels du Mont-Blanc et du Fréjus selon la classe Euro du profil, jamais dit.
+  const euro = euroRules(route, { vehicle });
+  lines.push(...euro.lines.filter((l) => l.level === 'warn'));
+  short.push(...euro.short);
   // Poids en trafic international (phase 5e) : alerte avant le départ, jamais dite.
   const weight = weightRules(route, { vehicle });
   lines.push(...weight.lines.filter((l) => l.level === 'warn'));
@@ -147,6 +152,7 @@ export function routeRules(route, {
     else if (w.checked) lines.push({ level: 'info', text: windCalmText(threshold) });
   } else if (wind?.status === 'failed') lines.push({ level: 'info', text: WIND.UNAVAILABLE_TEXT });
   lines.push(...tun.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...euro.lines.filter((l) => l.level !== 'warn'));
   lines.push(...acc.lines.filter((l) => l.level !== 'warn'));
   lines.push(...weight.lines.filter((l) => l.level !== 'warn'));
   lines.push(...win.lines.filter((l) => l.level !== 'warn'));
@@ -162,7 +168,7 @@ export function routeRules(route, {
   }
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
-    countries: ctry, weight, winter: win,
+    countries: ctry, weight, winter: win, euro,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional,
   };
 }

@@ -4,6 +4,7 @@
   "orsIds": [193],
   "verified": "2026-11-20",
   "sources": {
+    "orpl": {"name": "Ordonnance relative à une redevance sur le trafic des poids lourds (ORPL, RS 641.811), art. 14 et annexe 1", "url": "https://www.fedlex.admin.ch/eli/cc/2000/192/fr", "kind": "national"},
     "ocr": { "name": "Ordonnance sur les règles de la circulation routière (OCR, RS 741.11), art. 5 et 91", "url": "https://www.fedlex.admin.ch/eli/cc/1962/1364_1409_1420/fr", "kind": "national" },
     "astra": { "name": "Office fédéral des routes (OFROU), Circulation le dimanche ou la nuit", "url": "https://www.astra.admin.ch/fr/circulation-le-dimanche-ou-la-nuit", "kind": "national" },
     "rplp": { "name": "Office fédéral de la douane (OFDF), La RPLP en bref", "url": "https://www.bazg.admin.ch/fr/la-rplp-en-bref", "kind": "national" },
@@ -38,6 +39,9 @@
     { "id": "night", "kind": "daily", "over": 3.5, "from": "22:00", "to": "05:00",
       "label": "Nuit", "text": "Plus de 3,5 t : interdiction de circuler la nuit, de 22 h à 5 h, tous les jours.",
       "voice": "interdiction de nuit de 22 heures à 5 heures", "source": "ocr", "verified": "2026-11-20" }
+  ],
+  "euro": [
+    {"text": "RPLP selon la classe Euro (véhicules lourds de plus de 3,5 t) : catégorie de redevance 1 pour Euro 0 à V (EEV compris, comme Euro V), 3,26 centimes par tonne et par km ; catégorie 3 pour Euro VI et ultérieur, 2,39 centimes. Sans preuve de la classe : catégorie 1.", "source": "orpl", "verified": "2026-11-21", "mine": {"0": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "1": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "2": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "3": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "4": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "5": "catégorie de redevance 1 (3,26 centimes par tonne et par km)", "EEV": "catégorie de redevance 1 (3,26 centimes par tonne et par km), comme Euro V", "6": "catégorie de redevance 3 (2,39 centimes par tonne et par km)"}}
   ],
   "toll": [
     { "text": "Redevance poids lourds (RPLP) pour les véhicules de plus de 3,5 t transportant des biens, immatriculés en Suisse ou à l'étranger : kilomètres saisis par un système embarqué (NETS ou SET).", "source": "rplp", "verified": "2026-11-20" },

@@ -105,7 +105,7 @@ jobs:
 
           # Mont-Blanc : arrêté 2009-3425 (règlement de circulation) — ONU 3077 / 3082 (phase 5b bis).
           print('\n##### Arrêté 2009-3425 (Bison Futé)')
-          d, c = get('https://www.bison-fute.gouv.fr/IMG/pdf/04_ARP_2009_3425_modif_reglement_circulation.pdf')
+          d, c = get('https://www.bison-fute.gouv.fr/IMG/pdf/04_ARP_2009_3425' + '_modif_reglement_circulation.pdf')
           if d is not None:
             open('/tmp/a.pdf', 'wb').write(d)
             subprocess.run(['pdftoppm', '-r', '200', '-png', '/tmp/a.pdf', '/tmp/a'])

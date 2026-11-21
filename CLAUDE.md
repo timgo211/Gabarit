@@ -27,6 +27,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,
     consigne selon la remorque), `winter-convert.js` (liste Sécurité routière + contours → `data/hiver/`) ; UI
     `src/ui/winter.js` ; bloc `winter` des fiches pays
+  - phase 5g : `euro.js` (classe Euro du profil : tunnels du Mont-Blanc et du Fréjus par les tubes de `KNOWN_TUNNELS`,
+    statuts confirmé / exploitant / à vérifier, tableau EEV `EURO_EEV`, lignes « Normes Euro » des fiches pays, bloc
+    `euro` de `data/pays/*.json`)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -86,6 +89,9 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
   hazmat=no à côté, catégorie A, hazmat:E=yes, le long de la ligne de test à 45,05° N)
 - fixtures phase 5f : `hiver-liste-sheet.xml` (lignes réelles de la liste du 22/10/2022), `hiver-contours.geojson`
   (contours écrits autour de `ors-directions-nav.json` : petite commune sur 155 m sans point du tracé, trou, en partie)
+- fixtures phase 5g : `ors-directions-mont-blanc.json` (Le Fayet → tunnel du Mont-Blanc → Courmayeur) et
+  `ors-directions-frejus.json` (Modane → tunnel du Fréjus → Bardonecchia), countryinfo FR 70 / IT 97, tubes de
+  `KNOWN_TUNNELS`, écrites d'après la doc ORS
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)
@@ -109,6 +115,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
+                                   #   | euro
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -116,7 +123,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v25 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v27 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -126,7 +133,10 @@ de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8
 « Éviter la desserte locale » = une requête ORS, 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé à 360 et
 1280 px : bandeau et une annonce vers 3 km captée, copie absente), équipements d'hiver (`winter` : mercredi de
 novembre, alerte, date de la liste, B26, profil « Remorque » rechargé, crédits, juillet, copie absente, fiches Suisse /
-Italie en juillet, guidage avec le GPS émulé à 360 et 1280 px : rien d'hiver dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
+Italie en juillet, guidage avec le GPS émulé à 360 et 1280 px : rien d'hiver dit ni affiché), normes Euro (`euro` :
+Mont-Blanc Euro 3 / Euro 6 / non précisé, profil rechargé, Fréjus Euro 4 « exploitant », fiches Suisse et Allemagne
+« Normes Euro », 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé dans le tunnel à 360 et 1280 px : rien d'Euro
+dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
 
 ## Conventions
@@ -352,6 +362,19 @@ Italie en juillet, guidage avec le GPS émulé à 360 et 1280 px : rien d'hiver 
   panneaux, pas de période légale ») ; IT période « à vérifier » ; `data/pays/AT.json` minimal (tout « à vérifier »).
   Crédits dans Réglages (`#winter-credit` : liste du 22/10/2022, contours ODbL). Hôtes de l'Action :
   securite-routiere.gouv.fr, contours-administratifs.s3.rbx.io.cloud.ovh.net (bloqué au conteneur), ris.bka.gv.at.
+- Normes Euro (phase 5g, `euro.js`) : profil `euroClass` ('' non précisé par défaut, '0'–'6', 'EEV' ; anciens profils
+  → ''), servira à la 5h. Tunnels : seulement au-delà de 3,5 t de PTAC, tubes en dur de `KNOWN_TUNNELS` (pas de
+  fichier ni d'Overpass) ; règles `TUNNEL_RULES` avec `status` 'confirmed' (texte officiel lu), 'operator'
+  (« Confirmé par l'exploitant : nom, lu le JJ/MM/AAAA ; arrêté préfectoral non retrouvé »), 'check' (« à vérifier »,
+  information, jamais « interdit » ni « admise ») ; Mont-Blanc : arrêté n° 2020-0825 (Euro 0 à 4) ; Fréjus : arrêté
+  du 7/07/2017 (Euro 0 à 2) + SFTRF (Euro 3 et 4, exploitant). Classe interdite → alerte (notes + fiche
+  d'itinéraire), admise → information, non précisée → les deux cas (« classe Euro ? » sur la fiche) ; EEV admis
+  (absent des listes), comme Euro V pour la RPLP et la Maut (`EURO_EEV`). Textes « PL de marchandises » : le profil
+  n'a pas de type de véhicule (autocar, camping-car non distingués). Chaque alerte finit par « La signalisation fait
+  foi. » ; jamais de voix, de bandeau ni d'annonce. Fiches pays : bloc `euro` (règle + `mine` : texte par classe ;
+  classe absente de `mine` → « à vérifier ») ; CH (ORPL), DE (BFStrMG annexe 1, 35. BImSchV) ; AT et IT « à
+  vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
+  tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
