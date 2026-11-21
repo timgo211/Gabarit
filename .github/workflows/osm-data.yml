@@ -86,8 +86,9 @@ jobs:
             # Numéro écrit « R411-8 », « R. 411-8 » ou coupé en fin de ligne selon l'édition.
             if grep -n -i -E "R\.? ?411-8([^0-9]|$)" code.txt > hits.txt; then
               cat hits.txt | head -20
-              n=$(grep -n -i -E "Article R\.? ?411-8([^0-9]|$)" code.txt | head -1 | cut -d: -f1)
-              if [ -n "$n" ]; then sed -n "${n},$((n + 30))p" code.txt; fi
+              # Titre de l'article seul sur sa ligne (« R. 411-8 ») : texte des lignes suivantes.
+              n=$(grep -n -E "^(Article )?R\. ?411-8 *$" code.txt | head -1 | cut -d: -f1)
+              if [ -n "$n" ]; then sed -n "$((n - 3)),$((n + 25))p" code.txt; fi
             else
               echo "Article R411-8 absent du PDF"
               grep -n -i -E "411-[0-9]" code.txt | head -20
