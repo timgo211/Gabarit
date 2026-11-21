@@ -9,12 +9,13 @@ import { computeRouteOptions } from '../lib/route-options.js';
 
 /** Erreur portant un message déjà traduit pour l'utilisateur. */
 export class ApiError extends Error {
-  constructor({ kind, message, detail, status }) {
+  constructor({ kind, message, detail, status, code }) {
     super(message);
     this.name = 'ApiError';
     this.kind = kind;
     this.detail = detail ?? '';
     this.status = status ?? null;
+    this.code = code ?? null; // code d'erreur ORS (2009, 2010…), affiché en petit sous le message
   }
 }
 

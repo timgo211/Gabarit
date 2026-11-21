@@ -207,6 +207,8 @@ async function open(browser, base, {
       const body = JSON.parse(route.request().postData() || '{}');
       const json = directions ? directions(body) : (body.alternative_routes
         ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json'));
+      // Phase 5h bis : { __status, ...corps } simule une réponse d'erreur d'ORS (statut HTTP et corps).
+      if (json && json.__status) { const { __status, ...rest } = json; return route.fulfill({ status: __status, json: rest }); }
       return route.fulfill({ json });
     }
     return route.abort();
@@ -1669,7 +1671,7 @@ async function tollsCheck(browser, base) {
     await page.waitForSelector('.rules-notes', { timeout: 10000 });
     const notes = await notesOf(page);
     const r = rpass(notes);
-    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
+    check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km 9\d \(A36, A35\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
       `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
     check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
     await noHorizontalScroll(page, `${width} px notes taxes PL`);
@@ -1722,6 +1724,19 @@ async function tollsCheck(browser, base) {
     check(dg.errors.length === 0, `${width} px diagnostic : aucune erreur JavaScript`, dg.errors.join(' | '));
     await dg.ctx.close();
   }
+  // Phase 5h bis : échec d'ORS (404, code 2009) : message clair et, en petit, code et message du service.
+  const er = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'),
+    directions: () => ({ __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } }) });
+  await er.page.fill('#to-input', 'Lyon');
+  await er.page.waitForSelector('#to-list li', { timeout: 5000 });
+  await er.page.dispatchEvent('#to-list li', 'pointerdown');
+  await er.page.click('#btn-route');
+  await er.page.waitForSelector('#message:not([hidden]) .message-detail', { timeout: 10000 });
+  const msg = await er.page.textContent('#message');
+  check(/^Aucun itinéraire autorisé pour ce gabarit\..*Réponse du service d'itinéraire : HTTP 404, code 2009 — « Route could not be found/.test(msg), '360 px : échec 2009, message et code du service', msg);
+  await noHorizontalScroll(er.page, '360 px message d\'erreur');
+  check(er.errors.length === 0, 'échec 2009 : aucune erreur JavaScript', er.errors.join(' | '));
+  await er.ctx.close();
   // A36 et D 83 de Belfort (Besançon → Belfort, faux positif v28) : hors du réseau R-Pass, aucune ligne.
   const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(bb.page);
@@ -1734,7 +1749,7 @@ async function tollsCheck(browser, base) {
   await computeRoute(ge.page);
   await ge.page.waitForSelector('.rules-notes', { timeout: 10000 });
   const gn = await notesOf(ge.page);
-  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, de km 0 à km \d+ \(A31\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
+  check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km 0 à km \d+ \(A31\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
     'Grand Est : écocontribution sur l\'A31, réseau officiel, aucun montant, pas de R-Pass', gn.map((n) => n.text).join(' | '));
   await ge.ctx.close();
   const ab = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), tollsFile: null });

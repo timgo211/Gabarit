@@ -209,6 +209,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   margin-top: 12px; padding: 14px; border-radius: var(--radius);
   background: var(--error-bg); color: var(--error-fg); border: 2px solid var(--danger); font-weight: 600;
 }
+.message .message-detail { display: block; margin-top: 4px; font-size: .8rem; opacity: .85; overflow-wrap: anywhere; }
 .message.info { background: var(--card); color: var(--fg); border-color: var(--border); }
 
 .summary { margin-top: 12px; }

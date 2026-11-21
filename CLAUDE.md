@@ -398,7 +398,10 @@ dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du 
   (absent de la grille) → fourchette ; jamais de total ni d'estimation. Au-delà de 3,5 t (poids non précisé :
   signalé) ; en France d'après countryinfo (absent : cadre seul, « Pays traversés non lus : à vérifier ») ; heure de
   passage recalée par `elapsed`, journée de début à l'heure de la tablette (« prévue à partir du 1er janvier 2027 »
-  avant, « prévue depuis » après). Fichier absent → « Taxes PL régionales indisponibles (données non chargées) »
+  avant, « prévue depuis » après). Passage écrit « au moins de km X à km Y » (repérage par les noms d'étape : une partie
+  du réseau peut manquer). Échec ORS : `serviceDetailText` (statut HTTP, code ORS, message) en petit sous le message
+  (`showMessage(…, detail)`) ; « Aucun itinéraire autorisé » = code 2009, HTTP 404 sans code ou réponse sans tracé ;
+  429 = « Trop de demandes en une minute » ; 2004 = distance trop grande (pas une limite de poids). Fichier absent → « Taxes PL régionales indisponibles (données non chargées) »
   (trajet en France). Jamais de voix, de bandeau ni d'annonce ; lien « Site officiel ». Sources lues le 21/11/2026
   par une Action temporaire (retirée) : r-pass.eu (réseau : A35 et A36 non concédées hors Eurométropole — la M35 de
   l'Eurométropole n'est pas taxée —, RD83 Colmar–Sélestat, RD1363, RD502, RD504 ; délibération n° CD-2025-4-7-1 du

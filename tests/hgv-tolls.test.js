@@ -63,7 +63,7 @@ test('R-Pass annoncé : avant le 1er janvier 2027, « prévue à partir du », i
   const line = r.lines.find((l) => /R-Pass/.test(l.text));
   assert.ok(line, 'R-Pass non signalé sur l\'A35');
   assert.equal(line.level, 'info');
-  assert.match(line.text, /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, de km 0 à km \d+ \(A36, A35\)\./);
+  assert.match(line.text, /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km \d+ \(A36, A35\)\./);
   assert.match(line.text, /délibération du Conseil d'Alsace n° CD-2025-4-7-1 du 20 octobre 2025/i);
   assert.match(line.text, /Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)/);
   assert.match(line.text, /Tarif annoncé, poids du profil 19 t, Euro VI \(classe C \(PTRA de 18 à 32 t\)\) : 11,5 centimes par km \(dépliant officiel V02 du R-Pass \(grille tarifaire\), lu le 21\/11\/2026\)/);
@@ -123,7 +123,7 @@ test('taxe « à vérifier » (aucune source lue) : « Taxe possible », périm�
   const data = parseTollData({ ...sample, taxes: [{ ...sample.taxes[0], status: 'check', source: null, verified: null, note: 'Recours en cours.' }] });
   const r = tollRules(alsace, { vehicle: truck, tolls: ok(data), departure: new Date(2026, 10, 25, 9, 0) });
   assert.equal(r.lines[0].level, 'info');
-  assert.match(r.lines[0].text, /^Taxe possible : Taxe de test, annoncée à partir du 1er janvier 2027, de km \d+ à km \d+ \(A35\) : périmètre officiel non lu, à vérifier\. Recours en cours\. Aucun montant connu\. La signalisation fait foi\.$/);
+  assert.match(r.lines[0].text, /^Taxe possible : Taxe de test, annoncée à partir du 1er janvier 2027, au moins de km \d+ à km \d+ \(A35\) : périmètre officiel non lu, à vérifier\. Recours en cours\. Aucun montant connu\. La signalisation fait foi\.$/);
   assert.equal(r.short.length, 0);
   const after = tollRules(alsace, { vehicle: truck, tolls: ok(data), departure: new Date(2027, 0, 4) });
   assert.match(after.lines[0].text, /annoncée depuis le 1er janvier 2027/);
@@ -151,7 +151,7 @@ test('écocontribution Grand Est annoncée sur l\'A31 (réseau officiel), pas en
   const line = r.lines.find((l) => /Grand Est/.test(l.text));
   assert.ok(line, 'écocontribution non signalée sur l\'A31');
   assert.equal(line.level, 'info');
-  assert.match(line.text, /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, de km \d+ à km \d+ \(A31\)\./);
+  assert.match(line.text, /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km \d+ à km \d+ \(A31\)\./);
   assert.match(line.text, /A30, A31 \(de la frontière luxembourgeoise au sud de Toul\), A33, A313, RN4, RN44, RN431 et RN52/);
   assert.match(line.text, /classe d'émissions de CO2 \(absente du profil\)/);
   assert.match(line.text, /Aucun montant calculé\./);
@@ -246,4 +246,13 @@ test('RD83 comptée seulement entre Colmar et Sélestat (noms ORS « name, ref �
   // Cernay → Colmar (environ 30 km) et Sélestat → Erstein (environ 25 km) ne comptent pas.
   assert.ok(p.enter > 25000 && p.enter < 33000, `entrée à ${Math.round(p.enter)} m`);
   assert.ok(r.coordinates.length > 0 && p.exit < 62000, `sortie à ${Math.round(p.exit)} m`);
+});
+
+test('« au moins de km X à km Y » : le repérage par les noms ne présente jamais la section comme complète', () => {
+  const dep = new Date(2026, 10, 25, 9, 0);
+  for (const [f, re] of [['ors-directions-alsace.json', /R-Pass/], ['ors-directions-metz-nancy.json', /ECPL/]]) {
+    const line = tollRules(routeOf(f), { vehicle: truck, tolls: ok(real), departure: dep }).lines.find((l) => re.test(l.text));
+    assert.match(line.text, /, au moins de km \d+ à km \d+ \(/);
+    assert.doesNotMatch(line.text, /, de km \d+/);
+  }
 });

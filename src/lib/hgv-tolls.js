@@ -212,7 +212,9 @@ export function tollsAlongRoute(route, { data, departure = new Date(), elapsed =
 /** Texte d'un passage. `inForce` : l'heure de passage tombe après la date de début. */
 export function describeToll(p) {
   const { tax } = p;
-  const km = `de km ${Math.round(p.enter / 1000)} à km ${Math.max(Math.round(p.exit / 1000), Math.round(p.enter / 1000))}`;
+  // Repérage par les noms d'étape ORS : une partie du réseau peut manquer (étape sans référence, données plus
+  // anciennes) → « au moins », jamais une section présentée comme complète.
+  const km = `au moins de km ${Math.round(p.enter / 1000)} à km ${Math.max(Math.round(p.exit / 1000), Math.round(p.enter / 1000))}`;
   const roads = p.roads.join(', ');
   const inForce = p.enterTime.getTime() >= startOf(tax.start).getTime();
   const when = inForce ? `annoncée depuis le ${longDate(tax.start)}` : `annoncée à partir du ${longDate(tax.start)}`;

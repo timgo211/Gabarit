@@ -14,6 +14,7 @@ import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
 import { createWinter } from './ui/winter.js';
 import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
+import { serviceDetailText } from './lib/ors-errors.js';
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText } from './lib/route-rules.js';
@@ -561,7 +562,7 @@ const form = createRouteForm({
       access.clear();
       winter.clear();
       map.showZfe([]);
-      showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.');
+      showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.', 'error', serviceDetailText(err, store.getApiKey() ?? ''));
     } finally {
       form.setBusy(false);
     }
