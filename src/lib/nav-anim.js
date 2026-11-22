@@ -2,7 +2,7 @@
 // Logique pure ; la boucle requestAnimationFrame est dans src/ui/map.js et s'arrête à la fin de chaque interpolation
 // (aucun rendu continu quand rien ne bouge).
 
-import { normalizeBearing } from './nav-geo.js';
+import { normalizeBearing, haversine } from './nav-geo.js';
 
 /**
  * Durée d'une interpolation : intervalle mesuré entre deux positions, borné (pas de retard visible).
@@ -18,6 +18,10 @@ export const ANIM = Object.freeze({
    * redessinés. Au-delà (camion qui avance au pas), une image.
    */
   HOLD_M: 100,
+  /** Point d'arrêt : moyenne des 20 dernières positions reçues à l'arrêt au plus (voir stillPoint). */
+  STILL_N: 20,
+  /** Point d'arrêt à 50 m ou plus de la flèche (camion qui avance au pas, sous 3 km/h) : une image. */
+  STILL_SHIFT_M: 50,
   /** En dessous de ces écarts, rien n'a changé. */
   SAME_M: 0.5, SAME_DEG: 0.5, SAME_ZOOM: 0.01, SAME_PITCH: 0.1,
 });
@@ -66,6 +70,44 @@ export function holdStill(drawn, next, distanceM, speedKmh) {
   return !!drawn?.lonlat && Number.isFinite(speedKmh) && speedKmh < ANIM.STILL_KMH
     && Number.isFinite(distanceM) && distanceM < ANIM.HOLD_M
     && !!drawn.follow === !!next.follow && samePadding(drawn.padding, next.padding);
+}
+
+/**
+ * Point d'arrêt : moyenne des positions reçues depuis que le camion est arrêté (moins de 3 km/h), glissante sur les
+ * 20 dernières au plus (suit un vrai déplacement lent). Le GPS dérive de part et d'autre de la vraie position : deux
+ * mesures peuvent être jusqu'à deux fois l'amplitude de la dérive l'une de l'autre (± 60 m → 120 m), alors que la
+ * moyenne reste près de la vraie position. La dérive se mesure donc par rapport à ce point, pas à la dernière position
+ * dessinée (souvent déjà dérivée, par exemple redessinée parce que le bandeau a changé de taille).
+ * Remis à la position reçue en roulant, vitesse inconnue, sans point précédent ou à 100 m ou plus de lui.
+ * @param {{ lonlat:number[], n:number }|null} prev point d'arrêt précédent
+ * @param {number[]} lonlat position reçue
+ * @param {number|null} speedKmh
+ * @returns {{ lonlat:number[], n:number }|null}
+ */
+export function stillPoint(prev, lonlat, speedKmh) {
+  if (!Array.isArray(lonlat) || !Number.isFinite(lonlat[0]) || !Number.isFinite(lonlat[1])) return prev ?? null;
+  const still = Number.isFinite(speedKmh) && speedKmh < ANIM.STILL_KMH;
+  if (!still || !prev?.lonlat || !(haversine(prev.lonlat, lonlat) < ANIM.HOLD_M)) return { lonlat: [lonlat[0], lonlat[1]], n: 1 };
+  const n = Math.min(prev.n + 1, ANIM.STILL_N);
+  return {
+    lonlat: [prev.lonlat[0] + (lonlat[0] - prev.lonlat[0]) / n, prev.lonlat[1] + (lonlat[1] - prev.lonlat[1]) / n],
+    n,
+  };
+}
+
+/**
+ * Dérive à comparer à HOLD_M (holdStill) : distance de la position reçue au point d'arrêt précédent, ou Infinity si le
+ * point d'arrêt (mis à jour) s'est éloigné de 50 m ou plus de la flèche dessinée (le camion avance vraiment, au pas).
+ * Sous une dérive de ± 60 m, la moyenne reste à moins de 25 m de la vraie position (trace de ui-check parked).
+ * @param {{ lonlat:number[] }|null} prevStop point d'arrêt avant la position reçue
+ * @param {{ lonlat:number[] }|null} stop point d'arrêt après
+ * @param {number[]|null} drawnLonlat position de la flèche dessinée
+ * @param {number[]} lonlat position reçue
+ */
+export function stillDrift(prevStop, stop, drawnLonlat, lonlat) {
+  if (!prevStop?.lonlat || !Array.isArray(lonlat)) return NaN;
+  if (stop?.lonlat && Array.isArray(drawnLonlat) && !(haversine(stop.lonlat, drawnLonlat) < ANIM.STILL_SHIFT_M)) return Infinity;
+  return haversine(prevStop.lonlat, lonlat);
 }
 
 /**

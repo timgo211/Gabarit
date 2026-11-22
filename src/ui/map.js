@@ -10,7 +10,7 @@
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
 import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
-import { planMove, frameAt, holdStill } from '../lib/nav-anim.js';
+import { planMove, frameAt, holdStill, stillPoint, stillDrift } from '../lib/nav-anim.js';
 import { haversine } from '../lib/nav-geo.js';
 import { overviewPadding } from '../lib/navigation.js';
 import { recolorStyle, mapPaintPatches, ROUTE_WIDTH } from '../lib/map-palette.js';
@@ -110,6 +110,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let anim = null;
   let animFrame = null;
   let lastNav = null;
+  /** Point d'arrêt (moyenne des positions reçues à l'arrêt, stillPoint) : référence de la dérive du GPS. */
+  let stop = null;
   let layer = sanitizeMapLayer(opts.layer);
   let lastView = null;
   let styleUrl = null;
@@ -588,11 +590,15 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (!lonlat) return;
       const now = performance.now();
       const cur = anim ? frameAt(anim.move, (now - anim.start) / (anim.move.duration || 1)) : lastNav;
-      const target = { lonlat, bearing, zoom, pitch };
-      // À l'arrêt, GPS qui dérive : rien ne bouge, aucune image (ni carte ni repères des aires).
-      if (holdStill(lastNav, { follow, padding }, lastNav ? haversine(lastNav.lonlat, lonlat) : NaN, speedKmh)) return;
+      // À l'arrêt, GPS qui dérive : rien ne bouge, aucune image (ni carte ni repères des aires). La dérive se mesure
+      // depuis le point d'arrêt ; s'il faut redessiner à l'arrêt (bandeau, suivi, camion au pas), flèche et caméra y
+      // vont.
+      const prevStop = stop;
+      stop = stillPoint(stop, lonlat, speedKmh);
+      const target = { lonlat: stop?.lonlat ?? lonlat, bearing, zoom, pitch };
+      if (holdStill(lastNav, { follow, padding }, stillDrift(prevStop, stop, lastNav?.lonlat, lonlat), speedKmh)) return;
       // À l'arrêt (< 3 km/h) ou sans changement : une seule image, puis plus aucun rendu jusqu'à la position suivante.
-      const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, lonlat) : NaN,
+      const move = planMove(cur, target, lastNav ? now - lastNav.at : null, cur ? haversine(cur.lonlat, target.lonlat) : NaN,
         { speedKmh });
       lastNav = { ...target, at: now, follow: !!follow, padding };
       if (follow && map) map.stop(); // fin d'une vue d'ensemble animée
@@ -626,6 +632,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (!on) {
         stopAnim();
         lastNav = null;
+        stop = null;
         map.stop();
         map.setPadding({ top: 0, right: 0, bottom: 0, left: 0 });
         if (markers.me) vehicle(markers.me.getLngLat().toArray());
