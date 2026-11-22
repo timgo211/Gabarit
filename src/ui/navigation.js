@@ -409,8 +409,15 @@ export function createNavigation(ctx) {
     const toastBottom = listOpen && box.toastBottom !== null ? box.toastBottom
       : Math.round(h - (listTop === null ? pillBottom : listTop - 8));
     ui.toast.style.bottom = `${toastBottom}px`;
-    ui.toast.style.left = `${Math.round(vx)}px`;
-    ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
+    if (listOpen && box.inMap) {
+      // Liste sur la carte (paysage étroit) : message centré sous elle, de sa largeur, sur une ligne.
+      const listW = Math.max(0, w - box.right - box.left);
+      ui.toast.style.left = `${Math.round(box.left + listW / 2)}px`;
+      ui.toast.style.maxWidth = `${Math.round(listW)}px`;
+    } else {
+      ui.toast.style.left = `${Math.round(vx)}px`;
+      ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
+    }
     renderRoad();
   }
 

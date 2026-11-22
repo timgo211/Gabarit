@@ -110,7 +110,7 @@ export function parkedState(prev, kmh, now) {
 }
 
 /** Liste des aires du guidage (phase 2d) : en portrait, 40 % de la hauteur de l'écran au plus. */
-export const AREA_LIST_BOX = Object.freeze({ maxPortrait: 0.4, inset: 12, gap: 8, minColumn: 180, toastRoom: 60 });
+export const AREA_LIST_BOX = Object.freeze({ maxPortrait: 0.4, inset: 12, gap: 8, minColumn: 180, toastRoom: 72 });
 
 /**
  * Place de la liste défilante des aires (phase 2d), en px depuis le bord de l'écran de guidage.
