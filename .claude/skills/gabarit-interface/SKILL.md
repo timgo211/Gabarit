@@ -94,3 +94,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   `src/ui/dom.js`, appelés par `fitBanner`) ; au-delà, la pile du haut défile. Références de route : suffixes reconnus
   (`D 120 E`, `D 57e2`, `N 83 bis`), espaces insécables (`roadLabel`, `keepRefsTogether`). Bouton rond indisponible :
   `--nav-off-bg` / `--nav-off-fg` / `--nav-off-border` (opaques, AA testé), jamais d'opacité.
+
+- Phase 2g : fiche d'itinéraire, ligne `.route-card-an` « Autoroute et nationale : 82 % » (« inconnue » sans extras ou
+  > 30 % de km sans nom) sous les faits ; « Recommandé » choisi pour sa part A/N : note `AN_PREFERRED_NOTE`, ancien
+  premier renommé « Préférence ORS » (clé `ors-default`, partageable). Diagnostic du trajet : ligne « Classes de
+  route : A … km, N … km, autre … km ; km inconnus … ; part A/N … ».
+- Phase 2g : message d'un code 2009 au diagnostic précis (départ sans sortie, départ isolé, arrivée inaccessible) :
+  `NO_ROUTE_BASE_TEXT` + précision, sans le conseil péages / ferries (gardé seulement sans conclusion).

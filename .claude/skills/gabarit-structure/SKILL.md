@@ -39,6 +39,11 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   - phase 5h : `hgv-tolls.js` (taxes PL régionales de `data/taxes-pl.json` : R-Pass, écocontribution Grand Est ;
     références de route dans le cadre de la région, heure de passage, statuts confirmé / annoncé / à vérifier, taux
     de la grille officielle pour la classe du profil) ; lignes « Changements au 1er janvier 2027 » des fiches pays
+  - phase 2g : `road-class.js` (extras `waycategory` + `waytype` d'ORS et référence de l'étape → classe A / N / autre
+    par tronçon, km inconnus, part A/N, `ROUTE_PREF`, `pickRecommendedIndex`) ; `promoteRecommended` dans
+    `route-options.js` (« Recommandé » / « Préférence ORS ») ; fixtures `ors-directions-an-alternatives.json`
+    (Besançon → Belfort : D 683, A 36 + N 1019, N 57 + D 9) et `ors-directions-an-unnamed.json` (étapes sans nom),
+    écrites d'après la doc ORS (extra-info waycategory.md, waytype.md)
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

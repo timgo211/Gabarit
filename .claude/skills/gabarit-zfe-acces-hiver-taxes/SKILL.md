@@ -131,3 +131,9 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   (Gambsheim), `D 504` (Seltz) ; `M 35` = Eurométropole. Diagnostic du trajet (phase 5h bis, `route-diagnostic.js`) :
   bloc replié sous les notes de la fiche, texte à copier (étapes ORS : km, nom renvoyé, références lues, point de
   début arrondi à 0,01° ; pays ; ZFE et taxes PL avec leurs km), jamais de clé ni de profil complet.
+
+- Phase 2g : ZFE dont l'inclusion des autoroutes n'est pas tranchée (`ZFE_MOTORWAY_TO_CHECK` de `zfe.js`) — Grand Nancy
+  (245400676-ZFE-001 : BNZFE du 26/03/2026 sans tronçon d'exception, arrêté grandnancy.eu non lu le 22/11/2026, site
+  bloqué depuis le conteneur). Passage sur autoroute (référence A de l'étape) dans la zone : interdiction gardée par
+  prudence + « Passage par A 31 : inclusion de l'autoroute dans la ZFE à vérifier dans l'arrêté. La signalisation
+  fait foi. » Retirer l'entrée seulement d'après l'arrêté (source et date en commentaire).
