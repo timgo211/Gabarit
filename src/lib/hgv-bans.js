@@ -266,6 +266,19 @@ export function describeBanConflict(c) {
   return `${KIND_TEXT[c.kind] ?? KIND_TEXT.general} ${dayTime(c.start)} → ${dayTime(c.end)} : vous y seriez vers ${where} (${dayTime(c.time)}).${check}`;
 }
 
+/**
+ * Libellé court de la fiche d'itinéraire (phase 2e), même formulation que le bandeau du guidage :
+ * « Interdiction PL en cours jusqu'à dimanche 22 h » si le départ du trajet calculé (heure choisie, sinon maintenant)
+ * tombe pendant l'interdiction, sinon « Interdiction PL à partir de samedi 22 h ».
+ * @param {{ start:Date, end:Date }} c conflit de bansAlongRoute
+ * @param {Date} departure départ du trajet calculé
+ */
+export function banShortText(c, departure) {
+  const t = departure instanceof Date ? departure.getTime() : Date.now();
+  if (t >= c.start.getTime() && t < c.end.getTime()) return `Interdiction PL en cours jusqu'à ${dayTime(c.end)}`;
+  return `Interdiction PL à partir de ${dayTime(c.start)}`;
+}
+
 /** Fiche : rappel si le calendrier de l'année n'est pas dans l'appli. */
 export const CALENDAR_UNKNOWN_TEXT = 'Calendrier des interdictions complémentaires (samedis d\'été et d\'hiver) inconnu pour cette année : vérifie sur bison-fute.gouv.fr.';
 

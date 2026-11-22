@@ -16,8 +16,15 @@ export const BADGE_COLORS = Object.freeze({
   other: Object.freeze({ bg: '#5C5F69', fg: '#FFFFFF', border: '#A9A79E' }),
 });
 
-/** Référence seule : lettre(s) puis chiffres, avec ou sans espace ou tiret (« D 83 », « A89 », « RN7 », « E 25 »). */
-const REF = /^(RN|RD|[ADNEMCRT])\s*[-.]?\s*(\d{1,4}[A-Za-z]?(?:\.\d+)?)$/i;
+/**
+ * Référence seule : lettre(s) puis chiffres, avec ou sans espace ou tiret (« D 83 », « A89 », « RN7 », « E 25 »), et
+ * suffixe éventuel (phase 2e) : lettre collée ou séparée, suivie ou non d'un chiffre (« D 1083a », « D 120 E »,
+ * « D 57e2 »), « bis » ou « ter » (« N 83 bis »).
+ */
+const REF = /^(RN|RD|[ADNEMCRT])\s*[-.]?\s*(\d{1,4})(?:\.(\d+))?(?:\s*(bis|ter|[A-Za-z]\d{0,2}))?$/i;
+
+/** Espace insécable : une référence n'est jamais coupée en deux lignes (« D 120 E »). */
+const NBSP = '\u00A0';
 
 function badgeOf(token) {
   const m = REF.exec(token.trim());
@@ -26,7 +33,10 @@ function badgeOf(token) {
   if (letter === 'RN') letter = 'N';
   if (letter === 'RD') letter = 'D';
   const kind = Object.hasOwn(BADGE_COLORS, letter) ? letter : 'other';
-  const ref = `${letter} ${m[2].toUpperCase()}`;
+  const num = m[3] ? `${m[2]}.${m[3]}` : m[2];
+  const suffix = !m[4] ? '' : /^(bis|ter)$/i.test(m[4]) ? `${NBSP}${m[4].toLowerCase()}`
+    : /^\d/.test(m[4]) || !/\s/.test(token.slice(token.search(/\d/))) ? m[4].toUpperCase() : `${NBSP}${m[4].toUpperCase()}`;
+  const ref = `${letter}${NBSP}${num}${suffix}`;
   return { ref, kind, ...BADGE_COLORS[kind] };
 }
 
@@ -50,4 +60,16 @@ export function roadLabel(name) {
     }
   }
   return { badges, street: street.join(', ') };
+}
+
+const REF_IN_TEXT = /\b(RN|RD|[ADNEMCRT])[ \t]?[-.]?[ \t]?(\d{1,4})(?:[ \t](bis|ter|[A-Z]\d{0,2})\b)?/g;
+
+/**
+ * Consigne sans badge (« Prenez la D 120 E en direction de Metz ») : espaces insécables à l'intérieur des références,
+ * pour qu'elles ne soient jamais coupées entre deux lignes. Le reste du texte est inchangé.
+ * @param {string} text
+ */
+export function keepRefsTogether(text) {
+  if (typeof text !== 'string') return '';
+  return text.replace(REF_IN_TEXT, (all) => all.replace(/[ \t]/g, NBSP));
 }

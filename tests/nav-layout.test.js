@@ -116,7 +116,7 @@ test('tracé parcouru : tous les 25 m en roulant, jamais à l\'arrêt', () => {
 test('bandeau : badge et nom de rue, ou consigne entière avec une direction', async () => {
   const { bannerText } = await import('../src/lib/nav-layout.js');
   const a = bannerText({ text: 'Tournez à droite sur Route de Lyon, D 906', name: 'Route de Lyon, D 906' });
-  assert.deepEqual([a.badges.map((b) => b.ref), a.text, a.long], [['D 906'], 'Route de Lyon', false]);
+  assert.deepEqual([a.badges.map((b) => b.ref), a.text, a.long], [['D\u00A0906'], 'Route de Lyon', false]);
   const b = bannerText({ text: 'Prenez la sortie 34 en direction de Mâcon', name: 'A 6' });
   assert.deepEqual([b.badges, b.text], [[], 'Prenez la sortie 34 en direction de Mâcon']);
   const c = bannerText({ text: 'Continuez tout droit', name: '' });

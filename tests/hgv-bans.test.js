@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { frenchHolidays, easterSunday, holidayName, dayKey } from '../src/lib/holidays.js';
 import {
-  dayBans, banWindows, bansAlongRoute, vehicleBanScope, describeBanConflict, guidanceBan, prepareGuidanceBans,
+  dayBans, banWindows, bansAlongRoute, vehicleBanScope, describeBanConflict, banShortText, guidanceBan, prepareGuidanceBans,
   banAnnounceText, calendarKnown, HGV_BANS, CALENDAR_UNKNOWN_TEXT,
 } from '../src/lib/hgv-bans.js';
 import { roadRefs, sampleRoute } from '../src/lib/route-samples.js';
@@ -224,4 +224,18 @@ test('points du tracé : heure de passage croissante et route de l\'étape', () 
   assert.deepEqual(s[0].roads, ['A31']);
   assert.deepEqual(s[s.length - 1].roads, ['A6']);
   for (let i = 1; i < s.length; i += 1) assert.ok(s[i].time >= s[i - 1].time);
+});
+
+test('fiche d\'itinéraire (phase 2e) : « à partir de » avant l\'interdiction, « en cours jusqu\'à » pendant', () => {
+  const c = { start: D(2026, 11, 21, 22), end: D(2026, 11, 22, 22) };
+  assert.equal(banShortText(c, D(2026, 11, 21, 18)), 'Interdiction PL à partir de samedi 22 h');
+  assert.equal(banShortText(c, D(2026, 11, 22, 9)), 'Interdiction PL en cours jusqu\'à dimanche 22 h');
+  assert.equal(banShortText(c, D(2026, 11, 21, 22)), 'Interdiction PL en cours jusqu\'à dimanche 22 h');
+  // Trajet calculé : départ samedi 20 h, 4 h de route → commence avant, finit pendant → « à partir de ».
+  const route = line([5.04, 47.32], [4.83, 46.31], { km: 200, hours: 4, names: ['A 31', 'A 6'] });
+  const before = bansAlongRoute(route, { vehicle: semi, departure: D(2026, 11, 21, 20) }).conflicts[0];
+  assert.equal(banShortText(before, D(2026, 11, 21, 20)), 'Interdiction PL à partir de samedi 22 h');
+  // Départ choisi dimanche 9 h, pendant l'interdiction.
+  const during = bansAlongRoute(route, { vehicle: semi, departure: D(2026, 11, 22, 9) }).conflicts[0];
+  assert.equal(banShortText(during, D(2026, 11, 22, 9)), 'Interdiction PL en cours jusqu\'à dimanche 22 h');
 });
