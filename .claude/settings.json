@@ -10,5 +10,6 @@
       "Read(./node_modules/**)",
       "Read(./tools/ui-shots/**)"
     ]
-  }
+  },
+  "model": "opusplan"
 }
