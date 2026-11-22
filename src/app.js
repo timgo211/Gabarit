@@ -131,6 +131,8 @@ navigation = createNavigation({
   },
   onAreaOpen: (id) => areas.openSheet(id),
   onView: () => areas.refreshDrive(),
+  // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
+  onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
   // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
   onDriving: (d) => saveDriving(storage, d),
   onEnd: (message) => {
@@ -518,7 +520,7 @@ const form = createRouteForm({
   getApiKey: () => store.getApiKey(),
   initial: data.settings,
   onOptionsChange: (o) => update((d) => ({ ...d, settings: { ...d.settings, ...o } })),
-  onPosition: (lonlat) => { myPosition = lonlat; map.setMyPosition(lonlat); },
+  onPosition: (lonlat) => { myPosition = lonlat; map.setMyPosition(lonlat); theme.setPosition(lonlat); },
   onError: (err) => showMessage(messageNode, errorText(err)),
   // Saisie dans un champ : le point choisi par appui long est oublié, son repère retiré.
   onEdit: (which) => map.clearPin(which === 'to' ? 'pinTo' : 'pinFrom'),

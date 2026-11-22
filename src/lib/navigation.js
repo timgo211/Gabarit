@@ -417,6 +417,8 @@ export function updateNavigation(state, fix) {
     speedKmh: speed * 3.6,
     onRoute,
     distanceFromRoute: loc.distance,
+    /** Distance parcourue sur le tracé (m) : partie déjà faite dessinée en gris (phase 2c), affichage seulement. */
+    along: loc.along,
     maneuver: null,
     then: null,
     remainingDistance: s.arrived ? 0 : remaining,

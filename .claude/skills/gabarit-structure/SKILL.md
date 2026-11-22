@@ -21,6 +21,10 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
   - phase 2c-a : `contrast.js` (contraste WCAG, variables CSS lues par `tests/contrast.test.js`), `map-palette.js`
     (fond de carte recoloré jour/nuit, largeurs du tracé ; fixtures `style-liberty-layers.json`, `style-dark-layers.json`)
+  - phase 2c : `nav-layout.js` (écran de guidage : alertes et leur ordre, « à l'arrêt », caméra `followPadding`, colonne
+    de boutons, compteur, texte du bandeau, partie parcourue), `road-badge.js` (badges D/N/A/E des références de route),
+    `sun.js` (lever / coucher du soleil, NOAA ; mode nuit auto par `theme.js`), `map-palette.js` (bulles des noms de
+    rues, photos assombries la nuit)
   - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
     poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
   - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,
@@ -57,7 +61,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   - phase 9b (aires sur les longs trajets) : `areas-osm-data.js` (copie `data/aires-osm/` : export osmium → aires,
     contours `.poly` → zone couverte, cases de 1°, `routePlan` : cases touchées et morceaux hors copie)
 - `src/ui/` : interface (DOM, MapLibre, fetch) ; `src/app.js` assemble le tout
-  - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte), `voice.js`, `wake-lock.js`, `nav-icon.js`
+  - `navigation.js` (écran de guidage : GPS ou simulation → moteur → voix/carte ; disposition `layoutGuidance`, phase 2c),
+    `voice.js`, `wake-lock.js`, `nav-icon.js` (flèches de manœuvre maison), `nav-symbols.js` (pictogrammes Material
+    Symbols, Apache 2.0), `vehicle-icon.js` (repère du véhicule, registre d'icônes)
   - `layer-switch.js` (boutons Plan / Satellite à l'arrêt), `share.js` (fenêtre « Partager »)
   - `areas.js` (aires du trajet : copie `data/aires-osm/`, Overpass hors copie, liste, repères HTML sur la carte, fiche et
     « Mon avis »)

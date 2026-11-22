@@ -34,6 +34,8 @@
       </div>
       <p id="layer-message" class="layer-message" role="status" hidden></p>
 
+      <!-- Guidage (phase 2c) : bandeau et alertes en haut, colonne de boutons ronds à droite, compteur en bas à gauche,
+           panneau du bas (temps restant). Disposition posée par src/ui/navigation.js (layoutGuidance). -->
       <div id="nav" class="nav" hidden>
         <div class="nav-top">
           <div class="nav-maneuver" aria-live="polite">
@@ -44,53 +46,83 @@
             </div>
           </div>
           <div id="nav-then" class="nav-then" hidden></div>
-          <div id="nav-alert" class="nav-alert" role="status" hidden></div>
-          <div id="nav-rule" class="nav-rule" role="status" hidden></div>
-          <div id="nav-drive" class="nav-drive" role="status" data-level="ok" hidden>
-            <div class="nav-drive-text">
-              <span id="nav-drive-main" class="nav-drive-main"></span>
-              <span id="nav-drive-detail" class="nav-drive-detail"></span>
+          <div class="nav-alerts-row">
+          <div id="nav-alerts" class="nav-alerts">
+            <div id="nav-alert" class="nav-alert" role="status" hidden>
+              <span id="nav-alert-text" class="nav-alert-text"></span>
+              <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
             </div>
-            <button type="button" id="btn-nav-work" class="btn nav-work" hidden>Pas une pause (travail)</button>
+            <div id="nav-rule" class="nav-rule" role="status" hidden></div>
+            <div id="nav-drive" class="nav-drive" role="status" data-level="ok" hidden>
+              <div class="nav-drive-text">
+                <span id="nav-drive-main" class="nav-drive-main"></span>
+                <span id="nav-drive-detail" class="nav-drive-detail"></span>
+              </div>
+              <button type="button" id="btn-nav-work" class="btn nav-work" hidden>Pas une pause (travail)</button>
+            </div>
           </div>
-          <button type="button" id="btn-nav-reroute" class="btn btn-primary nav-reroute" hidden>↻ Recalculer d'ici</button>
+          <!-- Alertes au-delà de deux : « +N », à droite de la pile, ouvre les détails du trajet. -->
+          <button type="button" id="btn-nav-more" class="nav-more" aria-controls="nav-details" hidden></button>
+          </div>
         </div>
-        <div class="nav-foot">
-        <div class="nav-side">
+
+        <div id="nav-road" class="nav-road" hidden></div>
+
+        <div class="nav-mapbtns" role="group" aria-label="Carte">
+          <button type="button" id="btn-nav-compass" class="nav-round" aria-pressed="false" aria-label="Nord en haut"></button>
+          <button type="button" id="btn-nav-recenter" class="nav-round" aria-pressed="true" aria-label="Recentrer sur le camion" hidden></button>
+          <button type="button" id="btn-nav-search" class="nav-round" aria-expanded="false" aria-controls="nav-search" aria-label="Le long du trajet"></button>
+          <button type="button" id="btn-nav-voice" class="nav-round" aria-pressed="true" aria-label="Couper la voix"></button>
+          <button type="button" id="btn-nav-alt" class="nav-round" aria-disabled="true" aria-label="Autres itinéraires (à l'arrêt)"></button>
+          <!-- Place réservée au bouton « Signalement » (phase 3), non affiché. -->
+          <span class="nav-slot" aria-hidden="true"></span>
+        </div>
+        <div id="nav-search" class="nav-search" role="group" aria-label="Le long du trajet" hidden>
+          <button type="button" id="btn-nav-areas" class="nav-chip" aria-pressed="false" aria-controls="nav-areas"></button>
+          <button type="button" id="btn-nav-layer" class="nav-chip" aria-label="Passer en vue satellite"></button>
+        </div>
         <section id="nav-areas" class="nav-areas" aria-label="Prochaines aires" hidden>
           <h2 class="nav-areas-title">Prochaines aires</h2>
           <ol id="nav-areas-list" class="nav-areas-list"></ol>
           <p id="nav-areas-empty" class="nav-areas-empty" hidden></p>
         </section>
-        <div class="nav-mapbtns" role="group" aria-label="Carte">
-          <button type="button" id="btn-nav-overview" class="btn nav-mapbtn" aria-label="Vue d'ensemble du trajet restant">
-            <span aria-hidden="true">⤢</span><span class="nav-mapbtn-text">Vue d'ensemble</span></button>
-          <button type="button" id="btn-nav-recenter" class="btn nav-mapbtn" aria-label="Recentrer sur le camion">
-            <span aria-hidden="true">◎</span><span class="nav-mapbtn-text">Recentrer</span></button>
-          <button type="button" id="btn-nav-layer" class="btn nav-mapbtn" aria-label="Passer en vue satellite"><span aria-hidden="true">🛰</span><span class="nav-mapbtn-text">Satellite</span></button>
-          <button type="button" id="btn-nav-areas" class="btn nav-mapbtn" aria-label="Prochaines aires" aria-pressed="false" aria-controls="nav-areas">
-            <span aria-hidden="true">🅿</span><span class="nav-mapbtn-text">Aires</span></button>
+
+        <div id="nav-speedo" class="nav-speedo">
+          <div id="nav-limit" class="nav-limit" hidden></div>
+          <div class="nav-speed-pill"><span id="nav-speed" class="nav-speed">—</span><span class="nav-speed-unit">km/h</span></div>
         </div>
-        </div>
-        <div id="nav-road" class="nav-road" hidden></div>
+        <p id="nav-toast" class="nav-toast" role="status" hidden></p>
+
         <div class="nav-bottom">
           <div id="nav-sim" class="nav-sim" hidden>
             <span class="nav-sim-badge">SIMULATION</span>
             <button type="button" id="btn-sim-offroad" class="btn">↗ Sortir de la route</button>
             <button type="button" id="btn-sim-speed" class="btn" aria-label="Vitesse simulée">50 km/h</button>
           </div>
-          <dl class="nav-stats">
-            <div><dt>Reste</dt><dd id="nav-remaining">—</dd></div>
-            <div><dt>Temps</dt><dd id="nav-time">—</dd></div>
-            <div><dt>Arrivée</dt><dd id="nav-eta">—</dd></div>
-            <div><dt>Vitesse</dt><dd id="nav-speed">—</dd></div>
-          </dl>
-          <p id="nav-screen" class="nav-screen" hidden>⚠ Écran non maintenu allumé (économie d'énergie ?)</p>
-          <div class="nav-buttons">
-            <button type="button" id="btn-nav-voice" class="btn" aria-pressed="true">🔊 Voix</button>
-            <button type="button" id="btn-nav-stop" class="btn btn-danger">■ Arrêter</button>
+          <div class="nav-sheet-row">
+            <button type="button" id="btn-nav-stop" class="nav-round nav-stop" aria-label="Quitter le guidage"></button>
+            <!-- Poignée : toucher ou tirer vers le haut ouvre les détails du trajet (lecture seule). -->
+            <button type="button" id="btn-nav-sheet" class="nav-summary" aria-expanded="false" aria-controls="nav-details">
+              <span class="nav-grip" aria-hidden="true"></span>
+              <span id="nav-time" class="nav-time">—</span>
+              <span class="nav-sub"><span id="nav-remaining">—</span><span aria-hidden="true"> • </span><span id="nav-eta">—</span></span>
+            </button>
+            <button type="button" id="btn-nav-overview" class="nav-round" aria-pressed="false" aria-label="Vue d'ensemble du trajet restant"></button>
+          </div>
+          <p id="nav-screen" class="nav-screen" title="Économie d'énergie ?" hidden>⚠ Écran non maintenu allumé</p>
+          <div id="nav-details" class="nav-details" hidden>
+            <div id="nav-more-list" class="nav-more-list"></div>
+            <div id="nav-drive-slot" class="nav-drive-slot"></div>
+            <dl id="nav-facts" class="nav-facts"></dl>
           </div>
         </div>
+
+        <div id="nav-confirm" class="nav-confirm" role="alertdialog" aria-labelledby="nav-confirm-title" hidden>
+          <p id="nav-confirm-title" class="nav-confirm-title">Quitter le guidage ?</p>
+          <div class="nav-confirm-buttons">
+            <button type="button" id="btn-nav-quit" class="btn btn-danger">Quitter</button>
+            <button type="button" id="btn-nav-keep" class="btn btn-primary">Continuer</button>
+          </div>
         </div>
       </div>
     </main>
@@ -308,6 +340,9 @@
           et les contours IGN Admin Express
           (<a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte</a>) ;
           limites exactes à vérifier sur les sites officiels. La signalisation fait foi.</p>
+        <p class="hint" id="symbols-credit">Pictogrammes des boutons du guidage :
+          <a href="https://github.com/google/material-design-icons" target="_blank" rel="noopener noreferrer">Material Symbols</a>,
+          <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">licence Apache 2.0</a>.</p>
       </section>
       <p id="app-version" class="app-version">version inconnue</p>
     </div>

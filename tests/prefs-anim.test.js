@@ -134,6 +134,8 @@ test('arrêté, GPS qui dérive : flèche et carte figées (aucune image), sauf 
   assert.equal(holdStill(drawn, { ...next, follow: false }, 10, 0), false, 'vue d\'ensemble / recentrer : redessiné');
   assert.equal(holdStill(drawn, { ...next, padding: { ...pad, top: 200 } }, 10, 0), false, 'bandeau qui change de taille');
   assert.equal(holdStill(drawn, next, NaN, 0), false);
+  assert.equal(holdStill(drawn, { ...next, northUp: true }, 10, 0), false, 'boussole touchée à l\'arrêt : redessiné');
+  assert.equal(holdStill({ ...drawn, northUp: true }, { ...next, northUp: true }, 10, 0), true);
   assert.equal(samePadding(null, undefined), true);
   assert.equal(samePadding(pad, { ...pad, top: 300.3 }), true, 'arrondi au pixel');
   assert.equal(samePadding(pad, null), false);

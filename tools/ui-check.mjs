@@ -24,6 +24,7 @@ import { parseCommuneList, buildTiles, buildIndex } from '../src/lib/winter-conv
 import { tollWayFromFeature } from '../src/lib/hgv-tolls-geo.js';
 import { convertTollNetwork } from '../src/lib/hgv-tolls-convert.js';
 import { parseTollData } from '../src/lib/hgv-tolls.js';
+import { sunTimes } from '../src/lib/sun.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -63,7 +64,16 @@ const RED_TILE = solidPng([220, 0, 0]);
 // Fond des faux styles : recoloré au chargement par src/lib/map-palette.js (2c-a) en crème le jour, #14161C la nuit.
 const DAY_BG = '#dcdcdc';
 const NIGHT_BG = '#305070';
-const style = (bg) => ({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }] });
+const style = (bg, streets = false) => (streets ? {
+  // Phase 2c : une couche de noms de rues (schéma OpenMapTiles) pour les bulles du guidage ; tuiles et polices
+  // refusées (rien à dessiner, seuls les réglages de la couche sont vérifiés).
+  version: 8, glyphs: 'https://streets.test/fonts/{fontstack}/{range}.pbf',
+  sources: { streets: { type: 'vector', tiles: ['https://streets.test/{z}/{x}/{y}.pbf'], maxzoom: 14 } },
+  layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } },
+    { id: 'highway-name-minor', type: 'symbol', source: 'streets', 'source-layer': 'transportation_name',
+      layout: { 'symbol-placement': 'line', 'text-field': '{name}', 'text-font': ['Noto Sans Regular'] },
+      paint: { 'text-color': '#666' } }],
+} : { version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }] });
 /**
  * Style avec une source de tuiles lentes (comme le vrai fond vectoriel sur la tablette) : tant qu'une tuile se
  * charge, map.isStyleLoaded() est faux alors que le style est prêt depuis longtemps (régression v17 : tracé absent).
@@ -114,7 +124,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
-  tollsFile = undefined, tollsNetwork = null, sw = false,
+  tollsFile = undefined, tollsNetwork = null, sw = false, streets = false,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -173,7 +183,7 @@ async function open(browser, base, {
     }
     if (url.includes('tiles.openfreemap.org/styles/') || url.includes('tiles.versatiles.org')) {
       const bg = url.includes('/dark') || url.includes('eclipse') ? NIGHT_BG : DAY_BG;
-      return route.fulfill({ json: slowTiles ? slowStyle(bg) : style(bg) });
+      return route.fulfill({ json: slowTiles ? slowStyle(bg) : style(bg, streets) });
     }
     if (url.startsWith('https://slow-tiles.test/')) {
       await new Promise((r) => setTimeout(r, SLOW_TILE_MS));
@@ -363,6 +373,8 @@ async function mapColor(page) {
   }, png.toString('base64'));
 }
 const isRed = ([r, g, b]) => r > 150 && g < 90 && b < 90;
+/** Photos IGN factices (rouges), assombries ou non (la nuit : raster-brightness-max 0,6, phase 2c). */
+const isPhoto = ([r, g, b]) => r > 90 && g < 60 && b < 60;
 /** Fond de carte nuit recoloré (#14161C) ; le scénario « context » peint .map en magenta pour voir un canevas vide. */
 const isNight = ([r, g, b]) => Math.abs(r - 0x14) < 6 && Math.abs(g - 0x16) < 6 && Math.abs(b - 0x1c) < 6;
 const near = ([r, g, b], hex, tol = 6) => {
@@ -413,6 +425,41 @@ async function drive(ctx, page, coords, kmh, seconds) {
     await setGeo(page, { lon: a[0] + (b[0] - a[0]) * f, lat: a[1] + (b[1] - a[1]) * f, accuracy: 5, speed: step, heading: 90 });
     await page.waitForTimeout(1000);
   }
+}
+
+/** Guidage (phase 2c) : « Aires PL » et « Plan / Satellite » sont dans la rangée de la loupe. */
+async function navSearchChip(page, sel) {
+  if (!(await page.isVisible(sel))) await page.click('#btn-nav-search');
+  await page.click(sel);
+}
+const navAreas = (page) => navSearchChip(page, '#btn-nav-areas');
+const navLayer = (page) => navSearchChip(page, '#btn-nav-layer');
+/** Texte du bouton Plan / Satellite (rangée de la loupe ouverte puis refermée). */
+async function navLayerText(page) {
+  if (!(await page.isVisible('#btn-nav-layer'))) await page.click('#btn-nav-search');
+  const t = await page.textContent('#btn-nav-layer');
+  await page.click('#btn-nav-search');
+  return t;
+}
+/**
+ * Temps de conduite (phase 2c) : carte d'alerte quand il reste une des deux places, sinon dans les détails du trajet
+ * (panneau du bas déplié). Ouvre les détails si besoin ; closeDetails les referme.
+ */
+async function showDriving(page) {
+  if (!(await page.isVisible('#nav-drive')) && await page.getAttribute('#btn-nav-sheet', 'aria-expanded') !== 'true') {
+    await page.click('#btn-nav-sheet');
+    await page.waitForTimeout(200);
+  }
+}
+async function closeDetails(page) {
+  if (await page.getAttribute('#btn-nav-sheet', 'aria-expanded') === 'true') await page.click('#btn-nav-sheet');
+  await page.waitForTimeout(200);
+}
+
+/** Quitter le guidage : ✕ puis « Quitter » (confirmation), ou fin directe à l'arrivée. */
+async function stopGuidance(page) {
+  await page.click('#btn-nav-stop');
+  if (await page.isVisible('#btn-nav-quit')) await page.click('#btn-nav-quit');
 }
 
 /** Éléments du guidage dont le texte sort de la case. */
@@ -468,7 +515,7 @@ async function longTextCheck(browser, base) {
   await page.waitForSelector('#btn-nav-start:not([hidden])');
   await page.click('#btn-nav-start');
   await drive(ctx, page, line, 110, 8);
-  const speed = await page.textContent('#nav-speed');
+  const speed = await page.textContent('.nav-speed-pill');
   check(/110\s*km\/h/.test(speed ?? ''), '360 px : « 110 km/h » affiché', speed);
   const instr = await page.textContent('#nav-instr');
   check(instr?.includes('Villefranche'), '360 px : consigne longue affichée', instr?.slice(0, 40));
@@ -487,8 +534,10 @@ async function satelliteThemeCheck(browser, base) {
   let c = await mapColor(page);
   check(isRed(c), 'satellite, jour : photos affichées', `couleur ${c}`);
   await setTheme(page, 'night');
+  // Phase 2c : la nuit, mêmes photos assombries (raster-brightness-max 0,6).
+  const dayRed = c;
   c = await mapColor(page);
-  check(isRed(c), 'satellite, jour → nuit : photos affichées', `couleur ${c}`);
+  check(c[0] > 90 && c[1] < 60 && c[2] < 60 && c[0] < dayRed[0] - 40, 'satellite, jour → nuit : photos affichées, assombries', `couleur ${c} (jour ${dayRed})`);
   await page.screenshot({ path: join(SHOTS, 'satellite-nuit.png') });
   await setTheme(page, 'day');
   c = await mapColor(page);
@@ -566,7 +615,7 @@ async function parkedCheck(browser, base) {
   await page.click('#btn-nav-start');
   await page.waitForTimeout(1500);
   const before = stats.directions;
-  await page.click('#btn-nav-areas');
+  await navAreas(page);
   await page.waitForTimeout(300);
   // Aire à ≈ 150 m au nord du tracé, GPS qui dérive (jusqu'à 60 m), précision 15 m, camion arrêté.
   for (let i = 0; i < 14; i += 1) {
@@ -667,14 +716,16 @@ async function comfortCheck(browser, base) {
     await setGeo(page, { lon: line[0][0], lat: line[0][1], speed: 0 });
     await page.click('#btn-nav-start');
     await drive(ctx, page, line, 50, 6);
-    check(await page.isVisible('#btn-nav-overview') && await page.isVisible('#btn-nav-recenter') && await page.isVisible('#btn-nav-layer'),
-      `${width} px : boutons Vue d'ensemble, Recentrer, Satellite en guidage`);
+    check(await page.isVisible('#btn-nav-overview') && await page.isVisible('#btn-nav-compass') && await page.isVisible('#btn-nav-search')
+      && await page.isVisible('#btn-nav-voice') && !(await page.isVisible('#btn-nav-recenter')),
+    `${width} px : boutons ronds en guidage (Recentrer seulement si la carte a bougé)`);
     const road = await page.textContent('#nav-road');
     check(await page.isVisible('#nav-road') && /Route de Lyon|D 306/.test(road ?? ''), `${width} px : nom de la route en cours`, road);
     const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nav-maneuver')).backgroundColor);
     check(bg === 'rgb(20, 22, 28)', `${width} px : bandeau noir Panier Perdu, même de jour (2c-a)`, bg);
-    const sep = await page.evaluate(() => getComputedStyle(document.querySelectorAll('.nav-stats > div')[1]).borderLeftWidth);
-    check(sep === '1px', `${width} px : traits fins entre les valeurs`, sep);
+    const round = await page.$$eval('#nav .nav-round', (n) => n.filter((b) => b.getClientRects().length)
+      .map((b) => Math.round(Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))));
+    check(round.length >= 5 && round.every((x) => x >= 56), `${width} px : boutons ronds d'au moins 56 px`, round.join(', '));
     await noHorizontalScroll(page, `${width} px guidage (boutons de carte)`);
     const over = await overflowingNavText(page);
     check(over.length === 0, `${width} px guidage : textes dans leurs cases`, over.join(' ; '));
@@ -689,15 +740,15 @@ async function comfortCheck(browser, base) {
     check(await page.getAttribute('#btn-nav-recenter', 'aria-pressed') === 'true', `${width} px : recentrer en un appui`);
 
     const tiles = stats.tiles;
-    await page.click('#btn-nav-layer');
+    await navLayer(page);
     await drive(ctx, page, line.slice(1), 50, 2);
     await page.waitForTimeout(800);
     check(stats.tiles > tiles && isRed(await mapColor(page)), `${width} px : satellite en guidage en un appui`, `${stats.tiles - tiles} tuiles`);
-    check(/Plan/.test(await page.textContent('#btn-nav-layer')), `${width} px : le bouton propose ensuite le plan`);
+    check(/Plan/.test(await navLayerText(page)), `${width} px : le bouton propose ensuite le plan`);
     await page.screenshot({ path: join(SHOTS, `${width}-guidage-satellite.png`) });
 
     // Flèche fluide : plus de requestAnimationFrame quand aucune position n'arrive.
-    await page.click('#btn-nav-layer'); // retour au plan (pas de tuiles qui se chargent)
+    await navLayer(page); // retour au plan (pas de tuiles qui se chargent)
     await page.waitForTimeout(2000);
     const calls = await rafCalls(page, 2000);
     check(calls <= 2, `${width} px : aucun rendu continu sans nouvelle position`, `${calls} rAF en 2 s`);
@@ -707,7 +758,7 @@ async function comfortCheck(browser, base) {
     const during = (await page.evaluate(() => window.__raf)) - await moving;
     check(during >= 10, `${width} px : flèche animée entre deux positions`, `${during} rAF en 0,5 s`);
 
-    await page.click('#btn-nav-stop');
+    await stopGuidance(page);
     await page.waitForTimeout(800);
     check(isDay(await mapColor(page)), `${width} px : après le guidage, retour au plan mémorisé`);
     check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
@@ -796,7 +847,7 @@ async function overviewGpsCheck(browser, base) {
     const line = nav.features[0].geometry.coordinates;
     await setGeo(page, { lon: line[0][0], lat: line[0][1], speed: 0 });
     await page.click('#btn-nav-start');
-    if (layer === 'satellite') await page.click('#btn-nav-layer');
+    if (layer === 'satellite') await navLayer(page);
     // Positions GPS le long du tracé, une par seconde, à 50 km/h, sans s'arrêter pendant les vérifications.
     const step = 50 / 3.6;
     const cum = [0];
@@ -967,7 +1018,7 @@ async function areasCheck(browser, base) {
     await page.click('#btn-nav-start');
     await page.waitForTimeout(1500);
     check(await page.isHidden('#nav-areas'), `${width} px : encart fermé au départ`);
-    await page.click('#btn-nav-areas');
+    await navAreas(page);
     const navRows = async () => page.$$eval('#nav-areas-list .nav-area', (n) => n.map((b) => ({
       name: b.querySelector('.nav-area-name').textContent, dist: b.querySelector('.nav-area-dist').textContent,
       eta: b.querySelector('.nav-area-eta').textContent, places: b.querySelector('.nav-area-places').textContent,
@@ -1004,7 +1055,7 @@ async function areasCheck(browser, base) {
     await page.waitForSelector('#dlg-area[open]');
     check(await page.isEnabled('[data-avis="ok"]'), `${width} px : « Mon avis » possible à l'arrêt en guidage`);
     await page.click('#dlg-area [data-close]');
-    await page.click('#btn-nav-areas');
+    await navAreas(page);
     check(await page.isHidden('#nav-areas'), `${width} px : encart fermé d'un appui`);
     check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
@@ -1058,27 +1109,39 @@ async function areasCheck(browser, base) {
 /** Recouvrements entre boutons de carte, bandeau, encart des aires, nom de la route et barre du bas du guidage. */
 async function footOverlaps(page) {
   return page.evaluate(() => {
-    const vis = (n) => n && !n.hidden && n.getClientRects().length > 0;
+    const vis = (n) => n && !n.hidden && n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden';
     const box = (n) => n.getBoundingClientRect();
     const name = (n) => n.id || n.className.split(' ')[0];
-    const banner = [...document.querySelectorAll('#nav .nav-top > *')].filter(vis);
-    const buttons = [...document.querySelectorAll('#nav .nav-mapbtn')].filter(vis);
-    const areas = [document.querySelector('#nav-areas')].filter(vis);
-    const others = [document.querySelector('#nav-road'), document.querySelector('#nav .nav-bottom')].filter(vis);
+    // Phase 2c : bandeau (avec « Puis » et alertes), pastille de rue, boutons ronds, rangée de la loupe, encart des
+    // aires, compteur, message, panneau du bas : aucun ne recouvre un autre.
+    const banner = [...document.querySelectorAll('#nav .nav-top > *, #nav .nav-alerts > *')].filter(vis)
+      .filter((n) => !n.classList.contains('nav-alerts'));
+    const buttons = [...document.querySelectorAll('#nav .nav-mapbtns > button')].filter(vis);
+    const singles = ['#nav-road', '#nav-search', '#nav-areas', '#nav-speedo', '#nav-toast', '#nav .nav-bottom']
+      .map((q) => document.querySelector(q)).filter(vis);
+    const groups = [banner, buttons, ...singles.map((n) => [n])];
     const hit = (a, b) => {
       const p = box(a); const q = box(b);
       return p.left < q.right - 0.5 && q.left < p.right - 0.5 && p.top < q.bottom - 0.5 && q.top < p.bottom - 0.5;
     };
     const out = [];
-    for (const a of [...buttons, ...areas]) {
-      for (const b of [...banner, ...others, ...(buttons.includes(a) ? areas : [])]) if (hit(a, b)) out.push(`${name(a)} × ${name(b)}`);
+    for (let i = 0; i < groups.length; i += 1) {
+      for (let j = i + 1; j < groups.length; j += 1) {
+        for (const a of groups[i]) for (const b of groups[j]) if (hit(a, b)) out.push(`${name(a)} × ${name(b)}`);
+      }
+    }
+    for (let i = 0; i < buttons.length; i += 1) for (let j = i + 1; j < buttons.length; j += 1) {
+      if (hit(buttons[i], buttons[j])) out.push(`${name(buttons[i])} × ${name(buttons[j])}`);
+    }
+    for (const a of [...banner, ...buttons, ...singles]) {
       const r = box(a);
-      if (r.top < 0 || r.bottom > window.innerHeight + 0.5 || r.left < 0 || r.right > window.innerWidth + 0.5) {
+      if (r.top < -0.5 || r.bottom > window.innerHeight + 0.5 || r.left < -0.5 || r.right > window.innerWidth + 0.5) {
         out.push(`${name(a)} hors de l'écran (${Math.round(r.left)},${Math.round(r.top)} – ${Math.round(r.right)},${Math.round(r.bottom)})`);
       }
     }
-    const sizes = buttons.map((b) => Math.round(box(b).height));
-    return { out, sizes, areasHeight: areas.length ? Math.round(box(areas[0]).height) : 0 };
+    const sizes = buttons.map((b) => Math.round(Math.min(box(b).height, box(b).width)));
+    const areas = document.querySelector('#nav-areas');
+    return { out, sizes, areasHeight: vis(areas) ? Math.round(box(areas).height) : 0 };
   });
 }
 
@@ -1107,10 +1170,10 @@ async function footCheck(browser, base) {
     const label = `${width}×${height}`;
     const closed = await footOverlaps(page);
     check(closed.out.length === 0, `${label} guidage, encart fermé : boutons hors du bandeau et de la barre du bas`, closed.out.join(' ; '));
-    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 44), `${label} : boutons de carte d'au moins 44 px`,
+    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 56), `${label} : boutons ronds d'au moins 56 px`,
       closed.sizes.join(', '));
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-pied-ferme.png`) });
-    await page.click('#btn-nav-areas');
+    await navAreas(page);
     await drive(ctx, page, line, 40, 2);
     const opened = await footOverlaps(page);
     check(opened.out.length === 0, `${label} guidage, encart ouvert : aucun recouvrement bouton / bandeau / encart`, opened.out.join(' ; '));
@@ -2004,11 +2067,14 @@ async function driveWindCheck(browser, base) {
     await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
     await page.click('#btn-nav-start');
     await drive(ctx, page, line, 50, 4);
+    await showDriving(page);
     const main = await page.textContent('#nav-drive-main');
     check(await page.isVisible('#nav-drive') && /^Conduite 4 h 2\d · pause 45 min conseillée dans \d+ min$/.test(main)
       && await page.getAttribute('#nav-drive', 'data-level') === 'soon', `${label} : temps de conduite en guidage (orange)`, main);
     check(!(await page.isVisible('#btn-nav-work')), `${label} : pas de bouton « travail » en roulant`);
-    check(/Rafales (jusqu'à )?95 km\/h.*\(Open-Meteo\)/.test(await page.textContent('#nav-rule')), `${label} : bandeau vent fort avec Open-Meteo`, await page.textContent('#nav-rule'));
+    await closeDetails(page);
+    const windText = `${await page.textContent('#nav-rule')} ${await page.textContent('#nav-more-list')}`;
+    check(/Rafales (jusqu'à )?95 km\/h.*\(Open-Meteo\)/.test(windText), `${label} : bandeau vent fort avec Open-Meteo`, windText);
     check(!/obligatoire/i.test(await page.textContent('body')), `${label} : jamais « obligatoire »`);
     let foot = await footOverlaps(page);
     check(foot.out.length === 0, `${label} : boutons de carte hors du bandeau (conduite, vent)`, foot.out.join(' ; '));
@@ -2025,15 +2091,16 @@ async function driveWindCheck(browser, base) {
       await setGeo(page, { lon: last[0] + (i % 2) * 1e-5, lat: last[1], accuracy: 5, speed: 0 });
       await page.waitForTimeout(1000);
     }
-    check(await page.isVisible('#btn-nav-work') && (await page.textContent('#btn-nav-work')) === 'Pas une pause (travail)',
-      `${label} : bouton « Pas une pause (travail) » à l'arrêt`);
     foot = await footOverlaps(page);
-    check(foot.out.length === 0 && foot.sizes.every((h) => h >= 44), `${label} : à l'arrêt, boutons de carte toujours libres`, foot.out.join(' ; '));
+    check(foot.out.length === 0 && foot.sizes.every((h) => h >= 56), `${label} : à l'arrêt, boutons de carte toujours libres`, foot.out.join(' ; '));
     under = await bannerOverBottom(page);
     check(under.length === 0, `${label} : à l'arrêt, bandeau au-dessus de la barre du bas`, under.join(' ; '));
     check(!/Signal GPS perdu/.test(await page.textContent('#nav-alert')), `${label} : GPS émulé reçu à l'arrêt`);
+    await showDriving(page);
+    check(await page.isVisible('#btn-nav-work') && (await page.textContent('#btn-nav-work')) === 'Pas une pause (travail)',
+      `${label} : bouton « Pas une pause (travail) » à l'arrêt`);
     const work = await page.locator('#btn-nav-work').boundingBox();
-    check(work.height >= 44, `${label} : bouton « travail » d'au moins 44 px`, `${Math.round(work.height)} px`);
+    check(work.height >= 56, `${label} : bouton « travail » d'au moins 56 px`, `${Math.round(work.height)} px`);
     await page.click('#btn-nav-work');
     check(/compté comme travail/.test(await page.textContent('#nav-drive-main'))
       && (await page.textContent('#btn-nav-work')) === 'Compter comme pause', `${label} : arrêt retiré du décompte`);
@@ -2041,7 +2108,7 @@ async function driveWindCheck(browser, base) {
     check(over.length === 0, `${label} : textes dans leurs cases à l'arrêt`, over.join(' ; '));
     await noHorizontalScroll(page, `${label} guidage, temps de conduite`);
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-conduite-arret.png`) });
-    await page.click('#btn-nav-stop');
+    await stopGuidance(page);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.driving')));
     check(saved?.v === 1 && saved.sinceBreak >= 4 * 3600 + 25 * 60, `${label} : décompte enregistré sur la tablette`, `${saved?.sinceBreak}`);
     check(errors.length === 0, `${label} : aucune erreur JavaScript`, errors.join(' | '));
@@ -2080,6 +2147,198 @@ async function driveWindCheck(browser, base) {
       'Open-Meteo en échec : « Météo indisponible », sans bloquer', notes.join(' | '));
     check(await page.isVisible('#btn-nav-start'), 'Open-Meteo en échec : guidage possible');
     check(errors.length === 0, 'Open-Meteo en échec : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+/** Alertes empilées sous le bandeau (cartes visibles) : 2 au plus. */
+async function stackedAlerts(page) {
+  return page.evaluate(() => [...document.querySelectorAll('#nav-alerts > #nav-alert, #nav-alerts > #nav-drive, #nav-rule > span')]
+    .filter((n) => !n.hidden && n.getClientRects().length && !n.closest('[hidden]')).length);
+}
+
+/** Carte du guidage : tracé, partie parcourue, bulles des rues, photos, cap (window.__maps, posé par open()). */
+async function guidanceMap(page) {
+  return page.evaluate(() => {
+    const map = window.__maps?.at(-1);
+    const style = map?.getStyle();
+    const has = (id) => !!map?.getLayer(id);
+    return {
+      route: has('route-line') && has('route-casing'),
+      doneLayers: has('route-done-line') && has('route-done-casing'),
+      done: (map?.getSource('route-done')?._data ?? style?.sources?.['route-done']?.data)?.features?.[0]?.geometry?.coordinates?.length ?? 0,
+      doneRaw: JSON.stringify(map?.getSource('route-done')?._data ?? null).slice(0, 120),
+      width: has('route-line') ? map.getPaintProperty('route-line', 'line-width') : null,
+      bubble: has('highway-name-minor') ? map.getLayoutProperty('highway-name-minor', 'icon-image') : null,
+      bubbleFit: has('highway-name-minor') ? map.getLayoutProperty('highway-name-minor', 'icon-text-fit') : null,
+      bubbleImage: !!map?.hasImage('gabarit-bubble'),
+      brightness: has('ign-ortho') ? map.getPaintProperty('ign-ortho', 'raster-brightness-max') : null,
+      bearing: map ? Math.round(map.getBearing()) : null,
+      marker: !!document.querySelector('.maplibregl-marker.me-marker'),
+      theme: document.documentElement.dataset.theme,
+      disclaimer: (() => {
+        const d = document.querySelector('.disclaimer');
+        const b = d.getBoundingClientRect();
+        return getComputedStyle(d).display !== 'none' && b.height > 0 && b.bottom <= window.innerHeight + 0.5;
+      })(),
+    };
+  });
+}
+
+/**
+ * Phase 2c : écran de guidage façon GPS de téléphone. Téléphone (412×900, 900×412, et 760×360 de jour), tablette
+ * (800×1280, 1280×800) ; jour, nuit (412×900 : mode auto, le soleil se couche à Lyon pendant le guidage, un 21
+ * décembre ; ailleurs nuit choisie) et satellite de nuit ; GPS émulé (une position par seconde, vitesse fournie), 4 h 25 de conduite et rafales (alertes,
+ * « +N »). Rien ne se chevauche, boutons ronds ≥ 56 px, texte jamais coupé, 2 alertes au plus, « Autres itinéraires »
+ * grisé en roulant et actif après 3 s à l'arrêt, boussole (nord en haut), Recentrer après un glissé seulement,
+ * confirmation pour quitter, tracé épais et partie parcourue, bulles des rues ; nuit : voile sombre pendant le
+ * changement de style, tracé, partie parcourue, marqueur et bulles remis ; satellite de nuit assombri (0,6) ;
+ * « la signalisation fait foi » toujours visible.
+ */
+async function guidanceCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const runs = [];
+  for (const size of [[412, 900], [900, 412], [800, 1280], [1280, 800]]) for (const mode of ['jour', 'nuit', 'satellite']) runs.push([size, mode]);
+  runs.push([[760, 360], 'jour']);
+  // Filtre facultatif : node tools/ui-check.mjs guidage 412x900 (ou « nuit »).
+  const only = process.argv[3];
+  for (const [[width, height], mode] of runs) {
+    if (only && only !== `${width}x${height}` && only !== mode) continue;
+    const label = `${width}×${height} ${mode}`;
+    const night = mode === 'nuit';
+    // Mode auto, une fois : tablette réglée 8 s avant le coucher du soleil à Lyon ; la nuit tombe pendant le guidage
+    // (réévaluation chaque minute).
+    const auto = night && width === 412;
+    const sunset = sunTimes(Date.parse('2026-12-21T12:00:00Z'), START[1], START[0]).sunset;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, streets: true, directions: () => nav,
+      theme: auto ? 'auto' : night || mode === 'satellite' ? 'night' : 'day',
+      now: auto ? sunset - 8000 : null,
+      wind: () => 95, driving: night ? null : drivenFor(4 * 3600 + 25 * 60), overpass: () => fixture('overpass-aires.json'),
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(400);
+    if (auto) {
+      check((await guidanceMap(page)).theme === 'day', `${label} : mode auto, soleil encore levé → jour`);
+      // Voile de la carte pendant le changement de style : sa couleur à chaque apparition.
+      await page.evaluate(() => {
+        window.__veil = [];
+        const v = document.querySelector('.map-veil');
+        new MutationObserver(() => { if (v.classList.contains('on')) window.__veil.push(getComputedStyle(v).backgroundColor); })
+          .observe(v, { attributes: true, attributeFilter: ['class'] });
+      });
+    }
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    if (mode === 'satellite') await navLayer(page);
+    await drive(ctx, page, line, 50, 6);
+    await page.waitForTimeout(400);
+
+    if (auto) await page.waitForFunction(() => document.documentElement.dataset.theme === 'night', null, { timeout: 75000 }).catch(() => {});
+    if (auto) await drive(ctx, page, line.slice(1), 50, 3);
+    let m = await guidanceMap(page);
+    if (auto) {
+      const veil = await page.evaluate(() => window.__veil);
+      check(m.theme === 'night', `${label} : la nuit tombe pendant le guidage (soleil couché à la position)`, m.theme);
+      check(veil.length > 0 && veil.every((c) => c === 'rgb(20, 22, 28)'), `${label} : voile sombre pendant le changement de style, jamais de blanc`, veil.join(', '));
+      check(!isDay(await mapColor(page)), `${label} : fond de carte jamais clair après la bascule`);
+    }
+    check(m.route && m.doneLayers && m.done >= 2 && m.width === 12, `${label} : tracé épais et partie parcourue (grise)`, JSON.stringify(m));
+    check(m.bubble === 'gabarit-bubble' && m.bubbleFit === 'both' && m.bubbleImage, `${label} : noms des rues en bulles`, `${m.bubble} ${m.bubbleFit} ${m.bubbleImage}`);
+    check(m.marker && m.disclaimer, `${label} : marqueur et « la signalisation fait foi » visibles`);
+    if (mode === 'satellite') check(m.brightness === 0.6, `${label} : photos IGN assombries la nuit`, String(m.brightness));
+    let foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${label} : en roulant, rien ne se chevauche`, foot.out.join(' ; '));
+    check(foot.sizes.length >= 4 && foot.sizes.every((x) => x >= 56), `${label} : boutons ronds d'au moins 56 px`, foot.sizes.join(', '));
+    const under = await bannerOverBottom(page);
+    check(under.length === 0, `${label} : bandeau au-dessus du panneau du bas`, under.join(' ; '));
+    const over = await overflowingNavText(page);
+    check(over.length === 0, `${label} : textes dans leurs cases`, over.join(' ; '));
+    check(await stackedAlerts(page) <= 2, `${label} : 2 alertes au plus sous le bandeau`);
+    check(await page.getAttribute('#btn-nav-alt', 'aria-disabled') === 'true', `${label} : « Autres itinéraires » grisé en roulant`);
+    // aria-disabled : Playwright le tient pour désactivé, le doigt peut quand même le toucher.
+    await page.click('#btn-nav-alt', { force: true });
+    check(/Disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${label} : message « Disponible à l'arrêt »`);
+    check(!(await page.isVisible('#btn-nav-recenter')), `${label} : pas de « Recentrer » tant que la carte suit`);
+    await noHorizontalScroll(page, label);
+    const tag = `${width}x${height}`;
+    await page.screenshot({ path: join(SHOTS, `2c-${mode}-${tag}-route.png`) });
+
+    // Boussole : nord en haut, puis cap en haut.
+    await page.click('#btn-nav-compass');
+    await drive(ctx, page, line.slice(2), 50, 2);
+    m = await guidanceMap(page);
+    check(m.bearing === 0 && await page.getAttribute('#btn-nav-compass', 'aria-pressed') === 'true', `${label} : boussole → nord en haut`, String(m.bearing));
+    await page.click('#btn-nav-compass');
+
+    // Carte déplacée au doigt : « Recentrer » apparaît dans la colonne, sous la boussole.
+    const mapBox = await page.locator('#map').boundingBox();
+    await page.mouse.move(mapBox.x + mapBox.width * 0.6, mapBox.y + mapBox.height * 0.55);
+    await page.mouse.down();
+    await page.mouse.move(mapBox.x + mapBox.width * 0.4, mapBox.y + mapBox.height * 0.45, { steps: 6 });
+    await page.mouse.up();
+    await page.waitForTimeout(300);
+    const order = await page.evaluate(() => {
+      const c = document.querySelector('#btn-nav-compass').getBoundingClientRect();
+      const r = document.querySelector('#btn-nav-recenter').getBoundingClientRect();
+      return r.top >= c.bottom - 0.5 || r.left >= c.right - 0.5;
+    });
+    check(await page.isVisible('#btn-nav-recenter') && order, `${label} : « Recentrer » après un glissé, sous la boussole`);
+    foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${label} : Recentrer visible, rien ne se chevauche`, foot.out.join(' ; '));
+    await page.click('#btn-nav-recenter');
+    check(!(await page.isVisible('#btn-nav-recenter')), `${label} : recentré, bouton masqué`);
+
+    // Loupe : rangée de catégories (aucune saisie).
+    await page.click('#btn-nav-search');
+    check(await page.isVisible('#btn-nav-areas') && await page.isVisible('#btn-nav-layer')
+      && (await page.$$('#nav input, #nav textarea')).length === 0, `${label} : loupe → Aires PL, Plan/Satellite, sans saisie`);
+    foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${label} : rangée de la loupe libre`, foot.out.join(' ; '));
+    await page.click('#btn-nav-search');
+
+    // À l'arrêt (vitesse 0 pendant plus de 3 s) : « Autres itinéraires » actif (vue d'ensemble pour l'instant).
+    const stopAt = line[Math.min(line.length - 1, 4)];
+    // Vitesse lissée par le moteur (50 → 25 → 12 → 6 → 3 km/h), puis 3 s sous 5 km/h.
+    for (let i = 0; i < 9; i += 1) {
+      await setGeo(page, { lon: stopAt[0] + (i % 2) * 1e-5, lat: stopAt[1], accuracy: 5, speed: 0 });
+      await page.waitForTimeout(1000);
+    }
+    check(await page.getAttribute('#btn-nav-alt', 'aria-disabled') === 'false', `${label} : « Autres itinéraires » actif à l'arrêt`);
+    foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${label} : à l'arrêt, rien ne se chevauche`, foot.out.join(' ; '));
+    check((await overflowingNavText(page)).length === 0 && (await bannerOverBottom(page)).length === 0, `${label} : à l'arrêt, textes et bandeau à leur place`);
+    await page.screenshot({ path: join(SHOTS, `2c-${mode}-${tag}-arret.png`) });
+    await page.click('#btn-nav-alt');
+    await page.waitForTimeout(700);
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
+      `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble`);
+    await page.click('#btn-nav-recenter');
+
+    // Panneau du bas : détails du trajet (lecture seule), puis « +N » s'il y a plus de 2 alertes.
+    await page.click('#btn-nav-sheet');
+    check(await page.isVisible('#nav-details') && (await page.$$('#nav-details input, #nav-details textarea')).length === 0,
+      `${label} : détails du trajet en lecture seule`);
+    await page.screenshot({ path: join(SHOTS, `2c-${mode}-${tag}-details.png`) });
+    await page.click('#btn-nav-sheet');
+    if (await page.isVisible('#btn-nav-more')) {
+      const b = await page.locator('#btn-nav-more').boundingBox();
+      check(b.width >= 56 && b.height >= 56, `${label} : « +N » d'au moins 56 px`, `${Math.round(b.width)}×${Math.round(b.height)}`);
+      await page.click('#btn-nav-more');
+      check(await page.isVisible('#nav-details') && (await page.isVisible('#nav-more-list') || await page.isVisible('#nav-drive-slot #nav-drive')),
+        `${label} : « +N » ouvre les détails avec les autres alertes`);
+      await page.click('#btn-nav-sheet');
+    }
+
+    // ✕ : confirmation, « Continuer » garde le guidage.
+    await page.click('#btn-nav-stop');
+    check(await page.isVisible('#nav-confirm'), `${label} : ✕ demande confirmation`);
+    await page.click('#btn-nav-keep');
+    check(!(await page.isVisible('#nav-confirm')) && await page.isVisible('#nav'), `${label} : « Continuer » garde le guidage`);
+    await stopGuidance(page);
+    check(!(await page.isVisible('#nav')), `${label} : « Quitter » termine le guidage`);
+    check(errors.length === 0, `${label} : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
   }
 }
@@ -2309,7 +2568,9 @@ async function paletteCheck(browser, base) {
       check(await css('.nav-icon', 'color')(page) === 'rgb(232, 169, 59)', `${tag} : pictogramme ambre`);
       check(await css('.nav-dist', 'color')(page) === 'rgb(237, 234, 227)', `${tag} : texte du bandeau crème`);
       const ok = theme === 'day' ? 'rgb(39, 107, 62)' : 'rgb(143, 214, 164)';
-      check(await css('#nav-eta', 'color')(page) === ok && await css('#nav-time', 'color')(page) === ok, `${tag} : temps et arrivée en vert`);
+      // Phase 2c : temps restant en vert, « km • heure d'arrivée » en gris (--muted).
+      const muted = theme === 'day' ? 'rgb(92, 95, 105)' : 'rgb(169, 167, 158)';
+      check(await css('#nav-time', 'color')(page) === ok && await css('#nav-eta', 'color')(page) === muted, `${tag} : temps restant en vert, arrivée en gris`);
       const arrow = await page.evaluate(() => {
         const st = getComputedStyle(document.documentElement);
         return [st.getPropertyValue('--arrow-fill').trim(), st.getPropertyValue('--arrow-stroke').trim()];
@@ -2321,14 +2582,14 @@ async function paletteCheck(browser, base) {
       await page.screenshot({ path: file('guidage') });
 
       // Satellite (photos IGN factices rouges) : tracé ambre bordé de #14161C.
-      await page.click('#btn-nav-layer');
+      await navLayer(page);
       await drive(ctx, page, line.slice(1), 50, 2);
       await page.waitForTimeout(800);
       info = await layerInfo(page);
-      check(isRed(await mapColor(page)) && /^#14161c$/i.test(info.casing), `${tag} : satellite, bord du tracé #14161C`, info.casing);
+      check(isPhoto(await mapColor(page)) && /^#14161c$/i.test(info.casing), `${tag} : satellite, bord du tracé #14161C`, info.casing);
       await page.screenshot({ path: file('guidage-satellite') });
-      await page.click('#btn-nav-layer');
-      await page.click('#btn-nav-stop');
+      await navLayer(page);
+      await stopGuidance(page);
       await page.waitForTimeout(600);
 
       // Satellite à l'arrêt (accueil avec itinéraire).
@@ -2360,7 +2621,7 @@ try {
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
-    tolls: tollsCheck, failed: failedCheck, palette: paletteCheck };
+    tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);
@@ -2376,3 +2637,5 @@ try {
 }
 console.log(failures ? `\n${failures} vérification(s) en échec` : '\nTout est vert');
 process.exit(failures ? 1 : 0);
+
+
