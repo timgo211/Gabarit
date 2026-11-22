@@ -24,7 +24,10 @@
 // Temps de conduite (phase 5, règlement CE 561/2006, aide seulement) : carte d'alerte quand la pause approche ou
 // est dépassée, sinon dans les détails ; à l'arrêt seulement (sous 10 km/h), un bouton « Pas une pause (travail) ».
 
-import { $, setValueUnit, fitText } from './dom.js';
+import { $, setValueUnit, fitText, shrinkUntil } from './dom.js';
+
+/** Phase 2e : la consigne du bandeau n'est jamais réduite sous 70 % de sa taille (lisible en cabine). */
+const BANNER_MIN_SCALE = 0.7;
 import { maneuverSvg } from './nav-icon.js';
 import { symbolSvg } from './nav-symbols.js';
 import { fetchRoute } from './api.js';
@@ -181,7 +184,7 @@ export function createNavigation(ctx) {
       ui.instr.classList.toggle('long', b.long);
       ui.instr.setAttribute('aria-label', b.full || b.text);
     }
-    fitText(ui.instr, 0.6);
+    fitText(ui.instr, BANNER_MIN_SCALE);
   }
 
   function setInstruction(text) {
@@ -316,9 +319,14 @@ export function createNavigation(ctx) {
     root.classList.remove('nav-tight');
     ui.top.style.maxHeight = '';
     ui.top.style.overflowY = '';
+    fitText(ui.instr, BANNER_MIN_SCALE);
     // La limite se mesure après chaque changement : la version resserrée réduit aussi le panneau du bas.
     if (ui.top.getBoundingClientRect().bottom <= limitAfter()) return;
     root.classList.add('nav-tight');
+    fitText(ui.instr, BANNER_MIN_SCALE);
+    // Phase 2e : consigne réduite par pas de 6 % tant que le bandeau dépasse, jamais sous 70 % de sa taille (lisible
+    // en cabine) ; au-delà seulement, la pile du haut défile (la consigne, en premier, reste entière à l'écran).
+    shrinkUntil(ui.instr, () => ui.top.getBoundingClientRect().bottom > limitAfter(), BANNER_MIN_SCALE);
     const t = ui.top.getBoundingClientRect();
     const limit = limitAfter();
     if (t.bottom > limit) {

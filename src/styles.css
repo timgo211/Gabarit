@@ -349,8 +349,16 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   /* Phase 2c : pastille de la rue en cours (noire texte crème le jour, ambre texte noir la nuit). */
   --street-bg: #14161C;
   --street-fg: #EDEAE3;
+  /* Phase 2e : bouton rond indisponible (« Autres itinéraires » en roulant) : gris opaque, la carte ne se voit pas
+     au travers. */
+  --nav-off-bg: #D8D5CD;
+  --nav-off-fg: #4A4D56;
+  --nav-off-border: #A9A79E;
 }
 :root[data-theme="night"] {
+  --nav-off-bg: #2B2E37;
+  --nav-off-fg: #A9A79E;
+  --nav-off-border: #4A4D56;
   --nav-card: rgba(28, 31, 40, .96);
   --nav-card-fg: #EDEAE3;
   --nav-card-sep: #2B2E37;
@@ -372,6 +380,9 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 }
 .app.navigating .topbar, .app.navigating .panel { display: none; }
 .app.navigating .maplibregl-ctrl-top-right { display: none; }
+/* Phase 2e : barre d'échelle cachée pendant le guidage (en paysage elle passait sous le panneau du bas) ;
+   l'attribution OpenFreeMap / OpenStreetMap reste visible. */
+.app.navigating .maplibregl-ctrl-scale { display: none; }
 .app.navigating ~ .update-banner { display: none; }
 
 /* Phase 2c : disposition façon GPS de téléphone. Bandeau et alertes en haut, colonne de boutons ronds à droite
@@ -471,7 +482,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 }
 .nav-round[hidden] { display: none; }
 .nav-round .sym { width: 52%; height: 52%; display: block; }
-.nav-round[aria-disabled="true"] { opacity: .45; }
+.nav-round[aria-disabled="true"] { background: var(--nav-off-bg); color: var(--nav-off-fg); border-color: var(--nav-off-border); }
 .nav-round:focus-visible, .nav-chip:focus-visible, .nav-summary:focus-visible, .nav-more:focus-visible {
   outline: 3px solid var(--focus); outline-offset: 2px;
 }

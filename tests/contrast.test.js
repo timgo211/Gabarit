@@ -42,6 +42,7 @@ const TEXT = [
   // Phase 2c : pastille de la rue. Déjà vérifiés plus haut : panneau du bas et boutons ronds (--fg, --muted, --ok sur
   // --card), vitesse dépassée (--danger sur --card), boutons choisis (--primary-fg sur --primary).
   ['--street-fg', '--street-bg'],
+  ['--nav-off-fg', '--nav-off-bg'], // phase 2e : bouton rond indisponible, gris opaque
 ];
 const LARGE = [
   ['--border', '--panel'], ['--border', '--card'], ['--border', '--bg'],

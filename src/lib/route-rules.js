@@ -4,7 +4,7 @@
 // conseillées (breakSchedule().elapsed).
 
 import { zfeAlongRoute, describeZfePassage, describeZfeAllowed, ZFE } from './zfe.js';
-import { bansAlongRoute, describeBanConflict, dayTime, CALENDAR_UNKNOWN_TEXT } from './hgv-bans.js';
+import { bansAlongRoute, describeBanConflict, banShortText, CALENDAR_UNKNOWN_TEXT } from './hgv-bans.js';
 import { planDriving, breakSchedule } from './driving-time.js';
 import { windAlongRoute, describeWindZone, windCalmText, WIND } from './wind.js';
 import {
@@ -144,7 +144,7 @@ export function routeRules(route, {
   short.push(...acc.short);
   for (const c of bans.conflicts) {
     lines.push({ level: 'warn', text: describeBanConflict(c) });
-    short.push(`Interdiction PL ${dayTime(c.start)}`);
+    short.push(banShortText(c, departure));
   }
   if (bans.applies && !bans.calendarKnown) lines.push({ level: 'info', text: CALENDAR_UNKNOWN_TEXT });
   let windZones = [];

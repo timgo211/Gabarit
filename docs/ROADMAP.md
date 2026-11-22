@@ -156,6 +156,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   défaut, Clair), appliquée sous le voile sombre sans rechargement ; photos IGN 0,6 / 0,8 / 0,9 ; textes AA aux trois
   niveaux, tracé ambre et routes ≥ 3:1 sur le fond Clair. Phase d'interface : voix, recalcul et alertes inchangés.
 
+- [x] **Phase 2e — Retouches du guidage** (petite, seule, après la 2d, v37)
+  Barre d'échelle cachée pendant le guidage (en paysage elle dépassait sous le panneau du bas), visible hors guidage ;
+  attribution OpenFreeMap / OpenStreetMap toujours visible. Bandeau de manœuvre : aucun texte coupé ni tronqué, en
+  portrait comme en paysage ; consigne réduite proprement (70 % de sa taille au plus bas, lisible en cabine), puis
+  défilement de la pile du haut en dernier recours. Références de route avec suffixe reconnues et mises en badge
+  (« D 120 E », « D 57e2 », « N 83 bis »), jamais coupées entre deux lignes (espaces insécables) ; couleurs des
+  badges inchangées. Fiches d'itinéraire : même formulation que le guidage, « Interdiction PL en cours jusqu'à
+  dimanche 22 h » si le départ du trajet calculé tombe pendant l'interdiction, « à partir de samedi 22 h » sinon.
+  Bouton « Autres itinéraires » grisé : gris opaque (la carte ne se voit plus au travers).
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

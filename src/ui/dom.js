@@ -52,9 +52,25 @@ export function fitText(node, minScale = 0.6) {
   // Hauteur aussi pour un texte coupé à N lignes (line-clamp) : on réduit plutôt que de perdre la fin.
   const over = () => node.scrollWidth > node.clientWidth || node.scrollHeight > node.clientHeight + 1;
   if (!node.clientWidth || !over()) return;
+  shrinkUntil(node, over, minScale, false);
+}
+
+/**
+ * Réduit la taille du texte d'un élément (par pas de 6 % de sa taille d'origine, jusqu'à minScale) tant que over()
+ * est vrai. Part de la taille déjà posée (fitText) sans revenir au-dessus.
+ * @param {HTMLElement} node
+ * @param {() => boolean} over
+ * @param {number} minScale
+ * @param {boolean} [keep] partir de la taille déjà posée
+ */
+export function shrinkUntil(node, over, minScale, keep = true) {
+  if (!node.clientWidth) return;
+  const inline = node.style.fontSize;
+  node.style.fontSize = '';
   const base = parseFloat(getComputedStyle(node).fontSize);
-  let scale = 1;
-  while (over() && scale > minScale) {
+  node.style.fontSize = keep ? inline : '';
+  let scale = inline && keep ? parseFloat(inline) / base : 1;
+  while (over() && scale > minScale + 1e-6) {
     scale = Math.max(minScale, scale - 0.06);
     node.style.fontSize = `${(base * scale).toFixed(1)}px`;
   }

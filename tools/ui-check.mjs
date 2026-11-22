@@ -70,7 +70,8 @@ const style = (bg, streets = false) => (streets ? {
   // Phase 2c : une couche de noms de rues (schéma OpenMapTiles) pour les bulles du guidage ; tuiles et polices
   // refusées (rien à dessiner, seuls les réglages de la couche sont vérifiés).
   version: 8, glyphs: 'https://streets.test/fonts/{fontstack}/{range}.pbf',
-  sources: { streets: { type: 'vector', tiles: ['https://streets.test/{z}/{x}/{y}.pbf'], maxzoom: 14 } },
+  sources: { streets: { type: 'vector', tiles: ['https://streets.test/{z}/{x}/{y}.pbf'], maxzoom: 14,
+    attribution: '© OpenFreeMap © OpenStreetMap' } },
   layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } },
     { id: 'highway-name-minor', type: 'symbol', source: 'streets', 'source-layer': 'transportation_name',
       layout: { 'symbol-placement': 'line', 'text-field': '{name}', 'text-font': ['Noto Sans Regular'] },
@@ -1342,7 +1343,7 @@ async function rulesCheck(browser, base) {
     await computeRoute(page);
     await page.waitForSelector('.route-card-rules', { timeout: 10000 });
     const cardRules = await page.textContent('.route-card[aria-checked="true"] .route-card-rules');
-    check(/ZFE Testville interdite/.test(cardRules) && /Interdiction PL samedi 22 h/.test(cardRules),
+    check(/ZFE Testville interdite/.test(cardRules) && /Interdiction PL à partir de samedi 22 h/.test(cardRules),
       `${width} px : fiche, ZFE interdite et interdiction PL`, cardRules);
     const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent, link: li.querySelector('a')?.href ?? '' })));
     check(notes.some((n) => n.cls === 'warn' && /^ZFE Testville interdite : Crit'Air 3, 4, 5 et non classés interdits/.test(n.text)
@@ -2865,13 +2866,129 @@ async function paletteCheck(browser, base) {
   }
 }
 
+// ───────── Phase 2e : bandeau de manœuvre, échelle, bouton grisé ─────────
+
+/**
+ * Bandeau : la consigne entière est visible (ni coupée par le bandeau, ni par la pile du haut), sa taille reste
+ * ≥ 70 % de la taille d'origine ; références de route sur une seule ligne.
+ */
+async function bannerClip(page) {
+  return page.evaluate(() => {
+    const instr = document.querySelector('#nav-instr');
+    const top = instr.closest('.nav-top');
+    const r = instr.getBoundingClientRect();
+    const out = [];
+    for (let n = instr.parentElement; n && n !== document.body; n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      if (cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+      const b = n.getBoundingClientRect();
+      if (r.bottom > b.bottom + 1 || r.top < b.top - 1 || r.right > b.right + 1) out.push(`consigne coupée par ${n.id || n.className} (${Math.round(r.bottom)} > ${Math.round(b.bottom)})`);
+    }
+    const m = instr.closest('.nav-maneuver').getBoundingClientRect();
+    if (r.bottom > m.bottom + 1) out.push(`consigne sous le bandeau (${Math.round(r.bottom)} > ${Math.round(m.bottom)})`);
+    if (instr.scrollHeight > instr.clientHeight + 2 || instr.scrollWidth > instr.clientWidth + 1) out.push('consigne plus grande que sa case');
+    const inline = instr.style.fontSize;
+    const used = parseFloat(getComputedStyle(instr).fontSize);
+    instr.style.fontSize = '';
+    const base = parseFloat(getComputedStyle(instr).fontSize);
+    instr.style.fontSize = inline;
+    for (const b of instr.querySelectorAll('.nav-badge')) if (b.getClientRects().length !== 1) out.push(`badge « ${b.textContent} » sur deux lignes`);
+    // Référence sans badge : jamais de retour à la ligne à l'intérieur (espaces insécables).
+    if (/\b[ADN] \d/.test(instr.textContent)) out.push(`référence avec espace sécable : « ${instr.textContent} »`);
+    return { out, scale: used / base, scrolled: top.scrollHeight > top.clientHeight + 1, text: instr.textContent,
+      badges: [...instr.querySelectorAll('.nav-badge')].map((b) => b.textContent) };
+  });
+}
+
+async function scaleShown(page) {
+  return page.evaluate(() => {
+    const vis = (sel) => { const n = document.querySelector(sel); return !!n && n.getClientRects().length > 0 && getComputedStyle(n).visibility !== 'hidden'; };
+    return { scale: vis('.maplibregl-ctrl-scale'), attrib: vis('.maplibregl-ctrl-attrib') };
+  });
+}
+
+async function bannerCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const variants = {
+    rue: { name: 'Rue de Tortelet, D 120 E', instruction: 'Tournez à droite sur Rue de Tortelet, D 120 E' },
+    longue: { name: 'D 120 E', instruction: 'Tournez à droite sur la D 120 E en direction de Saint-Martin-de-Belleville, Moûtiers, Courchevel' },
+  };
+  // Police agrandie (Android : Réglages › Affichage › Taille de la police) : les rem grossissent.
+  const runs = [];
+  for (const size of [[412, 900], [900, 412], [760, 360], [1280, 800]]) for (const kind of Object.keys(variants)) runs.push([size, kind, 1]);
+  for (const size of [[900, 412], [1280, 800]]) for (const kind of Object.keys(variants)) runs.push([size, kind, 1.3]);
+  // Écran bas et police très grande : la consigne est réduite (70 % au plus bas), puis la pile du haut défile.
+  for (const kind of Object.keys(variants)) runs.push([[760, 360], kind, 1.6]);
+  for (const [[width, height], kind, font] of runs) {
+    {
+      const v = variants[kind];
+      const label = `${width}×${height} consigne ${kind}${font !== 1 ? ` police ${Math.round(font * 100)} %` : ''}`;
+      const data = JSON.parse(JSON.stringify(nav));
+      Object.assign(data.features[0].properties.segments[0].steps[1], v);
+      // Deux alertes : 4 h 25 de conduite déjà comptées et rafales.
+      const { page, ctx, errors } = await open(browser, base, {
+        width, height, streets: true, directions: () => data, wind: () => 95, driving: drivenFor(4 * 3600 + 25 * 60),
+      });
+      if (font !== 1) await page.addStyleTag({ content: `html { font-size: ${font * 100}% }` });
+      await computeRoute(page);
+      await page.waitForTimeout(300);
+      let sc = await scaleShown(page);
+      check(sc.scale && sc.attrib, `${label} : échelle et attribution visibles hors guidage`, JSON.stringify(sc));
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await drive(ctx, page, line, 50, 4);
+      await page.waitForTimeout(400);
+      sc = await scaleShown(page);
+      check(!sc.scale && sc.attrib, `${label} : échelle cachée en guidage, attribution visible`, JSON.stringify(sc));
+      const b = await bannerClip(page);
+      check(b.out.length === 0, `${label} : aucun texte du bandeau coupé`, `${b.out.join(' ; ')} « ${b.text} »`);
+      check(b.scale >= 0.69, `${label} : consigne à 70 % de sa taille au moins`, b.scale.toFixed(2));
+      if (kind === 'rue') check(b.badges.includes('D 120 E'), `${label} : badge « D 120 E »`, b.badges.join(', '));
+      if (kind === 'longue') check(/D 120 E/.test(b.text), `${label} : « D 120 E » d'un seul tenant dans la consigne`, b.text);
+      const alerts = await stackedAlerts(page);
+      check(alerts === 2, `${label} : 2 alertes actives`, String(alerts));
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${label} : textes dans leurs cases`, over.join(' ; '));
+      if (b.scrolled) {
+        // Pile du haut qui défile (dernier recours) : son cadre reste au-dessus du panneau du bas.
+        const gap = await page.evaluate(() => {
+          const t = document.querySelector('#nav .nav-top').getBoundingClientRect();
+          const bt = document.querySelector('#nav .nav-bottom').getBoundingClientRect();
+          const sp = document.querySelector('#nav .nav-speedo')?.getBoundingClientRect();
+          const hit = (o) => o && o.width && t.left < o.right && o.left < t.right && t.bottom > o.top + 0.5;
+          return [hit(bt) && 'panneau du bas', hit(sp) && 'compteur'].filter(Boolean);
+        });
+        check(gap.length === 0, `${label} : pile du haut défilante, rien dessous`, gap.join(', '));
+      } else {
+        const foot = await footOverlaps(page);
+        check(foot.out.length === 0, `${label} : rien ne se chevauche`, foot.out.join(' ; '));
+      }
+      const alt = await page.evaluate(() => {
+        const n = document.querySelector('#btn-nav-alt');
+        const cs = getComputedStyle(n);
+        return { dis: n.getAttribute('aria-disabled'), opacity: cs.opacity, bg: cs.backgroundColor };
+      });
+      check(alt.dis === 'true' && alt.opacity === '1' && /^rgb\(/.test(alt.bg),
+        `${label} : « Autres itinéraires » grisé opaque`, JSON.stringify(alt));
+      await page.screenshot({ path: join(SHOTS, `2e-${kind}-${width}x${height}-${Math.round(font * 100)}.png`) });
+      await stopGuidance(page);
+      sc = await scaleShown(page);
+      check(sc.scale, `${label} : échelle de retour après le guidage`);
+      await noHorizontalScroll(page, label);
+      check(errors.length === 0, `${label} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
-    tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck };
+    tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

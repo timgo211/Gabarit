@@ -5,7 +5,7 @@
 // aucune saisie, et ce qui change l'itinéraire (autres itinéraires) n'est actif qu'à l'arrêt.
 
 import { pointAt, segmentAt } from './nav-geo.js';
-import { roadLabel } from './road-badge.js';
+import { roadLabel, keepRefsTogether } from './road-badge.js';
 import { isLongInstruction } from './format.js';
 
 /** Alertes empilées sous le bandeau : 2 au plus, les autres dans le panneau du bas déplié. */
@@ -28,11 +28,13 @@ export const TRAVELED = Object.freeze({ STEP_M: 25, MIN_KMH: 3 });
  * @returns {{ badges:object[], text:string, long:boolean, full:string }}
  */
 export function bannerText(maneuver) {
-  const full = String(maneuver?.text ?? '');
+  // Références de route jamais coupées entre deux lignes (« D 120 E », phase 2e).
+  const full = keepRefsTogether(String(maneuver?.text ?? ''));
   const label = roadLabel(maneuver?.name);
   const named = label.street !== '' || label.badges.length > 0;
   if (!named || /\bdirection\b/i.test(full)) return { badges: [], text: full, long: isLongInstruction(full), full };
-  return { badges: label.badges, text: label.street, long: isLongInstruction(label.street), full };
+  const street = keepRefsTogether(label.street);
+  return { badges: label.badges, text: street, long: isLongInstruction(street), full };
 }
 
 /** Ordre d'importance des alertes (plus petit = plus important). */

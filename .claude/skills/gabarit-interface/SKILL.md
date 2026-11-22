@@ -89,3 +89,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   n'en dépend pas. En guidage, un repère d'aire touché ouvre la liste et la fiche courte (`navigation.pickArea`),
   jamais la fiche complète.
 
+- Phase 2e : barre d'échelle cachée en guidage (`.app.navigating .maplibregl-ctrl-scale`), attribution toujours
+  visible. Consigne du bandeau jamais sous 70 % de sa taille (`BANNER_MIN_SCALE`, `fitText` / `shrinkUntil` de
+  `src/ui/dom.js`, appelés par `fitBanner`) ; au-delà, la pile du haut défile. Références de route : suffixes reconnus
+  (`D 120 E`, `D 57e2`, `N 83 bis`), espaces insécables (`roadLabel`, `keepRefsTogether`). Bouton rond indisponible :
+  `--nav-off-bg` / `--nav-off-fg` / `--nav-off-border` (opaques, AA testé), jamais d'opacité.
