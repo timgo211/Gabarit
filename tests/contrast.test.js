@@ -38,6 +38,9 @@ const TEXT = [
   ['--nav-fg', '--nav-bg'], ['--nav-card-fg', '--nav-card'], ['--nav-alert-fg', '--nav-alert-bg'],
   ['--ok', '--nav-card'], // temps restant, arrivée
   ['--nav-rule-fg', '--nav-rule-bg'],
+  // Phase 2c : pastille de la rue. Déjà vérifiés plus haut : panneau du bas et boutons ronds (--fg, --muted, --ok sur
+  // --card), vitesse dépassée (--danger sur --card), boutons choisis (--primary-fg sur --primary).
+  ['--street-fg', '--street-bg'],
 ];
 const LARGE = [
   ['--border', '--panel'], ['--border', '--card'], ['--border', '--bg'],
@@ -67,4 +70,13 @@ test('flèche du camion : contour visible sur son remplissage', () => {
   // Auto : ressort sur le fond du thème (crème le jour, presque noir la nuit).
   assert.ok(contrastRatio(AUTO_ARROW.day.fill, day['--panel']) >= AA_TEXT);
   assert.ok(contrastRatio(AUTO_ARROW.night.fill, night['--bg']) >= AA_TEXT);
+});
+
+test('phase 2c : panneau de limitation et bulles des rues lisibles', () => {
+  assert.ok(contrastRatio('#000000', '#FFFFFF') >= AA_TEXT);
+  assert.ok(contrastRatio('#C8102E', '#FFFFFF') >= AA_LARGE, 'bord rouge du panneau');
+  // Pastille de la rue : jour noire texte crème, nuit ambre texte noir (demandé).
+  assert.equal(day['--street-bg'], '#14161C');
+  assert.equal(night['--street-bg'], '#E8A93B');
+  assert.equal(night['--street-fg'], '#14161C');
 });

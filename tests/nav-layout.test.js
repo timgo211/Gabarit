@@ -1,0 +1,106 @@
+// Phase 2c : décisions d'affichage de l'écran de guidage (alertes, arrêt, caméra, boutons, vitesse, tracé parcouru).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus,
+  traveledUpdate, traveledCoords, PARK, BUTTONS,
+} from '../src/lib/nav-layout.js';
+import { prepareLine } from '../src/lib/nav-geo.js';
+
+const base = { onRoute: true, arrived: false, rules: {}, driving: null };
+
+test('alerte système : mêmes textes qu\'avant, proposition de recalcul à l\'arrêt hors du tracé', () => {
+  assert.equal(systemAlert(base), null);
+  assert.match(systemAlert(base, { gpsLost: true }).text, /Signal GPS perdu/);
+  assert.equal(systemAlert(base, { gpsLost: true, sim: true }), null);
+  assert.match(systemAlert({ ...base, rerouting: true }).text, /recalcul en cours/);
+  assert.match(systemAlert({ ...base, onRoute: false }, { error: 'quota' }).text, /Recalcul impossible : quota/);
+  const off = systemAlert({ ...base, onRoute: false, offRouteStopped: true, canRequestReroute: true });
+  assert.deepEqual([off.info, off.offer, off.canReroute], [true, true, true]);
+  assert.equal(systemAlert({ ...base, arrived: true }, { gpsLost: true }), null);
+});
+
+test('ordre des alertes : système, tunnel, ZFE, accès, interdiction, conduite dépassée, frontière, vent, pause bientôt', () => {
+  const view = {
+    ...base,
+    rules: {
+      wind: { text: 'Rafales', distance: 100 }, border: { text: 'Suisse', distance: 5000 }, zfe: { text: 'ZFE', distance: 4000 },
+      tunnel: { text: 'Tunnel', distance: 9000 }, access: { text: 'Desserte', distance: 3000 }, ban: { text: 'Interdiction', active: true },
+    },
+    driving: { level: 'soon', main: 'Pause dans 20 min', detail: 'Journée', canMarkWork: false, workLabel: 'x' },
+  };
+  const sys = systemAlert({ ...view, rerouting: true });
+  assert.deepEqual(guidanceAlerts(view, sys).map((a) => a.key),
+    ['system', 'tunnel', 'zfe', 'access', 'ban', 'border', 'wind', 'driving']);
+  const over = guidanceAlerts({ ...view, driving: { ...view.driving, level: 'over', canMarkWork: true } });
+  assert.deepEqual(over.map((a) => a.key), ['tunnel', 'zfe', 'access', 'ban', 'driving', 'border', 'wind']);
+  assert.equal(over.find((a) => a.key === 'driving').work, true);
+  // Temps de conduite normal : pas d'alerte (ligne du panneau déplié).
+  assert.deepEqual(guidanceAlerts({ ...base, driving: { level: 'ok', main: 'Conduite 1 h' } }), []);
+  const { shown, more } = splitAlerts(guidanceAlerts(view));
+  assert.deepEqual([shown.length, more.length], [2, 5]);
+});
+
+test('à l\'arrêt : sous 5 km/h pendant 3 s', () => {
+  let p = parkedState(null, 50, 0);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 4, 1000);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, 1000 + PARK.MS - 1);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, 1000 + PARK.MS);
+  assert.equal(p.parked, true);
+  p = parkedState(p, 6, 5000);
+  assert.equal(p.parked, false);
+  assert.equal(parkedState(null, null, 0).since, 0);
+});
+
+test('caméra : véhicule à 78 % de la hauteur en portrait, à droite de la colonne en paysage, écran seulement', () => {
+  const p = followPadding({ width: 412, height: 900 });
+  assert.equal(p.left, 0);
+  assert.ok(Math.abs((p.top + 900) / 2 - 0.78 * 900) <= 1);
+  const l = followPadding({ width: 900, height: 412 });
+  assert.equal(l.left, 360);
+  assert.ok(Math.abs((l.top + 412) / 2 - 0.75 * 412) <= 1);
+  assert.deepEqual(followPadding({ width: 412, height: 900 }), p); // même taille, même marge
+});
+
+test('colonne de boutons : 64 px entre 45 et 85 %, remonte puis 56 px, deux colonnes en dernier', () => {
+  const tall = buttonColumn({ height: 1280, count: 5 });
+  assert.equal(tall.size, BUTTONS.size);
+  assert.ok(tall.top >= 1280 * 0.45 && tall.top + 5 * 64 + 4 * 12 <= 1280 * 0.85 + 1);
+  const phone = buttonColumn({ height: 760, minTop: 200, count: 5 });
+  assert.ok(phone.size >= 56 && phone.top >= 200 && phone.columns === 1);
+  const low = buttonColumn({ height: 360, minTop: 10, count: 6 });
+  assert.equal(low.columns, 2);
+  assert.ok(low.size >= 56);
+});
+
+test('vitesse : panneau seulement si la limite est connue, dépassement', () => {
+  assert.deepEqual(speedStatus(87.4), { value: '87', limit: null, over: false });
+  assert.deepEqual(speedStatus(95, 90), { value: '95', limit: 90, over: true });
+  assert.equal(speedStatus(null).value, '—');
+});
+
+test('tracé parcouru : tous les 25 m en roulant, jamais à l\'arrêt', () => {
+  assert.equal(traveledUpdate(null, 0, 0), true);
+  assert.equal(traveledUpdate(100, 110, 50), false);
+  assert.equal(traveledUpdate(100, 130, 50), true);
+  assert.equal(traveledUpdate(100, 160, 1), false); // dérive du GPS à l'arrêt
+  const line = prepareLine([[0, 0], [0.001, 0], [0.002, 0]]);
+  assert.deepEqual(traveledCoords(line, 0), []);
+  const c = traveledCoords(line, 150);
+  assert.equal(c.length, 3);
+  assert.ok(c[2][0] > 0.001 && c[2][0] < 0.002);
+});
+
+test('bandeau : badge et nom de rue, ou consigne entière avec une direction', async () => {
+  const { bannerText } = await import('../src/lib/nav-layout.js');
+  const a = bannerText({ text: 'Tournez à droite sur Route de Lyon, D 906', name: 'Route de Lyon, D 906' });
+  assert.deepEqual([a.badges.map((b) => b.ref), a.text, a.long], [['D 906'], 'Route de Lyon', false]);
+  const b = bannerText({ text: 'Prenez la sortie 34 en direction de Mâcon', name: 'A 6' });
+  assert.deepEqual([b.badges, b.text], [[], 'Prenez la sortie 34 en direction de Mâcon']);
+  const c = bannerText({ text: 'Continuez tout droit', name: '' });
+  assert.equal(c.text, 'Continuez tout droit');
+  assert.equal(bannerText(null).text, '');
+});

@@ -1,33 +1,45 @@
 // Écran de guidage : source de positions (GPS réel ou simulation), moteur de navigation, voix, carte, écran allumé.
 // Toutes les décisions (annonces, recalcul, arrivée) viennent de src/lib/navigation.js ; la simulation
-// (src/lib/nav-sim.js) passe par exactement le même chemin que le GPS : onFix().
+// (src/lib/nav-sim.js) passe par exactement le même chemin que le GPS : onFix(). Ce qui s'affiche (alertes et leur
+// ordre, boutons réservés à l'arrêt, place du véhicule, colonne de boutons) est décidé par src/lib/nav-layout.js.
 //
 // Code de la route, art. R412-6-2 (Légifrance) : un écran allumé dans le champ de vision du conducteur n'est permis
 // que s'il sert d'aide à la conduite ou à la navigation. Pendant le guidage, l'écran ne montre donc que la carte
-// et le guidage, sans aucune saisie : gros boutons d'un seul appui (voix, arrêter ; sur la carte : vue d'ensemble,
-// recentrer, plan / satellite, aires, actifs à toutes les vitesses, sans menu ni confirmation) et, à l'arrêt hors du
-// tracé seulement, « Recalculer d'ici » (l'itinéraire ne change jamais sans accord en dehors d'une vraie sortie de route).
-// Encart « Prochaines aires » (phase 9) : ouvert ou fermé d'un seul appui, rempli par le moteur à chaque position ;
+// et le guidage, sans aucune saisie : boutons ronds d'un seul appui (boussole, recentrer, loupe = catégories le long
+// du trajet, son, vue d'ensemble), confirmation en deux gros boutons pour quitter ; « Autres itinéraires » seulement
+// à l'arrêt (sous 5 km/h pendant 3 s) ; à l'arrêt hors du tracé seulement, « Recalculer d'ici » (l'itinéraire ne
+// change jamais sans accord en dehors d'une vraie sortie de route).
+//
+// Phase 2c (disposition façon GPS de téléphone) : bandeau de manœuvre en haut (flèche, distance, badge de route et
+// rue), « Puis » et 2 alertes au plus dessous (pastille « +N » pour les autres), pastille de la rue au-dessus du
+// véhicule, colonne de boutons ronds à droite, compteur de vitesse en bas à gauche, panneau du bas (temps restant ;
+// tiré ou touché : détails du trajet en lecture seule). Paysage : bandeau et panneau du bas dans une colonne à
+// gauche. Aucun élément ne demande de redessiner la carte à l'arrêt : la caméra ne dépend que de la taille de
+// l'écran (followPadding).
+// Encart « Prochaines aires » (phase 9) : ouvert par la loupe → « Aires PL », rempli par le moteur à chaque position ;
 // toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
-// Réglementation (phase 5) : bandeau « ZFE … dans 4 km : interdite », « Interdiction PL dans 45 min », « Rafales
-// 95 km/h dans 12 km » et voix, lecture seule (aucun bouton).
-// Temps de conduite (phase 5, règlement CE 561/2006, aide seulement) : ligne « Conduite 3 h 12 · pause de 45 min
-// dans 1 h 18 » sous le bandeau ; à l'arrêt seulement (sous 10 km/h), un bouton d'un seul appui « Pas une pause
-// (travail) ». Le décompte est enregistré sur l'appareil (ctx.onDriving) toutes les 15 s et à la fin du guidage.
+// Temps de conduite (phase 5, règlement CE 561/2006, aide seulement) : carte d'alerte quand la pause approche ou
+// est dépassée, sinon dans les détails ; à l'arrêt seulement (sous 10 km/h), un bouton « Pas une pause (travail) ».
 
 import { $, setValueUnit, fitText } from './dom.js';
 import { maneuverSvg } from './nav-icon.js';
+import { symbolSvg } from './nav-symbols.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, markStopAsWork, mapButtonSize, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, markStopAsWork, NAV,
 } from '../lib/navigation.js';
+import {
+  systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus, traveledUpdate,
+  traveledCoords, bannerText, isLandscape, LANDSCAPE_COLUMN,
+} from '../lib/nav-layout.js';
 import { describeNextArea, nextAreasChanged } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
+import { tollText } from '../lib/route-options.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
 import { createSimulator, SIM_SPEEDS } from '../lib/nav-sim.js';
 import {
-  formatNavDistance, formatDistance, formatDuration, formatArrival, formatSpeed, splitUnit, isLongInstruction,
+  formatNavDistance, formatDistance, formatDuration, formatArrival, splitUnit, isLongInstruction,
 } from '../lib/format.js';
 import { ERROR_KINDS } from '../lib/ors-errors.js';
 
@@ -36,17 +48,23 @@ const RECENTER_AFTER_MS = 15000;
 const RECENTER_MIN_KMH = NAV.OFF_ROUTE_MIN_SPEED * 3.6;
 const SIM_TICK_MS = 1000;
 const RELEASE_SCREEN_AFTER_ARRIVAL_MS = 120000;
-/** Encart des aires : hauteur sous laquelle on le met plutôt à droite du bandeau, et largeur minimale pour ça. */
-const AREAS_MIN_PX = 120;
-const AREAS_MIN_WIDTH_PX = 200;
 /** Décompte du temps de conduite enregistré au plus toutes les 15 s (une position par seconde). */
 const SAVE_DRIVING_MS = 15000;
+/** Rangée de la loupe et confirmation « Quitter » : fermées seules au bout de 8 s. */
+const AUTO_CLOSE_MS = 8000;
+const TOAST_MS = 4000;
+/** Panneau du bas tiré de plus de 24 px : ouvert (vers le haut) ou fermé (vers le bas). */
+const DRAG_PX = 24;
+const INSET = 12;
+/** Écart entre le véhicule et le bas de la pastille de la rue (px). */
+const PILL_ABOVE_PX = 40;
+const RULE_KINDS = new Set(['tunnel', 'zfe', 'access', 'ban', 'border', 'wind']);
 
 /**
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
  *   onVoiceToggle:(on:boolean)=>void, onSimSpeedChange:(kmh:number)=>void,
  *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void, onAreaOpen?:(id:string)=>void,
- *   onView?:(view:object)=>void, onDriving?:(driving:object)=>void }} ctx
+ *   onView?:(view:object)=>void, onDriving?:(driving:object)=>void, onPosition?:(lonlat:number[])=>void }} ctx
  */
 export function createNavigation(ctx) {
   const app = $('.app');
@@ -56,29 +74,46 @@ export function createNavigation(ctx) {
     dist: $('#nav-dist'),
     instr: $('#nav-instr'),
     then: $('#nav-then'),
+    alerts: $('#nav-alerts'),
     alert: $('#nav-alert'),
+    alertText: $('#nav-alert-text'),
     rule: $('#nav-rule'),
     drive: $('#nav-drive'),
     driveMain: $('#nav-drive-main'),
     driveDetail: $('#nav-drive-detail'),
+    driveSlot: $('#nav-drive-slot'),
     work: $('#btn-nav-work'),
     reroute: $('#btn-nav-reroute'),
+    more: $('#btn-nav-more'),
+    moreList: $('#nav-more-list'),
+    facts: $('#nav-facts'),
     remaining: $('#nav-remaining'),
     time: $('#nav-time'),
     eta: $('#nav-eta'),
+    speedo: $('#nav-speedo'),
     speed: $('#nav-speed'),
+    limit: $('#nav-limit'),
     screen: $('#nav-screen'),
     sim: $('#nav-sim'),
     simSpeed: $('#btn-sim-speed'),
     simOffroad: $('#btn-sim-offroad'),
-    voice: $('#btn-nav-voice'),
+    compass: $('#btn-nav-compass'),
     recenter: $('#btn-nav-recenter'),
+    searchBtn: $('#btn-nav-search'),
+    search: $('#nav-search'),
+    voice: $('#btn-nav-voice'),
+    alt: $('#btn-nav-alt'),
     overview: $('#btn-nav-overview'),
     layer: $('#btn-nav-layer'),
     road: $('#nav-road'),
-    foot: $('.nav-foot'),
     stop: $('#btn-nav-stop'),
     bottom: $('.nav-bottom'),
+    sheet: $('#btn-nav-sheet'),
+    details: $('#nav-details'),
+    confirm: $('#nav-confirm'),
+    quit: $('#btn-nav-quit'),
+    keep: $('#btn-nav-keep'),
+    toast: $('#nav-toast'),
     areasBtn: $('#btn-nav-areas'),
     areas: $('#nav-areas'),
     areasList: $('#nav-areas-list'),
@@ -88,26 +123,25 @@ export function createNavigation(ctx) {
   };
   let s = null; // session de guidage en cours
 
+  // Pictogrammes (Material Symbols, src/ui/nav-symbols.js).
+  ui.compass.append(symbolSvg('compass'));
+  ui.recenter.append(symbolSvg('recenter'));
+  ui.searchBtn.append(symbolSvg('search'));
+  ui.alt.append(symbolSvg('altRoute'));
+  ui.stop.append(symbolSvg('close'));
+  ui.overview.append(symbolSvg('overview'));
+
+  const size = () => ({ width: root.clientWidth || window.innerWidth, height: root.clientHeight || window.innerHeight });
+
   function cameraPadding() {
-    const h = root.clientHeight || window.innerHeight;
-    // Encart « Prochaines aires » ouvert devant le véhicule (téléphone : toute la largeur) : véhicule juste
-    // au-dessus de l'encart, sous le bandeau (phase 9). Tablette : l'encart est à gauche, rien ne change.
-    const box = s?.areasOpen && !ui.areas.hidden ? ui.areas.getBoundingClientRect() : null;
-    const mid = root.getBoundingClientRect().left + (root.clientWidth || window.innerWidth) / 2;
-    if (box && box.left < mid && box.right > mid) {
-      const above = box.top - root.getBoundingClientRect().top - 48;
-      const y = Math.round(Math.max(h * 0.3, Math.min(h * 0.75, above)));
-      return { top: Math.max(0, y - 1), bottom: Math.max(0, h - y - 1), left: 0, right: 0 };
-    }
-    const bottom = ui.bottom?.offsetHeight ?? 0; // barre du bas seulement (les boutons de carte sont sur le côté)
-    // Véhicule dans le bas de l'écran (au-dessus de la barre) : on voit loin devant.
-    return { top: Math.round(h * 0.5), bottom: Math.min(bottom, Math.round(h * 0.3)), left: 0, right: 0 };
+    return followPadding(size());
   }
 
   function renderVoice() {
     const on = ctx.voice.enabled;
-    ui.voice.textContent = on ? '🔊 Voix' : '🔇 Muet';
+    ui.voice.replaceChildren(symbolSvg(on ? 'soundOn' : 'soundOff'));
     ui.voice.setAttribute('aria-pressed', String(on));
+    ui.voice.setAttribute('aria-label', on ? 'Couper la voix' : 'Activer la voix');
     ui.voice.disabled = !ctx.voice.supported;
   }
 
@@ -118,93 +152,310 @@ export function createNavigation(ctx) {
     fitText(node);
   }
 
+  /** Bandeau : badges de route et nom de rue (ou consigne entière), jamais coupé au milieu d'un mot. */
+  function setBanner(b) {
+    const key = JSON.stringify([b.badges.map((x) => x.ref), b.text]);
+    if (ui.instr.dataset.key !== key) {
+      ui.instr.dataset.key = key;
+      const parts = b.badges.map((x) => {
+        const span = document.createElement('span');
+        span.className = 'nav-badge';
+        span.textContent = x.ref;
+        span.style.setProperty('--badge-bg', x.bg);
+        span.style.setProperty('--badge-fg', x.fg);
+        span.style.setProperty('--badge-border', x.border);
+        return span;
+      });
+      ui.instr.replaceChildren(...parts, document.createTextNode(b.text));
+      ui.instr.classList.toggle('long', b.long);
+      ui.instr.setAttribute('aria-label', b.full || b.text);
+    }
+    fitText(ui.instr, 0.6);
+  }
+
   function setInstruction(text) {
-    ui.instr.textContent = text;
-    ui.instr.classList.toggle('long', isLongInstruction(text));
-    fitText(ui.instr, 0.7);
+    setBanner({ badges: [], text, long: isLongInstruction(text), full: text });
   }
 
   function setIcon(icon) {
+    const key = JSON.stringify(icon);
+    if (ui.icon.dataset.key === key) return;
+    ui.icon.dataset.key = key;
     ui.icon.replaceChildren(maneuverSvg(icon));
   }
 
-  function alertText(view) {
-    if (!s) return '';
-    if (view?.arrived) return '';
-    if (s.gpsLost) return s.sim ? '' : 'Signal GPS perdu : la position n\'est plus à jour.';
-    if (view?.rerouting) return 'Hors itinéraire : recalcul en cours…';
-    if (s.error && view && !view.onRoute) return `Recalcul impossible : ${s.error}`;
-    if (view?.rerouteBlocked && !view.onRoute) return 'Hors itinéraire. Recalcul indisponible : rejoins l\'itinéraire.';
-    if (view?.offRouteStopped) return 'Hors itinéraire, à l\'arrêt : l\'itinéraire ne change pas sans ton accord.';
-    return '';
+  function renderThen(then) {
+    ui.then.hidden = !then;
+    if (!then) return;
+    const key = JSON.stringify([then.icon, then.text]);
+    if (ui.then.dataset.key === key) return;
+    ui.then.dataset.key = key;
+    const icon = document.createElement('span');
+    icon.className = 'nav-then-icon';
+    icon.append(maneuverSvg(then.icon));
+    ui.then.replaceChildren(document.createTextNode('Puis'), icon);
+    ui.then.setAttribute('aria-label', `Puis : ${then.text}`);
   }
 
-  function renderAlert(view) {
-    const text = alertText(view);
-    ui.alert.textContent = text;
-    ui.alert.hidden = !text;
-    ui.alert.classList.toggle('info', text !== '' && !!view?.offRouteStopped && !view.rerouting && !s?.error && !s?.gpsLost);
-    // Proposition à l'arrêt hors du tracé (aire, parking) : un seul bouton, jamais de recalcul tout seul.
-    const offer = !!s && !s.gpsLost && !!view?.offRouteStopped && !view.rerouting && !view.rerouteBlocked;
-    ui.reroute.hidden = !offer;
-    ui.reroute.disabled = !view?.canRequestReroute;
-    layoutFoot(); // le bandeau a pu grandir (alerte, bouton)
+  // ───────── Alertes ─────────
+
+  function renderAlerts(view) {
+    const sys = s ? systemAlert(view, { gpsLost: s.gpsLost, sim: !!s.sim, error: s.error }) : null;
+    const all = guidanceAlerts(view, sys);
+    const { shown, more } = splitAlerts(all);
+    const at = (key) => shown.findIndex((a) => a.key === key);
+
+    // Alerte système (GPS, recalcul, hors itinéraire) et « Recalculer d'ici ».
+    const iSys = at('system');
+    ui.alert.hidden = iSys < 0;
+    if (iSys >= 0) {
+      const a = shown[iSys];
+      if (ui.alertText.textContent !== a.text) ui.alertText.textContent = a.text;
+      ui.alert.classList.toggle('info', a.info);
+      ui.alert.style.order = String(iSys);
+      ui.reroute.hidden = !a.offer;
+      ui.reroute.disabled = !a.canReroute;
+    } else {
+      ui.reroute.hidden = true;
+    }
+
+    // Réglementation : une carte par alerte montrée.
+    const rules = shown.filter((a) => RULE_KINDS.has(a.kind));
+    const rulesKey = rules.map((a) => a.text).join('\n');
+    if (ui.rule.dataset.text !== rulesKey) {
+      ui.rule.dataset.text = rulesKey;
+      ui.rule.replaceChildren(...rules.map((a) => {
+        const line = document.createElement('span');
+        line.textContent = a.text;
+        line.dataset.kind = a.kind;
+        return line;
+      }));
+    }
+    ui.rule.hidden = !rules.length;
+    if (rules.length) ui.rule.style.order = String(at(rules[0].key));
+
+    // Temps de conduite : carte si la pause approche ou est dépassée et qu'il reste une place, sinon les détails.
+    const iDrive = at('driving');
+    renderDriving(view?.driving ?? null, iDrive >= 0);
+    if (iDrive >= 0) ui.drive.style.order = String(iDrive);
+
+    // Les autres : pastille « +N » (ouvre les détails) et liste dans les détails.
+    const rest = more.filter((a) => a.kind !== 'driving');
+    ui.more.hidden = more.length === 0;
+    if (more.length) {
+      const label = `+${more.length}`;
+      if (ui.more.textContent !== label) ui.more.textContent = label;
+      ui.more.setAttribute('aria-label', `${more.length} autre${more.length > 1 ? 's' : ''} alerte${more.length > 1 ? 's' : ''} : voir les détails`);
+    }
+    const moreKey = rest.map((a) => a.text).join('\n');
+    if (ui.moreList.dataset.text !== moreKey) {
+      ui.moreList.dataset.text = moreKey;
+      ui.moreList.replaceChildren(...rest.map((a) => {
+        const line = document.createElement('span');
+        line.textContent = a.text;
+        line.dataset.level = a.level;
+        if (RULE_KINDS.has(a.kind)) line.dataset.kind = a.kind;
+        return line;
+      }));
+    }
   }
 
+  /** Temps de conduite : deux lignes (pause, journée), couleur selon l'urgence, bouton « travail » à l'arrêt. */
+  function renderDriving(d, inStack) {
+    ui.drive.hidden = !d;
+    if (!d) return;
+    const parent = inStack ? ui.alerts : ui.driveSlot;
+    if (ui.drive.parentElement !== parent) parent.append(ui.drive);
+    if (!inStack) ui.drive.style.order = '';
+    if (ui.driveMain.textContent !== d.main) ui.driveMain.textContent = d.main;
+    if (ui.driveDetail.textContent !== d.detail) ui.driveDetail.textContent = d.detail;
+    ui.drive.dataset.level = d.level;
+    ui.work.hidden = !d.canMarkWork;
+    if (ui.work.textContent !== d.workLabel) ui.work.textContent = d.workLabel;
+  }
+
+  /** Détails du trajet (lecture seule) : prochaine aire PL, péage. */
+  function renderFacts(view) {
+    const rows = [];
+    const next = (view?.nextAreas ?? []).find((a) => a.distance > 0);
+    if (next) {
+      const d = describeNextArea(next, new Date());
+      rows.push(['Prochaine aire PL', `${d.name} · ${d.distance} · ${d.eta} · ${d.places}`]);
+    }
+    if (s?.tollDistance !== undefined) rows.push(['Péage', tollText(s.tollDistance)]);
+    const key = JSON.stringify(rows);
+    if (ui.facts.dataset.key === key) return;
+    ui.facts.dataset.key = key;
+    ui.facts.replaceChildren(...rows.flatMap(([k, v]) => {
+      const dt = document.createElement('dt');
+      dt.textContent = k;
+      const dd = document.createElement('dd');
+      dd.textContent = v;
+      return [dt, dd];
+    }));
+  }
+
+  // ───────── Disposition ─────────
+
   /**
-   * Pied de l'écran de guidage : les boutons de carte et l'encart des aires ne recouvrent jamais le bandeau du haut
-   * ni la barre du bas. Le pied commence sous le bandeau quand ils se chevauchent en largeur (téléphone) ; la taille
-   * des boutons s'adapte à la hauteur restante (mapButtonSize) ; l'encart est borné sous le bandeau et défile s'il
-   * manque de place (paysage sur téléphone).
+   * Bandeau du haut (consigne, « Puis », alertes) jamais sous le compteur ni le panneau du bas : sur un écran bas,
+   * version resserrée, puis hauteur bornée en dernier recours.
    */
-  /**
-   * Bandeau du haut (consigne, alertes, réglementation, temps de conduite) jamais sous la barre du bas : sur un écran
-   * bas (téléphone en paysage), version resserrée (« Puis », ligne de la journée masquées, textes plus petits), puis
-   * hauteur bornée en dernier recours.
-   */
-  function fitBanner(tight = false) {
+  function fitBanner(limitAfter) {
     root.classList.remove('nav-tight');
     ui.top.style.maxHeight = '';
-    const limit = ui.bottom.getBoundingClientRect().top - 8;
-    if (!tight && ui.top.getBoundingClientRect().bottom <= limit) return;
+    ui.top.style.overflowY = '';
+    // La limite se mesure après chaque changement : la version resserrée réduit aussi le panneau du bas.
+    if (ui.top.getBoundingClientRect().bottom <= limitAfter()) return;
     root.classList.add('nav-tight');
     const t = ui.top.getBoundingClientRect();
-    if (t.bottom > limit) ui.top.style.maxHeight = `${Math.max(0, Math.floor(limit - t.top))}px`;
+    const limit = limitAfter();
+    if (t.bottom > limit) {
+      ui.top.style.maxHeight = `${Math.max(0, Math.floor(limit - t.top))}px`;
+      ui.top.style.overflowY = 'auto';
+    }
   }
 
-  function layoutFoot(tight = false) {
+  /**
+   * Place les éléments posés sur la carte (rien ne se chevauche) : bandeau, compteur, colonne de boutons, rangée de
+   * la loupe, encart des aires, pastille de la rue, message. Ne touche jamais à la caméra.
+   */
+  function layoutGuidance() {
     if (!s || root.hidden) return;
-    fitBanner(tight);
+    const { width: w, height: h } = size();
+    const land = isLandscape({ width: w, height: h });
+    root.classList.toggle('land', land);
+    root.classList.toggle('sheet-open', s.detailsOpen);
     const r = root.getBoundingClientRect();
-    const t = ui.top.getBoundingClientRect();
-    const css = getComputedStyle(ui.foot);
-    const inset = parseFloat(css.right) || 0;
-    const gap = parseFloat(css.rowGap) || 0;
-    const preferred = parseFloat(getComputedStyle(root).getPropertyValue('--mapbtn')) || 56;
-    const btnWidth = Math.max(preferred, ui.mapbtns.offsetWidth);
-    const below = t.bottom - r.top + 8;
-    const colLeft = r.right - inset - btnWidth;
-    const top = t.right > colLeft - 4 ? below : inset;
-    ui.foot.style.top = `${Math.round(top)}px`;
-    const used = ui.bottom.offsetHeight + gap + (ui.road.hidden ? 0 : ui.road.offsetHeight + gap);
-    const side = ui.foot.clientHeight - (parseFloat(css.paddingBottom) || 0) - used;
-    const bcss = getComputedStyle(ui.mapbtns);
-    const columns = bcss.display === 'grid' ? bcss.gridTemplateColumns.split(' ').filter(Boolean).length : 1;
-    const rows = Math.ceil(ui.mapbtns.children.length / Math.max(1, columns));
-    // Colonne de boutons qui ne tient plus sous le bandeau (téléphone, plusieurs alertes) : bandeau resserré.
-    const rowGap = parseFloat(bcss.rowGap) || 0;
-    if (!tight && top !== inset && side < rows * 44 + rowGap * (rows - 1)) { layoutFoot(true); return; }
-    const size = mapButtonSize({ available: side, count: rows, gap: parseFloat(bcss.rowGap) || 0, preferred });
-    ui.foot.style.setProperty('--mapbtn', `${size}px`);
-    // Encart : sous le bandeau ; si la place y manque (paysage, écran bas) et qu'il y en a à droite du bandeau, à
-    // droite du bandeau sur toute la hauteur.
-    const under = top === inset ? side - Math.max(0, below - inset) : side;
-    const colWidth = ui.mapbtns.offsetWidth;
-    const besideLeft = t.right - r.left - inset + 8;
-    const besideWidth = (r.width - 2 * inset) - colWidth - 8 - besideLeft;
-    const beside = under < AREAS_MIN_PX && besideWidth >= AREAS_MIN_WIDTH_PX;
-    ui.areas.style.marginLeft = beside ? `${Math.round(besideLeft)}px` : '';
-    ui.areas.style.maxHeight = `${Math.max(0, Math.floor(beside ? side : under))}px`;
+    const columnRight = land ? Math.round(w * LANDSCAPE_COLUMN) : 0;
+
+    // Compteur : en bas à gauche, au-dessus du panneau du bas (portrait) ou à droite de la colonne (paysage).
+    const placeBottom = () => {
+      const sheetH = ui.bottom.offsetHeight;
+      ui.speedo.style.left = `${land ? columnRight + INSET : INSET}px`;
+      ui.speedo.style.bottom = `${land ? INSET : sheetH + INSET}px`;
+      return {
+        sheetH,
+        sheetTop: h - sheetH - (land ? INSET : 0),
+        speedoTop: h - (land ? INSET : sheetH + INSET) - ui.speedo.offsetHeight,
+      };
+    };
+
+    // Bandeau : au-dessus du compteur en portrait, du panneau du bas en paysage (même colonne).
+    fitBanner(() => {
+      const b = placeBottom();
+      return r.top + (land ? b.sheetTop : b.speedoTop) - 8;
+    });
+    const { sheetTop, speedoTop } = placeBottom();
+    const stackBottom = ui.top.getBoundingClientRect().bottom - r.top;
+
+    // Colonne de boutons ronds (45–85 % de la hauteur, sous le bandeau, au-dessus du panneau du bas).
+    const count = [...ui.mapbtns.children].filter((n) => !n.hidden).length;
+    const col = buttonColumn({
+      height: h, count,
+      minTop: land ? INSET : stackBottom + 8,
+      maxBottom: land ? h - INSET : sheetTop - INSET,
+    });
+    root.style.setProperty('--round', `${col.size}px`);
+    root.style.setProperty('--gap', `${col.gap}px`);
+    root.style.setProperty('--cols', String(col.columns));
+    ui.mapbtns.style.top = `${col.top}px`;
+    const colWidth = col.columns * col.size + (col.columns - 1) * col.gap;
+    const colLeft = w - INSET - colWidth;
+
+    // Rangée de la loupe : à gauche de la colonne, à hauteur de la loupe.
+    if (!ui.search.hidden) {
+      const b = ui.searchBtn.getBoundingClientRect();
+      ui.search.style.right = `${Math.round(w - colLeft + 8)}px`;
+      ui.search.style.top = `${Math.round(b.top - r.top + (col.size - 56) / 2)}px`;
+      ui.search.style.maxWidth = `${Math.max(0, Math.round(colLeft - 8 - (land ? columnRight + INSET : INSET)))}px`;
+    }
+
+    // Véhicule (followPadding) et pastille de la rue juste au-dessus.
+    const pad = cameraPadding();
+    const vx = pad.left + (w - pad.left - pad.right) / 2;
+    const vy = (pad.top + h - pad.bottom) / 2;
+    const pillBottom = vy - PILL_ABOVE_PX;
+    ui.road.style.left = `${Math.round(vx)}px`;
+    ui.road.style.top = `${Math.round(pillBottom)}px`;
+    const room = Math.min(vx - (land ? columnRight : 0), colLeft - vx) - 16;
+    ui.road.style.maxWidth = `${Math.max(0, Math.round(2 * room))}px`;
+
+    // Encart des aires : sous le bandeau, au-dessus de la pastille (portrait) ; à droite de la colonne (paysage).
+    const areasLeft = land ? columnRight + INSET : INSET;
+    const areasTop = land ? INSET : stackBottom + 8;
+    const areasBottom = Math.min(land ? speedoTop - 8 : h, pillBottom - 44);
+    ui.areas.style.left = `${areasLeft}px`;
+    ui.areas.style.right = `${Math.round(w - colLeft + 8)}px`;
+    ui.areas.style.top = `${Math.round(areasTop)}px`;
+    ui.areas.style.maxHeight = `${Math.max(0, Math.floor(areasBottom - areasTop))}px`;
+
+    // Message bref : à la place de la pastille de la rue (masquée pendant 4 s).
+    ui.toast.style.bottom = `${Math.round(h - pillBottom)}px`;
+    ui.toast.style.left = `${Math.round(vx)}px`;
+    ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
+    renderRoad();
+  }
+
+  /** Pastille de la rue : seulement en suivi, détails fermés. */
+  function renderRoad() {
+    const name = s?.view?.roadName ?? '';
+    if (ui.road.textContent !== name) ui.road.textContent = name;
+    ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || !ui.toast.hidden;
+  }
+
+  // ───────── Rendu d'une position ─────────
+
+  function render(view) {
+    if (view.arrived) {
+      setIcon({ kind: 'goal' });
+      ui.dist.textContent = '';
+      setInstruction('Destination atteinte');
+      renderThen(null);
+      ui.stop.setAttribute('aria-label', 'Terminer le guidage');
+    } else if (view.maneuver) {
+      setIcon(view.maneuver.icon);
+      setStat(ui.dist, formatNavDistance(view.maneuver.distance));
+      setBanner(bannerText(view.maneuver));
+      renderThen(view.then);
+    } else {
+      setIcon({ kind: 'arrow', angle: 0 });
+      ui.dist.textContent = '';
+      setInstruction('Suivez l\'itinéraire');
+      renderThen(null);
+    }
+    setStat(ui.remaining, formatDistance(view.remainingDistance));
+    setStat(ui.time, formatDuration(view.remainingDuration));
+    setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
+    const sp = speedStatus(view.speedKmh, view.speedLimit ?? null);
+    if (ui.speed.textContent !== sp.value) ui.speed.textContent = sp.value;
+    ui.limit.hidden = sp.limit === null;
+    if (sp.limit !== null && ui.limit.textContent !== String(sp.limit)) ui.limit.textContent = String(sp.limit);
+    ui.speedo.classList.toggle('over', sp.over);
+    if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
+
+    // « Autres itinéraires » : seulement à l'arrêt (sous 5 km/h pendant 3 s).
+    s.park = parkedState(s.park, view.speedKmh, Date.now());
+    ui.alt.setAttribute('aria-disabled', String(!s.park.parked));
+
+    renderAlerts(view);
+    renderAreas(view);
+    renderFacts(view);
+    layoutGuidance();
+    ctx.onView?.(view);
+    ctx.onPosition?.(view.position);
+
+    // Partie parcourue en gris : seulement en roulant, tous les 25 m (jamais de dessin à l'arrêt).
+    if (view.onRoute && traveledUpdate(s.doneAlong, view.along, view.speedKmh)) {
+      s.doneAlong = view.along;
+      ctx.map.showTraveled(traveledCoords(s.state.route.line, view.along));
+    }
+
+    // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
+    ctx.map.navigateTo({
+      lonlat: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch,
+      follow: s.follow, padding: cameraPadding(), speedKmh: view.speedKmh, northUp: s.northUp,
+    });
   }
 
   /** Encart « Prochaines aires » : 3 lignes (nom, distance, heure d'arrivée, places PL), une ligne = un bouton. */
@@ -249,74 +500,6 @@ export function createNavigation(ctx) {
     ui.areasEmpty.textContent = s.areasCount ? 'Plus d\'aire sur la suite du trajet.' : 'Aucune aire trouvée sur ce trajet (ou recherche en cours).';
   }
 
-  function render(view) {
-    if (view.arrived) {
-      setIcon({ kind: 'goal' });
-      ui.dist.textContent = '';
-      setInstruction('Destination atteinte');
-      ui.then.hidden = true;
-      ui.stop.textContent = '✔ Terminer';
-    } else if (view.maneuver) {
-      setIcon(view.maneuver.icon);
-      setStat(ui.dist, formatNavDistance(view.maneuver.distance));
-      setInstruction(view.maneuver.text);
-      if (view.then) {
-        ui.then.textContent = `Puis : ${view.then.text}`;
-        ui.then.hidden = false;
-      } else {
-        ui.then.hidden = true;
-      }
-    } else {
-      setIcon({ kind: 'arrow', angle: 0 });
-      ui.dist.textContent = '';
-      setInstruction('Suivez l\'itinéraire');
-      ui.then.hidden = true;
-    }
-    setStat(ui.remaining, formatDistance(view.remainingDistance));
-    setStat(ui.time, formatDuration(view.remainingDuration));
-    setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
-    setStat(ui.speed, formatSpeed(view.speedKmh));
-    if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
-    renderAlert(view);
-
-    // Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche (textes du moteur).
-    // Phase 5c : frontière proche (pays, vitesse PL, interdictions confirmées), une ligne.
-    const rules = [view.rules?.border?.text, view.rules?.tunnel?.text, view.rules?.access?.text, view.rules?.zfe?.text, view.rules?.ban?.text, view.rules?.wind?.text].filter(Boolean);
-    if (ui.rule.dataset.text !== rules.join('\n')) {
-      ui.rule.dataset.text = rules.join('\n');
-      ui.rule.replaceChildren(...rules.map((t) => {
-        const line = document.createElement('span');
-        line.textContent = t;
-        return line;
-      }));
-    }
-    ui.rule.hidden = !rules.length;
-    renderDriving(view.driving);
-
-    if (ui.road.textContent !== (view.roadName ?? '')) ui.road.textContent = view.roadName ?? '';
-    ui.road.hidden = !view.roadName;
-    renderAreas(view);
-    layoutFoot();
-    ctx.onView?.(view);
-
-    // Flèche (et caméra si elle suit) animées jusqu'à la nouvelle position (src/ui/map.js).
-    ctx.map.navigateTo({
-      lonlat: view.position, bearing: view.bearing, zoom: view.zoom, pitch: view.pitch,
-      follow: s.follow, padding: cameraPadding(), speedKmh: view.speedKmh,
-    });
-  }
-
-  /** Temps de conduite : deux lignes (pause, journée), couleur selon l'urgence, bouton « travail » à l'arrêt. */
-  function renderDriving(d) {
-    ui.drive.hidden = !d;
-    if (!d) return;
-    if (ui.driveMain.textContent !== d.main) ui.driveMain.textContent = d.main;
-    if (ui.driveDetail.textContent !== d.detail) ui.driveDetail.textContent = d.detail;
-    ui.drive.dataset.level = d.level;
-    ui.work.hidden = !d.canMarkWork;
-    if (ui.work.textContent !== d.workLabel) ui.work.textContent = d.workLabel;
-  }
-
   function saveDriving(force = false) {
     if (!s?.state?.driving || s.sim) return;
     const now = Date.now();
@@ -350,9 +533,15 @@ export function createNavigation(ctx) {
     saveDriving();
   }
 
+  /** Alertes redessinées hors d'une position (recalcul, signal perdu) : pas de mouvement de carte. */
+  function refreshAlerts(view) {
+    renderAlerts(view);
+    layoutGuidance();
+  }
+
   async function reroute(from) {
     const session = s;
-    renderAlert(s.view);
+    refreshAlerts(s.view);
     try {
       // Mêmes réglages que l'itinéraire choisi à l'arrêt (plus court, sans péage…) : rien à choisir en roulant.
       const route = await fetchRoute({
@@ -365,7 +554,9 @@ export function createNavigation(ctx) {
       const done = rerouteDone(s.state, route);
       s.state = done.state;
       s.error = '';
+      s.doneAlong = null;
       ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
+      ctx.map.showTraveled([]);
       // Simulation : le nouvel itinéraire part d'une fausse position, il ne remplace pas l'itinéraire réel.
       if (s.sim) s.sim.setRoute(route.coordinates);
       else ctx.onRouteChange?.(route);
@@ -377,7 +568,7 @@ export function createNavigation(ctx) {
       s.error = err?.message || 'erreur inattendue.';
       handle(f.events);
     }
-    if (s === session && s.view) renderAlert({ ...s.view, rerouting: s.state.rerouting, rerouteBlocked: s.state.rerouteBlocked });
+    if (s === session && s.view) refreshAlerts({ ...s.view, rerouting: s.state.rerouting, rerouteBlocked: s.state.rerouteBlocked });
   }
 
   function onGeoError(err) {
@@ -393,13 +584,20 @@ export function createNavigation(ctx) {
     const lost = !s.sim && gpsLost(s.state, Date.now());
     if (lost !== s.gpsLost) {
       s.gpsLost = lost;
-      renderAlert(s.view);
+      refreshAlerts(s.view);
     }
   }
 
+  // ───────── Boutons ─────────
+
   function renderFollow() {
     ui.recenter.setAttribute('aria-pressed', String(!!s?.follow));
+    ui.recenter.hidden = !s || s.follow; // n'apparaît que si la carte a été déplacée
     ui.overview.setAttribute('aria-pressed', String(!!s?.overview));
+    ui.compass.setAttribute('aria-pressed', String(!!s?.northUp));
+    ui.compass.setAttribute('aria-label', s?.northUp ? 'Cap en haut' : 'Nord en haut');
+    renderRoad();
+    layoutGuidance();
   }
 
   function recenter() {
@@ -427,25 +625,33 @@ export function createNavigation(ctx) {
     s.follow = false;
     s.overview = true;
     renderFollow();
-    const h = root.clientHeight || window.innerHeight;
-    const top = Math.min(Math.round(h * 0.35), ($('.nav-top')?.offsetHeight ?? 0) + 20);
-    const bottom = Math.min(Math.round(h * 0.45), (ui.foot?.offsetHeight ?? 0) + 20);
-    const side = Math.min(80, Math.round((root.clientWidth || window.innerWidth) * 0.12));
-    ctx.map.overview(overviewBbox(s.state), { top, bottom, left: side, right: side + 40 });
+    const { width, height } = size();
+    const r = root.getBoundingClientRect();
+    const land = isLandscape({ width, height });
+    const topBox = ui.top.getBoundingClientRect();
+    const top = land ? 20 : Math.min(Math.round(height * 0.35), Math.round(topBox.bottom - r.top) + 20);
+    const bottom = land ? 20 : Math.min(Math.round(height * 0.45), ui.bottom.offsetHeight + 20);
+    const left = land ? Math.round(width * LANDSCAPE_COLUMN) + 20 : Math.min(60, Math.round(width * 0.1));
+    const right = ui.mapbtns.offsetWidth + 2 * INSET;
+    ctx.map.overview(overviewBbox(s.state), { top, bottom, left, right });
     scheduleRecenter();
+  }
+
+  function toast(text) {
+    if (!s) return;
+    ui.toast.textContent = text;
+    ui.toast.hidden = false;
+    clearTimeout(s.toastTimer);
+    s.toastTimer = setTimeout(() => { ui.toast.hidden = true; renderRoad(); }, TOAST_MS);
+    layoutGuidance();
   }
 
   function renderLayer() {
     const b = guidanceLayerButton(s?.layer);
     const outside = s?.layer === 'satellite' && !!s.layerMessage;
-    const [icon, ...words] = (outside ? '🛰 France seulement' : b.text).split(' ');
-    const i = document.createElement('span');
-    i.setAttribute('aria-hidden', 'true');
-    i.textContent = icon;
-    const t = document.createElement('span');
-    t.className = 'nav-mapbtn-text';
-    t.textContent = words.join(' ');
-    ui.layer.replaceChildren(i, t);
+    const text = document.createElement('span');
+    text.textContent = outside ? 'France seulement' : b.text.split(' ').slice(1).join(' ');
+    ui.layer.replaceChildren(symbolSvg(b.next === 'satellite' ? 'satellite' : 'plan'), text);
     ui.layer.setAttribute('aria-label', outside ? `${s.layerMessage}. Passer en plan` : b.label);
   }
 
@@ -455,6 +661,39 @@ export function createNavigation(ctx) {
     s.layer = guidanceLayerButton(s.layer).next;
     ctx.map.setLayer(s.layer);
     renderLayer();
+  }
+
+  /** Loupe : rangée de catégories à une touche le long du trajet, fermée seule au bout de 8 s. */
+  function setSearch(open) {
+    if (!s) return;
+    s.searchOpen = open;
+    ui.search.hidden = !open;
+    ui.searchBtn.setAttribute('aria-expanded', String(open));
+    clearTimeout(s.searchTimer);
+    if (open) {
+      s.searchTimer = setTimeout(() => setSearch(false), AUTO_CLOSE_MS);
+      ui.toast.hidden = true; // message bref effacé : la rangée prend sa place
+      renderRoad();
+    }
+    layoutGuidance();
+  }
+
+  function setDetails(open) {
+    if (!s) return;
+    s.detailsOpen = open;
+    ui.details.hidden = !open;
+    ui.sheet.setAttribute('aria-expanded', String(open));
+    layoutGuidance();
+  }
+
+  function setConfirm(open) {
+    if (!s) return;
+    ui.confirm.hidden = !open;
+    clearTimeout(s.confirmTimer);
+    if (open) {
+      s.confirmTimer = setTimeout(() => setConfirm(false), AUTO_CLOSE_MS);
+      ui.keep.focus();
+    }
   }
 
   ctx.map.onUserGesture(() => {
@@ -484,36 +723,51 @@ export function createNavigation(ctx) {
       }),
       drivingSavedAt: now,
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0, areasShown: null,
-      params, vehicle, view: null, follow: true, overview: false, error: '', gpsLost: false,
-      layer: GUIDANCE_START_LAYER, layerMessage: '',
+      params, vehicle, view: null, follow: true, overview: false, northUp: false, error: '', gpsLost: false,
+      layer: GUIDANCE_START_LAYER, layerMessage: '', park: null, doneAlong: null,
+      tollDistance: typeof route.tollDistance === 'number' ? route.tollDistance : undefined,
+      searchOpen: false, detailsOpen: false,
       sim: simulate ? createSimulator(route.coordinates, { speedKmh: simulate.speedKmh }) : null,
       watchId: null, simTimer: null, signalTimer: null, recenterTimer: null, releaseTimer: null,
+      searchTimer: null, confirmTimer: null, toastTimer: null,
     };
     app.classList.add('navigating');
     root.hidden = false;
     ui.sim.hidden = !s.sim;
-    renderFollow();
     ui.road.hidden = true;
+    ui.search.hidden = true;
+    ui.details.hidden = true;
+    ui.confirm.hidden = true;
+    ui.toast.hidden = true;
+    ui.sheet.setAttribute('aria-expanded', 'false');
+    ui.searchBtn.setAttribute('aria-expanded', 'false');
+    ui.alt.setAttribute('aria-disabled', 'true');
+    ui.stop.setAttribute('aria-label', 'Quitter le guidage');
+    ui.areasBtn.replaceChildren(symbolSvg('parking'), Object.assign(document.createElement('span'), { textContent: 'Aires PL' }));
+    renderFollow();
     renderAreas(null);
-    requestAnimationFrame(() => layoutFoot());
     ctx.map.setLayer(s.layer);
     renderLayer();
-    ui.stop.textContent = '■ Arrêter';
-    ui.then.hidden = true;
+    renderThen(null);
     ui.alert.hidden = true;
     ui.rule.hidden = true;
     ui.drive.hidden = true;
     ui.work.hidden = true;
     ui.reroute.hidden = true;
+    ui.more.hidden = true;
+    ui.limit.hidden = true;
+    ui.speedo.classList.remove('over');
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';
     setInstruction(s.sim ? 'Simulation…' : 'Recherche du signal GPS…');
     for (const n of [ui.remaining, ui.time, ui.eta, ui.speed]) n.textContent = '—';
+    renderFacts(null);
     renderVoice();
     ctx.map.setNavigating(true);
     ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
     ctx.voice.speak(s.sim ? 'Simulation du trajet.' : 'Guidage démarré.', { interrupt: true });
     ctx.wakeLock.enable();
+    requestAnimationFrame(() => layoutGuidance());
 
     if (s.sim) {
       ui.simSpeed.textContent = `${s.sim.speedKmh} km/h`;
@@ -543,21 +797,28 @@ export function createNavigation(ctx) {
     if (session.watchId !== null) navigator.geolocation.clearWatch(session.watchId);
     clearInterval(session.simTimer);
     clearInterval(session.signalTimer);
-    clearTimeout(session.recenterTimer);
-    clearTimeout(session.releaseTimer);
+    for (const t of ['recenterTimer', 'releaseTimer', 'searchTimer', 'confirmTimer', 'toastTimer']) clearTimeout(session[t]);
     ctx.voice.cancel();
     ctx.wakeLock.disable();
     root.hidden = true;
+    root.classList.remove('nav-tight', 'land', 'sheet-open');
     app.classList.remove('navigating');
     ctx.map.setNavigating(false);
     ctx.onEnd?.(message);
   }
 
-  window.addEventListener('resize', () => layoutFoot());
+  window.addEventListener('resize', () => layoutGuidance());
   // Appli mise en arrière-plan ou fermée : le décompte de conduite est enregistré tout de suite.
   window.addEventListener('pagehide', () => saveDriving(true));
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveDriving(true); });
-  ui.stop.addEventListener('click', () => stop());
+  // ✕ : confirmation (deux gros boutons) ; à l'arrivée, fin directe.
+  ui.stop.addEventListener('click', () => {
+    if (!s) return;
+    if (s.view?.arrived) stop();
+    else setConfirm(true);
+  });
+  ui.quit.addEventListener('click', () => stop());
+  ui.keep.addEventListener('click', () => setConfirm(false));
   ui.reroute.addEventListener('click', () => {
     if (!s) return;
     const r = requestReroute(s.state, Date.now());
@@ -572,20 +833,25 @@ export function createNavigation(ctx) {
     if (!r.driving) return;
     s.state = r.state;
     if (s.view) s.view = { ...s.view, driving: r.driving };
-    renderDriving(r.driving);
-    layoutFoot();
+    refreshAlerts(s.view);
     saveDriving(true);
+  });
+  ui.compass.addEventListener('click', () => {
+    if (!s) return;
+    s.northUp = !s.northUp;
+    renderFollow();
+    if (s.view && s.follow) render(s.view);
   });
   ui.recenter.addEventListener('click', recenter);
   ui.overview.addEventListener('click', overview);
-  ui.layer.addEventListener('click', toggleLayer);
+  ui.searchBtn.addEventListener('click', () => setSearch(!s?.searchOpen));
+  ui.layer.addEventListener('click', () => { toggleLayer(); setSearch(false); });
   ui.areasBtn.addEventListener('click', () => {
     if (!s) return;
     s.areasOpen = !s.areasOpen;
     s.areasShown = null; // encart ouvert : lignes à jour
     renderAreas(s.view);
-    layoutFoot();
-    if (s.view && s.follow) render(s.view); // caméra recadrée au-dessus de l'encart
+    setSearch(false);
   });
   ui.areasList.addEventListener('click', (e) => {
     const b = e.target.closest('.nav-area');
@@ -597,6 +863,29 @@ export function createNavigation(ctx) {
     ctx.onVoiceToggle?.(on);
     renderVoice();
     if (on) ctx.voice.speak('Voix activée.', { interrupt: true });
+  });
+  // Autres itinéraires (Bloc 2) : à l'arrêt seulement ; pour l'instant, vue d'ensemble du trajet.
+  ui.alt.addEventListener('click', () => {
+    if (!s) return;
+    if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
+    overview();
+    toast('Autres itinéraires : bientôt');
+  });
+  ui.more.addEventListener('click', () => setDetails(true));
+  // Panneau du bas : toucher la poignée l'ouvre ou le ferme ; la tirer vers le haut l'ouvre, vers le bas le ferme.
+  let drag = null;
+  ui.sheet.addEventListener('pointerdown', (e) => { drag = { y: e.clientY, moved: false }; });
+  ui.sheet.addEventListener('pointermove', (e) => {
+    if (!drag || drag.moved || !s) return;
+    const dy = e.clientY - drag.y;
+    if (Math.abs(dy) < DRAG_PX) return;
+    drag.moved = true;
+    setDetails(dy < 0);
+  });
+  ui.sheet.addEventListener('pointerup', () => { setTimeout(() => { drag = null; }, 0); });
+  ui.sheet.addEventListener('click', () => {
+    if (drag?.moved) return;
+    setDetails(!s?.detailsOpen);
   });
   ui.simOffroad.addEventListener('click', () => {
     if (s?.sim?.leaveRoad()) ui.simOffroad.disabled = true;
@@ -654,6 +943,7 @@ export function createNavigation(ctx) {
     /** État du verrou d'écran (appelé par wake-lock.js). */
     setScreenStatus(active) {
       ui.screen.hidden = active || !s || (s.view?.arrived ?? false);
+      layoutGuidance();
     },
   };
 }

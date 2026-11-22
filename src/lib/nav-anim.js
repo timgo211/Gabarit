@@ -59,17 +59,17 @@ export function samePadding(a, b) {
 }
 
 /**
- * Camion arrêté (moins de 3 km/h), position à moins de 100 m de celle dessinée, même suivi et mêmes marges de
- * caméra : rien à redessiner (la dérive du GPS ne bouge ni la flèche ni la carte).
+ * Camion arrêté (moins de 3 km/h), position à moins de 100 m de celle dessinée, même suivi, même orientation (nord
+ * en haut ou cap en haut, phase 2c) et mêmes marges de caméra : rien à redessiner (la dérive du GPS ne bouge ni la flèche ni la carte).
  * @param {{ lonlat:number[], follow?:boolean, padding?:object }|null} drawn dernière position dessinée
- * @param {{ follow?:boolean, padding?:object }} next
+ * @param {{ follow?:boolean, northUp?:boolean, padding?:object }} next
  * @param {number} distanceM distance entre la position dessinée et la nouvelle
  * @param {number|null} speedKmh
  */
 export function holdStill(drawn, next, distanceM, speedKmh) {
   return !!drawn?.lonlat && Number.isFinite(speedKmh) && speedKmh < ANIM.STILL_KMH
     && Number.isFinite(distanceM) && distanceM < ANIM.HOLD_M
-    && !!drawn.follow === !!next.follow && samePadding(drawn.padding, next.padding);
+    && !!drawn.follow === !!next.follow && !!drawn.northUp === !!next.northUp && samePadding(drawn.padding, next.padding);
 }
 
 /**

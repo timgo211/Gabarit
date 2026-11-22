@@ -132,6 +132,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   arrivée en vert ; fond de carte OpenFreeMap recoloré au chargement (`src/lib/map-palette.js`), tracé ambre bordé de
   noir ; logo et écran de chargement Android noir et ambre. Couleurs réglementaires inchangées (ZFE, panneaux, aires).
 
+- [x] **Phase 2c — Interface de guidage façon Google Maps (jour, nuit, satellite)** (seule, après la 2c-a)
+  Disposition et proportions de l'écran de guidage de Google Maps sur Android, sans logo, marque ni icône de Google
+  (icônes maison et Material Symbols, Apache 2.0, embarquées), aux couleurs de la 2c-a. Bandeau de manœuvre arrondi
+  (flèche, distance, badge de route D/N/A/E aux couleurs des cartouches et nom de rue), « Puis » et 2 alertes au plus
+  dessous (« +N » pour les autres) ; véhicule à 78 % de la hauteur, flèche sur halo, tracé épais et partie parcourue
+  en gris, pastille de la rue en cours, noms des rues en bulles ; colonne de boutons ronds (boussole, recentrer, loupe
+  = catégories à une touche sans saisie, son, autres itinéraires à l'arrêt seulement, place du signalement) ;
+  compteur de vitesse (panneau de limitation seulement si la limite PL est connue) ; panneau du bas (temps restant,
+  km et heure d'arrivée, ✕ avec confirmation, vue d'ensemble, détails du trajet en tirant la poignée). Paysage :
+  colonne à gauche. Nuit : interface sombre, photos IGN assombries, mode auto au lever / coucher du soleil à la
+  position (calcul NOAA), bascule sans éclair blanc. Phase d'interface : voix, recalcul et alertes inchangés.
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

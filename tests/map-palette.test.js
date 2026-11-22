@@ -2,8 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { fixture } from './helpers.js';
-import { MAP_PALETTE, ROUTE_WIDTH, layerRole, mapPaintPatches, recolorStyle } from '../src/lib/map-palette.js';
-import { contrastRatio } from '../src/lib/contrast.js';
+import {
+  MAP_PALETTE, ROUTE_WIDTH, ROUTE_WIDTH_NAV, layerRole, mapPaintPatches, recolorStyle, streetLabelLayers, streetBubblePatches,
+  STREET_BUBBLE, satellitePaint, photoLabelPatches, PHOTO_NIGHT_LABEL,
+} from '../src/lib/map-palette.js';
+import { contrastRatio, AA_TEXT } from '../src/lib/contrast.js';
 
 const liberty = fixture('style-liberty-layers.json').layers;
 const dark = fixture('style-dark-layers.json').layers;
@@ -90,4 +93,37 @@ test('tracé : bord sombre de 2 px de chaque côté, à tous les zooms (largeurs
   assert.equal((ROUTE_WIDTH.casing - ROUTE_WIDTH.line) / 2, 2);
   assert.equal((ROUTE_WIDTH.altCasing - ROUTE_WIDTH.altLine) / 2, 2);
   for (const v of Object.values(ROUTE_WIDTH)) assert.equal(typeof v, 'number');
+});
+
+test('guidage : tracé épais, même bord de 2 px', () => {
+  assert.equal((ROUTE_WIDTH_NAV.casing - ROUTE_WIDTH_NAV.line) / 2, 2);
+  assert.equal((ROUTE_WIDTH_NAV.doneCasing - ROUTE_WIDTH_NAV.done) / 2, 2);
+  assert.ok(ROUTE_WIDTH_NAV.line > ROUTE_WIDTH.line);
+});
+
+test('bulles des noms de rues en guidage, réglages d\'origine ensuite', () => {
+  const layers = liberty;
+  const streets = streetLabelLayers(layers).map((l) => l.id);
+  assert.ok(streets.includes('highway-name-minor') && streets.includes('highway-name-major'));
+  assert.ok(!streets.some((id) => /shield/.test(id)));
+  const on = streetBubblePatches(layers, 'night', true);
+  const minor = on.filter((p) => p.id === 'highway-name-minor');
+  assert.equal(minor.find((p) => p.prop === 'icon-image').value, STREET_BUBBLE.image);
+  assert.equal(minor.find((p) => p.prop === 'icon-text-fit').value, 'both');
+  assert.equal(minor.find((p) => p.prop === 'text-color').value, STREET_BUBBLE.night.text);
+  const off = streetBubblePatches([{ id: 'n', type: 'symbol', 'source-layer': 'transportation_name', layout: { 'symbol-placement': 'line' } }], 'day', false);
+  assert.equal(off.find((p) => p.prop === 'symbol-placement').value, 'line');
+  assert.equal(off.find((p) => p.prop === 'icon-text-fit').value, undefined, 'valeur par défaut de MapLibre');
+  assert.ok(!off.some((p) => p.kind === 'paint'));
+  for (const t of ['day', 'night']) assert.ok(contrastRatio(STREET_BUBBLE[t].text, STREET_BUBBLE[t].fill) >= AA_TEXT, t);
+});
+
+test('satellite la nuit : photos assombries, libellés clairs', () => {
+  assert.deepEqual(satellitePaint('night'), { 'raster-brightness-max': 0.6 });
+  assert.deepEqual(satellitePaint('day'), { 'raster-brightness-max': 1 });
+  const layers = [{ id: 'place', type: 'symbol', paint: {} }, { id: 'road', type: 'line', 'source-layer': 'transportation' }];
+  assert.deepEqual(photoLabelPatches(layers, 'night', true), [
+    { id: 'place', prop: 'text-color', value: PHOTO_NIGHT_LABEL.text }, { id: 'place', prop: 'text-halo-color', value: PHOTO_NIGHT_LABEL.halo }]);
+  assert.equal(photoLabelPatches(layers, 'night', false)[0].value, MAP_PALETTE.night.label);
+  assert.ok(contrastRatio(PHOTO_NIGHT_LABEL.text, PHOTO_NIGHT_LABEL.halo) >= AA_TEXT);
 });

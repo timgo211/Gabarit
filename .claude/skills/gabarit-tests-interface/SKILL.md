@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette
+                                   #   | euro | tolls | failed | palette | guidage
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -25,7 +25,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v34 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v35 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -40,3 +40,13 @@ Mont-Blanc Euro 3 / Euro 6 / non précisé, profil rechargé, Fréjus Euro 4 « 
 « Normes Euro », 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé dans le tunnel à 360 et 1280 px : rien d'Euro
 dit ni affiché). Captures dans `tools/ui-shots/` (ignoré). Un comportement du guidage se vérifie avec le GPS émulé
 (`setGeo`, une position par seconde, vitesse fournie), pas seulement en simulation.
+Phase 2c (`guidage`) : téléphone 412×900, 900×412 et 760×360, tablette 800×1280 et 1280×800 ; jour, nuit (mode auto :
+la nuit tombe au premier point GPS, un 21 décembre à 17 h 40) et satellite de nuit ; GPS émulé avec 4 h 25 de conduite
+et rafales. Rien ne se chevauche (`footOverlaps` : bandeau et alertes, boutons ronds, pastille de rue, loupe, encart
+des aires, compteur, message, panneau du bas), boutons ronds ≥ 56 px, 2 alertes au plus, « Autres itinéraires » grisé
+en roulant et actif après 3 s à l'arrêt, boussole, Recentrer après un glissé, loupe sans saisie, détails et « +N »,
+✕ avec confirmation ; tracé épais, partie parcourue, bulles des rues, marqueur remis après le changement de style,
+voile sombre pendant la bascule, photos assombries (0,6), « la signalisation fait foi » visible.
+Aides du guidage : `navAreas` / `navLayer` (rangée de la loupe), `stopGuidance` (✕ puis « Quitter »), `showDriving` /
+`closeDetails` (temps de conduite dans les détails quand les deux places d'alerte sont prises). Le style de test
+`streets: true` ajoute une couche de noms de rues (tuiles refusées) pour vérifier les bulles.

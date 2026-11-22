@@ -17,14 +17,38 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
   France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
-- Pied du guidage (`layoutFoot`, `src/ui/navigation.js`) : boutons de carte et encart des aires ne recouvrent jamais
-  le bandeau ni la barre du bas. Le pied commence sous le bandeau quand ils se chevauchent en largeur (téléphone) ;
-  taille des boutons par `mapButtonSize` (56 tablette, 48 téléphone, plancher 44) ; encart à gauche de la colonne de
-  boutons, borné sous le bandeau, défilant ; paysage écran bas (≤ 500 px) : bandeau sur 52 % de la largeur, boutons
-  en grille 2 × 2 (icônes), encart à droite du bandeau. Vérifié par `node tools/ui-check.mjs foot` (360, 412 px,
-  760 × 360, 900 × 412, 1280 px, encart ouvert et fermé, consigne longue).
-- Boutons de carte en guidage (Vue d'ensemble, Recentrer, Plan/Satellite, Aires) : actifs à toutes les vitesses, un seul
-  appui, sans menu ni confirmation ; retour automatique au suivi après 15 s seulement en roulant. Vue d'ensemble :
+- Écran de guidage (phase 2c, façon GPS de téléphone, `src/ui/navigation.js` + décisions dans `src/lib/nav-layout.js`) :
+  bandeau de manœuvre en haut (rayon 24 px, marges 12 px, noir jour et nuit : flèche, distance, badge de route
+  `roadLabel` de `src/lib/road-badge.js` + nom de rue, ou la consigne entière si elle donne une direction, `bannerText`),
+  « Puis » (≤ 200 m, `THEN_MAX_GAP_M`, comme la voix), 2 alertes au plus (`guidanceAlerts` : système, tunnel, ZFE, accès,
+  interdiction, conduite dépassée, frontière, vent, pause bientôt) et « +N » (≥ 56 px, ouvre les détails). Temps de
+  conduite : carte seulement « bientôt » / « dépassé » et s'il reste une place, sinon dans les détails.
+  Colonne de boutons ronds à droite (`buttonColumn` : 64 px, plancher 56, 45–85 % de la hauteur, remonte sous le
+  bandeau, deux colonnes en dernier recours) : boussole, Recentrer (seulement carte déplacée), loupe (rangée « Aires
+  PL », « Plan / Satellite », fermée seule après 8 s, aucune saisie), son, autres itinéraires (actif seulement à
+  l'arrêt, `parkedState` : < 5 km/h pendant 3 s ; pour l'instant vue d'ensemble + « bientôt »), place du signalement
+  (`.nav-slot`, phase 3). Compteur en bas à gauche (`speedStatus` ; panneau de limitation seulement si la limite PL
+  est connue). Panneau du bas : ✕ (confirmation Quitter / Continuer, sauf à l'arrivée), temps restant (--ok),
+  « km • heure » (--muted), vue d'ensemble ; poignée touchée ou tirée : détails en lecture seule. Paysage
+  (`isLandscape`) : bandeau et panneau du bas dans la colonne gauche (40 %). Écran bas : `nav-tight`, mesuré après
+  chaque changement (le panneau du bas rétrécit aussi). `layoutGuidance` place tout (rien ne se chevauche), jamais
+  la caméra. Vérifié par `node tools/ui-check.mjs guidage` (et `foot`, `drive`, `long`).
+- Caméra du guidage : `followPadding` ne dépend que de la taille de l'écran (véhicule à 78 % de la hauteur en
+  portrait, 75 % et à droite de la colonne en paysage) : une alerte ou le compteur qui change à l'arrêt ne redessine
+  jamais la carte (`parked`). Boussole : `navigateTo({ northUp })`, comparé par `holdStill`.
+- Carte en guidage : tracé épais `ROUTE_WIDTH_NAV` (bord 2 px), partie parcourue grise (source `route-done`, mise à jour
+  par `traveledUpdate` : en roulant, tous les 25 m), noms des rues en bulles (`streetBubblePatches`, image
+  `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` 0,6 la nuit
+  et libellés clairs (`photoLabelPatches`). Réglages du style appliqués par `applyGuidanceStyle` (chargement de
+  style, thème, entrée / sortie du guidage), jamais à chaque position. Repère : `src/ui/vehicle-icon.js` (registre
+  d'icônes, flèche seule pour l'instant). Pictogrammes des boutons : `src/ui/nav-symbols.js` (Material Symbols,
+  Apache 2.0, recopiés ; crédit dans Réglages).
+- Thème auto (phase 2c) : nuit entre coucher et lever du soleil à la dernière position (`src/lib/sun.js`, NOAA) ;
+  sans position, 20 h – 7 h ; position du guidage reprise au plus toutes les 5 min (`THEME_RECHECK_NAV_MS`) ; choix
+  manuel prioritaire. Changement de style : voile `.map-veil` de la couleur `--bg` du nouveau thème (fondu 150 ms,
+  retiré au premier `idle`, 1,5 s au plus), jamais de blanc.
+- Boutons de carte en guidage (vue d'ensemble, recentrer, boussole, loupe, Plan / Satellite, son) : actifs à toutes
+  les vitesses, sans saisie ; retour automatique au suivi après 15 s seulement en roulant. Vue d'ensemble :
   marge de la carte remise à zéro et `overviewPadding` (MapLibre additionne la marge du suivi à celle de fitBounds et
   abandonne le cadrage s'il ne tient pas). data.geopf.fr est bloqué
   depuis le conteneur : GetCapabilities lu via xyzservices / iTowns / osmlab editor-layer-index sur GitHub.

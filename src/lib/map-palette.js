@@ -18,6 +18,8 @@ export const MAP_PALETTE = Object.freeze({
 
 /** Largeurs (px) du tracé choisi : le bord sombre dépasse de 2 px de chaque côté, à tous les zooms. */
 export const ROUTE_WIDTH = Object.freeze({ line: 7, casing: 11, altLine: 5, altCasing: 9 });
+/** Guidage (phase 2c) : tracé épais, même bord de 2 px ; partie parcourue (grise) de la même largeur. */
+export const ROUTE_WIDTH_NAV = Object.freeze({ line: 12, casing: 16, done: 12, doneCasing: 16 });
 
 const WATER = /^(water|waterway|water_polygons|water_lines|ocean)$/;
 const PARK = /park|wood|forest|grass|meadow|wetland|scrub|pitch|cemetery|garden|golf|farmland|orchard|vineyard|heath/;
@@ -95,4 +97,75 @@ export function recolorStyle(style, theme, keep = []) {
     ...style,
     layers: style.layers.map((l) => (byId.has(l.id) ? { ...l, paint: { ...(l.paint ?? {}), ...byId.get(l.id) } } : l)),
   };
+}
+
+// ───────── Guidage (phase 2c) ─────────
+
+/**
+ * Bulles des noms de rues pendant le guidage : petites étiquettes arrondies, à plat face à l'écran, au milieu de
+ * chaque tronçon. Couleurs de la palette (crème bordé de gris le jour, presque noir bordé de gris la nuit).
+ */
+export const STREET_BUBBLE = Object.freeze({
+  image: 'gabarit-bubble',
+  day: Object.freeze({ fill: '#FAF8F3', border: '#7E7A70', text: '#14161C' }),
+  night: Object.freeze({ fill: '#1C1F28', border: '#6B6E78', text: '#EDEAE3' }),
+});
+const STREET_SOURCES = /^(transportation_name|street_labels)$/;
+
+/** Couches de noms de rues du fond (OpenMapTiles ou Shortbread), sans les cartouches de références. */
+export function streetLabelLayers(layers) {
+  return (Array.isArray(layers) ? layers : []).filter((l) => l?.type === 'symbol'
+    && STREET_SOURCES.test(String(l['source-layer'] ?? '')) && !/shield|ref/.test(String(l.id).toLowerCase()));
+}
+
+/**
+ * Réglages des noms de rues : bulles en guidage (`on`), réglages d'origine du style sinon.
+ * @returns {{ id:string, kind:'layout'|'paint', prop:string, value:any }[]}
+ */
+export function streetBubblePatches(layers, theme, on) {
+  const c = STREET_BUBBLE[theme === 'night' ? 'night' : 'day'];
+  const out = [];
+  for (const l of streetLabelLayers(layers)) {
+    const lay = l.layout ?? {};
+    // Réglage d'origine, ou undefined : MapLibre remet alors la valeur par défaut.
+    const orig = (p) => lay[p];
+    const layout = on ? {
+      'symbol-placement': 'line-center', 'icon-image': STREET_BUBBLE.image, 'icon-text-fit': 'both',
+      'icon-text-fit-padding': [3, 8, 3, 8], 'icon-rotation-alignment': 'viewport', 'text-rotation-alignment': 'viewport',
+      'icon-pitch-alignment': 'viewport', 'text-pitch-alignment': 'viewport',
+    } : {
+      'symbol-placement': orig('symbol-placement'), 'icon-image': orig('icon-image'),
+      'icon-text-fit': orig('icon-text-fit'), 'icon-text-fit-padding': orig('icon-text-fit-padding'),
+      'icon-rotation-alignment': orig('icon-rotation-alignment'), 'text-rotation-alignment': orig('text-rotation-alignment'),
+      'icon-pitch-alignment': orig('icon-pitch-alignment'), 'text-pitch-alignment': orig('text-pitch-alignment'),
+    };
+    for (const [prop, value] of Object.entries(layout)) out.push({ id: l.id, kind: 'layout', prop, value });
+    if (on) {
+      out.push({ id: l.id, kind: 'paint', prop: 'text-color', value: c.text });
+      out.push({ id: l.id, kind: 'paint', prop: 'text-halo-width', value: 0 });
+    }
+  }
+  return out;
+}
+
+/** Photos IGN la nuit : même image, assombrie (pas d'éblouissement). */
+export function satellitePaint(theme) {
+  return { 'raster-brightness-max': theme === 'night' ? 0.6 : 1 };
+}
+
+/** Libellés sur les photos la nuit : clairs, halo noir (lisibles sur l'image assombrie). */
+export const PHOTO_NIGHT_LABEL = Object.freeze({ text: '#EDEAE3', halo: '#14161C' });
+
+/** Couleurs des libellés selon les photos et le thème : [{ id, prop, value }] (le reste : mapPaintPatches). */
+export function photoLabelPatches(layers, theme, photos, keep = []) {
+  const skip = new Set(keep);
+  const pal = MAP_PALETTE[theme === 'night' ? 'night' : 'day'];
+  const night = photos && theme === 'night';
+  const out = [];
+  for (const l of Array.isArray(layers) ? layers : []) {
+    if (!l || skip.has(l.id) || layerRole(l) !== 'label') continue;
+    out.push({ id: l.id, prop: 'text-color', value: night ? PHOTO_NIGHT_LABEL.text : pal.label });
+    out.push({ id: l.id, prop: 'text-halo-color', value: night ? PHOTO_NIGHT_LABEL.halo : pal.halo });
+  }
+  return out;
 }

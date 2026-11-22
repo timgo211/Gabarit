@@ -260,7 +260,8 @@ export function deltaText(route, reference) {
   return `${formatDurationDelta(route.duration - reference.duration)}, ${formatDistanceDelta(route.distance - reference.distance)}`;
 }
 
-function tollText(m) {
+/** Kilomètres à péage (« 0 km » sous le seuil, « inconnu » si ORS ne dit rien). */
+export function tollText(m) {
   if (m === null || m === undefined) return 'inconnu';
   return m < ROUTE_OPTIONS.NO_TOLL_M ? '0 km' : formatDistance(m);
 }

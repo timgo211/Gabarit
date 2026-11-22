@@ -346,6 +346,9 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   --nav-rule-fg: #1a1200;
   --arrow-fill: #14161C;
   --arrow-stroke: #E8A93B;
+  /* Phase 2c : pastille de la rue en cours (noire texte crème le jour, ambre texte noir la nuit). */
+  --street-bg: #14161C;
+  --street-fg: #EDEAE3;
 }
 :root[data-theme="night"] {
   --nav-card: rgba(28, 31, 40, .96);
@@ -355,6 +358,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   --nav-alert-fg: #14161C;
   --nav-rule-bg: #ffb000;
   --nav-rule-fg: #0b0f14;
+  --street-bg: #E8A93B;
+  --street-fg: #14161C;
 }
 
 .btn-start { margin-top: 12px; }
@@ -369,152 +374,244 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .app.navigating .maplibregl-ctrl-top-right { display: none; }
 .app.navigating ~ .update-banner { display: none; }
 
-.nav { position: absolute; inset: 0; pointer-events: none; z-index: 10; }
+/* Phase 2c : disposition façon GPS de téléphone. Bandeau et alertes en haut, colonne de boutons ronds à droite
+   (--round, posé par src/ui/navigation.js), compteur en bas à gauche, panneau du bas. Positions posées par
+   layoutGuidance ; paysage (.land) : bandeau et panneau du bas dans une colonne à gauche (40 %). */
+.nav { position: absolute; inset: 0; pointer-events: none; z-index: 10; --round: 64px; --gap: 12px; --cols: 1; }
 .nav > * { pointer-events: auto; }
+.nav-round, .nav-chip, .nav-bottom, .nav-speed-pill, .nav-areas, .nav-more, .nav-drive, .nav-confirm, .nav-alert.info {
+  transition: background-color .3s, color .3s, border-color .3s;
+}
 .nav-top {
-  position: absolute; top: 10px; left: 10px; right: 10px; max-width: 620px;
-  display: grid; gap: 6px;
-  padding-top: env(safe-area-inset-top);
+  position: absolute; top: 12px; left: 12px; right: 12px; max-width: 720px;
+  display: grid; gap: 8px; align-content: start; padding-top: env(safe-area-inset-top);
 }
 .nav-maneuver {
-  display: flex; align-items: center; gap: 14px; padding: 10px 16px 10px 10px;
-  background: var(--nav-bg); color: var(--nav-fg); border-radius: var(--radius);
-  border: 1px solid var(--nav-sep); box-shadow: 0 6px 20px rgba(0,0,0,.35);
+  display: flex; align-items: center; gap: 14px; padding: 14px 18px 14px 12px; min-width: 0;
+  background: var(--nav-bg); color: var(--nav-fg); border-radius: 24px; box-shadow: 0 6px 20px rgba(0,0,0,.35);
 }
-.nav-icon { flex: 0 0 auto; width: 92px; height: 92px; color: var(--nav-accent); }
-.nav-icon svg { width: 100%; height: 100%; display: block; }
+.nav-icon { flex: 0 0 auto; width: 84px; height: 84px; color: var(--nav-accent); }
+.nav-icon svg, .nav-then svg { width: 100%; height: 100%; display: block; }
 .ico-stroke { fill: none; stroke: currentColor; stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
 .ico-fill { fill: currentColor; }
 .ico-text { fill: currentColor; font: 800 30px system-ui, sans-serif; }
-.nav-maneuver-text { min-width: 0; flex: 1 1 auto; }
-.nav-dist { font-size: 2.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nav-dist .unit { font-size: .6em; margin-left: .12em; }
-/* Consigne : 3 lignes au plus, coupée entre les mots (ou dans un mot très long), plus petite si elle est longue. */
+.nav-maneuver-text { min-width: 0; flex: 1 1 auto; display: grid; gap: 2px; }
+.nav-dist { font-size: 1.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nav-dist .unit { font-size: .7em; margin-left: .12em; }
+/* Rue (et badge) plus gros que la distance, sur deux lignes au besoin : coupée entre les mots seulement (pas de
+   césure), réduite par fitText() si un mot ne tient pas. Consigne sans nom de rue : en entier, plus petite. */
 .nav-instr {
-  font-size: 1.3rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+  font-size: 2rem; font-weight: 800; line-height: 1.15; min-width: 0;
+  overflow-wrap: normal; word-break: normal; hyphens: manual;
 }
-.nav-instr.long { font-size: 1.1rem; -webkit-line-clamp: 5; line-clamp: 5; }
-.nav-then { overflow-wrap: anywhere; max-width: 100%; }
-.nav-alert { overflow-wrap: anywhere; }
+.nav-instr.long { font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+.nav-badge {
+  display: inline-block; margin-right: .3em; padding: 0 .3em; border-radius: 6px; border: 2px solid var(--badge-border);
+  background: var(--badge-bg); color: var(--badge-fg); line-height: 1.15; white-space: nowrap; vertical-align: .04em;
+}
 .nav-then {
-  justify-self: start; padding: 8px 14px; border-radius: var(--radius);
-  background: var(--nav-card); color: var(--nav-card-fg); font-weight: 700; font-size: 1.05rem;
-  box-shadow: 0 4px 14px rgba(0,0,0,.35);
-}
-.nav-alert {
-  padding: 10px 14px; border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;
-  background: var(--nav-alert-bg); color: var(--nav-alert-fg); box-shadow: 0 4px 14px rgba(0,0,0,.35);
-}
-
-.nav-alert.info { background: var(--nav-card); color: var(--nav-card-fg); border: 2px solid var(--nav-accent); }
-/* Réglementation (phase 5) : ZFE interdite devant, interdiction PL proche ; une ligne par alerte, jamais coupée. */
-.nav-rule {
-  justify-self: start; max-width: 100%; min-width: 0; padding: 8px 14px; border-radius: var(--radius);
-  background: var(--nav-rule-bg); color: var(--nav-rule-fg); font-weight: 700; font-size: 1.05rem; line-height: 1.25;
+  justify-self: start; max-width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 14px 6px 8px;
+  border-radius: 16px; background: var(--nav-bg); color: var(--nav-fg); font-weight: 700; font-size: 1.05rem;
   box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow-wrap: anywhere;
 }
-.nav-rule span { display: block; }
-@media (max-width: 600px) { .nav-rule { font-size: .95rem; padding: 6px 10px; } }
-/* Temps de conduite (phase 5) : une ligne pause + une ligne journée ; orange 30 min avant une limite, rouge au-delà.
-   Bouton « Pas une pause (travail) » à droite, seulement à l'arrêt. */
+.nav-then-icon { flex: 0 0 auto; width: 36px; height: 36px; color: var(--nav-accent); }
+.nav-alerts-row { display: flex; align-items: flex-end; gap: 6px; min-width: 0; }
+.nav-alerts { flex: 1 1 auto; display: grid; gap: 6px; justify-items: start; min-width: 0; }
+.nav-alerts > * { max-width: 100%; min-width: 0; }
+.nav-alert {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 16px;
+  font-weight: 700; font-size: 1rem; line-height: 1.25; overflow-wrap: anywhere;
+  background: var(--nav-alert-bg); color: var(--nav-alert-fg); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+.nav-alert-text { min-width: 0; flex: 1 1 12em; }
+.nav-alert.info { background: var(--card); color: var(--fg); border: 2px solid var(--nav-accent); }
+.nav-reroute { min-height: 56px; font-size: 1.05rem; }
+/* Réglementation (phase 5) : une carte compacte par alerte, texte jamais coupé, sans bouton. */
+.nav-rule { display: grid; gap: 6px; justify-items: start; }
+.nav-rule > span {
+  display: block; max-width: 100%; padding: 8px 12px; border-radius: 16px; font-weight: 700; font-size: 1rem;
+  line-height: 1.25; overflow-wrap: anywhere; background: var(--nav-rule-bg); color: var(--nav-rule-fg);
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
+}
+/* Temps de conduite (phase 5) : carte seulement si la pause approche ou est dépassée ; sinon dans les détails. */
 .nav-drive {
-  justify-self: start; max-width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px;
-  padding: 6px 6px 6px 12px; border-radius: var(--radius); background: var(--nav-card); color: var(--nav-card-fg);
-  border: 2px solid var(--nav-card-sep); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 12px; border-radius: 16px;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 4px 14px rgba(0,0,0,.35);
 }
 .nav-drive[data-level="soon"] { border-color: var(--nav-rule-bg); }
 .nav-drive[data-level="over"] { background: var(--nav-alert-bg); color: var(--nav-alert-fg); border-color: var(--nav-alert-bg); }
 .nav-drive-text { min-width: 0; flex: 1 1 auto; display: grid; line-height: 1.2; overflow-wrap: anywhere; }
 .nav-drive-main { font-weight: 700; font-size: 1rem; }
 .nav-drive-detail { font-size: .88rem; opacity: .9; }
-.nav-work { flex: 0 0 auto; min-height: 48px; padding: 0 12px; font-size: .95rem; white-space: nowrap; }
-@media (max-width: 600px) {
-  .nav-drive { padding: 4px 4px 4px 8px; gap: 6px; }
-  .nav-drive-main { font-size: .9rem; }
-  .nav-drive-detail { font-size: .8rem; }
-  .nav-work { min-height: 44px; padding: 0 8px; font-size: .85rem; white-space: normal; max-width: 9.5em; }
+.nav-work { flex: 0 0 auto; min-height: 56px; padding: 0 12px; font-size: .95rem; white-space: normal; max-width: 11em; }
+.nav-drive-slot .nav-drive { box-shadow: none; }
+.nav-more {
+  flex: 0 0 auto; min-width: 56px; min-height: 56px; padding: 0 14px; border-radius: 28px; cursor: pointer;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); font: inherit; font-weight: 800;
+  box-shadow: 0 4px 14px rgba(0,0,0,.35);
 }
-/* Écran bas (posé par fitBanner, src/ui/navigation.js) : bandeau resserré pour ne jamais passer sous la barre du bas. */
-.nav-tight .nav-top { overflow-y: auto; gap: 4px; }
-.nav-tight .nav-then, .nav-tight .nav-drive-detail { display: none; }
-.nav-tight .nav-icon { width: 56px; height: 56px; }
-.nav-tight .nav-dist { font-size: 1.7rem; }
-.nav-tight .nav-instr, .nav-tight .nav-instr.long { font-size: .95rem; -webkit-line-clamp: 2; line-clamp: 2; }
-.nav-tight .nav-maneuver { padding: 4px 8px 4px 4px; }
-.nav-tight .nav-alert { font-size: .9rem; padding: 4px 10px; }
-.nav-tight .nav-rule { font-size: .85rem; padding: 4px 10px; }
-.nav-tight .nav-drive-main { font-size: .85rem; }
-.nav-tight .nav-work { min-height: 44px; }
-.nav-reroute { justify-self: start; min-height: 64px; font-size: 1.15rem; box-shadow: 0 4px 14px rgba(0,0,0,.35); }
 
-/* Bas de l'écran : boutons de carte (à droite), nom de la route, barre du bas. */
-.nav { --mapbtn: 56px; }
-/* Le haut du pied (top) est posé par src/ui/navigation.js (layoutFoot) : sous le bandeau quand ils se chevauchent en
-   largeur (téléphone), sinon en haut de l'écran. Le contenu est calé en bas ; rien ne monte sur le bandeau. */
-.nav-foot {
-  position: absolute; left: 10px; right: 10px; bottom: 10px; top: 10px;
-  display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 8px; pointer-events: none;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.nav-foot > * { pointer-events: auto; flex-shrink: 0; }
-/* Encart des aires (à gauche) et boutons de carte (colonne à droite), côte à côte. */
-.nav-foot > .nav-side {
-  width: 100%; min-height: 0; flex: 0 1 auto; display: flex; align-items: flex-end; gap: 8px; pointer-events: none;
-}
-.nav-side > * { pointer-events: auto; }
-.nav-mapbtns { margin-left: auto; flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
-.nav-mapbtn {
-  height: var(--mapbtn); min-height: var(--mapbtn); min-width: var(--mapbtn); padding: 0 14px; justify-content: flex-start;
-  background: var(--nav-card); color: var(--nav-card-fg); border-color: var(--nav-card-sep);
-  box-shadow: 0 2px 10px rgba(0,0,0,.35);
-}
-.nav-mapbtn > span[aria-hidden] { font-size: calc(var(--mapbtn) * .42); line-height: 1; }
-.nav-mapbtn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+/* Pastille de la rue en cours, juste au-dessus du véhicule (posée par layoutGuidance). */
 .nav-road {
-  max-width: 100%; padding: 6px 14px; border-radius: 999px; font-weight: 800; font-size: 1.1rem;
-  background: var(--nav-bg); color: var(--nav-fg); border: 1px solid var(--nav-sep);
-  box-shadow: 0 2px 10px rgba(0,0,0,.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  position: absolute; transform: translate(-50%, -100%); max-width: calc(100% - 2 * var(--round) - 48px);
+  padding: 6px 16px; border-radius: 999px; font-weight: 800; font-size: 1.05rem;
+  background: var(--street-bg); color: var(--street-fg); box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
 }
+
+/* Boutons ronds (colonne de droite et panneau du bas) : 64 px, 56 px au moins. */
+.nav-mapbtns {
+  position: absolute; right: 12px; top: 45%; display: grid; gap: var(--gap);
+  grid-template-columns: repeat(var(--cols), var(--round)); grid-auto-rows: var(--round); justify-content: end;
+}
+.nav-round {
+  width: var(--round); height: var(--round); min-width: 56px; min-height: 56px; padding: 0; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font: inherit;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.3);
+}
+.nav-round[hidden] { display: none; }
+.nav-round .sym { width: 52%; height: 52%; display: block; }
+.nav-round[aria-disabled="true"] { opacity: .45; }
+.nav-round:focus-visible, .nav-chip:focus-visible, .nav-summary:focus-visible, .nav-more:focus-visible {
+  outline: 3px solid var(--focus); outline-offset: 2px;
+}
+#btn-nav-compass[aria-pressed="true"], #btn-nav-overview[aria-pressed="true"] {
+  background: var(--primary); color: var(--primary-fg); border-color: var(--primary);
+}
+.nav-slot { width: var(--round); height: var(--round); visibility: hidden; }
+/* Loupe : rangée de catégories à une touche, à gauche de la colonne (aucune saisie). */
+.nav-search { position: absolute; z-index: 3; display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.nav-chip {
+  min-height: 56px; min-width: 56px; padding: 0 18px; border-radius: 28px; display: inline-flex; align-items: center;
+  gap: 8px; cursor: pointer; white-space: nowrap; font: inherit; font-weight: 700;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.3);
+}
+.nav-chip .sym { width: 28px; height: 28px; }
+.nav-chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+
+/* Compteur de vitesse (bas gauche) ; panneau de limitation seulement si la limite PL est connue. */
+.nav-speedo { position: absolute; left: 12px; bottom: 120px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+.nav-speed-pill {
+  min-width: 76px; height: 76px; padding: 0 12px; border-radius: 38px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; line-height: 1;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.3);
+}
+.nav-speed { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nav-speed-unit { font-size: .75rem; font-weight: 700; color: var(--muted); }
+.nav-speedo.over .nav-speed { color: var(--danger); }
+/* Panneau B14 (rond blanc à bord rouge, chiffres noirs) : couleurs réglementaires. */
+.nav-limit {
+  width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: #FFFFFF; border: 7px solid #C8102E; color: #000000; font-weight: 800; font-size: 1.4rem;
+}
+.nav-toast {
+  position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); margin: 0; max-width: min(90%, 420px);
+  padding: 10px 16px; border-radius: 16px; text-align: center; font-weight: 700;
+  background: var(--chrome-bg); color: var(--chrome-fg); box-shadow: 0 4px 14px rgba(0,0,0,.4); pointer-events: none;
+}
+
+/* Panneau du bas : coins hauts arrondis, temps restant au centre (poignée), ✕ et vue d'ensemble de chaque côté. */
 .nav-bottom {
-  width: 100%;
-  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
-  padding: 8px; border-radius: var(--radius);
-  background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 -2px 16px rgba(0,0,0,.35);
+  position: absolute; left: 0; right: 0; bottom: 0; display: grid; gap: 6px;
+  padding: 6px 12px 10px; padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: var(--card); color: var(--fg); border-radius: 24px 24px 0 0; box-shadow: 0 -2px 16px rgba(0,0,0,.3);
 }
-.nav-stats {
-  flex: 1 1 380px; min-width: 0; margin: 0;
-  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+.nav-sheet-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.nav-summary {
+  min-width: 0; min-height: 64px; padding: 2px 0 4px; display: grid; justify-items: center; gap: 2px; cursor: pointer;
+  background: none; border: 0; color: inherit; font: inherit; touch-action: none;
 }
-.nav-stats div { min-width: 0; padding: 2px 6px; }
-.nav-stats div + div { border-left: 1px solid var(--nav-card-sep); } /* traits fins entre Reste, Temps, Arrivée, Vitesse */
-.nav-stats dt { font-size: .75rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-/* Valeur + unité plus petite ; réduite encore par fitText() (src/ui/dom.js) si elle ne tient pas. */
-.nav-stats dd {
-  margin: 0; font-size: clamp(1.05rem, 5.4vw, 1.35rem); font-weight: 800; white-space: nowrap; overflow: hidden;
-  font-variant-numeric: tabular-nums; line-height: 1.2;
-}
-/* Temps restant et heure d'arrivée en vert (2c-a). */
-#nav-time, #nav-eta { color: var(--ok); }
-.nav-stats dd .unit { font-size: .68em; font-weight: 700; margin-left: .12em; }
-.nav-buttons { display: flex; gap: 8px; flex: 0 1 auto; margin-left: auto; }
-.nav-buttons .btn { min-height: 64px; font-size: 1.1rem; }
-.nav-screen { order: 3; flex: 1 1 100%; margin: 0; font-weight: 700; color: var(--warn); }
-.nav-sim { flex: 1 1 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nav-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--border); margin-bottom: 4px; }
+.nav-time { font-size: 1.9rem; font-weight: 800; color: var(--ok); line-height: 1.1; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nav-time .unit { font-size: .7em; margin-left: .1em; }
+.nav-sub { max-width: 100%; color: var(--muted); font-size: 1.05rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.nav-sub .unit { margin-left: .1em; }
+.nav-screen { margin: 0; font-weight: 700; font-size: .85rem; line-height: 1.2; color: var(--warn); text-align: center; }
+.nav-sim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nav-sim .btn { min-height: 56px; }
 .nav-sim-badge {
   padding: 4px 10px; border-radius: 999px; font-weight: 800; letter-spacing: .05em;
   background: var(--accent); color: var(--accent-fg);
 }
+.nav-details {
+  display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid var(--sep); max-height: 45dvh; overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.nav-details[hidden] { display: none; }
+.nav-more-list { display: grid; gap: 6px; }
+.nav-more-list:empty, .nav-drive-slot:empty { display: none; }
+.nav-more-list > span {
+  display: block; padding: 8px 12px; border-radius: 12px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere;
+  background: var(--nav-rule-bg); color: var(--nav-rule-fg);
+}
+.nav-more-list > span[data-level="danger"]:not([data-kind]) { background: var(--nav-alert-bg); color: var(--nav-alert-fg); }
+.nav-facts { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; }
+.nav-facts dt { color: var(--muted); font-weight: 600; }
+.nav-facts dd { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+/* Quitter le guidage : confirmation en deux gros boutons (aucune saisie). */
+.nav-confirm {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92%, 420px); z-index: 5;
+  padding: 18px; display: grid; gap: 14px; border-radius: 24px;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.nav-confirm[hidden] { display: none; }
+.nav-confirm-title { margin: 0; font-size: 1.3rem; font-weight: 800; text-align: center; }
+.nav-confirm-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.nav-confirm-buttons .btn { min-height: 64px; font-size: 1.15rem; }
 
-/* Repère du véhicule */
-.me-marker { width: 48px; height: 48px; }
+/* Paysage : colonne de gauche (40 %) pour le bandeau et le panneau du bas. */
+.nav.land .nav-top { right: auto; width: calc(40% - 24px); max-width: none; }
+.nav.land .nav-bottom { left: 12px; right: auto; bottom: 12px; width: calc(40% - 24px); border-radius: 24px; }
+/* Détails du trajet ouverts : le panneau du bas passe devant ; boutons, compteur et pastille de rue s'effacent. */
+.nav.sheet-open .nav-mapbtns, .nav.sheet-open .nav-speedo, .nav.sheet-open .nav-search, .nav.sheet-open .nav-areas { visibility: hidden; }
+.nav.sheet-open .nav-bottom { z-index: 2; max-height: calc(100% - 24px); overflow-y: auto; }
+
+/* Téléphone (≤ 600 px de large) : bandeau un peu plus petit. */
+@media (max-width: 600px) {
+  .nav-maneuver { gap: 10px; padding: 10px 12px 10px 8px; }
+  .nav-icon { width: 64px; height: 64px; }
+  .nav-dist { font-size: 1.35rem; }
+  .nav-instr { font-size: 1.6rem; }
+  .nav-instr.long { font-size: 1rem; }
+  .nav-rule > span, .nav-alert { font-size: .95rem; padding: 6px 10px; }
+  .nav-drive-main { font-size: .92rem; }
+  .nav-drive-detail { font-size: .8rem; }
+  .nav-time { font-size: 1.6rem; }
+  .nav-sub { font-size: .95rem; }
+}
+/* Écran bas (posé par fitBanner) : bandeau resserré, jamais sous le panneau du bas. */
+.nav-tight .nav-top { gap: 4px; }
+.nav-tight .nav-then, .nav-tight .nav-drive-detail { display: none; }
+.nav-tight .nav-icon { width: 52px; height: 52px; }
+.nav-tight .nav-maneuver { padding: 6px 10px 6px 6px; gap: 8px; }
+.nav-tight .nav-dist { font-size: 1.15rem; }
+.nav-tight .nav-instr { font-size: 1.25rem; }
+.nav-tight .nav-instr.long { font-size: .8rem; line-height: 1.2; }
+.nav.land.nav-tight .nav-icon { width: 44px; height: 44px; }
+.nav-tight .nav-rule > span, .nav-tight .nav-alert { font-size: .85rem; padding: 4px 10px; }
+.nav-tight .nav-drive { padding: 2px 4px 2px 10px; }
+.nav-tight .nav-drive-main { font-size: .85rem; }
+.nav-tight .nav-time { font-size: 1.35rem; }
+.nav-tight .nav-sub { font-size: .9rem; }
+.nav-tight .nav-summary { min-height: 56px; }
+.nav-tight .nav-bottom .nav-round { width: 56px; height: 56px; }
+.nav-tight .nav-bottom { padding-top: 2px; padding-bottom: max(4px, env(safe-area-inset-bottom)); gap: 2px; }
+.nav-tight .nav-speed-pill { min-width: 64px; height: 64px; }
+.nav-tight .nav-speed { font-size: 1.5rem; }
+
+/* Repère du véhicule : flèche sur un halo rond posé à plat sur la carte (ovale avec l'inclinaison), ombre douce. */
+.me-marker { width: 60px; height: 60px; }
 .me-marker svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.me-halo { fill: var(--arrow-fill); fill-opacity: .18; stroke: var(--arrow-stroke); stroke-width: 2; }
+.me-halo { fill: var(--arrow-fill); fill-opacity: .16; stroke: var(--arrow-stroke); stroke-opacity: .7; stroke-width: 1.5; }
+.me-shadow { fill: rgba(0,0,0,.25); }
 /* Couleur choisie dans Réglages (phase 7c), appliquée par src/app.js dans --arrow-fill / --arrow-stroke. */
-.me-arrow { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3; stroke-linejoin: round; }
-.me-dot { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3; display: none; }
-.me-marker.no-heading .me-arrow { display: none; }
+.me-arrow { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3.5; stroke-linejoin: round; }
+.me-dot { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3.5; display: none; }
+.me-marker.no-heading .me-arrow, .me-marker.no-heading .me-shadow { display: none; }
 .me-marker.no-heading .me-dot { display: inline; }
+/* Changement de thème : voile de la couleur du nouveau fond pendant setStyle (src/ui/map.js), jamais de blanc. */
+.map-veil { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s; }
+.map-veil.on { opacity: 1; transition: opacity .15s; }
 
 .segmented-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .segmented label { min-width: 0; }
@@ -583,14 +680,14 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 
 /* Encart « Prochaines aires » du guidage : lisible d'un coup d'œil, chaque ligne ouvre la fiche. */
 .nav-areas {
-  flex: 1 1 auto; min-width: 0; max-width: 620px; align-self: flex-end; overflow-y: auto; overscroll-behavior: contain;
-  padding: 6px; border-radius: var(--radius);
-  background: var(--nav-card); color: var(--nav-card-fg); box-shadow: 0 2px 12px rgba(0,0,0,.35);
+  position: absolute; min-width: 0; max-width: 620px; overflow-y: auto; overscroll-behavior: contain;
+  padding: 6px; border-radius: 16px;
+  background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,.35);
 }
 .nav-areas-title { margin: 0 4px 4px; font-size: .85rem; font-weight: 700; opacity: .8; }
 .nav-areas-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .nav-area {
-  width: 100%; min-width: 0; min-height: 48px; padding: 4px 8px; display: grid; gap: 0; text-align: left; cursor: pointer;
+  width: 100%; min-width: 0; min-height: 56px; padding: 4px 8px; display: grid; gap: 0; text-align: left; cursor: pointer;
   font: inherit; color: inherit; background: transparent; border: 0; border-left: 6px solid var(--area); border-radius: 6px;
 }
 .nav-area-name { font-weight: 800; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -603,16 +700,6 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .nav-area-name { font-size: 1rem; }
   .nav-area-facts { gap: 8px; font-size: .9rem; }
   .area-avis .btn { font-size: .95rem; }
-}
-
-/* Téléphone en paysage (écran bas) : bandeau sur la moitié gauche, boutons de carte en grille 2 × 2 (icônes), encart
-   des aires à droite du bandeau (placé par layoutFoot) : rien ne se recouvre sur 360 px de haut. */
-@media (orientation: landscape) and (max-height: 500px) {
-  .nav { --mapbtn: 48px; }
-  .nav-top { max-width: 52%; }
-  .nav-mapbtns { display: grid; grid-template-columns: repeat(2, var(--mapbtn)); }
-  .nav-mapbtn { padding: 0; justify-content: center; }
-  .nav-mapbtn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 }
 
 /* Téléphone en portrait (≈ 360 à 412 px) : tout tient en largeur ; la tablette garde les règles ci-dessus. */
@@ -628,24 +715,4 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .route-card-time { font-size: 1.35rem; }
   .segmented-row label { padding: 0 6px; gap: 6px; white-space: nowrap; font-size: .95rem; }
   .segmented-row input[type="radio"] { width: 22px; height: 22px; }
-}
-@media (max-width: 600px) {
-  .nav-top { left: 8px; right: 8px; top: 8px; }
-  .nav-maneuver { gap: 10px; padding: 8px 10px 8px 6px; }
-  .nav-icon { width: 64px; height: 64px; }
-  .nav-dist { font-size: 2rem; }
-  .nav-instr { font-size: 1.1rem; }
-  .nav-instr.long { font-size: .98rem; }
-  .nav { --mapbtn: 48px; }
-  .nav-foot { left: 8px; right: 8px; bottom: 8px; gap: 6px; }
-  .nav-foot > .nav-side, .nav-mapbtns { gap: 6px; }
-  .nav-bottom { padding: 6px; gap: 6px; }
-  .nav-mapbtn { padding: 0; justify-content: center; }
-  .nav-mapbtn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .nav-road { font-size: 1rem; }
-  .nav-stats { flex: 1 1 100%; }
-  .nav-stats div { padding: 2px 3px; }
-  .nav-sim .btn { flex: 1 1 auto; min-height: 48px; padding: 0 10px; }
-  .nav-buttons { flex: 1 1 100%; }
-  .nav-buttons .btn { flex: 1 1 0; padding: 0 8px; }
 }
