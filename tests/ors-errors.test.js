@@ -1,6 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyError, formatDiagnostic, summarizeKeyTest, serviceDetailText, ERROR_KINDS } from '../src/lib/ors-errors.js';
+import {
+  classifyError, formatDiagnostic, summarizeKeyTest, serviceDetailText, failedSegment, ERROR_KINDS,
+} from '../src/lib/ors-errors.js';
 import { fixture } from './helpers.js';
 
 test('aucun itinéraire autorisé (2009)', () => {
@@ -134,4 +136,20 @@ test('phase 5h bis : ligne technique sous le message (statut, code, message ; ja
   assert.equal(serviceDetailText(classifyError({ networkError: true })), '');
   assert.equal(serviceDetailText(null), '');
   assert.ok(serviceDetailText({ status: 500, detail: 'x'.repeat(300) }).length < 220);
+});
+
+test('phase 2f : tronçon en échec lu dans le message 2009 (points comptés à partir de 1)', () => {
+  const read = (name) => failedSegment(classifyError({ status: 404, body: fixture(name) }).detail);
+  assert.equal(read('ors-error-2009-metz.json'), 1);
+  assert.equal(read('ors-error-2009-via-start.json'), 1);
+  assert.equal(read('ors-error-2009-via-end.json'), 2);
+  assert.equal(failedSegment('Route could not be found'), null);
+  assert.equal(failedSegment('between points 1 (x) and 3 (y)'), null, 'points non consécutifs : illisible');
+  assert.equal(failedSegment(null), null);
+});
+
+test('phase 2f : diagnostic interrompu ajouté à la ligne technique', () => {
+  const e = { ...classifyError({ status: 404, body: { error: { code: 2009, message: 'Route could not be found' } } }), status: 404,
+    diagnosticNote: 'Diagnostic interrompu : trop de demandes en une minute.' };
+  assert.equal(serviceDetailText(e), "Réponse du service d'itinéraire : HTTP 404, code 2009 — « Route could not be found ». Diagnostic interrompu : trop de demandes en une minute.");
 });

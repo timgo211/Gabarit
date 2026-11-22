@@ -1,0 +1,10 @@
+{
+  "error": {
+    "code": 2009,
+    "message": "Route could not be found - Unable to find a route between points 2 (6.1789600 48.9027300) and 3 (6.1782900 48.6903000)."
+  },
+  "info": {
+    "engine": { "version": "9.0.0" },
+    "timestamp": 1795075200000
+  }
+}

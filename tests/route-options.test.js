@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import {
   computeRouteOptions, planVariants, wantsAlternatives, sharedShare, isNearDuplicate, dedupeOptions, nameAlternatives,
   describeOption, deltaText, failureText, guidanceParams, reroutedOption, noZfeOption, routesBbox, pickRouteAt, requestFor,
-  VARIANTS, ROUTE_OPTIONS, RESTRICTION_HINT_TEXT, DEAD_END_HINT_TEXT,
+  VARIANTS, ROUTE_OPTIONS, diagnose2009, RESTRICTION_HINT_TEXT, DEAD_END_HINT_TEXT, START_NO_EXIT_TEXT, START_UNREACHABLE_TEXT,
+  END_UNREACHABLE_TEXT,
 } from '../src/lib/route-options.js';
 import { destinationPoint } from '../src/lib/nav-geo.js';
 import { ERROR_KINDS, classifyError } from '../src/lib/ors-errors.js';
@@ -32,6 +33,8 @@ function fakeOrs(respond) {
     },
   };
 }
+
+const assertRestrictions = { height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, hazmat: true };
 
 const avoidsTolls = (body) => (body.options.avoid_features ?? []).includes('tollways');
 
@@ -303,56 +306,125 @@ test('carte : emprise commune et tracé touché', () => {
   assert.equal(pickRouteAt([1, 1, 0], 1), 0);
 });
 
-// Phase 5h ter : code 2009 (Metz → Nancy, 404) → une seule requête de diagnostic sans les restrictions du profil.
-const error2009 = () => {
-  const c = classifyError({ status: 404, body: fixture('ors-error-2009.json') });
+// Phases 5h ter et 2f : code 2009 → diagnostic (sens inverse, point de passage, sans restrictions), 3 requêtes au plus.
+const METZ = [6.17963, 49.11516]; // centre de Metz renvoyé par le géocodage (tablette v35 à v37)
+const NANCY = [6.17829, 48.6903];
+const err2009 = (name = 'ors-error-2009.json') => {
+  const c = classifyError({ status: 404, body: fixture(name) });
   return Object.assign(new Error(c.message), { kind: c.kind, code: c.code, status: 404, detail: c.detail });
 };
+const error2009 = () => err2009();
+const isReverse = (b, start) => b.coordinates.length === 2 && b.coordinates[1][0] === start[0] && b.coordinates[1][1] === start[1];
+const isVia = (b) => b.coordinates.length === 3;
 
-test('code 2009 : diagnostic sans restrictions (une requête, dans le budget, jamais proposée), message ajouté', async () => {
-  for (const end of [VILLEFRANCHE, CLERMONT]) {
-    const ors = fakeOrs((b) => (b.options.profile_params ? error2009() : fixture('ors-variant-recommended.json')));
-    await assert.rejects(computeRouteOptions({ start: LYON, end, vehicle, send: ors.send }), (err) => {
-      assert.equal(err.code, 2009);
-      assert.equal(err.restrictionHint, true);
-      assert.ok(err.message.endsWith(RESTRICTION_HINT_TEXT));
-      return true;
-    });
-    assert.equal(ors.sent.length, 2, 'Recommandé + diagnostic');
-    assert.ok(ors.sent.length <= ROUTE_OPTIONS.MAX_REQUESTS);
-    const probe = ors.sent[1].body;
-    assert.equal(probe.options.profile_params, undefined);
-    assert.equal(probe.options.vehicle_type, 'hgv');
-    assert.equal(probe.alternative_routes, undefined);
-  }
-  assert.equal(RESTRICTION_HINT_TEXT, 'Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil. Essaie un point plus accessible (appui long). La signalisation fait foi.');
-});
-
-test('code 2009 : échec aussi sans restrictions → « rue sans sortie possible » (Metz rue Coislin, tablette v30)', async () => {
-  const both = fakeOrs(() => error2009());
-  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: both.send }), (err) => {
-    assert.equal(err.hint, 'dead-end');
+test('phase 2f : Metz → Nancy en 2009, Nancy → Metz passe → « le départ semble sans sortie »', async () => {
+  const ors = fakeOrs((b) => (isReverse(b, METZ) ? fixture('ors-variant-recommended.json') : err2009('ors-error-2009-metz.json')));
+  await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }), (err) => {
+    assert.equal(err.code, 2009);
+    assert.equal(err.hint, 'start-no-exit');
     assert.equal(err.restrictionHint, false);
-    assert.ok(err.message.endsWith(DEAD_END_HINT_TEXT));
-    assert.ok(!err.message.includes(RESTRICTION_HINT_TEXT));
+    assert.ok(err.message.startsWith('Aucun itinéraire autorisé pour ce gabarit.'));
+    assert.ok(err.message.endsWith(START_NO_EXIT_TEXT));
     return true;
   });
-  assert.equal(both.sent.length, 2, 'Recommandé + diagnostic');
-  // Diagnostic sans tracé (réponse vide) : même message.
-  const empty = fakeOrs((b) => (b.options.profile_params ? error2009() : { type: 'FeatureCollection', features: [] }));
-  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: empty.send }), (err) => err.hint === 'dead-end');
-  // Profil sans restriction : la requête d'origine valait le diagnostic, aucune requête en plus.
+  assert.equal(ors.sent.length, 2, 'Recommandé (alternative_routes) + sens inverse');
+  const back = ors.sent[1].body;
+  assert.deepEqual(back.coordinates, [NANCY, METZ]);
+  assert.equal(back.alternative_routes, undefined);
+  assertTruckRequest(ors.sent[1], { avoidFerries: false });
+  assert.equal(START_NO_EXIT_TEXT, 'Le départ semble sans sortie pour un camion (sens unique, zone piétonne, sortie interdite) : le trajet inverse passe. Pose le départ sur une route voisine plus large (appui long). La signalisation fait foi.');
+});
+
+test('phase 2f : aller et retour en 2009, point de passage en échec sur le 2e tronçon → arrivée en cause', async () => {
+  const ors = fakeOrs((b) => (isVia(b) ? err2009('ors-error-2009-via-end.json') : err2009('ors-error-2009-metz.json')));
+  await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }), (err) => {
+    assert.equal(err.hint, 'end-unreachable');
+    assert.ok(err.message.endsWith(END_UNREACHABLE_TEXT));
+    assert.ok(/semble/.test(END_UNREACHABLE_TEXT), 'accroche du point de passage non garantie : conditionnel');
+    return true;
+  });
+  assert.equal(ors.sent.length, ROUTE_OPTIONS.MAX_REQUESTS, 'Recommandé + sens inverse + point de passage');
+  const v = ors.sent[2].body;
+  assert.equal(v.coordinates.length, 3);
+  assert.deepEqual(v.coordinates[0], METZ);
+  assert.deepEqual(v.coordinates[2], NANCY);
+  assert.ok(Math.abs(v.coordinates[1][1] - (METZ[1] + NANCY[1]) / 2) < 1e-9);
+  assert.deepEqual(v.radiuses, [-1, -1, -1], 'un rayon par point, rayon maximal du serveur');
+  assert.equal(v.alternative_routes, undefined, 'alternative_routes : 2 points seulement');
+  assert.deepEqual(v.options.profile_params.restrictions, assertRestrictions);
+});
+
+test('phase 2f : point de passage en échec sur le 1er tronçon → départ en cause (au conditionnel)', async () => {
+  const ors = fakeOrs((b) => (isVia(b) ? err2009('ors-error-2009-via-start.json') : err2009('ors-error-2009-metz.json')));
+  await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }), (err) => {
+    assert.equal(err.hint, 'start-unreachable');
+    assert.ok(err.message.endsWith(START_UNREACHABLE_TEXT));
+    return true;
+  });
+  assert.ok(/^Le départ semble/.test(START_UNREACHABLE_TEXT));
+  assert.ok(/limite de gabarit/.test(START_UNREACHABLE_TEXT), 'la restriction réelle n\'est pas masquée');
+});
+
+test('phase 2f : point de passage non accroché (2010) → sans restrictions si le budget le permet, sinon sans conclusion', async () => {
+  // > 100 km : pas d'alternative_routes, mais Recommandé + sens inverse + point de passage = budget épuisé.
+  const p2010 = () => Object.assign(new Error('point'), { kind: ERROR_KINDS.POINT_NOT_FOUND, code: 2010 });
+  const ors = fakeOrs((b) => (isVia(b) ? p2010() : error2009()));
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: ors.send }), (err) => {
+    assert.equal(err.hint, undefined);
+    assert.ok(!err.message.includes('appui long'));
+    assert.match(err.diagnosticNote, /sans conclusion/);
+    return true;
+  });
+  assert.equal(ors.sent.length, 3);
+  // Profil sans restriction : la requête d'origine valait le diagnostic sans restrictions → « rue sans sortie ».
   const bare = { ...vehicle, height: null, width: null, length: null, weight: null, axleload: null, hazmat: false };
-  const none = fakeOrs(() => error2009());
-  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle: bare, send: none.send }), (err) => err.code === 2009 && err.message.endsWith(DEAD_END_HINT_TEXT));
-  assert.equal(none.sent.length, 1);
+  const none = fakeOrs((b) => (isVia(b) ? fixture('ors-variant-recommended.json') : error2009()));
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle: bare, send: none.send }), (err) => err.hint === 'dead-end' && err.message.endsWith(DEAD_END_HINT_TEXT));
+  assert.equal(none.sent.length, 3);
+});
+
+test('code 2009 : étape (c) sans restrictions, atteinte seulement s\'il reste une requête', async () => {
+  // Dans un calcul, Recommandé + sens inverse + point de passage prennent les 3 requêtes : jamais de 4e.
+  for (const respond of [() => error2009(), (b) => (isVia(b) ? fixture('ors-variant-recommended.json') : error2009())]) {
+    const ors = fakeOrs(respond);
+    await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }));
+    assert.equal(ors.sent.length, ROUTE_OPTIONS.MAX_REQUESTS);
+    assert.equal(ors.sent.filter((r) => !r.body.options.profile_params).length, 0);
+  }
+  // Diagnostic seul (aucune requête déjà faite) : point de passage sans conclusion → sans restrictions.
+  const run = async (bareResponse) => {
+    const err = error2009();
+    const ors = fakeOrs((b) => {
+      if (!b.options.profile_params) return bareResponse();
+      return isVia(b) ? fixture('ors-variant-recommended.json') : error2009();
+    });
+    const n = await diagnose2009({ err, start: METZ, end: NANCY, vehicle, send: ors.send, requests: 0 });
+    assert.equal(n, 3);
+    assert.equal(ors.sent[2].body.options.profile_params, undefined);
+    assert.equal(ors.sent[2].body.radiuses, undefined);
+    return err;
+  };
+  const limit = await run(() => fixture('ors-variant-recommended.json'));
+  assert.equal(limit.restrictionHint, true);
+  assert.ok(limit.message.endsWith(RESTRICTION_HINT_TEXT));
+  const dead = await run(() => error2009());
+  assert.equal(dead.hint, 'dead-end');
+  assert.ok(dead.message.endsWith(DEAD_END_HINT_TEXT));
+  assert.equal(RESTRICTION_HINT_TEXT, 'Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil. Essaie un point plus accessible (appui long). La signalisation fait foi.');
   assert.equal(DEAD_END_HINT_TEXT, 'Départ ou arrivée peut-être dans une rue sans sortie possible pour le camion (sens unique, zone piétonne). Essaie un point plus accessible (appui long). La signalisation fait foi.');
 });
 
-test('code 2009 : diagnostic en échec pour une autre raison (quota, réseau) ou erreur sans code 2009 → message d\'origine', async () => {
-  const quota = fakeOrs((b) => (b.options.profile_params ? error2009() : apiError(ERROR_KINDS.QUOTA)));
-  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: quota.send }), (err) => !err.hint && !err.message.includes('appui long'));
-  assert.equal(quota.sent.length, 2);
+test('code 2009 : diagnostic en 429 (ou réseau) → texte d\'origine conservé, raison dans la ligne technique', async () => {
+  const quota = fakeOrs((b) => (isReverse(b, METZ) ? apiError(ERROR_KINDS.QUOTA) : err2009('ors-error-2009-metz.json')));
+  await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: quota.send }), (err) => {
+    assert.equal(err.hint, undefined);
+    assert.equal(err.message, "Aucun itinéraire autorisé pour ce gabarit. Essaie d'autoriser péages/ferries ou vérifie le profil véhicule.");
+    assert.equal(err.diagnosticNote, 'Diagnostic interrompu : trop de demandes en une minute.');
+    return true;
+  });
+  assert.equal(quota.sent.length, 2, 'diagnostic arrêté au premier échec');
+  const viaQuota = fakeOrs((b) => (isVia(b) ? apiError(ERROR_KINDS.OFFLINE) : error2009()));
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: viaQuota.send }), (err) => !err.hint && err.diagnosticNote === 'Diagnostic interrompu : pas de réseau.');
   const other = fakeOrs((b) => (b.options.profile_params ? apiError(ERROR_KINDS.NO_ROUTE) : fixture('ors-variant-recommended.json')));
   await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle, send: other.send }), (err) => !err.hint);
   assert.equal(other.sent.length, 1, 'sans code 2009 (404 sans code, réponse vide) : pas de diagnostic');

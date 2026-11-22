@@ -98,7 +98,22 @@ export function serviceDetailText(err, apiKey = '') {
   let detail = String(err?.detail ?? '').replace(/\s+/g, ' ').trim();
   if (apiKey && apiKey.length >= 8) detail = detail.split(apiKey).join('•••');
   if (detail.length > 160) detail = `${detail.slice(0, 159)}…`;
-  return `Réponse du service d'itinéraire : ${parts.join(', ')}${detail ? ` — « ${detail} »` : ''}.`;
+  // Phase 2f : diagnostic d'un code 2009 interrompu (quota, réseau) : dit pourquoi aucune précision n'est donnée.
+  const note = typeof err?.diagnosticNote === 'string' && err.diagnosticNote ? ` ${err.diagnosticNote}` : '';
+  return `Réponse du service d'itinéraire : ${parts.join(', ')}${detail ? ` — « ${detail} »` : ''}.${note}`;
+}
+
+/**
+ * Tronçon en échec d'un code 2009 (phase 2f) : ORS calcule les tronçons dans l'ordre et s'arrête au premier
+ * impossible, en le nommant « Unable to find a route between points i (…) and i+1 (…) », points comptés à partir
+ * de 1 (ors-engine/src/main/java/org/heigit/ors/routing/RoutingRequest.java, boucle sur les tronçons).
+ * @returns {number|null} numéro du premier point du tronçon (1 = départ → 1er point de passage), null si illisible
+ */
+export function failedSegment(text) {
+  const m = /between points (\d+)\b.*?\band (\d+)\b/i.exec(String(text ?? ''));
+  if (!m) return null;
+  const a = Number(m[1]);
+  return Number(m[2]) === a + 1 && a >= 1 ? a : null;
 }
 
 export function messageFor(kind) {

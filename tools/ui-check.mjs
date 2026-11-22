@@ -2672,17 +2672,22 @@ async function drawCheck(browser, base) {
  * « peut-être joignable seulement en franchissant une limite », rien en voix, aucun tracé.
  */
 async function failedCheck(browser, base) {
-  const err2009 = { __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } };
+  const err2009 = (points) => ({ __status: 404, error: { code: 2009, message: `Route could not be found - Unable to find a route between points ${points}.` } });
   for (const [width, height] of [[360, 760], [1280, 800]]) {
     let failing = false;
+    let first = null; // premier point du calcul en échec : repère le trajet inverse (phase 2f)
     const sent = [];
     const { page, errors } = await open(browser, base, {
       width, height, voice: true, overpass: () => ({ elements: [] }),
       directions: (body) => {
         sent.push(body);
         if (!failing) return body.alternative_routes ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json');
-        if (failing === 'all') return err2009;
-        return body.options?.profile_params ? err2009 : fixture('ors-directions.json');
+        first ??= body.coordinates[0];
+        const reverse = body.coordinates.length === 2 && String(body.coordinates[1]) === String(first);
+        // Metz → Nancy (tablette v35 à v37) : l'aller échoue, le trajet inverse passe.
+        if (failing === 'start') return reverse ? fixture('ors-directions.json') : err2009('1 (6.1796300 49.1151600) and 2 (6.1782900 48.6903000)');
+        // Arrivée non routable : aller et retour en échec, point de passage en échec sur le 2e tronçon.
+        return body.coordinates.length === 3 ? err2009('2 (6.1789600 48.9027300) and 3 (6.1782900 48.6903000)') : err2009('1 (6.1796300 49.1151600) and 2 (6.1782900 48.6903000)');
       },
     });
     await computeRoute(page);
@@ -2694,30 +2699,34 @@ async function failedCheck(browser, base) {
     const before = await routeShown();
     const mBefore = await markersOf();
     check(before.source && before.layer && mBefore >= 2, `${width} px : premier calcul, tracé et repères affichés`, JSON.stringify({ before, mBefore }));
-    failing = true;
+    failing = 'start';
     sent.length = 0;
     await page.click('#btn-route');
     await page.waitForSelector('#message:not([hidden]) .message-detail', { timeout: 10000 });
     await page.waitForTimeout(500);
     const after = await routeShown();
     const mAfter = await markersOf();
-    check(!after.source && !after.layer, `${width} px : calcul en échec, ancien tracé effacé`, JSON.stringify(after));
+    check(!after.source && !after.layer, `${width} px : calcul en échec, ancien tracé effacé (trajet inverse jamais affiché)`, JSON.stringify(after));
     check(mAfter <= mBefore - 2, `${width} px : repères de départ et d'arrivée retirés`, `${mBefore} → ${mAfter}`);
     check(await page.locator('.route-card:visible').count() === 0, `${width} px : aucune fiche d'itinéraire visible`);
     const msg = await page.textContent('#message');
-    check(/^Aucun itinéraire autorisé pour ce gabarit\..*Départ ou arrivée peut-être joignable seulement en franchissant une limite de poids, hauteur ou largeur de ton profil\. Essaie un point plus accessible \(appui long\)\. La signalisation fait foi\..*code 2009/.test(msg),
-      `${width} px : message du diagnostic 2009`, msg);
-    check(sent.length <= 3 && sent.filter((b) => !b.options?.profile_params).length === 1, `${width} px : une seule requête sans restrictions, budget de 3`, String(sent.length));
-    // Même échec sans restrictions (Metz, rue Coislin) : « rue sans sortie possible pour le camion ».
-    failing = 'all';
+    check(/^Aucun itinéraire autorisé pour ce gabarit\..*Le départ semble sans sortie pour un camion \(sens unique, zone piétonne, sortie interdite\) : le trajet inverse passe\. Pose le départ sur une route voisine plus large \(appui long\)\. La signalisation fait foi\..*code 2009/.test(msg),
+      `${width} px : 2009, trajet inverse possible → message « départ sans sortie »`, msg);
+    check(sent.length === 2 && sent[1].coordinates.length === 2, `${width} px : aller + trajet inverse, budget de 3`, String(sent.length));
+    // Aller et retour impossibles, point de passage en échec sur le 2e tronçon → arrivée en cause.
+    failing = 'end';
+    first = null;
+    sent.length = 0;
     await page.click('#btn-route');
-    await page.waitForFunction(() => /sans sortie possible/.test(document.querySelector('#message')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+    await page.waitForFunction(() => /L'arrivée semble/.test(document.querySelector('#message')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
     const dead = await page.textContent('#message');
-    check(/^Aucun itinéraire autorisé pour ce gabarit\..*Départ ou arrivée peut-être dans une rue sans sortie possible pour le camion \(sens unique, zone piétonne\)\. Essaie un point plus accessible \(appui long\)\. La signalisation fait foi\..*code 2009/.test(dead) && !/franchissant une limite/.test(dead),
-      `${width} px : échec aussi sans restrictions, message « rue sans sortie »`, dead);
+    check(/^Aucun itinéraire autorisé pour ce gabarit\..*L'arrivée semble inaccessible à ton camion \(sens unique, zone piétonne, accès interdit ou limite de gabarit\)\. Pose l'arrivée sur une route voisine plus large \(appui long\)\. La signalisation fait foi\..*code 2009/.test(dead) && !/Le départ semble/.test(dead),
+      `${width} px : point de passage en échec au 2e tronçon, message « arrivée »`, dead);
+    check(sent.length <= 3 && sent.filter((b) => b.coordinates.length === 3 && Array.isArray(b.radiuses) && b.radiuses.length === 3 && !b.alternative_routes).length === 1,
+      `${width} px : une requête avec point de passage (un rayon par point), budget de 3`, String(sent.length));
     check(!(await routeShown()).source, `${width} px : toujours aucun tracé`);
     const spoken = await page.evaluate(() => window.__spoken ?? []);
-    check(!spoken.some((x) => /joignable|limite/.test(x)), `${width} px : rien en voix`, spoken.join(' | '));
+    check(!spoken.some((x) => /joignable|limite|semble/.test(x)), `${width} px : rien en voix`, spoken.join(' | '));
     await noHorizontalScroll(page, `${width} px message 2009`);
     if (width === 360) await page.screenshot({ path: join(SHOTS, `${width}-failed.png`) });
     check(errors.length === 0, `${width} px : aucune erreur JavaScript`, errors.join(' | '));
