@@ -294,11 +294,13 @@ async function open(browser, base, {
 }
 
 /** Fichiers de la copie des aires simulée (nom → JSON), d'après les fonctions de l'Action. */
+/** kind : 'fixture', 'uncovered', null (pas de copie) ou une liste d'éléments Overpass (copie couvrant la France). */
 function osmCopyFiles(kind) {
   if (!kind) return null;
   const box = kind === 'uncovered' ? [20, 55, 22, 57] : [-5, 42, 8.3, 51.2];
+  const elements = Array.isArray(kind) ? kind : fixture('overpass-aires.json').elements;
   const poly = parsePoly(`zone\n1\n   ${box[0]} ${box[1]}\n   ${box[2]} ${box[1]}\n   ${box[2]} ${box[3]}\n   ${box[0]} ${box[3]}\nEND\nEND\n`);
-  const { index, tiles } = convertAreas(fixture('overpass-aires.json').elements, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  const { index, tiles } = convertAreas(elements, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
 }
 
@@ -457,11 +459,14 @@ async function areaListState(page, { scroll = false } = {}) {
       if (n.scrollWidth > n.clientWidth + 1 || cs.textOverflow === 'ellipsis' || cs.wordBreak === 'break-all'
         || cs.overflowWrap === 'anywhere' || cs.hyphens === 'auto') cut.push(n.className || n.id);
     }
-    // Pile du bandeau : bas du dernier élément visible (bandeau, « Puis », alertes, « +N »).
+    // Pile du bandeau au-dessus de la liste : bas du dernier élément visible (bandeau, « Puis », alertes, « +N »)
+    // dans la même bande verticale que la liste.
     let stackBottom = 0;
     for (const n of document.querySelectorAll('#nav .nav-top > *, #nav .nav-alerts > *')) {
       if (n.hidden || !n.getClientRects().length || getComputedStyle(n).visibility === 'hidden') continue;
-      stackBottom = Math.max(stackBottom, n.getBoundingClientRect().bottom);
+      const b = n.getBoundingClientRect();
+      if (b.right <= r.left + 0.5 || b.left >= r.right - 0.5) continue;
+      stackBottom = Math.max(stackBottom, b.bottom);
     }
     const scrollable = list.scrollHeight > list.clientHeight + 1;
     let scrolled = false;
@@ -488,17 +493,31 @@ async function areaListState(page, { scroll = false } = {}) {
   }, scroll);
 }
 
+/**
+ * Phase 2d : aires de la fixture Overpass + 9 aires de repos posées sur le tracé (tous les 3 points, noms longs pour
+ * vérifier le retour à la ligne entre les mots) : la liste dépasse sa hauteur et doit défiler.
+ */
+function manyAreas(line) {
+  const base = fixture('overpass-aires.json');
+  const extra = [];
+  for (let i = 8, n = 1; i < line.length; i += 3, n += 1) {
+    extra.push({ type: 'node', id: 9100 + n, lat: line[i][1], lon: line[i][0],
+      tags: { highway: 'rest_area', name: `Aire poids lourds de la Vallée-de-Saint-Bonnet-les-Oules n° ${n}`, 'capacity:hgv': String(10 + n) } });
+  }
+  return { ...base, elements: [...base.elements, ...extra] };
+}
+
 /** Phase 2d : contrôles de la liste des aires ouverte (en roulant ou à l'arrêt). */
 async function checkAreaList(page, label, land) {
   const al = await areaListState(page, { scroll: true });
-  check(al.open && al.rows >= 4, `${label} : liste des aires ouverte`, `${al.rows} ligne(s)`);
+  check(al.open && al.rows >= 8, `${label} : liste des aires ouverte (aires du trajet, 15 au plus)`, `${al.rows} ligne(s)`);
   check(al.minRow >= 56 && al.closeH >= 56, `${label} : lignes et « Fermer » d'au moins 56 px`, `${al.heights} ; Fermer ${al.closeH}`);
   check(al.cut.length === 0, `${label} : aucun texte coupé dans la liste`, al.cut.join(', '));
   check(al.inputs === 0, `${label} : liste sans saisie`);
   check(al.top >= al.stackBottom - 0.5, `${label} : liste jamais au-dessus du bandeau, de « Puis » ni des alertes`,
     `haut ${Math.round(al.top)} < pile ${Math.round(al.stackBottom)}`);
   if (!land) check(al.ratio <= 0.4 + 0.003, `${label} : portrait, liste ≤ 40 % de la hauteur`, `${Math.round(al.ratio * 100)} %`);
-  check(al.overflowY === 'auto' && al.touch === 'pan-y' && (!al.scrollable || al.scrolled),
+  check(al.overflowY === 'auto' && al.touch === 'pan-y' && al.scrollable && al.scrolled,
     `${label} : défilement au doigt possible`, `${al.overflowY} ${al.touch} débordement ${al.scrollable} défilée ${al.scrolled}`);
   const foot = await footOverlaps(page);
   check(foot.out.length === 0, `${label} : liste ouverte, rien ne se chevauche`, foot.out.join(' ; '));
@@ -2305,7 +2324,8 @@ async function guidanceCheck(browser, base) {
       width, height, streets: true, directions: () => nav,
       theme: auto ? 'auto' : night || mode === 'satellite' ? 'night' : 'day',
       now: auto ? sunset - 8000 : null,
-      wind: () => 95, driving: night ? null : drivenFor(4 * 3600 + 25 * 60), overpass: () => fixture('overpass-aires.json'),
+      wind: () => 95, driving: night ? null : drivenFor(4 * 3600 + 25 * 60), overpass: () => manyAreas(line),
+      osmCopy: manyAreas(line).elements,
     });
     await computeRoute(page);
     await page.waitForTimeout(400);

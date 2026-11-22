@@ -129,3 +129,17 @@ test('liste des aires (phase 2d) : paysage dans la colonne de gauche, entre band
   assert.equal(p.top, 228);
   assert.equal(p.maxHeight, 652 - 228, 'pas de limite à 40 % en paysage');
 });
+
+test('liste des aires (phase 2d) : téléphone en paysage, colonne pleine → sur la carte, à droite de la colonne', () => {
+  // 760 × 360 : bandeau et panneau du bas remplissent la colonne de gauche (304 px).
+  const p = areaListBox({ width: 760, height: 360, stackBottom: 200, colLeft: 684, speedoTop: 280, sheetTop: 260, columnRight: 304 });
+  assert.equal(p.inMap, true);
+  assert.equal(p.left, 304 + 12, 'à droite de la colonne de gauche');
+  assert.equal(760 - p.right, 684 - 8, 'à gauche des boutons');
+  assert.equal(p.top, 12);
+  assert.equal(360 - p.bottom, 280 - 8 - AREA_LIST_BOX.toastRoom, 'place du message au-dessus du compteur');
+  assert.equal(p.toastBottom, 360 - 280 + 8);
+  assert.ok(p.maxHeight >= 100);
+  assert.equal(areaListBox({ width: 412, height: 900, stackBottom: 260, colLeft: 336, speedoTop: 700, sheetTop: 780 }).inMap, false);
+});
+

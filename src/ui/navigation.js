@@ -400,11 +400,15 @@ export function createNavigation(ctx) {
     ui.areas.style.top = '';
     ui.areas.style.bottom = `${box.bottom}px`;
     ui.areas.style.maxHeight = `${box.maxHeight}px`;
+    s.areasInMap = box.inMap;
 
     // Message bref : à la place de la pastille de la rue (masquée pendant 4 s) ; en portrait, liste des aires
     // ouverte : juste au-dessus de la liste (qui couvre le véhicule).
-    const listTop = !land && !ui.areas.hidden ? ui.areas.getBoundingClientRect().top - r.top : null;
-    ui.toast.style.bottom = `${Math.round(h - (listTop === null ? pillBottom : listTop - 8))}px`;
+    const listOpen = !ui.areas.hidden;
+    const listTop = !land && listOpen ? ui.areas.getBoundingClientRect().top - r.top : null;
+    const toastBottom = listOpen && box.toastBottom !== null ? box.toastBottom
+      : Math.round(h - (listTop === null ? pillBottom : listTop - 8));
+    ui.toast.style.bottom = `${toastBottom}px`;
     ui.toast.style.left = `${Math.round(vx)}px`;
     ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
     renderRoad();
@@ -414,7 +418,8 @@ export function createNavigation(ctx) {
   function renderRoad() {
     const name = s?.view?.roadName ?? '';
     if (ui.road.textContent !== name) ui.road.textContent = name;
-    const listOver = !!s?.areasOpen && !root.classList.contains('land'); // portrait : la liste couvre le véhicule
+    // Portrait, ou paysage avec la liste sur la carte : elle couvre le véhicule.
+    const listOver = !!s?.areasOpen && (!root.classList.contains('land') || !!s.areasInMap);
     ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || listOver || !ui.toast.hidden;
   }
 

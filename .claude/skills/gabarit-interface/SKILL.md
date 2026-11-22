@@ -74,7 +74,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Liste des aires en guidage (phase 2d, `#nav-areas`) : 15 aires au plus (`AREAS.LIST_COUNT`, `nextAreas` du moteur,
   aucun appel réseau), lignes mises à jour sur place (`areaRowsPlan`, jamais `replaceChildren` : `parked` reste à 0 image),
   figées à l'arrêt (`nextAreasChanged`). Place : `areaListBox` (`src/lib/nav-layout.js`) — portrait au-dessus du compteur,
-  ≤ 40 % de la hauteur, jamais sur la pile du bandeau ; paysage dans la colonne de gauche. Pastille de la rue masquée
+  ≤ 40 % de la hauteur, jamais sur la pile du bandeau ; paysage dans la colonne de gauche, ou sur la carte entre
+  la colonne et les boutons si la colonne a moins de 180 px (téléphone en paysage, `inMap`, message bref dessous). Pastille de la rue masquée
   en portrait tant qu'elle est ouverte, message bref au-dessus d'elle. Appui : `map.highlightArea` (classe CSS) + fiche
   courte ; caméra déplacée (`map.showPlace`) seulement à l'arrêt ; « Y aller » / « Fiche complète » `aria-disabled`
   hors `parkedState`. Fermée après 20 s sans toucher (`AREA_LIST.AUTO_CLOSE_MS`) ou par « Fermer ». Aucune saisie.
