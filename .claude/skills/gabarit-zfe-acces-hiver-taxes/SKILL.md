@@ -93,6 +93,34 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   intermédiaire (TeleSec Business TLS-CA 2022, lu par l'adresse AIA, vérification gardée). Pas de champ « Essieux »
   tant qu'aucun montant n'en dépend. alsace.eu, toll-collect.de, gesetze-im-internet.de, asfinag.at et
   ris.bka.gv.at ne répondent pas non plus à l'Action ; tous refusent le conteneur.
+  Phase 5h ter (`hgv-tolls-geo.js`) : réseau en géométrie, la bbox ne décide plus seule. `data/taxes-pl-osm.json`
+  (Action mensuelle, extrait France découpé au cadre des taxes, `w/highway=motorway,trunk,primary,secondary,tertiary`,
+  hors `APP_FILES`) : voies dont une référence normalisée (`normalizeRefs` : majuscules, espaces, « A 35;E 25 ») est
+  dans `roads`, hors `*_link`, hors péage PL (`isHgvToll` : `toll:hgv=yes`, ou `toll=yes` sans `toll:hgv=no` ;
+  sections concédées exclues sans liste à la main : A355, A36 vers Belfort, A31 au sud de Toul) ; cadre ECPL = Grand
+  Est entier (3,38–8,24° E, 47,42–50,17° N : RN44 et RN4 dans la Marne) ; segments gardés si leur milieu est dans le périmètre (`pointInTax` : `bbox`, `area`,
+  `exclude` — Eurométropole de Strasbourg, 33 communes ; Alsace pour l'ECPL —, `roadBoxes`, `roadAreas` — RN52 en
+  Meurthe-et-Moselle) ; contours IGN Admin Express COG 2018 (Licence Ouverte, gregoiredavid/france-geojson) dans
+  `data/taxes-pl.json`. Journal : par référence, km avant découpage (cadre seul) puis gardés après découpage (comptés par
+  l'appli) et exclus pour péage (sens unique compté pour moitié), répartition `toll` / `toll:hgv` de l'A31 au sud de
+  48,65° N (`TOLL_BREAKDOWN`), total
+  ECPL comparé aux 525 km annoncés. Appli : point du tracé tous les 50 m, ≤ 15 m d'un segment (graphe ORS = nœuds OSM ;
+  simplification 3 m, retouches OSM, autre chaussée ; même écart que les accès conditionnels), écart de cap ≤ 30°
+  modulo 180°, veto si l'étape ORS nomme une autre route, séries ≥ 300 m réunies à 2 km ; texte « de km X à km Y
+  (repérage sur la carte OpenStreetMap du JJ/MM/AAAA (ODbL) et les contours IGN Admin Express (Licence Ouverte),
+  limites exactes à vérifier) » ; copie absente ou sans la taxe → noms d'étape, « au moins … (repérage par les noms
+  d'étape, carte OpenStreetMap du réseau non chargée) ». Crédits `#tolls-credit` dans Réglages. Diagnostic :
+  « Méthode taxes PL », méthode de chaque passage, `point km X : lat, lon` (0,001°) tous les 10 km sur les étapes sans
+  nom (« - ») de plus de 5 km, jamais à moins de 1 km du départ ou de l'arrivée. Calcul en échec :
+  `map.showRoutes([])` retire tracés et repères de départ / d'arrivée. Code 2009 (`computeRouteOptions`) : une
+  requête sans `profile_params.restrictions` (`noRestrictions`), dans le budget de 3, si le profil a des
+  restrictions ; elle passe → `RESTRICTION_HINT_TEXT` ajouté au message (jamais affichée, guidée ni dite) ; elle
+  échoue aussi (2009 ou sans tracé) ou profil sans restriction → `DEAD_END_HINT_TEXT` (« rue sans sortie possible pour
+  le camion », constat tablette : Metz rue Coislin → Nancy / Toul en 2009, Nancy → Metz y arrive) ; autre échec du
+  diagnostic (quota, réseau) → message d'origine. Version du diagnostic : `requestVersionLabel` (même demande au
+  service worker que Réglages ; avant, #app-version vide tant que Réglages n'était pas ouvert → « version inconnue »). Cause
+  (ORS `ORSRouter.createSnapFilter`) : accrochage sur une voie permise au gabarit, mais test de sous-réseau sans les
+  limites de poids / hauteur ; `radiuses` (400 m par défaut, `maximum_snapping_radius`) n'y change rien (2010 sinon).
   Noms d'étape ORS : GraphHopper v4.17 (`EncodingManager.applyWayTags`) écrit `name` d'OSM puis « , » et `ref`
   (ref seule sans nom) → `roadRefs` lit les références dans le nom. Références OSM lues le 21/11/2026 (extrait Alsace,
   miroir download.openstreetmap.fr : Geofabrik et Overpass injoignables depuis l'Action, IPv6) : Colmar–Sélestat =
