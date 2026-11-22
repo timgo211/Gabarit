@@ -3,7 +3,8 @@
 // (phase 5d, data/acces-osm/ : tranches horaires, poids limité par tranche) et réseau des taxes PL régionales
 // (phase 5h ter, data/taxes-pl-osm.json : R-Pass et écocontribution du Grand Est, extrait France seulement, découpé
 // au cadre des taxes par osmium extract, puis filtré à part : les routes primaires de toute l'Europe ne passent pas
-// dans le filtrage commun). Lancé par
+// dans le filtrage commun) et ponts sans hauteur connue (phase 12a, data/ponts-osm/ : extrait France, filtrage à part,
+// voir src/lib/bridges-convert.js). Lancé par
 // .github/workflows/osm-data.yml (le 1er du mois, à la main, ou quand ce fichier change) ; Node 22, sans dépendance
 // npm ; osmium-tool installé par l'Action (apt).
 //
@@ -38,12 +39,16 @@ import { accessElementFromFeature, convertAccess, osmiumAccessFilter } from '../
 import { tollWayFromFeature } from '../src/lib/hgv-tolls-geo.js';
 import { convertTollNetwork, osmiumTollsFilter, tollsBbox } from '../src/lib/hgv-tolls-convert.js';
 import { parseTollData } from '../src/lib/hgv-tolls.js';
+import {
+  BRIDGES, bridgeFromFeature, clearanceFromFeature, convertBridges, osmiumBridgesFilter, sizeProblem,
+} from '../src/lib/bridges-convert.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'data', 'tunnels-adr.json');
 const AREAS_DIR = join(ROOT, 'data', 'aires-osm');
 const ACCESS_DIR = join(ROOT, 'data', 'acces-osm');
 const TOLLS_OUT = join(ROOT, 'data', 'taxes-pl-osm.json');
+const BRIDGES_DIR = join(ROOT, 'data', 'ponts-osm');
 // Réseau des taxes PL : périmètre (cadres, contours IGN, zones exclues) lu dans data/taxes-pl.json.
 const TOLL_DATA = parseTollData(JSON.parse(readFileSync(join(ROOT, 'data', 'taxes-pl.json'), 'utf8')));
 const TOLL_BBOX = tollsBbox(TOLL_DATA);
@@ -111,6 +116,32 @@ async function filterTolls(file, dir, tollWays) {
   }
   for (const f of [box, kept, seq]) rmSync(f, { force: true });
   return { n, lines };
+}
+
+/**
+ * Ponts et tronçons à hauteur connue (phase 12a) : filtrage osmium à part (ponts et maxheight de toute l'Europe ne
+ * tiennent pas dans les limites de taille), export GeoJSON lu ligne à ligne. Pays de BRIDGES.REGIONS seulement (et
+ * chaque fichier local en essai).
+ */
+async function filterBridges(file, dir, bridges, clearances) {
+  const kept = join(dir, 'ponts.osm.pbf');
+  const seq = join(dir, 'ponts.geojsonseq');
+  execFileSync('osmium', ['tags-filter', '--overwrite', '-o', kept, file, ...osmiumBridgesFilter()], { stdio: 'inherit' });
+  execFileSync('osmium', ['export', '--overwrite', '-f', 'geojsonseq', '--add-unique-id=type_id', '-o', seq, kept], { stdio: 'inherit' });
+  let nb = 0; let nh = 0; let lines = 0;
+  const rl = createInterface({ input: createReadStream(seq, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of rl) {
+    lines += 1;
+    const f = parseGeojsonLine(line);
+    if (!f) continue;
+    const b = bridgeFromFeature(f);
+    if (b) { bridges.set(b.id, b); nb += 1; }
+    const h = clearanceFromFeature(f);
+    if (h) { clearances.set(h.id, h); nh += 1; }
+  }
+  const size = statSync(seq).size;
+  for (const f of [kept, seq]) rmSync(f, { force: true });
+  return { nb, nh, lines, size };
 }
 
 /** Date de l'extrait (en-tête osmosis_replication_timestamp du fichier .pbf), ou null. */
@@ -255,15 +286,20 @@ async function main() {
   const areas = new Map();
   const ways = new Map();
   const tollWays = new Map();
+  const bridges = new Map();
+  const clearances = new Map();
+  const bridgePolys = [];
   const polys = [];
   const freshPolys = new Map();
   let updated = null;
   try {
     if (args.length) {
       for (const f of args) {
-        if (f.endsWith('.poly')) { polys.push(parsePoly(readFileSync(f, 'utf8'))); continue; }
+        if (f.endsWith('.poly')) { const p = parsePoly(readFileSync(f, 'utf8')); polys.push(p); bridgePolys.push(p); continue; }
         const r = await filterFile(f, dir, tunnels, areas, ways);
         const t = await filterTolls(f, dir, tollWays);
+        const b = await filterBridges(f, dir, bridges, clearances);
+        console.log(`${f} : ${b.nb} ponts, ${b.nh} tronçons à hauteur connue (${b.lines} objets exportés).`);
         console.log(`${f} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires, ${r.nw} voies à accès conditionnel, ${t.n} routes à référence dans le cadre des taxes PL.`);
       }
     } else {
@@ -281,6 +317,13 @@ async function main() {
         const date = extractDate(file);
         if (date && (!updated || date < updated)) updated = date; // date la plus ancienne des extraits
         const r = await filterFile(file, dir, tunnels, areas, ways);
+        if (BRIDGES.REGIONS.includes(region)) {
+          const t4 = Date.now();
+          const b = await filterBridges(file, dir, bridges, clearances);
+          bridgePolys.push(poly);
+          console.log(`${region} : ${b.nb} ponts, ${b.nh} tronçons à hauteur connue (${b.lines} objets exportés, `
+            + `${(b.size / 1024 / 1024).toFixed(0)} Mo de GeoJSON, ${Math.round((Date.now() - t4) / 1000)} s).`);
+        }
         if (region === TOLL_REGION) {
           const t3 = Date.now();
           const t = await filterTolls(file, dir, tollWays);
@@ -334,6 +377,17 @@ async function main() {
     writeFileSync(TOLLS_OUT, tt);
     console.log(`data/taxes-pl-osm.json : ${tollTaxes.join(', ')}, ${kb(Buffer.byteLength(tt))} (extraits du ${day}).`);
   } else console.log(`⚠ data/taxes-pl-osm.json non modifié : réseau absent pour ${tollsMissing.join(', ')}.`);
+  // Ponts (phase 12a) : écrits seulement si la copie tient dans les limites (5 Mo par fichier, 60 Mo en tout) ;
+  // sinon ancienne copie gardée, sans bloquer les autres données.
+  if (bridges.size) {
+    const bconv = convertBridges([...bridges.values()], [...clearances.values()], {
+      updated: day, grid: buildCoverage(bridgePolys), countries: BRIDGES.REGIONS.map((c) => c.split('/').pop()),
+    });
+    for (const line of bconv.log) console.log(line);
+    const problem = sizeProblem(bconv.sizes);
+    if (problem) console.log(`⚠ data/ponts-osm/ non modifié : ${problem}.`);
+    else writeTiles(BRIDGES_DIR, bconv.index, bconv.tiles, 'ponts et tronçons à hauteur');
+  } else console.log('⚠ data/ponts-osm/ non modifié : aucun pont lu.');
   if (freshPolys.size) {
     mkdirSync(POLY_DIR, { recursive: true });
     const dates = existsSync(POLY_DATES) ? JSON.parse(readFileSync(POLY_DATES, 'utf8')) : {};

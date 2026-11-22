@@ -133,6 +133,10 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
    */
   let areaItems = [];
   let areaMarkers = [];
+  // Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement, jamais en guidage.
+  let bridgeItems = [];
+  let bridgeMarkers = [];
+  let onBridge = null;
   let onArea = null;
   /** ZFE affichées (phase 5) : [{ name, banned, polygons }]. */
   let zfeItems = [];
@@ -442,6 +446,33 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.pinTo) marker('pinTo', marks.pinTo, MARK_COLORS.pin);
     if (marks.pinFrom) marker('pinFrom', marks.pinFrom, MARK_COLORS.pin);
     drawAreas();
+    drawBridges();
+  }
+
+  function bridgeElement(item) {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = `bridge-marker ${item.level === 'high' ? 'high' : 'medium'}`;
+    node.dataset.key = item.key;
+    node.textContent = '⚠';
+    node.setAttribute('aria-label', item.label);
+    node.title = item.label;
+    for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      onBridge?.(item.key);
+    });
+    return node;
+  }
+
+  function drawBridges() {
+    for (const m of bridgeMarkers) m.remove();
+    bridgeMarkers = [];
+    if (!map || navigating) return;
+    for (const item of bridgeItems) {
+      bridgeMarkers.push(new lib.Marker({ element: bridgeElement(item), anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
+    }
   }
 
   function areaElement(item) {
@@ -554,6 +585,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     map = null;
     for (const k of Object.keys(markers)) markers[k] = null;
     areaMarkers = [];
+    bridgeMarkers = [];
     lost = false;
     lastView = null;
     build(styleUrl, camera);
@@ -726,6 +758,18 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       areaItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
       drawAreas();
     },
+    /**
+     * Ponts sans hauteur connue (phase 12a) : [{ key, lonlat, level, label }] ; repères à l'arrêt seulement (retirés
+     * pendant le guidage, R412-6-2).
+     */
+    showBridges(items) {
+      bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
+      drawBridges();
+    },
+    /** Appelé avec la clé du repère de pont touché (à l'arrêt). */
+    onBridgePick(cb) {
+      onBridge = cb;
+    },
     /** Contours des ZFE du trajet (phase 5) : [{ name, banned, polygons }] ; liste vide = aucun contour. */
     showZfe(items) {
       zfeItems = Array.isArray(items) ? items.filter((z) => Array.isArray(z?.polygons) && z.polygons.length) : [];
@@ -791,6 +835,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
     setNavigating(on) {
       navigating = on;
+      drawBridges(); // phase 12a : aucun repère de pont pendant le guidage
       applyLayer(); // boutons « Plan / Satellite » de l'arrêt masqués en guidage (le guidage a le sien)
       if (!map) return;
       map.resize();

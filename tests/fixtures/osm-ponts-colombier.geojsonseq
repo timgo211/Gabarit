@@ -1,0 +1,9 @@
+{"type":"Feature","id":"w243477938","properties":{"railway":"rail","bridge":"viaduct","layer":"1","name":"Viaduc de Colombier","note_fixture":"GÉOMÉTRIE SYNTHÉTIQUE : api.openstreetmap.org bloqué depuis le conteneur le 22/11/2026 ; id et étiquettes du constat (pas de maxheight)"},"geometry":{"type":"LineString","coordinates":[[6.2040,47.6585],[6.2070,47.6592],[6.2100,47.6600],[6.2130,47.6607],[6.2160,47.6612]]}}
+{"type":"Feature","id":"w190520091","properties":{"highway":"residential","name":"Rue du Viaduc","maxweight":"3.5","note_fixture":"GÉOMÉTRIE SYNTHÉTIQUE, sous le viaduc"},"geometry":{"type":"LineString","coordinates":[[6.2098,47.6560],[6.2102,47.6640]]}}
+{"type":"Feature","id":"w1001","properties":{"highway":"footway","bridge":"yes","layer":"1"},"geometry":{"type":"LineString","coordinates":[[6.2080,47.6620],[6.2120,47.6620]]}}
+{"type":"Feature","id":"w1002","properties":{"highway":"tertiary","bridge":"yes","layer":"-1"},"geometry":{"type":"LineString","coordinates":[[6.2080,47.6630],[6.2120,47.6630]]}}
+{"type":"Feature","id":"w1003","properties":{"highway":"unclassified","bridge":"yes"},"geometry":{"type":"LineString","coordinates":[[6.20998,47.6570],[6.21002,47.6570]]}}
+{"type":"Feature","id":"w1004","properties":{"highway":"secondary","bridge":"yes","layer":"1","ref":"D 9"},"geometry":{"type":"LineString","coordinates":[[6.2080,47.6550],[6.2120,47.6550]]}}
+{"type":"Feature","id":"w1005","properties":{"highway":"residential","maxheight":"4.2","name":"Passage sous le pont D 9"},"geometry":{"type":"LineString","coordinates":[[6.2100,47.6546],[6.2100,47.6554]]}}
+{"type":"Feature","id":"w1006","properties":{"highway":"primary","bridge":"yes","maxheight":"3.5","name":"Pont bas"},"geometry":{"type":"LineString","coordinates":[[6.2080,47.6650],[6.2120,47.6650]]}}
+{"type":"Feature","id":"w1007","properties":{"railway":"rail","bridge":"yes","layer":"2"},"geometry":{"type":"LineString","coordinates":[[6.2080,47.6700],[6.2120,47.6700]]}}
