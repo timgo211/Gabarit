@@ -10,6 +10,7 @@ import {
   sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
+import { sanitizeRestrictions } from './restrictions.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -48,6 +49,7 @@ export function emptyData() {
     reports: [],
     trips: [],
     areaReports: [],
+    restrictions: [],
     settings: {
       theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
@@ -94,6 +96,7 @@ export function sanitizeData(raw) {
     reports: arr(raw.reports),
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
+    restrictions: sanitizeRestrictions(raw.restrictions).list, // Mes restrictions (phase 12b) : invalides et doublons écartés
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       nightMapLevel: sanitizeNightLevel(s.nightMapLevel), // luminosité de la carte la nuit (phase 2d), Normal par défaut
