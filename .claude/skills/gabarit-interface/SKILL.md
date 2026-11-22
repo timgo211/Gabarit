@@ -42,3 +42,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   `recolorStyle` dans `transformStyle` au changement de thème. Tracé toujours au-dessus des ZFE ; bord du tracé
   `ROUTE_WIDTH` (2 px de chaque côté), #14161C sur les photos IGN. Bandeau de manœuvre noir jour et nuit.
   Vérifié par `node tools/ui-check.mjs palette` (jour, nuit, satellite, 412 × 900 et 900 × 412, zoom 17).
+- Flèche à l'arrêt (< 3 km/h, `src/lib/nav-anim.js`) : la dérive du GPS se mesure depuis le point d'arrêt
+  (`stillPoint` : moyenne des 20 dernières positions reçues à l'arrêt), jamais depuis la dernière position dessinée
+  (± 60 m de dérive = jusqu'à 120 m entre deux mesures). Rien n'est redessiné tant que la position reste à moins de
+  100 m de ce point et que lui reste à moins de 50 m de la flèche (`stillDrift`) ; un redessin à l'arrêt (bandeau,
+  suivi) place flèche et caméra sur le point d'arrêt. Vérifié par `node tools/ui-check.mjs parked` (0 image attendue).

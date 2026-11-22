@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   ARROW_COLORS, AUTO_ARROW, sanitizeArrowColor, arrowColors, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, VOICE_RATE,
 } from '../src/lib/prefs.js';
-import { planMove, frameAt, shortestTurn, ANIM, holdStill, samePadding } from '../src/lib/nav-anim.js';
+import { planMove, frameAt, shortestTurn, ANIM, holdStill, samePadding, stillPoint, stillDrift } from '../src/lib/nav-anim.js';
+import { haversine } from '../src/lib/nav-geo.js';
 import { frenchVoices, pickVoice } from '../src/lib/nav-guidance.js';
 import { emptyData, sanitizeData } from '../src/lib/store.js';
 
@@ -136,4 +137,60 @@ test('arrêté, GPS qui dérive : flèche et carte figées (aucune image), sauf 
   assert.equal(samePadding(null, undefined), true);
   assert.equal(samePadding(pad, { ...pad, top: 300.3 }), true, 'arrondi au pixel');
   assert.equal(samePadding(pad, null), false);
+});
+
+// Position à dx m à l'est et dy m au nord de [lon, lat].
+const offset = ([lon, lat], dx, dy) => [lon + dx / (111320 * Math.cos((lat * Math.PI) / 180)), lat + dy / 110540];
+
+test("arrêté, GPS qui dérive de ± 60 m (trace de ui-check parked) : dérive mesurée depuis le point d'arrêt", () => {
+  const center = [4.85, 45.75];
+  const fixes = [];
+  for (let i = 0; i < 14; i += 1) {
+    const r = 60 * Math.abs(Math.sin(i * 0.9));
+    const a = (i * 137 * Math.PI) / 180;
+    fixes.push(offset(center, r * Math.sin(a), r * Math.cos(a)));
+  }
+  // Deux mesures peuvent être à plus de 100 m l'une de l'autre : la dernière position dessinée ne suffit pas.
+  const spread = Math.max(...fixes.flatMap((p) => fixes.map((q) => haversine(p, q))));
+  assert.ok(spread > ANIM.HOLD_M, `écart maximal ${spread.toFixed(0)} m`);
+  let stop = stillPoint(null, offset(center, 0, -150), 0); // arrivée sur le tracé, 150 m plus au sud
+  stop = stillPoint(stop, fixes[0], 0);
+  assert.equal(stop.n, 1, 'saut de 150 m : point remis à la position reçue');
+  const drawn = { lonlat: stop.lonlat, follow: true, padding: null };
+  for (const p of fixes.slice(1)) {
+    const prev = stop;
+    stop = stillPoint(stop, p, 0);
+    const d = stillDrift(prev, stop, drawn.lonlat, p);
+    assert.equal(holdStill(drawn, { follow: true, padding: null }, d, 0), true, `${d.toFixed(0)} m du point d'arrêt`);
+    assert.ok(haversine(stop.lonlat, center) < 25, "point d'arrêt près de la vraie position");
+  }
+  assert.equal(stop.n, 14);
+});
+
+test("point d'arrêt : remis à zéro en roulant, vitesse inconnue, saut de 100 m ; moyenne sur 20 positions", () => {
+  const p = [6, 48];
+  const prev = { lonlat: p, n: 5 };
+  const near = offset(p, 20, 0);
+  assert.deepEqual(stillPoint(null, p, 0), { lonlat: p, n: 1 });
+  assert.deepEqual(stillPoint(prev, near, 3), { lonlat: near, n: 1 }, 'en roulant');
+  assert.deepEqual(stillPoint(prev, near, null), { lonlat: near, n: 1 }, 'vitesse inconnue');
+  const far = offset(p, 101, 0);
+  assert.deepEqual(stillPoint(prev, far, 0), { lonlat: far, n: 1 }, 'camion qui avance au pas');
+  const avg = stillPoint(prev, near, 0);
+  assert.equal(avg.n, 6);
+  assert.ok(Math.abs(haversine(p, avg.lonlat) - 20 / 6) < 0.1, 'moyenne');
+  assert.equal(stillPoint({ lonlat: p, n: ANIM.STILL_N }, near, 0).n, ANIM.STILL_N, 'plafond');
+  assert.equal(stillPoint(prev, null, 0), prev, 'position absente : point gardé');
+  // Vrai déplacement lent (1 m par position, sous 3 km/h) : le point suit, la flèche est redessinée au plus tard
+  // quand il s'en est éloigné de 50 m.
+  let s = stillPoint(null, p, 0);
+  let k = 1;
+  for (; k < 2000; k += 1) {
+    const prevS = s;
+    s = stillPoint(s, offset(p, k, 0), 1);
+    if (!holdStill({ lonlat: p }, {}, stillDrift(prevS, s, p, offset(p, k, 0)), 1)) break;
+  }
+  assert.ok(k < 2000 && haversine(s.lonlat, p) >= ANIM.STILL_SHIFT_M, `flèche redessinée après ${k} m`);
+  assert.equal(stillDrift(null, s, p, p), NaN, 'sans point précédent : dessinée');
+  assert.equal(stillDrift(prev, prev, p, near), haversine(p, near));
 });
