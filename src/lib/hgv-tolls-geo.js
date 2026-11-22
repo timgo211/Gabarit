@@ -5,8 +5,8 @@
 //
 // Copie data/taxes-pl-osm.json (Action mensuelle, © contributeurs OpenStreetMap, ODbL ; contours IGN Admin Express,
 // Licence Ouverte, dans data/taxes-pl.json) : par taxe, les voies gardées (référence de la taxe, hors bretelles,
-// toll ≠ yes : les sections concédées à péage — A355, A36 vers Belfort, A31 au sud de Toul — sont exclues sans liste
-// écrite à la main), découpées par le cadre, le contour de la collectivité, les zones exclues (Eurométropole de
+// hors péage poids lourd — toll:hgv=yes, ou toll=yes sans toll:hgv=no : les sections concédées à péage — A355, A36
+// vers Belfort, A31 au sud de Toul — sont exclues sans liste écrite à la main), découpées par le cadre, le contour de la collectivité, les zones exclues (Eurométropole de
 // Strasbourg) et le cadre ou contour propre à une route (RD83 Colmar–Sélestat, RN52 en Meurthe-et-Moselle).
 //
 // Comparaison au tracé : un point tous les 50 m ; il compte s'il est à 15 m au plus d'un segment du réseau, avec un
@@ -235,6 +235,7 @@ export function tollWayFromFeature(f) {
   if (coords.length < 2) return null;
   return {
     id: Number(m[1]), refs, highway: t.highway, toll: String(t.toll ?? '').trim().toLowerCase(),
+    tollHgv: String(t['toll:hgv'] ?? '').trim().toLowerCase(),
     oneway: /^(yes|1|-1)$/i.test(String(t.oneway ?? '')) || t.highway === 'motorway', coords,
   };
 }

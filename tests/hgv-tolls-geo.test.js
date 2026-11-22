@@ -8,7 +8,7 @@ import { parseTollData, tollRules, tollsAlongRoute } from '../src/lib/hgv-tolls.
 import {
   TOLLS_GEO, normalizeRefs, axisDiff, tollWayFromFeature, parseTollNetwork, matchTollNetwork, encodeLine,
 } from '../src/lib/hgv-tolls-geo.js';
-import { convertTollNetwork, osmiumTollsFilter, tollsBbox } from '../src/lib/hgv-tolls-convert.js';
+import { convertTollNetwork, isHgvToll, osmiumTollsFilter, tollsBbox } from '../src/lib/hgv-tolls-convert.js';
 import { parseGeojsonLine } from '../src/lib/areas-osm-data.js';
 import { routeDiagnosticText } from '../src/lib/route-diagnostic.js';
 
@@ -70,10 +70,40 @@ test('conversion : toll=yes exclu et compté, Eurométropole exclue, M35 jamais 
   const net = network.taxes['r-pass'];
   assert.ok(net.segments.every((s) => !(s.a[1] > 48.5 && s.a[0] > 7.68 && s.b[1] > 48.5)), 'segment dans l\'Eurométropole');
   assert.ok(net.segments.every((s) => !s.refs.includes('M35')));
-  const rLog = converted.log.find((l) => /^R-Pass/.test(l));
-  assert.match(rLog, /A35 gardés \d+,\d km, exclus toll=yes 0,0 km/);
-  assert.match(rLog, /A36 gardés \d+,\d km, exclus toll=yes \d+,\d km/);
-  assert.match(converted.log.find((l) => /^Écocontribution/.test(l)), /total gardé ≈ \d+,\d km de route \(environ 525 km annoncés\)/);
+  const rBefore = converted.log.find((l) => /^R-Pass : avant découpage/.test(l));
+  const rLog = converted.log.find((l) => /^R-Pass : après découpage/.test(l));
+  assert.match(rBefore, /cadre 6\.84,47\.42,8\.24,49\.08 seul, hors péage\) : A35 \d+,\d km/);
+  assert.match(rLog, /après découpage \(contour \(Contours du Bas-Rhin et du Haut-Rhin\), sans Eurométropole de Strasbourg, cadre propre à D83, N83\)/);
+  assert.match(rLog, /A35 gardés \d+,\d km, exclus péage 0,0 km/);
+  assert.match(rLog, /A36 gardés \d+,\d km, exclus péage \d+,\d km/);
+  // Avant découpage : l'A35 de l'Eurométropole comptée ; après : retirée.
+  assert.ok(rp.km.A35.box > rp.km.A35.kept, `A35 avant ${rp.km.A35.box} km, après ${rp.km.A35.kept} km`);
+  const eLog = converted.log.find((l) => /^Écocontribution PL : après découpage/.test(l));
+  assert.match(eLog, /contour propre à N52/);
+  assert.match(eLog, /total gardé ≈ \d+,\d km de route \(environ 525 km annoncés\)/);
+  assert.match(converted.log.find((l) => /^Écocontribution PL : avant découpage/.test(l)), /cadre 3\.38,47\.42,8\.24,50\.17 seul/);
+  assert.match(converted.log.find((l) => /^Écocontribution PL : A31 au sud de 48,65° N/.test(l)), /toll=yes \d+,\d km.*toll:hgv=/);
+});
+
+test('péage poids lourd : toll:hgv=yes exclu même sans toll, toll:hgv=no garde une voie toll=yes', () => {
+  const line = (id, props) => tollWayFromFeature({
+    type: 'Feature', id: `w${id}`, properties: { highway: 'motorway', ref: 'A 31', oneway: 'yes', ...props },
+    geometry: { type: 'LineString', coordinates: [[5.9, 48.3], [5.9, 48.32]] },
+  });
+  const hgv = line(1, { 'toll:hgv': 'yes' });
+  assert.equal(hgv.tollHgv, 'yes');
+  assert.equal(isHgvToll(hgv), true);
+  assert.equal(isHgvToll(line(2, { toll: 'yes' })), true);
+  assert.equal(isHgvToll(line(3, { toll: 'yes', 'toll:hgv': 'no' })), false);
+  assert.equal(isHgvToll(line(4, {})), false);
+  // A31 en Meurthe-et-Moselle au sud de Toul (48,3° N) : seule la voie toll:hgv=no et la voie sans péage gardées.
+  const r = convertTollNetwork([hgv, line(2, { toll: 'yes' }), line(3, { toll: 'yes', 'toll:hgv': 'no' }), line(4, {})], real);
+  const a31 = r.json.taxes.ecpl.km.A31;
+  assert.equal(a31.kept, 2.2, `gardés ${a31.kept} km`);
+  assert.equal(a31.toll, 2.2, `exclus ${a31.toll} km`);
+  assert.equal(r.json.taxes.ecpl.lines.length, 2);
+  const bd = r.log.find((l) => /A31 au sud de 48,65° N/.test(l));
+  assert.match(bd, /toll=(yes|\(absent\)) 2,2 km, toll=(yes|\(absent\)) 2,2 km ; toll:hgv=\(absent\) 2,2 km, toll:hgv=(yes|no) 1,1 km, toll:hgv=(yes|no) 1,1 km\./);
 });
 
 test('Mulhouse → Strasbourg sans aucune référence : R-Pass trouvé sur l\'A35 par la géométrie', () => {

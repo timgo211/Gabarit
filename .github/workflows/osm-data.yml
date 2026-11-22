@@ -28,6 +28,7 @@ on:
       - src/lib/access-convert.js
       - src/lib/hgv-tolls-convert.js
       - src/lib/hgv-tolls-geo.js
+      - data/taxes-pl.json
       - .github/workflows/osm-data.yml
 
 permissions:

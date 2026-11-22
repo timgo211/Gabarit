@@ -311,7 +311,8 @@ async function main() {
   // Voies à accès conditionnel (phase 5d)
   const acc = convertAccess([...ways.values()], { updated: day, grid, countries });
   for (const line of acc.log) console.log(line);
-  // Réseau des taxes PL (phase 5h ter) : journal par référence (km gardés, km exclus toll=yes), total ECPL.
+  // Réseau des taxes PL (phase 5h ter) : journal par référence (km avant découpage, km gardés après
+  // découpage, km exclus pour péage poids lourd), total ECPL, répartition toll / toll:hgv de l'A31 au sud de Toul.
   const tolls = convertTollNetwork([...tollWays.values()], TOLL_DATA, { updated: day });
   for (const line of tolls.log) console.log(line);
   const tollTaxes = Object.keys(tolls.json.taxes);

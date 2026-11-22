@@ -351,10 +351,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [x] **Phase 5h ter — R-Pass / ECPL repérés par la géométrie**
     Fait : ORS renvoie de longues étapes sans nom ni référence (90 km entre Mulhouse et Strasbourg, 83 km d'A31 entre
     Thionville et Toul, diagnostics v30). Réseau taxé copié d'OSM par l'Action mensuelle (`data/taxes-pl-osm.json`,
-    hors `APP_FILES` ; voies portant une référence de la taxe, hors bretelles et hors toll=yes, découpées par les
+    hors `APP_FILES` ; voies portant une référence de la taxe, hors bretelles et hors péage PL (`toll:hgv=yes`, ou `toll=yes` sans `toll:hgv=no`), découpées par les
     contours IGN Admin Express : Alsace, Grand Est sans l'Alsace, Eurométropole exclue, RN52 en Meurthe-et-Moselle),
     comparé au tracé (`hgv-tolls-geo.js` : 15 m, cap modulo 180°, veto du nom d'étape, séries de 300 m) ; copie absente
-    → noms d'étape (« au moins »). Journal de l'Action : km gardés et exclus toll=yes par référence, total ECPL (environ
+    → noms d'étape (« au moins »). Journal de l'Action : km avant et après découpage, exclus pour péage par référence, répartition
+    toll / toll:hgv de l'A31 au sud de Toul, total ECPL (environ
     525 km annoncés). Diagnostic : méthode, points tous les 10 km sur les étapes sans nom. Calcul en échec : ancien
     tracé et repères effacés. Code 2009 : une requête de diagnostic sans les restrictions du profil (budget de 3),
     message « peut-être joignable seulement en franchissant une limite… », jamais affichée ni guidée ; échec aussi sans

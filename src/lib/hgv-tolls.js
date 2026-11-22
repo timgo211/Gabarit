@@ -111,7 +111,7 @@ export function parseTollData(json) {
     const grid = status !== 'check' ? parseGrid(t.grid, sources) : null;
     taxes.push({
       id, name, short: str(t.short) ?? name, start: t.start, bbox, roads, roadBoxes, rings, areaSource: str(t.area?.source),
-      excludeRings, roadAreas,
+      excludeRings, excludeSource: str(t.exclude?.source), roadAreas,
       status, basis: str(t.basis), source, verified, url: str(t.url),
       scope: str(t.scope), note: str(t.note), rates: rates?.length ? rates : null, grid,
     });
