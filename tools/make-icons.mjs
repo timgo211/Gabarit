@@ -3,9 +3,10 @@
 import { deflateSync } from 'node:zlib';
 import { writeFileSync } from 'node:fs';
 
-const BG = [15, 23, 32];
-const FG = [255, 176, 0];
-const WIN = [15, 23, 32];
+// Couleurs Panier Perdu (phase 2c-a) : noir #14161C, ambre #E8A93B.
+const BG = [0x14, 0x16, 0x1c];
+const FG = [0xe8, 0xa9, 0x3b];
+const WIN = BG;
 // Formes sur une grille 512 × 512 (identiques au SVG).
 const rects = [
   { x: 96, y: 176, w: 224, h: 160, c: FG },   // remorque

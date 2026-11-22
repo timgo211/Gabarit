@@ -124,6 +124,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Bloc 2 — Guidage
 
+- [x] **Phase 2c-a — Couleurs Panier Perdu (thème, logo, écran de chargement)** (seule, avant la 2c : disposition)
+  Identité visuelle de Panier Perdu : noir #14161C, ambre #E8A93B, crème #EDEAE3. Couleurs seulement (police
+  system-ui et disposition inchangées). Thème jour/nuit (`src/styles.css`, mêmes variables, contraste WCAG AA vérifié
+  par un test), barre du haut noire et titre ambre ; bandeau de manœuvre noir à pictogrammes ambre et texte crème de
+  jour comme de nuit ; flèche « auto » noire bordée d'ambre le jour, ambre bordée de noir la nuit ; temps restant et
+  arrivée en vert ; fond de carte OpenFreeMap recoloré au chargement (`src/lib/map-palette.js`), tracé ambre bordé de
+  noir ; logo et écran de chargement Android noir et ambre. Couleurs réglementaires inchangées (ZFE, panneaux, aires).
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

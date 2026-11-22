@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v32';
+const VERSION = 'v33';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -42,6 +42,7 @@ const APP_FILES = [
   './src/lib/areas-osm.js',
   './src/lib/areas-route.js',
   './src/lib/config.js',
+  './src/lib/contrast.js',
   './src/lib/coords.js',
   './src/lib/countries.js',
   './src/lib/country-rules.js',
@@ -50,6 +51,7 @@ const APP_FILES = [
   './src/lib/hgv-bans.js',
   './src/lib/holidays.js',
   './src/lib/map-layers.js',
+  './src/lib/map-palette.js',
   './src/lib/nav-anim.js',
   './src/lib/nav-geo.js',
   './src/lib/nav-guidance.js',

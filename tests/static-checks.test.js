@@ -68,6 +68,31 @@ test('manifest : chemins relatifs et icônes présentes', () => {
   assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.sizes === '512x512'));
 });
 
+test('phase 2c-a : écran de chargement, barre d\'état et logo aux couleurs Panier Perdu', () => {
+  const m = JSON.parse(read('manifest.webmanifest'));
+  assert.equal(m.background_color, '#14161C');
+  assert.equal(m.theme_color, '#14161C');
+  assert.match(read('index.html'), /<meta name="theme-color" content="#14161C">/);
+  const svg = read('icons/icon.svg');
+  assert.match(svg, /<rect width="512" height="512" fill="#14161C"\/>/);
+  assert.ok(!/#0f1720|#ffb000/i.test(svg), 'anciennes couleurs du logo');
+  // Icône « maskable » : tout le camion dans la zone sûre (cercle centré de rayon 40 % = 204,8 px sur 512).
+  // Source : W3C, Web App Manifest, « icon masks » (https://www.w3.org/TR/appmanifest/#icon-masks).
+  let far = 0;
+  for (const r of svg.matchAll(/<rect x="(\d+)" y="(\d+)" width="(\d+)" height="(\d+)"/g)) {
+    const [x, y, w, h] = r.slice(1).map(Number);
+    for (const [px, py] of [[x, y], [x + w, y], [x, y + h], [x + w, y + h]]) far = Math.max(far, Math.hypot(px - 256, py - 256));
+  }
+  const sw = Number(/stroke-width="(\d+)"/.exec(svg)[1]);
+  for (const c of svg.matchAll(/<circle cx="(\d+)" cy="(\d+)" r="(\d+)"/g)) {
+    const [x, y, r] = c.slice(1).map(Number);
+    far = Math.max(far, Math.hypot(x - 256, y - 256) + r + sw / 2);
+  }
+  assert.ok(far > 150 && far <= 204.8, `camion à ${far.toFixed(1)} px du centre`);
+  // PNG régénérés par tools/make-icons.mjs : premier pixel (fond) = #14161C.
+  assert.match(read('tools/make-icons.mjs'), /const BG = \[0x14, 0x16, 0x1c\]/);
+});
+
 test('service worker : ne met pas en cache les API, liste complète et relative', () => {
   const sw = read('sw.js');
   assert.doesNotMatch(sw, /heigit|openrouteservice|pelias|api_key|openfreemap|versatiles/i, 'sw.js ne doit citer aucune API');

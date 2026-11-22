@@ -60,8 +60,9 @@ function solidPng([r, g, b]) {
 }
 const RED_TILE = solidPng([220, 0, 0]);
 
+// Fond des faux styles : recoloré au chargement par src/lib/map-palette.js (2c-a) en crème le jour, #14161C la nuit.
 const DAY_BG = '#dcdcdc';
-const NIGHT_BG = '#305070'; // bien distinct du fond de la page (--panel nuit #0f1720), visible si le canevas est vide
+const NIGHT_BG = '#305070';
 const style = (bg) => ({ version: 8, sources: {}, layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } }] });
 /**
  * Style avec une source de tuiles lentes (comme le vrai fond vectoriel sur la tablette) : tant qu'une tuile se
@@ -362,7 +363,12 @@ async function mapColor(page) {
   }, png.toString('base64'));
 }
 const isRed = ([r, g, b]) => r > 150 && g < 90 && b < 90;
-const isNight = ([r, g, b]) => Math.abs(r - 0x30) < 14 && Math.abs(g - 0x50) < 14 && Math.abs(b - 0x70) < 14;
+/** Fond de carte nuit recoloré (#14161C) ; le scénario « context » peint .map en magenta pour voir un canevas vide. */
+const isNight = ([r, g, b]) => Math.abs(r - 0x14) < 6 && Math.abs(g - 0x16) < 6 && Math.abs(b - 0x1c) < 6;
+const near = ([r, g, b], hex, tol = 6) => {
+  const n = parseInt(hex.slice(1), 16);
+  return Math.abs(r - (n >> 16)) < tol && Math.abs(g - ((n >> 8) & 255)) < tol && Math.abs(b - (n & 255)) < tol;
+};
 const isDay = ([r, g, b]) => r > 190 && g > 190 && b > 190;
 
 async function setTheme(page, mode) {
@@ -497,6 +503,8 @@ async function satelliteThemeCheck(browser, base) {
 
 async function contextLossCheck(browser, base) {
   const { page, ctx } = await open(browser, base, { width: 412, height: 900, theme: 'night' });
+  // Canevas vide = magenta (le fond de la carte nuit, #14161C, se confondrait avec celui de la page).
+  await page.addStyleTag({ content: '.map { background: #ff00ff !important; }' });
   await computeRoute(page);
   await startSim(page);
   const before = await mapColor(page);
@@ -664,7 +672,7 @@ async function comfortCheck(browser, base) {
     const road = await page.textContent('#nav-road');
     check(await page.isVisible('#nav-road') && /Route de Lyon|D 306/.test(road ?? ''), `${width} px : nom de la route en cours`, road);
     const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nav-maneuver')).backgroundColor);
-    check(/rgb\(2[34]\d, 2[34]\d, 2[45]\d\)/.test(bg), `${width} px : bandeau clair en mode jour`, bg);
+    check(bg === 'rgb(20, 22, 28)', `${width} px : bandeau noir Panier Perdu, même de jour (2c-a)`, bg);
     const sep = await page.evaluate(() => getComputedStyle(document.querySelectorAll('.nav-stats > div')[1]).borderLeftWidth);
     check(sep === '1px', `${width} px : traits fins entre les valeurs`, sep);
     await noHorizontalScroll(page, `${width} px guidage (boutons de carte)`);
@@ -2093,7 +2101,7 @@ async function drawnRoutes(page) {
   });
 }
 
-/** Pixels bleus du tracé choisi (--route #0b57d0) dans la carte : le tracé est vraiment rendu. */
+/** Pixels ambre du tracé choisi (--route #E8A93B, 2c-a) dans la carte : le tracé est vraiment rendu. */
 async function bluePixels(page) {
   const png = await page.locator('#map').screenshot();
   return page.evaluate(async (b64) => {
@@ -2103,7 +2111,7 @@ async function bluePixels(page) {
     g.drawImage(img, 0, 0);
     const d = g.getImageData(0, 0, img.width, img.height).data;
     let n = 0;
-    for (let i = 0; i < d.length; i += 4) if (d[i] < 60 && d[i + 1] > 60 && d[i + 1] < 120 && d[i + 2] > 170) n += 1;
+    for (let i = 0; i < d.length; i += 4) if (d[i] > 205 && d[i + 1] > 150 && d[i + 1] < 190 && d[i + 2] < 95) n += 1;
     return n;
   }, png.toString('base64'));
 }
@@ -2114,14 +2122,14 @@ async function bluePixels(page) {
  */
 async function drawCheck(browser, base) {
   const { page, ctx, errors } = await open(browser, base, { width: 1280, height: 800, theme: 'day', layer: 'plan', slowTiles: true });
-  // Pixels bleus déjà là sans tracé (bouton « Plan », point GPS) : le tracé doit en ajouter nettement.
+  // Pixels ambre déjà là sans tracé (titre, point GPS) : le tracé doit en ajouter nettement.
   let baseline = await bluePixels(page);
   const expect = async (label, n) => {
     await page.waitForTimeout(1500);
     const d = await drawnRoutes(page);
     const blue = (await bluePixels(page)) - baseline;
     check(d.features === n && d.layer && d.visible && blue > 2000, `${label} : tracés dessinés`,
-      `source ${d.features}/${n}, couche ${d.layer ? (d.visible ? 'visible' : 'masquée') : 'absente'}, +${blue} px bleus, tuiles chargées : ${d.loaded}`);
+      `source ${d.features}/${n}, couche ${d.layer ? (d.visible ? 'visible' : 'masquée') : 'absente'}, +${blue} px ambre, tuiles chargées : ${d.loaded}`);
   };
   // Fond qui bouge encore (tuiles lentes en cours) au moment du calcul, comme sur la tablette.
   await page.evaluate(() => window.__maps.at(-1).panBy([200, 120], { duration: 0 }));
@@ -2207,13 +2215,152 @@ async function failedCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 2c-a — couleurs Panier Perdu : jour, nuit et satellite ; accueil, itinéraire, guidage (GPS émulé), Réglages ;
+ * portrait 412 × 900 et paysage 900 × 412. Tracé au-dessus des ZFE (aussi après changement de thème), bord du tracé
+ * de 2 px de chaque côté, flèche « Auto » cochée par défaut, pastilles lisibles, capture de jour zoomée sur le tracé.
+ */
+async function paletteCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const [cx, cy] = line[Math.floor(line.length / 2)];
+  const d = 0.006;
+  const zfe = {
+    updated: '2026-03-26',
+    zones: [{
+      id: 'TEST-ZFE-001', name: 'Testville', start: '2025-01-01', end: null,
+      pl: { critair: 'V3', hours: '24/7' }, vul: { critair: 'V3', hours: '24/7' }, url: 'https://example.org/arrete-zfe.pdf',
+      polygons: [[[[cx - d, cy - d], [cx + d, cy - d], [cx + d, cy + d], [cx - d, cy + d], [cx - d, cy - d]]]],
+    }],
+    voies: [],
+  };
+  const css = (sel, prop) => (pg) => pg.evaluate(([q, k]) => {
+    const n = document.querySelector(q);
+    return n ? getComputedStyle(n)[k] : null;
+  }, [sel, prop]);
+  const layerInfo = (pg) => pg.evaluate(() => {
+    const map = window.__maps?.at(-1);
+    const ids = (map?.getStyle()?.layers ?? []).map((l) => l.id);
+    const paint = (id, k) => (map?.getLayer(id) ? map.getPaintProperty(id, k) : null);
+    return {
+      ids, bg: paint(ids[0], 'background-color'),
+      casing: paint('route-casing', 'line-color'), line: paint('route-line', 'line-color'),
+      wCasing: paint('route-casing', 'line-width'), wLine: paint('route-line', 'line-width'),
+    };
+  });
+  const above = (info) => {
+    const top = Math.max(info.ids.indexOf('zfe-fill'), info.ids.indexOf('zfe-line'));
+    const low = Math.min(...['route-alt-casing', 'route-alt-line', 'route-casing', 'route-line'].map((id) => info.ids.indexOf(id)));
+    return top >= 0 && low > top;
+  };
+  for (const theme of ['day', 'night']) {
+    const tname = theme === 'day' ? 'jour' : 'nuit';
+    const bgHex = theme === 'day' ? '#EDEAE3' : '#14161C';
+    for (const [width, height] of [[412, 900], [900, 412]]) {
+      const tag = `${tname} ${width}×${height}`;
+      const file = (what) => join(SHOTS, `2ca-${tname}-${width}x${height}-${what}.png`);
+      const { page, ctx, errors } = await open(browser, base, { width, height, theme, zfe, directions: () => nav });
+      await page.waitForTimeout(600);
+      // Accueil : barre du haut noire, titre ambre, fond de carte recoloré.
+      check(await css('.topbar', 'backgroundColor')(page) === 'rgb(20, 22, 28)', `${tag} : barre du haut #14161C`);
+      check(await css('.brand', 'color')(page) === 'rgb(232, 169, 59)', `${tag} : titre « Gabarit » ambre`);
+      const c = await mapColor(page);
+      check(near(c, bgHex), `${tag} : fond de carte recoloré ${bgHex}`, `couleur ${c}`);
+      await page.screenshot({ path: file('accueil') });
+
+      // Réglages : « Auto (noir le jour, ambre la nuit) » cochée par défaut, pastilles lisibles.
+      await page.click('#btn-settings');
+      const auto = await page.evaluate(() => {
+        const r = document.querySelector('input[name="arrow-color"][value="auto"]');
+        return { checked: r.checked, text: r.closest('label').textContent.trim() };
+      });
+      check(auto.checked && auto.text === 'Auto (noir le jour, ambre la nuit)', `${tag} : flèche « Auto » cochée par défaut`, JSON.stringify(auto));
+      const sw = await page.$$eval('.swatch', (n) => n.map((e) => {
+        const st = getComputedStyle(e);
+        return { border: st.borderTopColor, width: st.borderTopWidth, w: e.getBoundingClientRect().width };
+      }));
+      const fg = theme === 'day' ? 'rgb(20, 22, 28)' : 'rgb(237, 234, 227)';
+      check(sw.length === 4 && sw.every((x) => x.border === fg && x.width === '2px' && x.w >= 28),
+        `${tag} : 4 pastilles de couleur bordées de la couleur du texte`, JSON.stringify(sw[0]));
+      await page.screenshot({ path: file('reglages'), fullPage: true });
+      await page.click('#dlg-settings [data-close]');
+
+      // Itinéraire : tracé ambre bordé de noir, 2 px de bord de chaque côté, au-dessus de la ZFE.
+      await computeRoute(page);
+      await page.waitForTimeout(800);
+      let info = await layerInfo(page);
+      check(above(info), `${tag} : tracé au-dessus des contours ZFE`, info.ids.filter((i) => /route|zfe/.test(i)).join(' < '));
+      check(/^#e8a93b$/i.test(info.line) && /^#(14161c|000000)$/i.test(info.casing), `${tag} : tracé ambre bordé de noir`, `${info.line} / ${info.casing}`);
+      check((info.wCasing - info.wLine) / 2 >= 2, `${tag} : bord du tracé ≥ 2 px de chaque côté`, `${info.wLine} / ${info.wCasing}`);
+      await page.screenshot({ path: file('itineraire') });
+
+      if (theme === 'day' && width === 412) {
+        // Capture zoomée (z 17) sur le tracé, fond crème.
+        await page.evaluate(([x, y]) => window.__maps.at(-1).jumpTo({ center: [x, y], zoom: 17 }), line[3]);
+        await page.waitForTimeout(700);
+        await page.locator('#map').screenshot({ path: file('trace-zoom17') });
+      }
+
+      // Guidage, GPS émulé comme le vrai.
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], speed: 0 });
+      await page.click('#btn-nav-start');
+      await drive(ctx, page, line, 50, 6);
+      check(await css('.nav-maneuver', 'backgroundColor')(page) === 'rgb(20, 22, 28)', `${tag} : bandeau de manœuvre noir`);
+      check(await css('.nav-icon', 'color')(page) === 'rgb(232, 169, 59)', `${tag} : pictogramme ambre`);
+      check(await css('.nav-dist', 'color')(page) === 'rgb(237, 234, 227)', `${tag} : texte du bandeau crème`);
+      const ok = theme === 'day' ? 'rgb(39, 107, 62)' : 'rgb(143, 214, 164)';
+      check(await css('#nav-eta', 'color')(page) === ok && await css('#nav-time', 'color')(page) === ok, `${tag} : temps et arrivée en vert`);
+      const arrow = await page.evaluate(() => {
+        const st = getComputedStyle(document.documentElement);
+        return [st.getPropertyValue('--arrow-fill').trim(), st.getPropertyValue('--arrow-stroke').trim()];
+      });
+      const want = theme === 'day' ? ['#14161c', '#e8a93b'] : ['#e8a93b', '#14161c'];
+      check(arrow.join() === want.join(), `${tag} : flèche auto`, arrow.join(' / '));
+      const over = await overflowingNavText(page);
+      check(over.length === 0, `${tag} guidage : textes dans leurs cases`, over.join(' ; '));
+      await page.screenshot({ path: file('guidage') });
+
+      // Satellite (photos IGN factices rouges) : tracé ambre bordé de #14161C.
+      await page.click('#btn-nav-layer');
+      await drive(ctx, page, line.slice(1), 50, 2);
+      await page.waitForTimeout(800);
+      info = await layerInfo(page);
+      check(isRed(await mapColor(page)) && /^#14161c$/i.test(info.casing), `${tag} : satellite, bord du tracé #14161C`, info.casing);
+      await page.screenshot({ path: file('guidage-satellite') });
+      await page.click('#btn-nav-layer');
+      await page.click('#btn-nav-stop');
+      await page.waitForTimeout(600);
+
+      // Satellite à l'arrêt (accueil avec itinéraire).
+      await page.click('[data-layer="satellite"]');
+      await page.waitForTimeout(800);
+      await page.screenshot({ path: file('satellite') });
+      await page.click('[data-layer="plan"]');
+
+      if (width === 412) {
+        // Changement de thème (setStyle + transformStyle) : fond recoloré, tracé toujours au-dessus des ZFE.
+        const other = theme === 'day' ? 'night' : 'day';
+        await setTheme(page, other);
+        await page.waitForTimeout(1200);
+        info = await layerInfo(page);
+        const otherHex = other === 'day' ? '#EDEAE3' : '#14161C';
+        check(String(info.bg).toUpperCase() === otherHex && above(info), `${tag} → ${other} : fond recoloré, tracé au-dessus des ZFE`,
+          `${info.bg} ; ${info.ids.filter((i) => /route|zfe/.test(i)).join(' < ')}`);
+      }
+      await noHorizontalScroll(page, tag);
+      check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
-    tolls: tollsCheck, failed: failedCheck };
+    tolls: tollsCheck, failed: failedCheck, palette: paletteCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

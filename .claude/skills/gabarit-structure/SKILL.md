@@ -19,6 +19,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     partage / copie / téléchargement, guide d'installation `INSTALL_STEPS`)
   - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
+  - phase 2c-a : `contrast.js` (contraste WCAG, variables CSS lues par `tests/contrast.test.js`), `map-palette.js`
+    (fond de carte recoloré jour/nuit, largeurs du tracé ; fixtures `style-liberty-layers.json`, `style-dark-layers.json`)
   - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
     poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
   - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,

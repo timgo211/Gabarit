@@ -37,3 +37,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Coordonnées saisies (départ / arrivée) : proposées sans appel Pelias ; appui long et coordonnées ne lancent jamais
   de calcul. Toute saisie dans un champ oublie le point choisi (et le repère de l'appui long) ; la liste de
   suggestions est remplacée dès la frappe (`suggestionPlan`), jamais d'ancienne suggestion à toucher.
+- Couleurs du fond de carte (2c-a) : style OpenFreeMap / VersaTiles recoloré par `src/lib/map-palette.js` (seules les
+  propriétés « *-color », jamais nos couches tracé / ZFE / IGN) : `recolorBase` au `style.load` (setPaintProperty),
+  `recolorStyle` dans `transformStyle` au changement de thème. Tracé toujours au-dessus des ZFE ; bord du tracé
+  `ROUTE_WIDTH` (2 px de chaque côté), #14161C sur les photos IGN. Bandeau de manœuvre noir jour et nuit.
+  Vérifié par `node tools/ui-check.mjs palette` (jour, nuit, satellite, 412 × 900 et 900 × 412, zoom 17).

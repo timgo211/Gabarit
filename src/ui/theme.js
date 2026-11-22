@@ -1,6 +1,6 @@
 // Applique le thème jour/nuit et le réévalue chaque minute en mode auto.
 
-import { resolveTheme } from '../lib/theme.js';
+import { resolveTheme, CHROME_COLOR } from '../lib/theme.js';
 
 export function createThemeController(onChange) {
   let mode = 'auto';
@@ -11,7 +11,7 @@ export function createThemeController(onChange) {
     if (theme === current) return;
     current = theme;
     document.documentElement.dataset.theme = theme;
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'night' ? '#05080b' : '#0f1720');
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', CHROME_COLOR); // barre d'état noire jour et nuit (2c-a)
     onChange?.(theme);
   }
 
