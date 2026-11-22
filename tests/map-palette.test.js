@@ -4,9 +4,12 @@ import assert from 'node:assert/strict';
 import { fixture } from './helpers.js';
 import {
   MAP_PALETTE, ROUTE_WIDTH, ROUTE_WIDTH_NAV, layerRole, mapPaintPatches, recolorStyle, streetLabelLayers, streetBubblePatches,
-  STREET_BUBBLE, satellitePaint, photoLabelPatches, PHOTO_NIGHT_LABEL,
+  STREET_BUBBLE, satellitePaint, photoLabelPatches, PHOTO_NIGHT_LABEL, NIGHT_PALETTES, NIGHT_BUBBLES, NIGHT_LEVELS,
+  DEFAULT_NIGHT_LEVEL, mapPalette, sanitizeNightLevel, bubbleColors,
 } from '../src/lib/map-palette.js';
-import { contrastRatio, AA_TEXT } from '../src/lib/contrast.js';
+import { contrastRatio, luminance, parseColor, AA_TEXT, AA_LARGE } from '../src/lib/contrast.js';
+
+const relativeLuminance = (hex) => luminance(parseColor(hex));
 
 const liberty = fixture('style-liberty-layers.json').layers;
 const dark = fixture('style-dark-layers.json').layers;
@@ -16,8 +19,7 @@ const patch = (patches, id, prop) => patches.find((p) => p.id === id && p.prop =
 
 test('palette jour et nuit : valeurs Panier Perdu', () => {
   assert.equal(MAP_PALETTE.day.background, '#EDEAE3');
-  assert.equal(MAP_PALETTE.night.background, '#14161C');
-  assert.equal(MAP_PALETTE.night.majorCasing, '#6B6E78');
+  assert.equal(MAP_PALETTE.night, NIGHT_PALETTES.normal, 'nuit par défaut : Normal (phase 2d)');
   for (const t of ['day', 'night']) {
     const p = MAP_PALETTE[t];
     for (const v of Object.values(p)) assert.match(v, /^#[0-9A-F]{6}$/);
@@ -119,11 +121,61 @@ test('bulles des noms de rues en guidage, réglages d\'origine ensuite', () => {
 });
 
 test('satellite la nuit : photos assombries, libellés clairs', () => {
-  assert.deepEqual(satellitePaint('night'), { 'raster-brightness-max': 0.6 });
+  assert.deepEqual(satellitePaint('night'), { 'raster-brightness-max': 0.8 }, 'Normal (phase 2d)');
+  assert.deepEqual(satellitePaint('night', 'dark'), { 'raster-brightness-max': 0.6 }, 'Sombre = v35');
+  assert.deepEqual(satellitePaint('night', 'light'), { 'raster-brightness-max': 0.9 });
+  assert.deepEqual(satellitePaint('day', 'dark'), { 'raster-brightness-max': 1 });
   assert.deepEqual(satellitePaint('day'), { 'raster-brightness-max': 1 });
   const layers = [{ id: 'place', type: 'symbol', paint: {} }, { id: 'road', type: 'line', 'source-layer': 'transportation' }];
   assert.deepEqual(photoLabelPatches(layers, 'night', true), [
     { id: 'place', prop: 'text-color', value: PHOTO_NIGHT_LABEL.text }, { id: 'place', prop: 'text-halo-color', value: PHOTO_NIGHT_LABEL.halo }]);
   assert.equal(photoLabelPatches(layers, 'night', false)[0].value, MAP_PALETTE.night.label);
   assert.ok(contrastRatio(PHOTO_NIGHT_LABEL.text, PHOTO_NIGHT_LABEL.halo) >= AA_TEXT);
+});
+
+// ───────── Phase 2d : trois niveaux de luminosité la nuit ─────────
+
+test('nuit : Sombre = la v35 à l\'identique, Normal par défaut, valeur inconnue → Normal', () => {
+  assert.deepEqual({ ...NIGHT_PALETTES.dark }, {
+    background: '#14161C', land: '#1C1F28', building: '#22252F', water: '#17222C', park: '#1B2620',
+    road: '#1C1F28', roadCasing: '#3A3E4A', major: '#2B2E37', majorCasing: '#6B6E78',
+    label: '#A9A79E', halo: '#14161C',
+  });
+  assert.deepEqual({ ...NIGHT_BUBBLES.dark }, { fill: '#1C1F28', border: '#6B6E78', text: '#EDEAE3' });
+  assert.deepEqual(NIGHT_LEVELS, ['dark', 'normal', 'light']);
+  assert.equal(DEFAULT_NIGHT_LEVEL, 'normal');
+  for (const x of [undefined, null, 'clair', 42]) assert.equal(sanitizeNightLevel(x), 'normal');
+  assert.equal(mapPalette('night', 'light'), NIGHT_PALETTES.light);
+  assert.equal(mapPalette('day', 'light'), MAP_PALETTE.day, 'le jour ne change pas');
+  assert.equal(bubbleColors('day', 'dark'), STREET_BUBBLE.day);
+});
+
+test('nuit : chaque niveau plus clair que le précédent (fond, terre, bâti, routes)', () => {
+  for (const k of ['background', 'land', 'building', 'road', 'major']) {
+    const [d, n, l] = NIGHT_LEVELS.map((lv) => relativeLuminance(NIGHT_PALETTES[lv][k]));
+    assert.ok(d < n && n < l, `${k} : ${d.toFixed(3)} < ${n.toFixed(3)} < ${l.toFixed(3)}`);
+  }
+});
+
+test('nuit : écart plus net entre fond, bâti, routes et libellés (Normal et Clair)', () => {
+  for (const lv of ['normal', 'light']) {
+    const p = NIGHT_PALETTES[lv];
+    const d = NIGHT_PALETTES.dark;
+    assert.ok(contrastRatio(p.major, p.background) > contrastRatio(d.major, d.background), `${lv} : grands axes`);
+    assert.ok(contrastRatio(p.road, p.background) > contrastRatio(d.road, d.background), `${lv} : routes`);
+    assert.ok(contrastRatio(p.building, p.land) >= contrastRatio(d.building, d.land), `${lv} : bâti`);
+    assert.ok(contrastRatio(p.label, p.background) > contrastRatio(d.label, d.background), `${lv} : libellés`);
+  }
+});
+
+test('nuit : niveau appliqué au fond, aux bulles et aux libellés sur la carte plan', () => {
+  const light = mapPaintPatches(dark, 'night', [], 'light');
+  assert.equal(patch(light, 'background', 'background-color'), NIGHT_PALETTES.light.background);
+  assert.equal(patch(light, 'highway_minor', 'line-color'), NIGHT_PALETTES.light.road);
+  const sombre = recolorStyle({ layers: dark }, 'night', [], 'dark');
+  assert.equal(sombre.layers.find((l) => l.id === 'background').paint['background-color'], '#14161C');
+  const on = streetBubblePatches(liberty, 'night', true, 'light');
+  assert.equal(on.find((p) => p.prop === 'text-color').value, NIGHT_BUBBLES.light.text);
+  const layers = [{ id: 'place', type: 'symbol', paint: {} }];
+  assert.equal(photoLabelPatches(layers, 'night', false, [], 'dark')[0].value, NIGHT_PALETTES.dark.label);
 });

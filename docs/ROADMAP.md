@@ -144,6 +144,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   colonne à gauche. Nuit : interface sombre, photos IGN assombries, mode auto au lever / coucher du soleil à la
   position (calcul NOAA), bascule sans éclair blanc. Phase d'interface : voix, recalcul et alertes inchangés.
 
+- [ ] **Phase 2d — Retouches du guidage (nuit plus claire, liste des aires)** (seule, après les tests tablette de la 2c, v35)
+  Liste défilante « Aires et parkings PL » à la place de l'encart à 3 lignes : jusqu'à 15 aires du trajet dans l'ordre
+  de la route (déjà placées, aucun appel réseau), une ligne = un bouton ≥ 56 px (pictogramme aire officielle / parking
+  OSM, nom, distance, heure d'arrivée, places PL), texte jamais coupé, défilement au doigt sans saisie, mise à jour sans
+  clignoter ni redessiner la carte à l'arrêt, fermée seule après 20 s ou par « Fermer ». Portrait : au-dessus du
+  compteur, 40 % de la hauteur au plus, jamais sur le bandeau, « Puis » ni les alertes ; paysage : colonne de gauche.
+  Appui : repère mis en évidence et fiche courte ; la carte ne se déplace sur l'aire qu'à l'arrêt ; « Y aller » et
+  « Fiche complète » seulement à l'arrêt (vue d'ensemble + « Autres itinéraires : bientôt »), jamais de changement
+  d'itinéraire. Nuit plus claire : Réglages › Affichage › « Luminosité de la carte la nuit » (Sombre = v35, Normal par
+  défaut, Clair), appliquée sous le voile sombre sans rechargement ; photos IGN 0,6 / 0,8 / 0,9 ; textes AA aux trois
+  niveaux, tracé ambre et routes ≥ 3:1 sur le fond Clair. Phase d'interface : voix, recalcul et alertes inchangés.
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

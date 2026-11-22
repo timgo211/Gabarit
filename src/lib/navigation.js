@@ -12,7 +12,7 @@ import {
   firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName,
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
-import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
+import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, AREAS } from './areas-route.js';
 import { zfeAlongRoute, guidanceZfe } from './zfe.js';
 import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
 import { emptyDriving, trackDriving, drivingView, drivingAnnouncements, toggleStopWork, DRIVING } from './driving-time.js';
@@ -402,7 +402,7 @@ export function updateNavigation(state, fix) {
   // Temps de conduite et pauses (phase 5, PR B, règlement CE 561/2006, aide seulement) : chaque position compte, même
   // hors du tracé ou après l'arrivée (manœuvres au dépôt).
   s.driving = trackDriving(s.driving, t, speed * 3.6);
-  const areasAhead = s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al));
+  const areasAhead = s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al), AREAS.LIST_COUNT);
   const da = drivingAnnouncements(s.driving, t, { nextArea: areasAhead.find((a) => a.distance > 0) ?? null });
   s.driving = da.state;
   if (s.driveVoice) for (const text of da.speak) events.push({ type: 'speak', text });
@@ -431,7 +431,10 @@ export function updateNavigation(state, fix) {
     canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
-    /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
+    /**
+     * Les 15 prochaines aires du sens de circulation (phase 9, liste de la phase 2d) : nom, distance, temps (s)
+     * jusqu'à l'aire, places PL, source officielle, position.
+     */
     nextAreas: areasAhead,
     /**
      * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,

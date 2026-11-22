@@ -16,8 +16,11 @@
 // tiré ou touché : détails du trajet en lecture seule). Paysage : bandeau et panneau du bas dans une colonne à
 // gauche. Aucun élément ne demande de redessiner la carte à l'arrêt : la caméra ne dépend que de la taille de
 // l'écran (followPadding).
-// Encart « Prochaines aires » (phase 9) : ouvert par la loupe → « Aires PL », rempli par le moteur à chaque position ;
-// toucher une aire ouvre sa fiche (lecture ; « Mon avis » seulement sous 10 km/h).
+// Liste « Aires et parkings PL » (phase 9, liste défilante de la phase 2d) : ouverte par la loupe → « Aires PL »,
+// remplie par le moteur à chaque position (15 aires au plus, dans l'ordre de la route), défilement au doigt, aucune
+// saisie. Toucher une aire : repère mis en évidence et fiche courte ; en roulant, la caméra ne bouge pas. « Y aller »
+// et « Fiche complète » seulement à l'arrêt (parkedState) ; l'itinéraire ne change jamais. Fermée seule après 20 s
+// sans toucher.
 // Temps de conduite (phase 5, règlement CE 561/2006, aide seulement) : carte d'alerte quand la pause approche ou
 // est dépassée, sinon dans les détails ; à l'arrêt seulement (sous 10 km/h), un bouton « Pas une pause (travail) ».
 
@@ -31,9 +34,9 @@ import {
 } from '../lib/navigation.js';
 import {
   systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus, traveledUpdate,
-  traveledCoords, bannerText, isLandscape, LANDSCAPE_COLUMN,
+  traveledCoords, bannerText, isLandscape, areaListBox, LANDSCAPE_COLUMN,
 } from '../lib/nav-layout.js';
-import { describeNextArea, nextAreasChanged } from '../lib/areas-route.js';
+import { describeNextArea, nextAreasChanged, areaRowsPlan, AREA_LIST } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
 import { tollText } from '../lib/route-options.js';
 import { GUIDANCE_START_LAYER, guidanceLayerButton } from '../lib/map-layers.js';
@@ -64,6 +67,7 @@ const RULE_KINDS = new Set(['tunnel', 'zfe', 'access', 'ban', 'border', 'wind'])
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
  *   onVoiceToggle:(on:boolean)=>void, onSimSpeedChange:(kmh:number)=>void,
  *   onRouteChange:(route:object)=>void, onEnd:(message?:string)=>void, onAreaOpen?:(id:string)=>void,
+ *   areaFacts?:(id:string)=>string,
  *   onView?:(view:object)=>void, onDriving?:(driving:object)=>void, onPosition?:(lonlat:number[])=>void }} ctx
  */
 export function createNavigation(ctx) {
@@ -118,6 +122,13 @@ export function createNavigation(ctx) {
     areas: $('#nav-areas'),
     areasList: $('#nav-areas-list'),
     areasEmpty: $('#nav-areas-empty'),
+    areasClose: $('#btn-nav-areas-close'),
+    areaCard: $('#nav-area-card'),
+    areaCardName: $('#nav-area-card-name'),
+    areaCardFacts: $('#nav-area-card-facts'),
+    areaCardMore: $('#nav-area-card-more'),
+    areaGo: $('#btn-nav-area-go'),
+    areaSheet: $('#btn-nav-area-sheet'),
     top: $('.nav-top'),
     mapbtns: $('.nav-mapbtns'),
   };
@@ -381,17 +392,19 @@ export function createNavigation(ctx) {
     const room = Math.min(vx - (land ? columnRight : 0), colLeft - vx) - 16;
     ui.road.style.maxWidth = `${Math.max(0, Math.round(2 * room))}px`;
 
-    // Encart des aires : sous le bandeau, au-dessus de la pastille (portrait) ; à droite de la colonne (paysage).
-    const areasLeft = land ? columnRight + INSET : INSET;
-    const areasTop = land ? INSET : stackBottom + 8;
-    const areasBottom = Math.min(land ? speedoTop - 8 : h, pillBottom - 44);
-    ui.areas.style.left = `${areasLeft}px`;
-    ui.areas.style.right = `${Math.round(w - colLeft + 8)}px`;
-    ui.areas.style.top = `${Math.round(areasTop)}px`;
-    ui.areas.style.maxHeight = `${Math.max(0, Math.floor(areasBottom - areasTop))}px`;
+    // Liste des aires (phase 2d) : portrait, au-dessus du compteur, 40 % de la hauteur au plus, jamais sur la pile du
+    // bandeau ; paysage, dans la colonne de gauche entre le bandeau et le panneau du bas (src/lib/nav-layout.js).
+    const box = areaListBox({ width: w, height: h, stackBottom, colLeft, speedoTop, sheetTop, columnRight });
+    ui.areas.style.left = `${box.left}px`;
+    ui.areas.style.right = `${box.right}px`;
+    ui.areas.style.top = '';
+    ui.areas.style.bottom = `${box.bottom}px`;
+    ui.areas.style.maxHeight = `${box.maxHeight}px`;
 
-    // Message bref : à la place de la pastille de la rue (masquée pendant 4 s).
-    ui.toast.style.bottom = `${Math.round(h - pillBottom)}px`;
+    // Message bref : à la place de la pastille de la rue (masquée pendant 4 s) ; en portrait, liste des aires
+    // ouverte : juste au-dessus de la liste (qui couvre le véhicule).
+    const listTop = !land && !ui.areas.hidden ? ui.areas.getBoundingClientRect().top - r.top : null;
+    ui.toast.style.bottom = `${Math.round(h - (listTop === null ? pillBottom : listTop - 8))}px`;
     ui.toast.style.left = `${Math.round(vx)}px`;
     ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
     renderRoad();
@@ -401,7 +414,8 @@ export function createNavigation(ctx) {
   function renderRoad() {
     const name = s?.view?.roadName ?? '';
     if (ui.road.textContent !== name) ui.road.textContent = name;
-    ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || !ui.toast.hidden;
+    const listOver = !!s?.areasOpen && !root.classList.contains('land'); // portrait : la liste couvre le véhicule
+    ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || listOver || !ui.toast.hidden;
   }
 
   // ───────── Rendu d'une position ─────────
@@ -437,6 +451,7 @@ export function createNavigation(ctx) {
     // « Autres itinéraires » : seulement à l'arrêt (sous 5 km/h pendant 3 s).
     s.park = parkedState(s.park, view.speedKmh, Date.now());
     ui.alt.setAttribute('aria-disabled', String(!s.park.parked));
+    renderAreaButtons();
 
     renderAlerts(view);
     renderAreas(view);
@@ -458,14 +473,64 @@ export function createNavigation(ctx) {
     });
   }
 
-  /** Encart « Prochaines aires » : 3 lignes (nom, distance, heure d'arrivée, places PL), une ligne = un bouton. */
+  /** Pictogrammes maison des lignes : écusson « P » (aire officielle), carré « P » (parking OpenStreetMap). */
+  const AREA_ICONS = {
+    official: '<svg viewBox="0 0 24 24" aria-hidden="true"><path class="ico-fill" d="M12 1.5 21 5v6.5c0 5.4-3.8 9.7-9 11-5.2-1.3-9-5.6-9-11V5z"/><path class="nav-area-ico-p" d="M9.2 17V7h3.6a3.1 3.1 0 0 1 0 6.2H9.2"/></svg>',
+    osm: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="ico-fill" x="2.5" y="2.5" width="19" height="19" rx="4"/><path class="nav-area-ico-p" d="M9.2 18V6h3.8a3.4 3.4 0 0 1 0 6.8H9.2"/></svg>',
+  };
+
+  /** Contenu d'une ligne (bouton) de la liste : pictogramme, nom, distance · heure · places PL. */
+  function fillAreaRow(b, d) {
+    if (b.dataset.icon !== d.icon) {
+      b.dataset.icon = d.icon;
+      b.querySelector('.nav-area-ico').innerHTML = AREA_ICONS[d.icon];
+    }
+    b.querySelector('.nav-area-ico').setAttribute('title', d.kind);
+    const texts = [['.nav-area-name', d.name], ['.nav-area-dist', d.distance], ['.nav-area-eta', d.eta], ['.nav-area-places', d.places]];
+    for (const [sel, t] of texts) {
+      const n = b.querySelector(sel);
+      if (n.textContent !== t) n.textContent = t;
+    }
+    b.setAttribute('aria-label', `${d.kind} : ${d.name}, ${d.distance}, arrivée ${d.eta}, ${d.places}`);
+  }
+
+  function newAreaRow(id) {
+    const li = document.createElement('li');
+    li.dataset.id = id;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'nav-area';
+    b.dataset.id = id;
+    const ico = document.createElement('span');
+    ico.className = 'nav-area-ico';
+    const text = document.createElement('span');
+    text.className = 'nav-area-text';
+    const name = document.createElement('span');
+    name.className = 'nav-area-name';
+    const facts = document.createElement('span');
+    facts.className = 'nav-area-facts';
+    for (const cls of ['nav-area-dist', 'nav-area-eta', 'nav-area-places']) {
+      const x = document.createElement('span');
+      x.className = cls;
+      facts.append(x);
+    }
+    text.append(name, facts);
+    b.append(ico, text);
+    li.append(b);
+    return li;
+  }
+
+  /**
+   * Liste « Aires et parkings PL » : lignes mises à jour sur place (src/lib/areas-route.js, areaRowsPlan), jamais
+   * reconstruites en entier ; à l'arrêt avec les mêmes aires, rien ne bouge (aucun dessin de la carte).
+   */
   function renderAreas(view) {
     ui.areasBtn.setAttribute('aria-pressed', String(!!s?.areasOpen));
     ui.areas.hidden = !s?.areasOpen;
     if (!s?.areasOpen) return;
     const next = view?.nextAreas ?? [];
     const now = new Date();
-    const texts = next.map((n) => ({ id: n.id, d: describeNextArea(n, now) }));
+    const texts = next.map((n) => ({ id: n.id, n, d: describeNextArea(n, now) }));
     // Mêmes textes, ou arrêté avec les mêmes aires : rien à redessiner (src/lib/areas-route.js).
     const shown = {
       key: JSON.stringify([s.areasCount, texts.map(({ id, d }) => [id, d.name, d.distance, d.eta, d.places])]),
@@ -474,30 +539,86 @@ export function createNavigation(ctx) {
     };
     if (!nextAreasChanged(s.areasShown, shown, view?.speedKmh, shown.at)) return;
     s.areasShown = shown;
-    const rows = texts.map(({ id, d }) => {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'nav-area';
-      b.dataset.id = id;
-      const name = document.createElement('span');
-      name.className = 'nav-area-name';
-      name.textContent = d.name;
-      const facts = document.createElement('span');
-      facts.className = 'nav-area-facts';
-      for (const [cls, t] of [['nav-area-dist', d.distance], ['nav-area-eta', d.eta], ['nav-area-places', d.places]]) {
-        const x = document.createElement('span');
-        x.className = cls;
-        x.textContent = t;
-        facts.append(x);
-      }
-      b.append(name, facts);
-      const li = document.createElement('li');
-      li.append(b);
-      return li;
-    });
-    ui.areasList.replaceChildren(...rows);
-    ui.areasEmpty.hidden = rows.length > 0;
-    ui.areasEmpty.textContent = s.areasCount ? 'Plus d\'aire sur la suite du trajet.' : 'Aucune aire trouvée sur ce trajet (ou recherche en cours).';
+    s.areasById = new Map(texts.map((t) => [t.id, t]));
+    if (s.areaPicked) renderAreaCard();
+    const rows = new Map([...ui.areasList.children].map((li) => [li.dataset.id, li]));
+    const plan = areaRowsPlan([...rows.keys()], texts.map((t) => t.id));
+    for (const id of plan.remove) rows.get(id).remove();
+    let prev = null;
+    for (const { id, d } of texts) {
+      let li = rows.get(id);
+      if (!li || !li.isConnected) li = newAreaRow(id);
+      fillAreaRow(li.firstElementChild, d);
+      // Ordre de la route : une ligne n'est déplacée que si elle n'est pas déjà à sa place.
+      const want = prev ? prev.nextElementSibling : ui.areasList.firstElementChild;
+      if (want !== li) ui.areasList.insertBefore(li, want);
+      prev = li;
+    }
+    const empty = texts.length === 0;
+    if (ui.areasEmpty.hidden !== !empty) ui.areasEmpty.hidden = !empty;
+    const msg = s.areasCount ? 'Plus d\'aire sur la suite du trajet.' : 'Aucune aire trouvée sur ce trajet (ou recherche en cours).';
+    if (ui.areasEmpty.textContent !== msg) ui.areasEmpty.textContent = msg;
+  }
+
+  /** Fiche courte de l'aire touchée (lecture seule). */
+  function renderAreaCard() {
+    const t = s?.areaPicked ? s.areasById?.get(s.areaPicked) : null;
+    ui.areaCard.hidden = !t;
+    if (!t) return;
+    const { d } = t;
+    const facts = `${d.kind} · ${d.distance} · arrivée ${d.eta} · ${d.places}`;
+    const more = ctx.areaFacts?.(t.id) ?? '';
+    if (ui.areaCardName.textContent !== d.name) ui.areaCardName.textContent = d.name;
+    if (ui.areaCardFacts.textContent !== facts) ui.areaCardFacts.textContent = facts;
+    if (ui.areaCardMore.textContent !== more) ui.areaCardMore.textContent = more;
+    ui.areaCardMore.hidden = !more;
+  }
+
+  /** « Y aller » et « Fiche complète » : actifs seulement à l'arrêt (moins de 5 km/h pendant 3 s). */
+  function renderAreaButtons() {
+    const off = String(!s?.park?.parked);
+    for (const b of [ui.areaGo, ui.areaSheet]) if (b.getAttribute('aria-disabled') !== off) b.setAttribute('aria-disabled', off);
+  }
+
+  /** Ouvre ou ferme la liste ; fermée seule au bout de 20 s sans toucher. */
+  function setAreasOpen(open) {
+    if (!s) return;
+    s.areasOpen = open;
+    s.areasShown = null; // liste ouverte : lignes à jour
+    clearTimeout(s.areasTimer);
+    if (open) touchAreas();
+    else {
+      s.areaPicked = null;
+      ui.areaCard.hidden = true;
+      ctx.map.highlightArea?.(null);
+    }
+    renderAreas(s.view);
+    renderAreaButtons();
+    renderRoad();
+    layoutGuidance();
+  }
+
+  /** Toucher ou faire défiler la liste relance les 20 s. */
+  function touchAreas() {
+    if (!s?.areasOpen) return;
+    clearTimeout(s.areasTimer);
+    s.areasTimer = setTimeout(() => setAreasOpen(false), AREA_LIST.AUTO_CLOSE_MS);
+  }
+
+  /** Aire touchée : repère mis en évidence, fiche courte ; la carte ne se déplace sur l'aire qu'à l'arrêt. */
+  function pickArea(id) {
+    if (!s) return;
+    s.areaPicked = id;
+    ctx.map.highlightArea?.(id);
+    renderAreaCard();
+    layoutGuidance();
+    const t = s.areasById?.get(id);
+    if (s.park?.parked && t?.n.lonlat) {
+      s.follow = false;
+      s.overview = false;
+      renderFollow();
+      ctx.map.showPlace?.(t.n.lonlat);
+    }
   }
 
   function saveDriving(force = false) {
@@ -723,6 +844,7 @@ export function createNavigation(ctx) {
       }),
       drivingSavedAt: now,
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0, areasShown: null,
+      areasTimer: null, areaPicked: null, areasById: new Map(),
       params, vehicle, view: null, follow: true, overview: false, northUp: false, error: '', gpsLost: false,
       layer: GUIDANCE_START_LAYER, layerMessage: '', park: null, doneAlong: null,
       tollDistance: typeof route.tollDistance === 'number' ? route.tollDistance : undefined,
@@ -745,6 +867,9 @@ export function createNavigation(ctx) {
     ui.stop.setAttribute('aria-label', 'Quitter le guidage');
     ui.areasBtn.replaceChildren(symbolSvg('parking'), Object.assign(document.createElement('span'), { textContent: 'Aires PL' }));
     renderFollow();
+    ui.areasList.replaceChildren();
+    ui.areaCard.hidden = true;
+    renderAreaButtons();
     renderAreas(null);
     ctx.map.setLayer(s.layer);
     renderLayer();
@@ -797,7 +922,8 @@ export function createNavigation(ctx) {
     if (session.watchId !== null) navigator.geolocation.clearWatch(session.watchId);
     clearInterval(session.simTimer);
     clearInterval(session.signalTimer);
-    for (const t of ['recenterTimer', 'releaseTimer', 'searchTimer', 'confirmTimer', 'toastTimer']) clearTimeout(session[t]);
+    for (const t of ['recenterTimer', 'releaseTimer', 'searchTimer', 'confirmTimer', 'toastTimer', 'areasTimer']) clearTimeout(session[t]);
+    ctx.map.highlightArea?.(null);
     ctx.voice.cancel();
     ctx.wakeLock.disable();
     root.hidden = true;
@@ -848,14 +974,26 @@ export function createNavigation(ctx) {
   ui.layer.addEventListener('click', () => { toggleLayer(); setSearch(false); });
   ui.areasBtn.addEventListener('click', () => {
     if (!s) return;
-    s.areasOpen = !s.areasOpen;
-    s.areasShown = null; // encart ouvert : lignes à jour
-    renderAreas(s.view);
+    setAreasOpen(!s.areasOpen);
     setSearch(false);
   });
+  ui.areasClose.addEventListener('click', () => setAreasOpen(false));
   ui.areasList.addEventListener('click', (e) => {
     const b = e.target.closest('.nav-area');
-    if (b?.dataset.id) ctx.onAreaOpen?.(b.dataset.id);
+    if (b?.dataset.id) pickArea(b.dataset.id);
+  });
+  for (const ev of ['pointerdown', 'scroll', 'wheel']) ui.areas.addEventListener(ev, touchAreas, { passive: true });
+  // Réservés à l'arrêt : en roulant, un message et rien d'autre (jamais de changement d'itinéraire).
+  ui.areaGo.addEventListener('click', () => {
+    if (!s) return;
+    if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
+    overview();
+    toast('Autres itinéraires : bientôt');
+  });
+  ui.areaSheet.addEventListener('click', () => {
+    if (!s || !s.areaPicked) return;
+    if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
+    ctx.onAreaOpen?.(s.areaPicked);
   });
   ui.voice.addEventListener('click', () => {
     const on = !ctx.voice.enabled;

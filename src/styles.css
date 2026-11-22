@@ -678,27 +678,54 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .area-avis .avis-ok { border-color: var(--avis-ok); }
 .area-avis .btn:disabled { opacity: .45; }
 
-/* Encart « Prochaines aires » du guidage : lisible d'un coup d'œil, chaque ligne ouvre la fiche. */
+/* Liste « Aires et parkings PL » du guidage (phase 2d) : défile au doigt, ancrée en bas (elle monte vers le haut),
+   une ligne = un bouton de 56 px au moins ; texte replié entre les mots seulement (ni coupe ni points de suspension). */
 .nav-areas {
-  position: absolute; min-width: 0; max-width: 620px; overflow-y: auto; overscroll-behavior: contain;
-  padding: 6px; border-radius: 16px;
+  position: absolute; min-width: 0; max-width: 620px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y;
+  padding: 0 6px 6px; border-radius: 16px;
   background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 12px rgba(0,0,0,.35);
 }
-.nav-areas-title { margin: 0 4px 4px; font-size: .85rem; font-weight: 700; opacity: .8; }
+.nav-areas-head {
+  position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 8px; padding: 6px 0 6px 4px;
+  background: var(--card);
+}
+.nav-areas-title { flex: 1 1 auto; min-width: 0; margin: 0; font-size: 1rem; font-weight: 800; }
+.nav-areas-close { flex: 0 0 auto; min-height: 56px; min-width: 96px; }
 .nav-areas-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
 .nav-area {
-  width: 100%; min-width: 0; min-height: 56px; padding: 4px 8px; display: grid; gap: 0; text-align: left; cursor: pointer;
-  font: inherit; color: inherit; background: transparent; border: 0; border-left: 6px solid var(--area); border-radius: 6px;
+  width: 100%; min-width: 0; min-height: 56px; padding: 6px 8px; display: flex; align-items: center; gap: 10px;
+  text-align: left; cursor: pointer; font: inherit; color: inherit; background: transparent;
+  border: 0; border-left: 6px solid var(--area); border-radius: 6px;
 }
-.nav-area-name { font-weight: 800; font-size: 1.05rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.nav-area-facts { display: flex; gap: 10px; min-width: 0; font-size: .95rem; font-variant-numeric: tabular-nums; }
-.nav-area-facts > span { white-space: nowrap; }
+.nav-area:active { background: var(--panel); }
+.nav-area-ico { flex: 0 0 auto; width: 32px; height: 32px; color: var(--area); }
+.nav-area-ico svg { display: block; width: 100%; height: 100%; }
+.nav-area-ico-p { fill: none; stroke: var(--area-fg); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.nav-area-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 0; }
+.nav-area-name, .nav-area-facts > span, .nav-area-card p {
+  white-space: normal; overflow-wrap: normal; word-break: normal; hyphens: manual;
+}
+.nav-area-name { font-weight: 800; font-size: 1.05rem; line-height: 1.2; }
+.nav-area-facts { display: flex; flex-wrap: wrap; column-gap: 10px; min-width: 0; font-size: .95rem; font-variant-numeric: tabular-nums; }
 .nav-area-dist { font-weight: 800; }
-.nav-area-places { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.nav-areas-empty { margin: 0 4px; font-weight: 600; }
+.nav-areas-empty { margin: 4px; font-weight: 600; }
+.nav-area-card {
+  margin: 0 0 6px; padding: 8px 10px; display: grid; gap: 4px; border-radius: 12px;
+  background: var(--panel); border: 2px solid var(--area);
+}
+.nav-area-card[hidden] { display: none; }
+.nav-area-card p { margin: 0; }
+.nav-area-card-name { font-weight: 800; font-size: 1.1rem; }
+.nav-area-card-facts { font-weight: 600; font-variant-numeric: tabular-nums; }
+.nav-area-card-more { color: var(--muted); font-size: .95rem; }
+.nav-area-card-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+.nav-area-card-btns .btn { min-height: 56px; white-space: normal; line-height: 1.15; }
+.nav-area-card-btns .btn[aria-disabled="true"] { opacity: .5; }
+/* Repère de l'aire choisie dans la liste : plus gros, cerné d'ambre, au-dessus des autres. */
+.area-marker.selected { width: 44px; height: 44px; font-size: 22px; border: 4px solid var(--accent); z-index: 2; }
 @media (max-width: 600px) {
   .nav-area-name { font-size: 1rem; }
-  .nav-area-facts { gap: 8px; font-size: .9rem; }
+  .nav-area-facts { column-gap: 8px; font-size: .9rem; }
   .area-avis .btn { font-size: .95rem; }
 }
 

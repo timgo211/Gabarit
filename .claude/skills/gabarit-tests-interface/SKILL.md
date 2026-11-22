@@ -50,3 +50,12 @@ voile sombre pendant la bascule, photos assombries (0,6), « la signalisation fa
 Aides du guidage : `navAreas` / `navLayer` (rangée de la loupe), `stopGuidance` (✕ puis « Quitter »), `showDriving` /
 `closeDetails` (temps de conduite dans les détails quand les deux places d'alerte sont prises). Le style de test
 `streets: true` ajoute une couche de noms de rues (tuiles refusées) pour vérifier les bulles.
+Phase 2d (`guidage`) : liste des aires ouverte en roulant et à l'arrêt aux 5 tailles (`checkAreaList` : lignes et
+« Fermer » ≥ 56 px, aucun texte coupé, aucune saisie, jamais au-dessus de la pile du bandeau, ≤ 40 % en portrait,
+défilement possible, rien ne se chevauche), fiche courte et repère `.selected`, caméra immobile en roulant, « Y aller »
+et « Fiche complète » grisés à 50 km/h puis actifs après 3 s d'arrêt, aucun recalcul, « Fermer », fermeture seule
+après 20 s (412×900 jour). Puis `nightLevelsCheck` (`guidage niveaux` pour lui seul) : Réglages › Affichage, Sombre →
+Normal → Clair à 412×900 et 1280×800, fond jamais clair pendant le changement, voile sombre, fond mesuré de chaque
+niveau, réglage mémorisé, sans rechargement ; guidage à chaque niveau (captures `2d-nuit-*`), photos 0,6 / 0,8 / 0,9.
+La nuit attendue ailleurs est le niveau Normal (`MAP_PALETTE.night`, photos 0,8).
+

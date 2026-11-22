@@ -10,6 +10,7 @@ import {
   sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
+import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
 
@@ -48,7 +49,7 @@ export function emptyData() {
     trips: [],
     areaReports: [],
     settings: {
-      theme: 'auto', avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
+      theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
       arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
@@ -94,6 +95,7 @@ export function sanitizeData(raw) {
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
+      nightMapLevel: sanitizeNightLevel(s.nightMapLevel), // luminosité de la carte la nuit (phase 2d), Normal par défaut
       avoidTolls: s.avoidTolls === true,
       avoidFerries: s.avoidFerries === true,
       voice: s.voice !== false, // guidage vocal activé par défaut

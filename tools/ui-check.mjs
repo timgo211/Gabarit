@@ -25,6 +25,7 @@ import { tollWayFromFeature } from '../src/lib/hgv-tolls-geo.js';
 import { convertTollNetwork } from '../src/lib/hgv-tolls-convert.js';
 import { parseTollData } from '../src/lib/hgv-tolls.js';
 import { sunTimes } from '../src/lib/sun.js';
+import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
@@ -61,7 +62,8 @@ function solidPng([r, g, b]) {
 }
 const RED_TILE = solidPng([220, 0, 0]);
 
-// Fond des faux styles : recoloré au chargement par src/lib/map-palette.js (2c-a) en crème le jour, #14161C la nuit.
+// Fond des faux styles : recoloré au chargement par src/lib/map-palette.js (2c-a) en crème le jour ; la nuit, fond du
+// niveau de luminosité (phase 2d : #22252F en Normal, par défaut).
 const DAY_BG = '#dcdcdc';
 const NIGHT_BG = '#305070';
 const style = (bg, streets = false) => (streets ? {
@@ -124,7 +126,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
-  tollsFile = undefined, tollsNetwork = null, sw = false, streets = false,
+  tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -161,16 +163,16 @@ async function open(browser, base, {
       }
     });
   }
-  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on }) => {
+  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on, nightLevel: nl }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
     localStorage.setItem('gabarit.orsKey', 'cle-factice-de-test');
     localStorage.setItem('gabarit.data', JSON.stringify({
       version: 1, vehicles: [v ?? { id: 'v1', name: 'Semi-remorque frigorifique 44 t', height: 4, width: 2.55, length: 16.5,
         weight: 44, axleload: 11.5, maxSpeed: 90 }],
-      activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: on },
+      activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: on, ...(nl ? { nightMapLevel: nl } : {}) },
     }));
-  }, { theme, layer, vehicle, voice });
+  }, { theme, layer, vehicle, voice, nightLevel });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async (route) => {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
@@ -373,10 +375,13 @@ async function mapColor(page) {
   }, png.toString('base64'));
 }
 const isRed = ([r, g, b]) => r > 150 && g < 90 && b < 90;
-/** Photos IGN factices (rouges), assombries ou non (la nuit : raster-brightness-max 0,6, phase 2c). */
+/** Photos IGN factices (rouges), assombries ou non (la nuit : raster-brightness-max 0,6 à 0,9 selon le niveau, 2d). */
 const isPhoto = ([r, g, b]) => r > 90 && g < 60 && b < 60;
-/** Fond de carte nuit recoloré (#14161C) ; le scénario « context » peint .map en magenta pour voir un canevas vide. */
-const isNight = ([r, g, b]) => Math.abs(r - 0x14) < 6 && Math.abs(g - 0x16) < 6 && Math.abs(b - 0x1c) < 6;
+/**
+ * Fond de carte nuit recoloré (niveau Normal par défaut, phase 2d) ; le scénario « context » peint .map en magenta
+ * pour voir un canevas vide.
+ */
+const isNight = (c) => near(c, MAP_PALETTE.night.background);
 const near = ([r, g, b], hex, tol = 6) => {
   const n = parseInt(hex.slice(1), 16);
   return Math.abs(r - (n >> 16)) < tol && Math.abs(g - ((n >> 8) & 255)) < tol && Math.abs(b - (n & 255)) < tol;
@@ -433,6 +438,86 @@ async function navSearchChip(page, sel) {
   await page.click(sel);
 }
 const navAreas = (page) => navSearchChip(page, '#btn-nav-areas');
+
+/**
+ * Phase 2d : état de la liste « Aires et parkings PL » du guidage : lignes, hauteur, défilement, textes coupés, place
+ * par rapport à la pile du bandeau (« Puis », alertes) ; scroll : essaie de la faire défiler.
+ */
+async function areaListState(page, { scroll = false } = {}) {
+  return page.evaluate(async (doScroll) => {
+    const list = document.querySelector('#nav-areas');
+    const open = !!list && !list.hidden && getComputedStyle(list).visibility !== 'hidden';
+    if (!open) return { open };
+    const r = list.getBoundingClientRect();
+    const rows = [...list.querySelectorAll('#nav-areas-list .nav-area')];
+    const cut = [];
+    for (const n of list.querySelectorAll('.nav-area-name, .nav-area-facts > span, .nav-area-card p, .btn')) {
+      if (n.closest('[hidden]')) continue;
+      const cs = getComputedStyle(n);
+      if (n.scrollWidth > n.clientWidth + 1 || cs.textOverflow === 'ellipsis' || cs.wordBreak === 'break-all'
+        || cs.overflowWrap === 'anywhere' || cs.hyphens === 'auto') cut.push(n.className || n.id);
+    }
+    // Pile du bandeau : bas du dernier élément visible (bandeau, « Puis », alertes, « +N »).
+    let stackBottom = 0;
+    for (const n of document.querySelectorAll('#nav .nav-top > *, #nav .nav-alerts > *')) {
+      if (n.hidden || !n.getClientRects().length || getComputedStyle(n).visibility === 'hidden') continue;
+      stackBottom = Math.max(stackBottom, n.getBoundingClientRect().bottom);
+    }
+    const scrollable = list.scrollHeight > list.clientHeight + 1;
+    let scrolled = false;
+    if (doScroll && scrollable) {
+      const before = list.scrollTop;
+      list.scrollTop = before + 120;
+      await new Promise((res) => setTimeout(res, 50));
+      scrolled = list.scrollTop > before;
+      list.scrollTop = before;
+    }
+    const style = getComputedStyle(list);
+    return {
+      open, rows: rows.length, minRow: rows.length ? Math.round(Math.min(...rows.map((b) => b.getBoundingClientRect().height))) : 0,
+      heights: rows.map((b) => Math.round(b.getBoundingClientRect().height)).join(','),
+      ratio: r.height / window.innerHeight, top: r.top, bottom: r.bottom, stackBottom,
+      scrollable, scrolled, overflowY: style.overflowY, touch: style.touchAction, cut,
+      inputs: list.querySelectorAll('input, textarea, select, [contenteditable]').length,
+      card: !document.querySelector('#nav-area-card').hidden,
+      selected: document.querySelectorAll('.area-marker.selected').length,
+      go: document.querySelector('#btn-nav-area-go').getAttribute('aria-disabled'),
+      sheet: document.querySelector('#btn-nav-area-sheet').getAttribute('aria-disabled'),
+      closeH: Math.round(document.querySelector('#btn-nav-areas-close').getBoundingClientRect().height),
+    };
+  }, scroll);
+}
+
+/** Phase 2d : contrôles de la liste des aires ouverte (en roulant ou à l'arrêt). */
+async function checkAreaList(page, label, land) {
+  const al = await areaListState(page, { scroll: true });
+  check(al.open && al.rows >= 4, `${label} : liste des aires ouverte`, `${al.rows} ligne(s)`);
+  check(al.minRow >= 56 && al.closeH >= 56, `${label} : lignes et « Fermer » d'au moins 56 px`, `${al.heights} ; Fermer ${al.closeH}`);
+  check(al.cut.length === 0, `${label} : aucun texte coupé dans la liste`, al.cut.join(', '));
+  check(al.inputs === 0, `${label} : liste sans saisie`);
+  check(al.top >= al.stackBottom - 0.5, `${label} : liste jamais au-dessus du bandeau, de « Puis » ni des alertes`,
+    `haut ${Math.round(al.top)} < pile ${Math.round(al.stackBottom)}`);
+  if (!land) check(al.ratio <= 0.4 + 0.003, `${label} : portrait, liste ≤ 40 % de la hauteur`, `${Math.round(al.ratio * 100)} %`);
+  check(al.overflowY === 'auto' && al.touch === 'pan-y' && (!al.scrollable || al.scrolled),
+    `${label} : défilement au doigt possible`, `${al.overflowY} ${al.touch} débordement ${al.scrollable} défilée ${al.scrolled}`);
+  const foot = await footOverlaps(page);
+  check(foot.out.length === 0, `${label} : liste ouverte, rien ne se chevauche`, foot.out.join(' ; '));
+  return al;
+}
+
+/** Centre de la caméra (lon, lat) de la carte en cours. */
+async function cameraCenter(page) {
+  return page.evaluate(() => {
+    const c = window.__maps?.at(-1)?.getCenter();
+    return c ? [c.lng, c.lat] : null;
+  });
+}
+/** Même centre à quelques mètres près (fin d'animation de la flèche). */
+const sameCenter = (a, b) => !!a && !!b && Math.abs(a[0] - b[0]) < 2e-4 && Math.abs(a[1] - b[1]) < 2e-4;
+
+/** Couleur de la carte : sombre (aucun éclair clair) — moyenne des composantes sous 90. */
+const isDark = ([r, g, b]) => (r + g + b) / 3 < 90;
+
 const navLayer = (page) => navSearchChip(page, '#btn-nav-layer');
 /** Texte du bouton Plan / Satellite (rangée de la loupe ouverte puis refermée). */
 async function navLayerText(page) {
@@ -534,7 +619,7 @@ async function satelliteThemeCheck(browser, base) {
   let c = await mapColor(page);
   check(isRed(c), 'satellite, jour : photos affichées', `couleur ${c}`);
   await setTheme(page, 'night');
-  // Phase 2c : la nuit, mêmes photos assombries (raster-brightness-max 0,6).
+  // Phase 2c : la nuit, mêmes photos assombries (raster-brightness-max 0,8 au niveau Normal, phase 2d).
   const dayRed = c;
   c = await mapColor(page);
   check(c[0] > 90 && c[1] < 60 && c[2] < 60 && c[0] < dayRed[0] - 40, 'satellite, jour → nuit : photos affichées, assombries', `couleur ${c} (jour ${dayRed})`);
@@ -2211,7 +2296,7 @@ async function guidanceCheck(browser, base) {
     // (réévaluation chaque minute).
     const auto = night && width === 412;
     const sunset = sunTimes(Date.parse('2026-12-21T12:00:00Z'), START[1], START[0]).sunset;
-    const { page, ctx, errors } = await open(browser, base, {
+    const { page, ctx, errors, stats } = await open(browser, base, {
       width, height, streets: true, directions: () => nav,
       theme: auto ? 'auto' : night || mode === 'satellite' ? 'night' : 'day',
       now: auto ? sunset - 8000 : null,
@@ -2247,7 +2332,7 @@ async function guidanceCheck(browser, base) {
     check(m.route && m.doneLayers && m.done >= 2 && m.width === 12, `${label} : tracé épais et partie parcourue (grise)`, JSON.stringify(m));
     check(m.bubble === 'gabarit-bubble' && m.bubbleFit === 'both' && m.bubbleImage, `${label} : noms des rues en bulles`, `${m.bubble} ${m.bubbleFit} ${m.bubbleImage}`);
     check(m.marker && m.disclaimer, `${label} : marqueur et « la signalisation fait foi » visibles`);
-    if (mode === 'satellite') check(m.brightness === 0.6, `${label} : photos IGN assombries la nuit`, String(m.brightness));
+    if (mode === 'satellite') check(m.brightness === SATELLITE_NIGHT_BRIGHTNESS.normal, `${label} : photos IGN assombries la nuit (Normal : 0,8)`, String(m.brightness));
     let foot = await footOverlaps(page);
     check(foot.out.length === 0, `${label} : en roulant, rien ne se chevauche`, foot.out.join(' ; '));
     check(foot.sizes.length >= 4 && foot.sizes.every((x) => x >= 56), `${label} : boutons ronds d'au moins 56 px`, foot.sizes.join(', '));
@@ -2298,6 +2383,27 @@ async function guidanceCheck(browser, base) {
     check(foot.out.length === 0, `${label} : rangée de la loupe libre`, foot.out.join(' ; '));
     await page.click('#btn-nav-search');
 
+    // Phase 2d : liste défilante des aires et parkings PL, en roulant (50 km/h).
+    const land = width > height;
+    const reqBefore = stats.directions;
+    await navAreas(page);
+    await drive(ctx, page, line.slice(3), 50, 2);
+    await checkAreaList(page, `${label} en roulant`, land);
+    const camBefore = await cameraCenter(page);
+    await page.locator('#nav-areas-list .nav-area').first().click();
+    await page.waitForTimeout(400);
+    let al = await areaListState(page);
+    check(al.card && al.selected === 1, `${label} : appui sur une aire → fiche courte et repère mis en évidence`, `fiche ${al.card}, repère ${al.selected}`);
+    check(!(await page.isVisible('#btn-nav-recenter')) && sameCenter(camBefore, await cameraCenter(page)),
+      `${label} : en roulant, la caméra ne bouge pas vers l'aire`);
+    check(al.go === 'true' && al.sheet === 'true', `${label} : « Y aller » et « Fiche complète » grisés à 50 km/h`, `${al.go} ${al.sheet}`);
+    await page.click('#btn-nav-area-go', { force: true });
+    check(/Disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${label} : « Y aller » en roulant → « Disponible à l'arrêt »`);
+    await page.click('#btn-nav-area-sheet', { force: true });
+    check(!(await page.isVisible('#dlg-area')), `${label} : « Fiche complète » en roulant n'ouvre rien`);
+    await checkAreaList(page, `${label} fiche courte ouverte`, land);
+    await page.screenshot({ path: join(SHOTS, `2d-${mode}-${width}x${height}-aires-roulant.png`) });
+
     // À l'arrêt (vitesse 0 pendant plus de 3 s) : « Autres itinéraires » actif (vue d'ensemble pour l'instant).
     const stopAt = line[Math.min(line.length - 1, 4)];
     // Vitesse lissée par le moteur (50 → 25 → 12 → 6 → 3 km/h), puis 3 s sous 5 km/h.
@@ -2315,6 +2421,32 @@ async function guidanceCheck(browser, base) {
     check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
       `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble`);
     await page.click('#btn-nav-recenter');
+
+    // Phase 2d : à l'arrêt, « Y aller » et « Fiche complète » actifs ; l'aire touchée est montrée sur la carte.
+    if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
+    await page.waitForTimeout(300);
+    al = await areaListState(page);
+    check(al.go === 'false' && al.sheet === 'false', `${label} : « Y aller » et « Fiche complète » actifs après 3 s d'arrêt`, `${al.go} ${al.sheet}`);
+    await checkAreaList(page, `${label} à l'arrêt`, land);
+    await page.locator('#nav-areas-list .nav-area').nth(1).click();
+    await page.waitForTimeout(900);
+    check(await page.isVisible('#btn-nav-recenter'), `${label} : à l'arrêt, la carte montre l'aire touchée (Recentrer proposé)`);
+    await page.screenshot({ path: join(SHOTS, `2d-${mode}-${width}x${height}-aires-arret.png`) });
+    await page.click('#btn-nav-area-go');
+    await page.waitForTimeout(700);
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
+      `${label} : « Y aller » à l'arrêt → vue d'ensemble, « Autres itinéraires : bientôt »`);
+    check(stats.directions === reqBefore, `${label} : liste des aires, aucun recalcul`, `${stats.directions - reqBefore} requête(s)`);
+    await page.click('#btn-nav-recenter');
+    if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
+    await page.click('#btn-nav-areas-close');
+    check(!(await page.isVisible('#nav-areas')) && (await page.$$('.area-marker.selected')).length === 0,
+      `${label} : « Fermer » ferme la liste, repère remis`);
+    if (width === 412 && mode === 'jour') {
+      await navAreas(page);
+      await page.waitForTimeout(20_600);
+      check(!(await page.isVisible('#nav-areas')), `${label} : liste fermée seule après 20 s sans toucher`);
+    }
 
     // Panneau du bas : détails du trajet (lecture seule), puis « +N » s'il y a plus de 2 alertes.
     await page.click('#btn-nav-sheet');
@@ -2339,6 +2471,85 @@ async function guidanceCheck(browser, base) {
     await stopGuidance(page);
     check(!(await page.isVisible('#nav')), `${label} : « Quitter » termine le guidage`);
     check(errors.length === 0, `${label} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Phase 2d : nuit aux trois niveaux de luminosité (filtre facultatif : node tools/ui-check.mjs guidage niveaux).
+  if (!only || only === 'niveaux') await nightLevelsCheck(browser, base);
+}
+
+/**
+ * Phase 2d : luminosité de la carte la nuit (Sombre, Normal, Clair) choisie dans Réglages › Affichage, appliquée sans
+ * rechargement ni éclair clair (voile sombre, fond toujours sombre), fond de plus en plus clair ; guidage de nuit à
+ * chaque niveau (captures de l'interface, satellite 0,6 / 0,8 / 0,9). Téléphone 412×900 et tablette 1280×800.
+ */
+async function nightLevelsCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height] of [[412, 900], [1280, 800]]) {
+    const tag = `${width}×${height} nuit`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme: 'night', nightLevel: 'dark', streets: true, directions: () => nav,
+      overpass: () => fixture('overpass-aires.json'),
+    });
+    await page.waitForTimeout(800);
+    await page.evaluate(() => {
+      window.__veil = [];
+      const v = document.querySelector('.map-veil');
+      new MutationObserver(() => { if (v.classList.contains('on')) window.__veil.push(getComputedStyle(v).backgroundColor); })
+        .observe(v, { attributes: true, attributeFilter: ['class'] });
+    });
+    const lum = ([r, g, b]) => r + g + b;
+    const colors = {};
+    for (const level of NIGHT_LEVELS) {
+      if (level !== 'dark') {
+        await page.click('#btn-settings');
+        await page.check(`input[name="night-level"][value="${level}"]`);
+        await page.click('#dlg-settings [data-close]');
+        // Pendant le changement : le fond reste sombre à chaque mesure (jamais d'éclair clair).
+        const samples = [];
+        for (let i = 0; i < 6; i += 1) { samples.push(await mapColor(page)); await page.waitForTimeout(120); }
+        check(samples.every(isDark), `${tag} → ${level} : fond jamais clair pendant le changement`, samples.map((c) => c.join('/')).join(' '));
+        await page.waitForTimeout(900);
+      }
+      colors[level] = await mapColor(page);
+      check(near(colors[level], NIGHT_PALETTES[level].background, 8), `${tag} ${level} : fond de carte ${NIGHT_PALETTES[level].background}`,
+        `couleur ${colors[level]}`);
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).settings.nightMapLevel);
+      check(stored === level, `${tag} ${level} : réglage mémorisé sur l'appareil`, String(stored));
+    }
+    const veil = await page.evaluate(() => window.__veil);
+    check(veil.length >= 2 && veil.every((c) => c === 'rgb(20, 22, 28)'), `${tag} : voile sombre à chaque changement de luminosité`, veil.join(', '));
+    check(lum(colors.dark) < lum(colors.normal) && lum(colors.normal) < lum(colors.light), `${tag} : Sombre < Normal < Clair`,
+      NIGHT_LEVELS.map((l) => colors[l].join('/')).join(' < '));
+    check(await page.evaluate(() => performance.getEntriesByType('navigation').length === 1 && !!window.__maps && window.__maps.length === 1),
+      `${tag} : appliqué sans rechargement ni nouvelle carte`);
+
+    // Guidage de nuit à chaque niveau : captures (panneau du bas, boutons ronds, alertes), satellite assombri.
+    for (const level of ['light', 'normal', 'dark']) {
+      if (level !== 'light') {
+        await page.click('#btn-settings');
+        await page.check(`input[name="night-level"][value="${level}"]`);
+        await page.click('#dlg-settings [data-close]');
+        await page.waitForTimeout(1200);
+      }
+      await computeRoute(page);
+      await page.waitForTimeout(300);
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await drive(ctx, page, line, 50, 4);
+      await page.waitForTimeout(400);
+      const foot = await footOverlaps(page);
+      check(foot.out.length === 0, `${tag} ${level} : guidage, rien ne se chevauche`, foot.out.join(' ; '));
+      await page.screenshot({ path: join(SHOTS, `2d-nuit-${level}-${width}x${height}-plan.png`) });
+      await navLayer(page);
+      await page.waitForTimeout(800);
+      const m = await guidanceMap(page);
+      check(m.brightness === SATELLITE_NIGHT_BRIGHTNESS[level], `${tag} ${level} : photos IGN à ${SATELLITE_NIGHT_BRIGHTNESS[level]}`, String(m.brightness));
+      await page.screenshot({ path: join(SHOTS, `2d-nuit-${level}-${width}x${height}-satellite.png`) });
+      await stopGuidance(page);
+      await page.waitForTimeout(400);
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
   }
 }
@@ -2514,7 +2725,7 @@ async function paletteCheck(browser, base) {
   };
   for (const theme of ['day', 'night']) {
     const tname = theme === 'day' ? 'jour' : 'nuit';
-    const bgHex = theme === 'day' ? '#EDEAE3' : '#14161C';
+    const bgHex = theme === 'day' ? '#EDEAE3' : MAP_PALETTE.night.background;
     for (const [width, height] of [[412, 900], [900, 412]]) {
       const tag = `${tname} ${width}×${height}`;
       const file = (what) => join(SHOTS, `2ca-${tname}-${width}x${height}-${what}.png`);
@@ -2604,7 +2815,7 @@ async function paletteCheck(browser, base) {
         await setTheme(page, other);
         await page.waitForTimeout(1200);
         info = await layerInfo(page);
-        const otherHex = other === 'day' ? '#EDEAE3' : '#14161C';
+        const otherHex = other === 'day' ? '#EDEAE3' : MAP_PALETTE.night.background;
         check(String(info.bg).toUpperCase() === otherHex && above(info), `${tag} → ${other} : fond recoloré, tracé au-dessus des ZFE`,
           `${info.bg} ; ${info.ids.filter((i) => /route|zfe/.test(i)).join(' < ')}`);
       }

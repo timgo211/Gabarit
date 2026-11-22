@@ -18,7 +18,7 @@ import { haversine } from '../lib/nav-geo.js';
 import { overviewPadding } from '../lib/navigation.js';
 import {
   recolorStyle, mapPaintPatches, ROUTE_WIDTH, ROUTE_WIDTH_NAV, streetBubblePatches, satellitePaint, photoLabelPatches,
-  STREET_BUBBLE,
+  STREET_BUBBLE, bubbleColors, sanitizeNightLevel,
 } from '../lib/map-palette.js';
 import { vehicleElement } from './vehicle-icon.js';
 
@@ -93,6 +93,10 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let selected = 0; // indice de l'itinéraire choisi (couleur vive)
   let routeBbox = null;
   let theme = initialTheme;
+  /** Luminosité de la carte la nuit (phase 2d) : 'dark' | 'normal' | 'light'. */
+  let nightLevel = sanitizeNightLevel(opts.nightLevel);
+  /** Aire mise en évidence (liste du guidage, phase 2d). */
+  let highlighted = null;
   let navigating = false;
   let onGesture = null;
   let onPick = null;
@@ -285,7 +289,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     const style = map.getStyle();
     const firstSymbol = style?.layers?.find((l) => l.type === 'symbol')?.id;
     const beforeId = firstSymbol ?? (map.getLayer(ROUTE_LAYERS[4]) ? ROUTE_LAYERS[4] : undefined);
-    map.addLayer({ id: SAT_LAYER, type: 'raster', source: SAT_SOURCE, layout: { visibility: 'none' }, paint: satellitePaint(theme) }, beforeId);
+    map.addLayer({ id: SAT_LAYER, type: 'raster', source: SAT_SOURCE, layout: { visibility: 'none' }, paint: satellitePaint(theme, nightLevel) }, beforeId);
     applyLayer();
   }
 
@@ -313,14 +317,14 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function paintLabels() {
     const layers = map?.getStyle()?.layers;
     if (!layers) return;
-    for (const p of photoLabelPatches(layers, theme, !!lastView?.photos, OWN_LAYERS)) {
+    for (const p of photoLabelPatches(layers, theme, !!lastView?.photos, OWN_LAYERS, nightLevel)) {
       try { map.setPaintProperty(p.id, p.prop, p.value); } catch { /* couche refusée : laissée */ }
     }
   }
 
   /** Bulle des noms de rues (image étirable autour du texte), aux couleurs du thème. */
   function bubbleImage() {
-    const c = STREET_BUBBLE[theme === 'night' ? 'night' : 'day'];
+    const c = bubbleColors(theme, nightLevel);
     const size = 32;
     const cv = document.createElement('canvas');
     cv.width = size; cv.height = size;
@@ -354,12 +358,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (!layers) return;
     if (!navigating) recolorBase(); // couleurs des libellés de la palette rendues (bulles retirées)
     if (map.getLayer(SAT_LAYER)) {
-      for (const [prop, value] of Object.entries(satellitePaint(theme))) map.setPaintProperty(SAT_LAYER, prop, value);
+      for (const [prop, value] of Object.entries(satellitePaint(theme, nightLevel))) map.setPaintProperty(SAT_LAYER, prop, value);
     }
     paintLabels();
     if (navigating) putBubble();
     if (navigating || bubbles) {
-      for (const p of streetBubblePatches(layers, theme, navigating)) {
+      for (const p of streetBubblePatches(layers, theme, navigating, nightLevel)) {
         try {
           if (p.kind === 'layout') map.setLayoutProperty(p.id, p.prop, p.value);
           else map.setPaintProperty(p.id, p.prop, p.value);
@@ -373,7 +377,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   /** Fond de carte aux couleurs Panier Perdu (src/lib/map-palette.js), au premier chargement d'un style. */
   function recolorBase() {
     const layers = map?.getStyle()?.layers;
-    for (const p of mapPaintPatches(layers, theme, OWN_LAYERS)) {
+    for (const p of mapPaintPatches(layers, theme, OWN_LAYERS, nightLevel)) {
       try { map.setPaintProperty(p.id, p.prop, p.value); } catch { /* couche ou propriété refusée : laissée */ }
     }
   }
@@ -391,7 +395,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function transformStyle(prev, next) {
     const c = routeColors();
     const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
-    return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS), { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
+    return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS, nightLevel), { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
   }
 
   /** Crée la carte MapLibre (au démarrage, ou pour remplacer une carte dont le contexte WebGL est perdu). */
@@ -443,7 +447,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function areaElement(item) {
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = `area-marker${item.otherSide ? ' other-side' : ''}`;
+    node.className = `area-marker${item.otherSide ? ' other-side' : ''}${item.id === highlighted ? ' selected' : ''}`;
+    node.dataset.id = item.id;
     node.textContent = 'P';
     node.setAttribute('aria-label', item.label);
     node.title = item.label;
@@ -565,6 +570,33 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     }, ms);
   }
 
+  /**
+   * Voile de la couleur du nouveau fond (variables CSS déjà basculées) : aucune image claire pendant le changement
+   * de style ou de luminosité, fondu de 300 ms (src/styles.css).
+   */
+  function showVeil() {
+    veil.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#14161C';
+    veil.classList.add('on');
+    clearTimeout(veilTimer);
+  }
+
+  /**
+   * Luminosité de la nuit changée (phase 2d) : mêmes couches, couleurs reprises par setPaintProperty sous le voile,
+   * sans setStyle ni rechargement. Le jour : retenue pour la prochaine nuit, rien à redessiner.
+   */
+  function applyNightLevel() {
+    if (!map || theme !== 'night' || !map.getStyle()?.layers) return;
+    showVeil();
+    veilTimer = setTimeout(() => {
+      recolorBase();
+      applyGuidanceStyle();
+      const off = () => { clearTimeout(veilTimer); veil.classList.remove('on'); };
+      map.once('idle', off);
+      map.triggerRepaint();
+      veilTimer = setTimeout(off, VEIL_MAX_MS);
+    }, VEIL_IN_MS);
+  }
+
   async function loadStyle() {
     const url = await pickStyle(MAP_STYLES[theme] ?? MAP_STYLES.day);
     if (!url) {
@@ -576,11 +608,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (!map) {
       build(url);
     } else {
-      // Voile de la couleur du nouveau fond (variables CSS déjà basculées) : aucune image claire pendant le
-      // changement de style, fondu de 300 ms (src/styles.css).
-      veil.style.background = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#14161C';
-      veil.classList.add('on');
-      clearTimeout(veilTimer);
+      showVeil();
       veilTimer = setTimeout(() => {
         bubbles = false; // nouveau style : couches d'origine
         map.setStyle(url, { transformStyle });
@@ -657,6 +685,30 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (t === theme) return;
       theme = t;
       if (lib) loadStyle();
+    },
+    /** Luminosité de la carte la nuit (phase 2d) : appliquée tout de suite la nuit, sans rechargement. */
+    setNightLevel(level) {
+      const l = sanitizeNightLevel(level);
+      if (l === nightLevel) return;
+      nightLevel = l;
+      applyNightLevel();
+    },
+    /**
+     * Repère d'une aire mis en évidence (liste du guidage, phase 2d) ; null : aucun. Classe CSS seulement : ni
+     * repère recréé ni carte redessinée.
+     */
+    highlightArea(id) {
+      highlighted = id ?? null;
+      for (const m of areaMarkers) {
+        const el = m.getElement();
+        el.classList.toggle('selected', !!highlighted && el.dataset.id === highlighted);
+      }
+    },
+    /** Montre une aire (geste, à l'arrêt seulement : décidé par l'écran de guidage). */
+    showPlace(lonlat) {
+      if (!map || !Array.isArray(lonlat)) return;
+      if (anim) anim.follow = false;
+      map.easeTo({ center: lonlat, duration: 600 });
     },
     showRoutes,
     /** Un seul itinéraire (guidage, recalcul) : les autres disparaissent. */

@@ -25,6 +25,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     de boutons, compteur, texte du bandeau, partie parcourue), `road-badge.js` (badges D/N/A/E des références de route),
     `sun.js` (lever / coucher du soleil, NOAA ; mode nuit auto par `theme.js`), `map-palette.js` (bulles des noms de
     rues, photos assombries la nuit)
+  - phase 2d : `areas-route.js` (liste du guidage : `LIST_COUNT`, `areaRowsPlan`, `AREA_LIST`), `nav-layout.js`
+    (`areaListBox`), `map-palette.js` (nuit Sombre / Normal / Clair : `NIGHT_PALETTES`, `NIGHT_BUBBLES`,
+    `SATELLITE_NIGHT_BRIGHTNESS`, `sanitizeNightLevel` ; réglage `settings.nightMapLevel` de `store.js`)
   - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
     poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
   - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,

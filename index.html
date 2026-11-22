@@ -81,8 +81,21 @@
           <button type="button" id="btn-nav-areas" class="nav-chip" aria-pressed="false" aria-controls="nav-areas"></button>
           <button type="button" id="btn-nav-layer" class="nav-chip" aria-label="Passer en vue satellite"></button>
         </div>
-        <section id="nav-areas" class="nav-areas" aria-label="Prochaines aires" hidden>
-          <h2 class="nav-areas-title">Prochaines aires</h2>
+        <!-- Liste défilante des aires et parkings PL (phase 2d) : un doigt pour défiler, aucune saisie (R412-6-2). -->
+        <section id="nav-areas" class="nav-areas" aria-label="Aires et parkings PL" hidden>
+          <div class="nav-areas-head">
+            <h2 class="nav-areas-title">Aires et parkings PL</h2>
+            <button type="button" id="btn-nav-areas-close" class="btn nav-areas-close">Fermer</button>
+          </div>
+          <div id="nav-area-card" class="nav-area-card" role="status" hidden>
+            <p id="nav-area-card-name" class="nav-area-card-name"></p>
+            <p id="nav-area-card-facts" class="nav-area-card-facts"></p>
+            <p id="nav-area-card-more" class="nav-area-card-more"></p>
+            <div class="nav-area-card-btns">
+              <button type="button" id="btn-nav-area-go" class="btn" aria-disabled="true">Y aller</button>
+              <button type="button" id="btn-nav-area-sheet" class="btn" aria-disabled="true">Fiche complète</button>
+            </div>
+          </div>
           <ol id="nav-areas-list" class="nav-areas-list"></ol>
           <p id="nav-areas-empty" class="nav-areas-empty" hidden></p>
         </section>
@@ -203,11 +216,18 @@
       </section>
 
       <section class="card">
-        <h3>Mode nuit</h3>
-        <div class="segmented" role="radiogroup" aria-label="Mode nuit">
+        <h3>Affichage</h3>
+        <p class="field-label" id="theme-label">Mode nuit</p>
+        <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
           <label><input type="radio" name="theme" value="auto"> Auto (20 h – 7 h)</label>
           <label><input type="radio" name="theme" value="day"> Jour</label>
           <label><input type="radio" name="theme" value="night"> Nuit</label>
+        </div>
+        <p class="field-label" id="night-level-label">Luminosité de la carte la nuit</p>
+        <div class="segmented segmented-row" role="radiogroup" aria-labelledby="night-level-label">
+          <label><input type="radio" name="night-level" value="dark"> Sombre</label>
+          <label><input type="radio" name="night-level" value="normal"> Normal</label>
+          <label><input type="radio" name="night-level" value="light"> Clair</label>
         </div>
       </section>
 

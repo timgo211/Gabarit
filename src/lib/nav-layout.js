@@ -109,6 +109,37 @@ export function parkedState(prev, kmh, now) {
   return { since, parked: now - since >= PARK.MS };
 }
 
+/** Liste des aires du guidage (phase 2d) : en portrait, 40 % de la hauteur de l'écran au plus. */
+export const AREA_LIST_BOX = Object.freeze({ maxPortrait: 0.4, inset: 12, gap: 8 });
+
+/**
+ * Place de la liste défilante des aires (phase 2d), en px depuis le bord de l'écran de guidage.
+ * Portrait : au-dessus du compteur et du panneau du bas, à gauche de la colonne de boutons, ancrée en bas (elle monte
+ * vers le haut), 40 % de la hauteur au plus, jamais au-dessus de la pile du bandeau (« Puis », alertes).
+ * Paysage : dans la colonne de gauche, entre la pile du bandeau et le panneau du bas.
+ * @param {{ width:number, height:number, stackBottom:number, colLeft:number, speedoTop:number, sheetTop:number,
+ *   columnRight?:number }} p stackBottom : bas du bandeau et de ses alertes ; colLeft : bord gauche de la colonne de
+ *   boutons ; speedoTop : haut du compteur ; sheetTop : haut du panneau du bas ; columnRight : bord droit de la colonne
+ *   de gauche (paysage)
+ * @returns {{ left:number, right:number, bottom:number, top:number, maxHeight:number }} right et bottom : distances au
+ *   bord droit et au bas de l'écran (CSS)
+ */
+export function areaListBox({ width, height, stackBottom, colLeft, speedoTop, sheetTop, columnRight = 0 }) {
+  const w = Math.max(0, width || 0);
+  const h = Math.max(0, height || 0);
+  const { inset, gap, maxPortrait } = AREA_LIST_BOX;
+  const land = isLandscape({ width: w, height: h });
+  const floor = land ? sheetTop - gap : speedoTop - gap;
+  const ceil = stackBottom + gap;
+  const room = Math.max(0, floor - ceil);
+  const maxHeight = Math.floor(land ? room : Math.min(room, h * maxPortrait));
+  const left = inset;
+  const rightEdge = land ? Math.max(left, columnRight - inset) : Math.max(left, colLeft - gap);
+  return {
+    left, right: Math.round(w - rightEdge), bottom: Math.round(h - floor), top: Math.round(floor - maxHeight), maxHeight,
+  };
+}
+
 /** Paysage : écran plus large que haut. */
 export function isLandscape({ width, height }) {
   return width > height;

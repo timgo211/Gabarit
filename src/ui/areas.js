@@ -315,6 +315,12 @@ export function createAreas(ctx) {
       if (pool.length) place(route);
     },
     openSheet,
+    /** Fiche courte du guidage (phase 2d) : services et accès en une ligne, '' si rien de connu. */
+    shortFacts(id) {
+      const a = findArea(id);
+      if (!a) return '';
+      return [servicesText(a.services), [...statusBadges(a), a.price].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
+    },
     /** Vitesse du guidage changée : boutons « Mon avis » de la fiche ouverte mis à jour. */
     refreshDrive() {
       if (!dlg.open || !openId) return;
