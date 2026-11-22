@@ -75,6 +75,7 @@ function card(d, { checked, onSelect, rules }) {
       el('span', { class: 'route-card-time', text: d.duration }),
     ]),
     el('span', { class: 'route-card-facts', text: facts.join(' · ') }),
+    d.an ? el('span', { class: 'route-card-an', text: d.an }) : null,
     d.delta ? el('span', { class: 'route-card-delta', text: d.delta }) : null,
     d.note ? el('span', { class: 'route-card-note', text: d.note }) : null,
     rules?.short?.length ? el('span', { class: 'route-card-rules', text: `⚠ ${rules.short.join(' · ')}` }) : null,
@@ -198,7 +199,7 @@ export function renderRouteChoice(node, notesNode, {
   if (choice.avoidTolls) notes.push('Péages évités si possible.');
   if (choice.avoidFerries) notes.push('Ferries évités si possible.');
   if (current.key === VARIANTS.alternative.key) {
-    notes.push('Si tu sors de cet itinéraire, le recalcul automatique suit l\'itinéraire recommandé depuis ta position.');
+    notes.push('Si tu sors de cet itinéraire, le recalcul automatique suit la préférence d\'OpenRouteService depuis ta position.');
   }
   if (typeof vehicle.consumption === 'number' && dieselPrice === null) {
     notes.push('Indique le prix du gazole dans Réglages (⚙) pour estimer le coût.');

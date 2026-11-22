@@ -20,6 +20,7 @@
 import { buildDirectionsRequest, buildRestrictions } from './ors-request.js';
 import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bboxOf } from './ors-response.js';
 import { ERROR_KINDS, failedSegment, NO_ROUTE_BASE_TEXT } from './ors-errors.js';
+import { pickRecommendedIndex, anShareText } from './road-class.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
@@ -69,7 +70,32 @@ export const VARIANTS = Object.freeze({
   }),
   noToll: Object.freeze({ key: 'no-toll', label: 'Sans péage', avoidTolls: true }),
   fastest: Object.freeze({ key: 'fastest', label: 'Plus rapide', preference: 'fastest' }),
+  /** Phase 2g : itinéraire de la préférence d'ORS quand un autre devient « Recommandé » (part A/N). */
+  orsDefault: Object.freeze({ key: 'ors-default', label: 'Préférence ORS' }),
 });
+
+/** Note du « Recommandé » choisi pour sa part A/N (phase 2g) : jamais une garantie. */
+export const AN_PREFERRED_NOTE = "Préféré pour sa part d'autoroute et de nationale. Une autoroute ou une nationale peut aussi avoir une limite : la signalisation fait foi.";
+
+/**
+ * Phase 2g : « Recommandé » = parmi les itinéraires calculés, la plus forte part A/N à 15 % de durée au plus du plus
+ * rapide (pickRecommendedIndex, road-class.js). Le choisi passe en tête et prend le nom « Recommandé » (son ancien
+ * nom en « aussi », sauf une simple alternative) ; la préférence d'ORS devient « Préférence ORS ». Clés et réglages de
+ * requête inchangés (recalcul en guidage, partage). Sinon, liste inchangée.
+ */
+export function promoteRecommended(options) {
+  const i = pickRecommendedIndex(options);
+  if (i <= 0) return options;
+  const best = options[i];
+  const ors = options[0];
+  const also = best.key === VARIANTS.alternative.key ? best.also : [best.label, ...best.also];
+  const promoted = {
+    ...best, label: VARIANTS.recommended.label, also, promoted: true,
+    note: [best.note, AN_PREFERRED_NOTE].filter(Boolean).join(' '),
+  };
+  const demoted = { ...ors, key: VARIANTS.orsDefault.key, label: VARIANTS.orsDefault.label };
+  return [promoted, demoted, ...options.filter((_, k) => k !== 0 && k !== i)];
+}
 
 /**
  * Échecs du Recommandé avec alternative_routes qui justifient de le redemander sans : limite de distance (2004),
@@ -319,7 +345,7 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     });
     options = dedupeOptions(options);
   }
-  return { options: nameAlternatives(options), failures, requests };
+  return { options: promoteRecommended(nameAlternatives(options)), failures, requests };
 }
 
 /** Ligne discrète pour une variante non calculée. */
@@ -360,6 +386,7 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
     distance: formatDistance(r.distance),
     arrival: `Arrivée : ${formatArrival(now, r.duration)}`,
     toll: `Péage : ${tollText(r.tollDistance)}`,
+    an: anShareText(r), // phase 2g
     fuel,
     delta: reference && reference !== option ? deltaText(r, reference.route) : '',
   };

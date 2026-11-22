@@ -65,6 +65,7 @@ const APP_FILES = [
   './src/lib/ors-response.js',
   './src/lib/prefs.js',
   './src/lib/route-options.js',
+  './src/lib/road-class.js',
   './src/lib/route-rules.js',
   './src/lib/route-samples.js',
   './src/lib/share.js',

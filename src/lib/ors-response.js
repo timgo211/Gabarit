@@ -5,6 +5,7 @@
 
 import { parseAccessExtra } from './access-local.js';
 import { parseCountryInfo } from './countries.js';
+import { parseRoadExtras } from './road-class.js';
 
 const EARTH_RADIUS_M = 6371008.8;
 
@@ -110,6 +111,8 @@ function parseFeature(feature, fallbackBbox) {
     countries: parseCountryInfo(props.extras),
     // Routes réservées à la desserte locale (phase 5d, extra « roadaccessrestrictions ») : [{ from, to, value }] ou null.
     local: parseAccessExtra(props.extras),
+    // Classe de route (phase 2g, extras « waycategory » et « waytype ») : voir road-class.js ; null si absents.
+    roadExtras: parseRoadExtras(props.extras),
     steps,
     warnings,
   };
