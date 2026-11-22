@@ -25,6 +25,11 @@ node --test
 
 Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relancer après toute modif d'interface) — mode d'emploi et scénarios : skill `gabarit-tests-interface`.
 
+## Modèles (choisis automatiquement)
+- Mode plan → Opus ; exécution → Sonnet (`"model": "opusplan"` dans `.claude/settings.json`).
+- Recherches dans le code → sous-agent `Explore` (Haiku). Vérifications après modif → sous-agent `verificateur` (Haiku) : ne pas lancer les tests dans la conversation principale.
+- Tâche vraiment simple (texte, renommage, petite correction) : rester en exécution, pas de mode plan.
+
 ## Règles détaillées par domaine (skills, à charger avant de toucher au domaine)
 - `gabarit-interface` : carte, guidage à l'écran, mise en page téléphone/tablette, satellite, partage, réglages 7c, coordonnées
 - `gabarit-aires` : aires et parkings PL (phases 9, 9b)
