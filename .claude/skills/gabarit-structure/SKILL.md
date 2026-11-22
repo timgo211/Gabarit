@@ -50,6 +50,10 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
     `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
     api.openstreetmap.org bloqué ; id 243477938 du constat)
+  - phase 12b : `restrictions.js` (Mes restrictions : modèle, validation, doublons à 5 m, `applies`, polygones de
+    30 m, zone du trajet, limite des 150 km, `mergeAvoid`, textes, `fromBridge` au point de croisement) ; UI
+    `src/ui/restrictions.js` (Réglages › Mes restrictions, panneau `#bridge-panel`) ; `withBlockedHint` dans
+    `route-options.js` (échec avec restrictions → phrase au conditionnel)
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

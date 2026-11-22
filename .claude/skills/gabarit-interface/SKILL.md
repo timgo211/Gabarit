@@ -105,3 +105,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   repères `.bridge-marker` (`map.showBridges`, retirés par `setNavigating(true)`, jamais en guidage), repère touché →
   message (texte du pont), jamais de voix ; Réglages › Ponts, case `#bridge-warnings` (`settings.bridgeWarnings`,
   activée par défaut). Texte fixe `BRIDGE.TEXT` ; « à vérifier », « la signalisation fait foi ».
+- Phase 12b : Réglages › Mes restrictions (`#restrictions-card` : type, valeur, note, « Ajouter au centre de la carte »,
+  liste Modifier / Supprimer) ; repère de pont touché → `#bridge-panel` (texte, aide `BRIDGE_AVOID_HELP`, « Éviter ce
+  passage », fermé au démarrage du guidage). Boutons refusés si `canEditRestrictions` faux (en guidage hors
+  `navigation.parked`). Fiche : « Évite N restrictions saisies par toi. » ; trajet > 150 km : `TOO_FAR_TEXT`.
