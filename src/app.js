@@ -101,6 +101,7 @@ const layerSwitch = createLayerSwitch({
 });
 map = createMap($('#map'), $('#map-fallback'), theme.theme, {
   layer: data.settings.mapLayer,
+  nightLevel: data.settings.nightMapLevel, // phase 2d : luminosité de la carte la nuit
   onLayerView: (view) => { layerSwitch.render(view); navigation?.setLayerView(view); },
 });
 window.addEventListener('resize', () => map.resize());
@@ -130,6 +131,7 @@ navigation = createNavigation({
     winter.extend(route); // phase 5f : cases de data/hiver/ manquantes
   },
   onAreaOpen: (id) => areas.openSheet(id),
+  areaFacts: (id) => areas.shortFacts(id),
   onView: () => areas.refreshDrive(),
   // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
   onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
@@ -150,6 +152,7 @@ const areas = createAreas({
   update,
   getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
   getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
+  onNavPick: (id) => navigation.pickArea(id), // phase 2d : repère touché en guidage
   onPool: (pool) => {
     navigation.setAreas(pool);
     renderChoice(); // pause conseillée replacée sur une aire du trajet
@@ -482,11 +485,13 @@ const settings = createSettings({
   onDataReplaced: (d) => {
     update(() => d);
     theme.setMode(d.settings.theme);
+    map.setNightLevel(d.settings.nightMapLevel);
     voice.setEnabled(d.settings.voice);
     voice.setOptions({ name: d.settings.voiceName, rate: d.settings.voiceRate, volume: d.settings.voiceVolume });
     applyArrowColor();
   },
   onThemeChange: (mode) => { setSetting({ theme: mode }); theme.setMode(mode); },
+  onNightLevelChange: (level) => { setSetting({ nightMapLevel: level }); map.setNightLevel(level); },
   onVoiceChange: (on) => { setSetting({ voice: on }); voice.setEnabled(on); },
   onTestVoice: () => {
     if (!voice.supported) return 'Synthèse vocale indisponible sur ce navigateur (essaie Chrome).';

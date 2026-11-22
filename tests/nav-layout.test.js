@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus,
-  traveledUpdate, traveledCoords, PARK, BUTTONS,
+  traveledUpdate, traveledCoords, PARK, BUTTONS, areaListBox, AREA_LIST_BOX,
 } from '../src/lib/nav-layout.js';
 import { prepareLine } from '../src/lib/nav-geo.js';
 
@@ -52,7 +52,26 @@ test('à l\'arrêt : sous 5 km/h pendant 3 s', () => {
   assert.equal(p.parked, true);
   p = parkedState(p, 6, 5000);
   assert.equal(p.parked, false);
-  assert.equal(parkedState(null, null, 0).since, 0);
+});
+
+test('à l\'arrêt : vitesse inconnue (null, NaN, absente) = en mouvement, jamais à l\'arrêt (R412-6-2)', () => {
+  for (const x of [null, NaN, undefined, Infinity, '0']) {
+    let p = null;
+    for (let t = 0; t <= 10_000; t += 1000) p = parkedState(p, x, t);
+    assert.deepEqual(p, { since: null, parked: false }, String(x));
+  }
+  // Premier point sans vitesse : en mouvement.
+  assert.equal(parkedState(null, null, 0).parked, false);
+  // Vitesse perdue au milieu d'un arrêt : compteur remis à zéro, 3 s de nouveau.
+  let p = parkedState(null, 0, 0);
+  p = parkedState(p, 0, PARK.MS);
+  assert.equal(p.parked, true);
+  p = parkedState(p, null, PARK.MS + 1000);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, PARK.MS + 2000);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, 2 * PARK.MS + 2000);
+  assert.equal(p.parked, true);
 });
 
 test('caméra : véhicule à 78 % de la hauteur en portrait, à droite de la colonne en paysage, écran seulement', () => {
@@ -104,3 +123,42 @@ test('bandeau : badge et nom de rue, ou consigne entière avec une direction', a
   assert.equal(c.text, 'Continuez tout droit');
   assert.equal(bannerText(null).text, '');
 });
+
+test('liste des aires (phase 2d) : portrait au-dessus du compteur, 40 % au plus, jamais sur le bandeau', () => {
+  // Téléphone 412 × 900 : pile du bandeau jusqu'à 260 px, colonne de boutons à 336 px, compteur à 700 px.
+  const p = areaListBox({ width: 412, height: 900, stackBottom: 260, colLeft: 336, speedoTop: 700, sheetTop: 780 });
+  assert.equal(p.left, AREA_LIST_BOX.inset);
+  assert.equal(412 - p.right, 336 - 8, 'à gauche de la colonne de boutons');
+  assert.equal(900 - p.bottom, 692, 'au-dessus du compteur');
+  assert.equal(p.maxHeight, 360, '40 % de 900 px');
+  assert.ok(p.top >= 260 + 8);
+  // Bandeau haut (longue consigne, deux alertes) : la liste rapetisse, jamais au-dessus de la pile.
+  const tall = areaListBox({ width: 412, height: 900, stackBottom: 520, colLeft: 336, speedoTop: 700, sheetTop: 780 });
+  assert.equal(tall.top, 528);
+  assert.equal(tall.maxHeight, 692 - 528);
+  // Plus de place : hauteur nulle, jamais négative.
+  assert.equal(areaListBox({ width: 412, height: 900, stackBottom: 720, colLeft: 336, speedoTop: 700, sheetTop: 780 }).maxHeight, 0);
+});
+
+test('liste des aires (phase 2d) : paysage dans la colonne de gauche, entre bandeau et panneau du bas', () => {
+  const p = areaListBox({ width: 1280, height: 800, stackBottom: 220, colLeft: 1204, speedoTop: 700, sheetTop: 660, columnRight: 512 });
+  assert.equal(p.left, 12);
+  assert.equal(1280 - p.right, 512 - 12, 'même largeur que le bandeau');
+  assert.equal(800 - p.bottom, 652, 'au-dessus du panneau du bas');
+  assert.equal(p.top, 228);
+  assert.equal(p.maxHeight, 652 - 228, 'pas de limite à 40 % en paysage');
+});
+
+test('liste des aires (phase 2d) : téléphone en paysage, colonne pleine → sur la carte, à droite de la colonne', () => {
+  // 760 × 360 : bandeau et panneau du bas remplissent la colonne de gauche (304 px).
+  const p = areaListBox({ width: 760, height: 360, stackBottom: 200, colLeft: 684, speedoTop: 280, sheetTop: 260, columnRight: 304 });
+  assert.equal(p.inMap, true);
+  assert.equal(p.left, 304 + 12, 'à droite de la colonne de gauche');
+  assert.equal(760 - p.right, 684 - 8, 'à gauche des boutons');
+  assert.equal(p.top, 12);
+  assert.equal(360 - p.bottom, 280 - 8 - AREA_LIST_BOX.toastRoom, 'place du message au-dessus du compteur');
+  assert.equal(p.toastBottom, 360 - 280 + 8);
+  assert.ok(p.maxHeight >= 100);
+  assert.equal(areaListBox({ width: 412, height: 900, stackBottom: 260, colLeft: 336, speedoTop: 700, sheetTop: 780 }).inMap, false);
+});
+

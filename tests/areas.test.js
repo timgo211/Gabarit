@@ -12,7 +12,7 @@ import {
 } from '../src/lib/areas-official.js';
 import {
   mergeAreas, placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, describeArea, describeNextArea, placesText,
-  sourcesText, AREAS, nextAreasChanged, NEXT_AREAS_VIEW,
+  sourcesText, AREAS, nextAreasChanged, NEXT_AREAS_VIEW, areaRowsPlan, AREA_LIST, isOfficial,
 } from '../src/lib/areas-route.js';
 import {
   addAreaReport, latestReport, reportText, canReport, sanitizeAreaReports, AVIS_RULES,
@@ -319,6 +319,35 @@ test('fiche de liste : km, heure d\'arrivée, places, services, badges', () => {
   assert.equal(placesText(null), null);
 });
 
+test('liste du guidage (phase 2d) : 15 aires au plus, source officielle et position, icône du type', () => {
+  const many = Array.from({ length: 20 }, (_, i) => ({ id: `a${i}`, name: `Aire ${i}`, kind: i % 2 ? 'parking' : 'official',
+    along: 1000 * (i + 1), otherSide: false, lon: 4 + i / 100, lat: 45, sources: [i % 2 ? 'osm' : 'official'] }));
+  const n = nextAreas(many, 0, (al) => 30000 - al, AREAS.LIST_COUNT);
+  assert.equal(n.length, 15);
+  assert.deepEqual(n.slice(0, 3).map((a) => a.id), ['a0', 'a1', 'a2']);
+  assert.equal(n[0].official, true);
+  assert.equal(n[1].official, false);
+  assert.deepEqual(n[0].lonlat, [4, 45]);
+  assert.equal(describeNextArea(n[0]).icon, 'official');
+  assert.equal(describeNextArea(n[0]).kind, 'Aire officielle');
+  assert.equal(describeNextArea(n[1]).icon, 'osm');
+  assert.equal(describeNextArea(n[1]).kind, 'Parking PL');
+  assert.equal(nextAreas(many, 0, (al) => 30000 - al).length, 3, 'sans nombre : 3 (détails du trajet)');
+  // Aire OSM fusionnée avec une fiche officielle : officielle.
+  assert.equal(isOfficial({ kind: 'rest_area', sources: ['osm', 'official'] }), true);
+  assert.equal(isOfficial({ kind: 'rest_area', source: 'osm' }), false);
+});
+
+test('liste du guidage : lignes gardées, ajoutées ou retirées sans tout reconstruire', () => {
+  assert.deepEqual(areaRowsPlan([], ['a', 'b']), { keep: [], add: ['a', 'b'], remove: [], reorder: false });
+  assert.deepEqual(areaRowsPlan(['a', 'b', 'c'], ['a', 'b', 'c']), { keep: ['a', 'b', 'c'], add: [], remove: [], reorder: false });
+  assert.deepEqual(areaRowsPlan(['a', 'b', 'c'], ['b', 'c', 'd']), { keep: ['b', 'c'], add: ['d'], remove: ['a'], reorder: false },
+    'aire dépassée : la première sort, une nouvelle arrive en bas');
+  assert.equal(areaRowsPlan(['a', 'b'], ['b', 'a']).reorder, true);
+  assert.deepEqual(areaRowsPlan(['a'], []), { keep: [], add: [], remove: ['a'], reorder: false });
+  assert.equal(AREA_LIST.AUTO_CLOSE_MS, 20000);
+});
+
 test('prochaines aires : les 3 suivantes du sens de circulation, aire tout juste dépassée gardée', () => {
   const remainingAt = (al) => Math.max(0, (route.distance - al) / 15);
   const n = nextAreas(placed, 0, remainingAt);
@@ -355,11 +384,13 @@ function simFixes(r, kmh, seconds, t0 = 1_000_000) {
   return Array.from({ length: seconds }, (_, i) => sim.next(t0 + i * 1000));
 }
 
-test('guidage : encart « Prochaines aires » mis à jour à chaque position, autre sens exclu', () => {
+test('guidage : liste des aires mise à jour à chaque position, autre sens exclu', () => {
   const state = startNavigation(route, { destination: route.coordinates.at(-1), now: 999_000, areas: pool });
   const { views } = runFixes(updateNavigation, state, simFixes(route, 50, 140));
   const first = views[0].nextAreas;
-  assert.equal(first.length, 3);
+  // Phase 2d : toutes les aires du sens de circulation (15 au plus), dans l'ordre de la route.
+  assert.ok(first.length >= 4 && first.length <= AREAS.LIST_COUNT, String(first.length));
+  assert.ok(first.every((a, i) => i === 0 || a.distance >= first[i - 1].distance), 'ordre de la route');
   assert.equal(first[0].name, 'Aire PL de Test-Est');
   assert.ok(views.every((v) => v.nextAreas.every((a) => a.name !== 'Aire de l\'Autre-Sens')));
   const d = views.map((v) => v.nextAreas.find((a) => a.name === 'Parking PL de la Zone')?.distance).filter((x) => x !== undefined);

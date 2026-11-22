@@ -47,3 +47,8 @@ description: Règles des aires et parkings PL (phases 9 et 9b) : Overpass, copie
   n'échoue que si les deux échouent. Fixture `official-sca-2025-*.xml` = lignes réelles lues par l'Action ;
   bison-fute.gouv.fr, transport.data.gouv.fr et overpass-api.de sont bloqués depuis le conteneur. Pas d'occupation en
   temps réel gratuite en France (Allemagne : SID / Mobilithek, pour plus tard).
+- Guidage (phase 2d) : la liste « Aires et parkings PL » reçoit jusqu'à 15 aires (`AREAS.LIST_COUNT`) ; `nextAreas`
+  renvoie aussi `official` (`isOfficial` : fiche officielle seule ou fusionnée) et `lonlat`. Fiche courte : services et
+  accès (`areas.shortFacts`) ; « Fiche complète » (dialogue) seulement à l'arrêt. `AREAS.NEXT_COUNT` (3) reste le
+  défaut pour les détails du trajet.
+

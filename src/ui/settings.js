@@ -103,6 +103,7 @@ export function createSettings(ctx) {
 
   function syncChoices(settings) {
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
+    for (const r of dlg.querySelectorAll('input[name="night-level"]')) r.checked = r.value === settings.nightMapLevel;
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
     voiceEnabled.checked = settings.voice;
     areaVoice.checked = settings.areaVoice;
@@ -209,6 +210,10 @@ export function createSettings(ctx) {
 
   for (const r of dlg.querySelectorAll('input[name="theme"]')) {
     r.addEventListener('change', () => { if (r.checked) ctx.onThemeChange(r.value); });
+  }
+  // Luminosité de la carte la nuit (phase 2d) : appliquée tout de suite, sans rechargement.
+  for (const r of dlg.querySelectorAll('input[name="night-level"]')) {
+    r.addEventListener('change', () => { if (r.checked) ctx.onNightLevelChange?.(r.value); });
   }
 
   voiceEnabled.addEventListener('change', () => ctx.onVoiceChange(voiceEnabled.checked));

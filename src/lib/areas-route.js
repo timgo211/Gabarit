@@ -19,8 +19,10 @@ export const AREAS = Object.freeze({
   MERGE_M: 300,
   /** Sous cet écart au tracé (m), le côté n'est pas fiable : aire gardée dans le sens de circulation. */
   SIDE_MIN_M: 25,
-  /** Prochaines aires affichées en guidage. */
+  /** Prochaines aires (détails du trajet, annonce de la pause). */
   NEXT_COUNT: 3,
+  /** Liste défilante du guidage (phase 2d) : déjà placées sur le tracé, aucun appel réseau de plus. */
+  LIST_COUNT: 15,
   /** Une aire dépassée de moins de 500 m reste en tête (camion arrêté dessus : sa fiche reste à portée). */
   PASSED_KEEP_M: 500,
   /** Annonce vocale « vers 10 km » : dite une fois quand l'aire passe sous 10 km, si elle est encore à plus de 2 km. */
@@ -148,8 +150,10 @@ export function placeAlongRoute(pool, route) {
  * @param {object[]} placed placeAlongRoute
  * @param {number} along distance parcourue (m)
  * @param {(along:number)=>number} remainingAt temps restant jusqu'à l'arrivée depuis une distance (s)
- * @returns {{ id:string, name:string, kind:string, hgvPlaces:number|null, distance:number, eta:number }[]}
- *   distance (m, 0 si l'aire vient d'être dépassée), eta : secondes depuis maintenant
+ * @returns {{ id:string, name:string, kind:string, hgvPlaces:number|null, distance:number, eta:number,
+ *   official:boolean, lonlat:number[]|null }[]}
+ *   distance (m, 0 si l'aire vient d'être dépassée), eta : secondes depuis maintenant, official : fiche du jeu
+ *   officiel (seule ou fusionnée), lonlat : position de l'aire (repère mis en évidence)
  */
 export function nextAreas(placed, along, remainingAt, count = AREAS.NEXT_COUNT) {
   if (!Array.isArray(placed) || !isNum(along)) return [];
@@ -160,6 +164,7 @@ export function nextAreas(placed, along, remainingAt, count = AREAS.NEXT_COUNT) 
     .map((a) => ({
       id: a.id, name: areaName(a), kind: a.kind, hgvPlaces: a.hgvPlaces ?? null,
       distance: Math.max(0, a.along - along), eta: Math.max(0, now - remainingAt(Math.max(a.along, along))),
+      official: isOfficial(a), lonlat: isNum(a.lon) && isNum(a.lat) ? [a.lon, a.lat] : null,
     }));
 }
 
@@ -180,6 +185,11 @@ export function areaToAnnounce(placed, along, done = {}) {
     return { area: a, distance: d };
   }
   return null;
+}
+
+/** Aire du jeu officiel (seule ou fusionnée avec OpenStreetMap). */
+export function isOfficial(a) {
+  return a?.kind === 'official' || (Array.isArray(a?.sources) ? a.sources : [a?.source]).includes('official');
 }
 
 export function areaName(a) {
@@ -253,11 +263,13 @@ export function describeArea(a, departure = new Date()) {
  */
 export const NEXT_AREAS_VIEW = Object.freeze({ ROUND_M: 50, STILL_KMH: 3, STILL_REFRESH_MS: 60_000 });
 
-/** Ligne de l'encart « Prochaines aires » (guidage). */
+/** Ligne de la liste « Aires et parkings PL » (guidage). icon : 'official' (aire officielle) ou 'osm'. */
 export function describeNextArea(n, now = new Date()) {
   const r = NEXT_AREAS_VIEW.ROUND_M;
   return {
     name: n.name,
+    icon: n.official ? 'official' : 'osm',
+    kind: n.official ? 'Aire officielle' : (KIND_LABELS[n.kind] ?? 'Aire'),
     distance: n.distance < 50 ? 'Ici' : formatDistance(n.distance < 1000 ? Math.round(n.distance / r) * r : n.distance),
     eta: formatArrival(now, n.eta),
     places: placesText(n.hgvPlaces) ?? 'places PL ?',
@@ -277,4 +289,31 @@ export function nextAreasChanged(drawn, next, speedKmh, now) {
   if (drawn.key === next.key) return false;
   const still = Number.isFinite(speedKmh) && speedKmh < NEXT_AREAS_VIEW.STILL_KMH;
   return !(still && drawn.ids === next.ids && now - drawn.at < NEXT_AREAS_VIEW.STILL_REFRESH_MS);
+}
+
+/**
+ * Liste défilante du guidage (phase 2d) : fermée seule au bout de 20 s sans toucher ; « Y aller » et « Fiche
+ * complète » seulement à l'arrêt (parkedState de nav-layout.js : moins de 5 km/h pendant 3 s).
+ */
+export const AREA_LIST = Object.freeze({ AUTO_CLOSE_MS: 20_000 });
+
+/**
+ * Lignes à garder, ajouter ou retirer pour passer de la liste dessinée à la nouvelle, sans tout reconstruire
+ * (pas de clignotement ; à l'arrêt, les mêmes lignes restent en place).
+ * @param {string[]} drawn ids des lignes affichées, dans l'ordre
+ * @param {string[]} next ids à afficher, dans l'ordre de la route
+ * @returns {{ keep:string[], add:string[], remove:string[], reorder:boolean }} reorder : les lignes gardées ne sont
+ *   plus dans le même ordre relatif (ne se produit pas en roulant : l'ordre de la route ne change pas)
+ */
+export function areaRowsPlan(drawn = [], next = []) {
+  const want = new Set(next);
+  const had = new Set(drawn);
+  const keep = next.filter((id) => had.has(id));
+  const kept = drawn.filter((id) => want.has(id));
+  return {
+    keep,
+    add: next.filter((id) => !had.has(id)),
+    remove: drawn.filter((id) => !want.has(id)),
+    reorder: kept.some((id, i) => id !== keep[i]),
+  };
 }

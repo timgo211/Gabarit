@@ -20,6 +20,17 @@ test('sauvegarde puis rechargement', () => {
   assert.equal(s.load().settings.theme, 'night');
 });
 
+test('luminosité de la carte la nuit (phase 2d) : Normal par défaut, mémorisée, valeur inconnue → Normal', () => {
+  const s = createStore(memoryStorage());
+  assert.equal(s.load().settings.nightMapLevel, 'normal');
+  const d = emptyData();
+  d.settings.nightMapLevel = 'dark';
+  s.save(d);
+  assert.equal(s.load().settings.nightMapLevel, 'dark');
+  assert.equal(sanitizeData({ ...emptyData(), settings: { nightMapLevel: 'éblouissant' } }).settings.nightMapLevel, 'normal');
+  assert.equal(sanitizeData({ ...emptyData(), settings: { nightMapLevel: 'light' } }).settings.nightMapLevel, 'light');
+});
+
 test('l\'export ne contient jamais la clé ORS', () => {
   const storage = memoryStorage();
   const s = createStore(storage);

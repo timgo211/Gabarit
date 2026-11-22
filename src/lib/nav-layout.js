@@ -96,17 +96,55 @@ export function splitAlerts(list, max = MAX_ALERTS) {
 }
 
 /**
- * Arrêt « franc » pour les boutons réservés à l'arrêt : vitesse < 5 km/h depuis au moins 3 s.
+ * Arrêt « franc » pour les boutons réservés à l'arrêt : vitesse connue < 5 km/h depuis au moins 3 s.
+ * Vitesse inconnue (null, NaN : premier point, GPS sans vitesse et pas de vitesse déduite) = en mouvement : aucune
+ * saisie ni changement d'itinéraire possible en roulant (Code de la route, art. R412-6-2).
  * @param {{ since:number|null }|null} prev
- * @param {number|null} kmh
+ * @param {number|null} kmh vitesse du GPS ou déduite des deux dernières positions (view.parkSpeedKmh)
  * @param {number} now ms
  * @returns {{ since:number|null, parked:boolean }}
  */
 export function parkedState(prev, kmh, now) {
-  const slow = !(kmh >= PARK.KMH); // vitesse inconnue (premier point, GPS sans vitesse) : comptée comme à l'arrêt
+  const slow = typeof kmh === 'number' && Number.isFinite(kmh) && kmh < PARK.KMH;
   if (!slow) return { since: null, parked: false };
   const since = prev?.since ?? now;
   return { since, parked: now - since >= PARK.MS };
+}
+
+/** Liste des aires du guidage (phase 2d) : en portrait, 40 % de la hauteur de l'écran au plus. */
+export const AREA_LIST_BOX = Object.freeze({ maxPortrait: 0.4, inset: 12, gap: 8, minColumn: 180, toastRoom: 72 });
+
+/**
+ * Place de la liste défilante des aires (phase 2d), en px depuis le bord de l'écran de guidage.
+ * Portrait : au-dessus du compteur et du panneau du bas, à gauche de la colonne de boutons, ancrée en bas (elle monte
+ * vers le haut), 40 % de la hauteur au plus, jamais au-dessus de la pile du bandeau (« Puis », alertes).
+ * Paysage : dans la colonne de gauche, entre la pile du bandeau et le panneau du bas ; si la colonne n'a plus la place
+ * (téléphone en paysage, moins de 180 px), sur la carte entre la colonne de gauche et les boutons, au-dessus du
+ * compteur, en laissant la place du message bref.
+ * @param {{ width:number, height:number, stackBottom:number, colLeft:number, speedoTop:number, sheetTop:number,
+ *   columnRight?:number }} p stackBottom : bas du bandeau et de ses alertes ; colLeft : bord gauche de la colonne de
+ *   boutons ; speedoTop : haut du compteur ; sheetTop : haut du panneau du bas ; columnRight : bord droit de la colonne
+ *   de gauche (paysage)
+ * @returns {{ left:number, right:number, bottom:number, top:number, maxHeight:number, inMap:boolean,
+ *   toastBottom:number|null }} right et bottom : distances au bord droit et au bas de l'écran (CSS) ; inMap : posée sur
+ *   la carte (paysage) ; toastBottom : place du message bref sous la liste (inMap), sinon null
+ */
+export function areaListBox({ width, height, stackBottom, colLeft, speedoTop, sheetTop, columnRight = 0 }) {
+  const w = Math.max(0, width || 0);
+  const h = Math.max(0, height || 0);
+  const { inset, gap, maxPortrait, minColumn, toastRoom } = AREA_LIST_BOX;
+  const land = isLandscape({ width: w, height: h });
+  const box = (left, rightEdge, ceil, floor, max = Infinity, inMap = false) => {
+    const maxHeight = Math.floor(Math.min(Math.max(0, floor - ceil), max));
+    return {
+      left, right: Math.round(w - Math.max(left, rightEdge)), bottom: Math.round(h - floor), top: Math.round(floor - maxHeight),
+      maxHeight, inMap, toastBottom: inMap ? Math.round(h - speedoTop + gap) : null,
+    };
+  };
+  if (!land) return box(inset, colLeft - gap, stackBottom + gap, speedoTop - gap, h * maxPortrait);
+  const column = box(inset, columnRight - inset, stackBottom + gap, sheetTop - gap);
+  if (column.maxHeight >= minColumn) return column;
+  return box(columnRight + inset, colLeft - gap, inset, speedoTop - gap - toastRoom, Infinity, true);
 }
 
 /** Paysage : écran plus large que haut. */

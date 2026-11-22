@@ -12,7 +12,7 @@ import {
   firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName,
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
-import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText } from './areas-route.js';
+import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, AREAS } from './areas-route.js';
 import { zfeAlongRoute, guidanceZfe } from './zfe.js';
 import { prepareGuidanceBans, guidanceBan, banBannerText } from './hgv-bans.js';
 import { emptyDriving, trackDriving, drivingView, drivingAnnouncements, toggleStopWork, DRIVING } from './driving-time.js';
@@ -44,6 +44,12 @@ export const NAV = Object.freeze({
   OFF_ROUTE_MAX_ACCURACY_M: 30,
   /** Vitesse calculée entre deux positions au-delà de 150 km/h : saut de position (bruit), ignorée. */
   MAX_COMPUTED_SPEED: 150 / 3.6,
+  /**
+   * « À l'arrêt » des boutons réservés à l'arrêt (phase 2d, R412-6-2) : sans vitesse du GPS, vitesse déduite des deux
+   * dernières positions ; un déplacement sous max(précision annoncée, 5 m) est de la dérive (même sans précision
+   * annoncée : sinon la dérive d'un GPS à l'arrêt ne tomberait jamais sous 5 km/h).
+   */
+  PARK_DRIFT_MIN_M: 5,
   /** Proposition « Recalculer d'ici » après 3 positions hors tracé, à l'arrêt. */
   STOPPED_OFF_FIXES: 3,
   /** Au plus un recalcul toutes les 30 s (quota gratuit HeiGIT : 2 000 itinéraires/jour, 40/min). */
@@ -263,6 +269,15 @@ export function updateNavigation(state, fix) {
   }
   if (raw !== null) s.speed = s.speed === null ? raw : s.speed + NAV.SPEED_SMOOTHING * (raw - s.speed);
   const speed = s.speed ?? 0;
+  // Vitesse pour « à l'arrêt » (affichage seulement) : null = inconnue (premier point, trou de plus de 10 s, saut
+  // irréaliste), comptée comme « en mouvement » par parkedState (src/lib/nav-layout.js).
+  let parkRaw = isNum(fix.speed) && fix.speed >= 0 ? fix.speed : null;
+  if (parkRaw === null && s.lastFix && dt > 0 && dt <= 10) {
+    const moved = haversine(s.lastFix, p);
+    parkRaw = moved > Math.max(accuracy, NAV.PARK_DRIFT_MIN_M) ? moved / dt : 0;
+    if (parkRaw > NAV.MAX_COMPUTED_SPEED) parkRaw = null;
+  }
+  const parkSpeedKmh = parkRaw === null ? null : parkRaw * 3.6;
 
   const loc = locateOnLine(line, p, s.segIndex);
   s.segIndex = loc.segIndex;
@@ -402,7 +417,7 @@ export function updateNavigation(state, fix) {
   // Temps de conduite et pauses (phase 5, PR B, règlement CE 561/2006, aide seulement) : chaque position compte, même
   // hors du tracé ou après l'arrivée (manœuvres au dépôt).
   s.driving = trackDriving(s.driving, t, speed * 3.6);
-  const areasAhead = s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al));
+  const areasAhead = s.arrived ? [] : nextAreas(s.areas, loc.along, (al) => remainingDuration(s.route, al), AREAS.LIST_COUNT);
   const da = drivingAnnouncements(s.driving, t, { nextArea: areasAhead.find((a) => a.distance > 0) ?? null });
   s.driving = da.state;
   if (s.driveVoice) for (const text of da.speak) events.push({ type: 'speak', text });
@@ -415,6 +430,11 @@ export function updateNavigation(state, fix) {
     zoom: zoomForSpeed(speed * 3.6),
     pitch: NAV.PITCH,
     speedKmh: speed * 3.6,
+    /**
+     * Vitesse pour les boutons réservés à l'arrêt (km/h) : vitesse du GPS, sinon déduite des deux dernières
+     * positions (dérive sous max(précision, 5 m) = 0) ; null si inconnue (= en mouvement).
+     */
+    parkSpeedKmh,
     onRoute,
     distanceFromRoute: loc.distance,
     /** Distance parcourue sur le tracé (m) : partie déjà faite dessinée en gris (phase 2c), affichage seulement. */
@@ -431,7 +451,10 @@ export function updateNavigation(state, fix) {
     canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
-    /** Les 3 prochaines aires du sens de circulation (phase 9) : nom, distance, temps (s) jusqu'à l'aire, places PL. */
+    /**
+     * Les 15 prochaines aires du sens de circulation (phase 9, liste de la phase 2d) : nom, distance, temps (s)
+     * jusqu'à l'aire, places PL, source officielle, position.
+     */
     nextAreas: areasAhead,
     /**
      * Réglementation (phase 5) : { zfe:{ name, distance, text }|null, ban:{ active, start, end, minutes?, text }|null,

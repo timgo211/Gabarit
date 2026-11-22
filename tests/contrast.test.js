@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { contrastRatio, cssVars, parseColor, AA_TEXT, AA_LARGE } from '../src/lib/contrast.js';
 import { ARROW_COLORS, AUTO_ARROW } from '../src/lib/prefs.js';
+import { NIGHT_PALETTES, NIGHT_BUBBLES, NIGHT_LEVELS, PHOTO_NIGHT_LABEL } from '../src/lib/map-palette.js';
 
 const css = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 const day = cssVars(css, ':root');
@@ -79,4 +80,26 @@ test('phase 2c : panneau de limitation et bulles des rues lisibles', () => {
   assert.equal(day['--street-bg'], '#14161C');
   assert.equal(night['--street-bg'], '#E8A93B');
   assert.equal(night['--street-fg'], '#14161C');
+});
+
+// Phase 2d : carte de nuit à trois niveaux de luminosité (Sombre, Normal, Clair, src/lib/map-palette.js).
+test('nuit : textes AA aux trois niveaux (libellés sur fond, terre et halo ; bulles des rues)', () => {
+  for (const lv of NIGHT_LEVELS) {
+    const p = NIGHT_PALETTES[lv];
+    for (const v of Object.values(p)) assert.match(v, /^#[0-9A-F]{6}$/);
+    for (const bg of ['background', 'land', 'halo']) {
+      assert.ok(contrastRatio(p.label, p[bg]) >= AA_TEXT, `${lv} : libellés sur ${bg}`);
+    }
+    const b = NIGHT_BUBBLES[lv];
+    assert.ok(contrastRatio(b.text, b.fill) >= AA_TEXT, `${lv} : bulles`);
+    assert.ok(contrastRatio(PHOTO_NIGHT_LABEL.text, PHOTO_NIGHT_LABEL.halo) >= AA_TEXT);
+  }
+});
+
+test('nuit Clair : tracé ambre et routes ≥ 3:1 sur le fond', () => {
+  const p = NIGHT_PALETTES.light;
+  assert.ok(contrastRatio(day['--route'], p.background) >= AA_LARGE, 'tracé ambre');
+  assert.ok(contrastRatio(p.road, p.background) >= AA_LARGE, 'routes');
+  assert.ok(contrastRatio(p.major, p.background) >= AA_LARGE, 'grands axes');
+  for (const lv of NIGHT_LEVELS) assert.ok(contrastRatio(day['--route'], NIGHT_PALETTES[lv].background) >= AA_LARGE, `tracé ambre, ${lv}`);
 });

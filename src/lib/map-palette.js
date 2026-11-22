@@ -3,18 +3,54 @@
 // Shortbread) est recoloré à son chargement : seules les propriétés « *-color » changent, jamais les largeurs, les
 // opacités, les filtres ni l'ordre des couches. Une couche non reconnue reste telle quelle.
 
-export const MAP_PALETTE = Object.freeze({
-  day: Object.freeze({
-    background: '#EDEAE3', land: '#E2DED5', building: '#D8D5CD', water: '#C9D3D3', park: '#D9DFCB',
-    road: '#FAF8F3', roadCasing: '#A9A79E', major: '#FFFFFF', majorCasing: '#7E7A70',
-    label: '#2B2E37', halo: '#EDEAE3',
-  }),
-  night: Object.freeze({
+const DAY = Object.freeze({
+  background: '#EDEAE3', land: '#E2DED5', building: '#D8D5CD', water: '#C9D3D3', park: '#D9DFCB',
+  road: '#FAF8F3', roadCasing: '#A9A79E', major: '#FFFFFF', majorCasing: '#7E7A70',
+  label: '#2B2E37', halo: '#EDEAE3',
+});
+
+/**
+ * Nuit, trois niveaux de luminosité (phase 2d, Réglages › Affichage). Gris de la gamme Panier Perdu déjà employés
+ * dans l'interface (#14161C, #1C1F28, #22252F, #2B2E37, #3A3E4A, #4A4E5A, #5C5F69, #6B6E78, #7E7A70, #A9A79E,
+ * #EDEAE3) ; seules l'eau et la verdure gardent une pointe de bleu / vert (mêmes teintes que la v35, éclaircies).
+ * - dark : la nuit de la v35, à l'identique.
+ * - normal (défaut) : fond et routes un cran plus clairs, libellés crème : fond, terre, bâti et routes bien séparés.
+ * - light : routes nettement visibles (≥ 3:1 sur le fond, comme le tracé ambre) ; libellés crème sur halo du fond.
+ */
+export const NIGHT_PALETTES = Object.freeze({
+  dark: Object.freeze({
     background: '#14161C', land: '#1C1F28', building: '#22252F', water: '#17222C', park: '#1B2620',
     road: '#1C1F28', roadCasing: '#3A3E4A', major: '#2B2E37', majorCasing: '#6B6E78',
     label: '#A9A79E', halo: '#14161C',
   }),
+  normal: Object.freeze({
+    background: '#22252F', land: '#2B2E37', building: '#3A3E4A', water: '#1C2A36', park: '#232F28',
+    road: '#4A4E5A', roadCasing: '#6B6E78', major: '#5C5F69', majorCasing: '#A9A79E',
+    label: '#EDEAE3', halo: '#22252F',
+  }),
+  light: Object.freeze({
+    background: '#2B2E37', land: '#343844', building: '#4A4E5A', water: '#253747', park: '#2D3D33',
+    road: '#7E7A70', roadCasing: '#4A4E5A', major: '#A9A79E', majorCasing: '#5C5F69',
+    label: '#EDEAE3', halo: '#2B2E37',
+  }),
 });
+
+/** Niveaux de luminosité de la carte la nuit (Sombre, Normal, Clair) ; Normal par défaut (phase 2d). */
+export const NIGHT_LEVELS = Object.freeze(['dark', 'normal', 'light']);
+export const DEFAULT_NIGHT_LEVEL = 'normal';
+export const NIGHT_LEVEL_LABELS = Object.freeze({ dark: 'Sombre', normal: 'Normal', light: 'Clair' });
+
+export function sanitizeNightLevel(x) {
+  return NIGHT_LEVELS.includes(x) ? x : DEFAULT_NIGHT_LEVEL;
+}
+
+/** Palette du jour et de la nuit au niveau par défaut (Normal). */
+export const MAP_PALETTE = Object.freeze({ day: DAY, night: NIGHT_PALETTES[DEFAULT_NIGHT_LEVEL] });
+
+/** Palette à appliquer selon le thème et, la nuit, le niveau de luminosité. */
+export function mapPalette(theme, level = DEFAULT_NIGHT_LEVEL) {
+  return theme === 'night' ? NIGHT_PALETTES[sanitizeNightLevel(level)] : DAY;
+}
 
 /** Largeurs (px) du tracé choisi : le bord sombre dépasse de 2 px de chaque côté, à tous les zooms. */
 export const ROUTE_WIDTH = Object.freeze({ line: 7, casing: 11, altLine: 5, altCasing: 9 });
@@ -66,8 +102,8 @@ const PROPS = {
  * ne sont jamais touchées. Une propriété absente de la couche n'est ajoutée que si elle est indispensable
  * (couleur de fond, de ligne ou de texte), pas le contour des surfaces ni le halo.
  */
-export function mapPaintPatches(layers, theme, keep = []) {
-  const pal = MAP_PALETTE[theme === 'night' ? 'night' : 'day'];
+export function mapPaintPatches(layers, theme, keep = [], level = DEFAULT_NIGHT_LEVEL) {
+  const pal = mapPalette(theme, level);
   const skip = new Set(keep);
   const out = [];
   for (const l of Array.isArray(layers) ? layers : []) {
@@ -86,10 +122,10 @@ export function mapPaintPatches(layers, theme, keep = []) {
 }
 
 /** Copie du style JSON recolorée (pour l'option transformStyle de setStyle). */
-export function recolorStyle(style, theme, keep = []) {
+export function recolorStyle(style, theme, keep = [], level = DEFAULT_NIGHT_LEVEL) {
   if (!style || !Array.isArray(style.layers)) return style;
   const byId = new Map();
-  for (const p of mapPaintPatches(style.layers, theme, keep)) {
+  for (const p of mapPaintPatches(style.layers, theme, keep, level)) {
     if (!byId.has(p.id)) byId.set(p.id, {});
     byId.get(p.id)[p.prop] = p.value;
   }
@@ -103,13 +139,24 @@ export function recolorStyle(style, theme, keep = []) {
 
 /**
  * Bulles des noms de rues pendant le guidage : petites étiquettes arrondies, à plat face à l'écran, au milieu de
- * chaque tronçon. Couleurs de la palette (crème bordé de gris le jour, presque noir bordé de gris la nuit).
+ * chaque tronçon. Couleurs de la palette (crème bordé de gris le jour, gris foncé bordé de gris la nuit, un cran
+ * au-dessus du fond du niveau de luminosité choisi).
  */
+export const NIGHT_BUBBLES = Object.freeze({
+  dark: Object.freeze({ fill: '#1C1F28', border: '#6B6E78', text: '#EDEAE3' }),
+  normal: Object.freeze({ fill: '#2B2E37', border: '#A9A79E', text: '#EDEAE3' }),
+  light: Object.freeze({ fill: '#3A3E4A', border: '#A9A79E', text: '#EDEAE3' }),
+});
 export const STREET_BUBBLE = Object.freeze({
   image: 'gabarit-bubble',
   day: Object.freeze({ fill: '#FAF8F3', border: '#7E7A70', text: '#14161C' }),
-  night: Object.freeze({ fill: '#1C1F28', border: '#6B6E78', text: '#EDEAE3' }),
+  night: NIGHT_BUBBLES[DEFAULT_NIGHT_LEVEL],
 });
+
+/** Couleurs des bulles selon le thème et le niveau de nuit. */
+export function bubbleColors(theme, level = DEFAULT_NIGHT_LEVEL) {
+  return theme === 'night' ? NIGHT_BUBBLES[sanitizeNightLevel(level)] : STREET_BUBBLE.day;
+}
 const STREET_SOURCES = /^(transportation_name|street_labels)$/;
 
 /** Couches de noms de rues du fond (OpenMapTiles ou Shortbread), sans les cartouches de références. */
@@ -122,8 +169,8 @@ export function streetLabelLayers(layers) {
  * Réglages des noms de rues : bulles en guidage (`on`), réglages d'origine du style sinon.
  * @returns {{ id:string, kind:'layout'|'paint', prop:string, value:any }[]}
  */
-export function streetBubblePatches(layers, theme, on) {
-  const c = STREET_BUBBLE[theme === 'night' ? 'night' : 'day'];
+export function streetBubblePatches(layers, theme, on, level = DEFAULT_NIGHT_LEVEL) {
+  const c = bubbleColors(theme, level);
   const out = [];
   for (const l of streetLabelLayers(layers)) {
     const lay = l.layout ?? {};
@@ -148,18 +195,22 @@ export function streetBubblePatches(layers, theme, on) {
   return out;
 }
 
-/** Photos IGN la nuit : même image, assombrie (pas d'éblouissement). */
-export function satellitePaint(theme) {
-  return { 'raster-brightness-max': theme === 'night' ? 0.6 : 1 };
+/**
+ * Photos IGN la nuit : même image, assombrie (pas d'éblouissement). Phase 2d : 0,6 (Sombre, = v35), 0,8 (Normal),
+ * 0,9 (Clair).
+ */
+export const SATELLITE_NIGHT_BRIGHTNESS = Object.freeze({ dark: 0.6, normal: 0.8, light: 0.9 });
+export function satellitePaint(theme, level = DEFAULT_NIGHT_LEVEL) {
+  return { 'raster-brightness-max': theme === 'night' ? SATELLITE_NIGHT_BRIGHTNESS[sanitizeNightLevel(level)] : 1 };
 }
 
 /** Libellés sur les photos la nuit : clairs, halo noir (lisibles sur l'image assombrie). */
 export const PHOTO_NIGHT_LABEL = Object.freeze({ text: '#EDEAE3', halo: '#14161C' });
 
 /** Couleurs des libellés selon les photos et le thème : [{ id, prop, value }] (le reste : mapPaintPatches). */
-export function photoLabelPatches(layers, theme, photos, keep = []) {
+export function photoLabelPatches(layers, theme, photos, keep = [], level = DEFAULT_NIGHT_LEVEL) {
   const skip = new Set(keep);
-  const pal = MAP_PALETTE[theme === 'night' ? 'night' : 'day'];
+  const pal = mapPalette(theme, level);
   const night = photos && theme === 'night';
   const out = [];
   for (const l of Array.isArray(layers) ? layers : []) {

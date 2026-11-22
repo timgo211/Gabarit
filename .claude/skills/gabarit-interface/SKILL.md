@@ -27,7 +27,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   bandeau, deux colonnes en dernier recours) : boussole, Recentrer (seulement carte déplacée), loupe (rangée « Aires
   PL », « Plan / Satellite », fermée seule après 8 s, aucune saisie), son, autres itinéraires (actif seulement à
   l'arrêt, `parkedState` : < 5 km/h pendant 3 s ; pour l'instant vue d'ensemble + « bientôt »), place du signalement
-  (`.nav-slot`, phase 3). Compteur en bas à gauche (`speedStatus` ; panneau de limitation seulement si la limite PL
+  (`.nav-slot`, phase 3). Liste « Aires et parkings PL » (phase 2d) : voir plus bas. Compteur en bas à gauche (`speedStatus` ; panneau de limitation seulement si la limite PL
   est connue). Panneau du bas : ✕ (confirmation Quitter / Continuer, sauf à l'arrivée), temps restant (--ok),
   « km • heure » (--muted), vue d'ensemble ; poignée touchée ou tirée : détails en lecture seule. Paysage
   (`isLandscape`) : bandeau et panneau du bas dans la colonne gauche (40 %). Écran bas : `nav-tight`, mesuré après
@@ -38,7 +38,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   jamais la carte (`parked`). Boussole : `navigateTo({ northUp })`, comparé par `holdStill`.
 - Carte en guidage : tracé épais `ROUTE_WIDTH_NAV` (bord 2 px), partie parcourue grise (source `route-done`, mise à jour
   par `traveledUpdate` : en roulant, tous les 25 m), noms des rues en bulles (`streetBubblePatches`, image
-  `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` 0,6 la nuit
+  `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` la nuit selon le niveau (0,6 / 0,8 / 0,9, phase 2d)
   et libellés clairs (`photoLabelPatches`). Réglages du style appliqués par `applyGuidanceStyle` (chargement de
   style, thème, entrée / sortie du guidage), jamais à chaque position. Repère : `src/ui/vehicle-icon.js` (registre
   d'icônes, flèche seule pour l'instant). Pictogrammes des boutons : `src/ui/nav-symbols.js` (Material Symbols,
@@ -71,3 +71,21 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   (± 60 m de dérive = jusqu'à 120 m entre deux mesures). Rien n'est redessiné tant que la position reste à moins de
   100 m de ce point et que lui reste à moins de 50 m de la flèche (`stillDrift`) ; un redessin à l'arrêt (bandeau,
   suivi) place flèche et caméra sur le point d'arrêt. Vérifié par `node tools/ui-check.mjs parked` (0 image attendue).
+- Liste des aires en guidage (phase 2d, `#nav-areas`) : 15 aires au plus (`AREAS.LIST_COUNT`, `nextAreas` du moteur,
+  aucun appel réseau), lignes mises à jour sur place (`areaRowsPlan`, jamais `replaceChildren` : `parked` reste à 0 image),
+  figées à l'arrêt (`nextAreasChanged`). Place : `areaListBox` (`src/lib/nav-layout.js`) — portrait au-dessus du compteur,
+  ≤ 40 % de la hauteur, jamais sur la pile du bandeau ; paysage dans la colonne de gauche, ou sur la carte entre
+  la colonne et les boutons si la colonne a moins de 180 px (téléphone en paysage, `inMap`, message bref dessous). Pastille de la rue masquée
+  en portrait tant qu'elle est ouverte, message bref au-dessus d'elle. Appui : `map.highlightArea` (classe CSS) + fiche
+  courte ; caméra déplacée (`map.showPlace`) seulement à l'arrêt ; « Y aller » / « Fiche complète » `aria-disabled`
+  hors `parkedState`. Fermée après 20 s sans toucher (`AREA_LIST.AUTO_CLOSE_MS`) ou par « Fermer ». Aucune saisie.
+- Luminosité de la carte la nuit (phase 2d) : `settings.nightMapLevel` (`dark` = v35, `normal` par défaut, `light`),
+  palettes `NIGHT_PALETTES` / `NIGHT_BUBBLES` de `src/lib/map-palette.js` (gris de la gamme Panier Perdu seulement),
+  `map.setNightLevel` : voile `.map-veil` puis `setPaintProperty`, jamais setStyle. Interface (variables CSS) identique aux
+  trois niveaux. Tests : textes AA aux trois niveaux, tracé ambre et routes ≥ 3:1 sur le fond Clair (`contrast.test.js`).
+- « À l'arrêt » (`parkedState`, boutons réservés à l'arrêt, « Mon avis ») : vitesse du GPS, sinon déduite des deux
+  dernières positions (`view.parkSpeedKmh` du moteur, dérive sous max(précision, `NAV.PARK_DRIFT_MIN_M` = 5 m) = 0) ;
+  inconnue (premier point, trou > 10 s, saut) = en mouvement. La vitesse du moteur (`speedKmh` : zoom, voix, recalcul)
+  n'en dépend pas. En guidage, un repère d'aire touché ouvre la liste et la fiche courte (`navigation.pickArea`),
+  jamais la fiche complète.
+

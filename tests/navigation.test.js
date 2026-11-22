@@ -10,6 +10,7 @@ import { parseDirections } from '../src/lib/ors-response.js';
 import { destinationPoint, haversine, prepareLine, pointAt } from '../src/lib/nav-geo.js';
 import { UTURN_SAFE_TEXT } from '../src/lib/nav-guidance.js';
 import { fixture, runFixes } from './helpers.js';
+import { parkedState, PARK } from '../src/lib/nav-layout.js';
 
 const NAV_ROUTE = parseDirections(fixture('ors-directions-nav.json'));
 const UTURN_ROUTE = parseDirections(fixture('ors-directions-uturn.json'));
@@ -439,3 +440,81 @@ test('boutons de carte du guidage : taille voulue si la colonne tient, sinon ré
   assert.equal(mapButtonSize({ available: 141, count: 2, gap: 8, preferred: 56 }), 56, 'grille 2 × 2 : 2 rangées');
   assert.equal(mapButtonSize({ available: NaN, count: 4, gap: 6, preferred: 56 }), 56);
 });
+
+// ───────── Phase 2d : « à l'arrêt » des boutons réservés à l'arrêt (R412-6-2) ─────────
+
+/** « À l'arrêt » position par position, comme l'écran de guidage (parkedState sur view.parkSpeedKmh). */
+function parkedSeries(views, fixes) {
+  let p = null;
+  return views.map((v, i) => (p = parkedState(p, v.parkSpeedKmh, fixes[i].timestamp)).parked);
+}
+const noSpeed = (f, { accuracy = true } = {}) => {
+  const out = { ...f, speed: null, heading: null };
+  if (!accuracy) delete out.accuracy;
+  return out;
+};
+
+test('à l\'arrêt : premier point sans vitesse = en mouvement', () => {
+  const [f] = simFixes(NAV_ROUTE, 50, 0);
+  const r = updateNavigation(startNavigation(NAV_ROUTE, { now: T0 }), noSpeed(f));
+  assert.equal(r.view.parkSpeedKmh, null);
+  assert.equal(parkedState(null, r.view.parkSpeedKmh, f.timestamp).parked, false);
+  assert.equal(r.view.speedKmh, 0, 'vitesse du moteur inchangée (zoom, voix)');
+});
+
+test('à l\'arrêt : GPS sans vitesse en roulant (≈ 50 km/h) = jamais à l\'arrêt, avec ou sans précision', () => {
+  for (const accuracy of [true, false]) {
+    const fixes = simFixes(NAV_ROUTE, 50, 20).map((f) => noSpeed(f, { accuracy }));
+    const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+    assert.ok(r.views.slice(1).every((v) => v.parkSpeedKmh > 40), r.views.map((v) => v.parkSpeedKmh).join(','));
+    assert.ok(parkedSeries(r.views, fixes).every((x) => !x), `précision ${accuracy}`);
+  }
+});
+
+test('à l\'arrêt : GPS sans vitesse, camion immobile (dérive dans la précision) → à l\'arrêt après 3 s', () => {
+  const p = NAV_ROUTE.coordinates[3];
+  const fixes = Array.from({ length: 8 }, (_, i) => {
+    const q = destinationPoint(p, i * 90, i % 2 ? 4 : 0);
+    return { lon: q[0], lat: q[1], accuracy: 10, speed: null, heading: null, timestamp: T0 + i * 1000 };
+  });
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+  assert.equal(r.views[0].parkSpeedKmh, null);
+  assert.ok(r.views.slice(1).every((v) => v.parkSpeedKmh === 0));
+  const parked = parkedSeries(r.views, fixes);
+  // 1er point : inconnue ; arrêt compté à partir du 2e (t0 + 1 s), à l'arrêt 3 s plus tard.
+  assert.deepEqual(parked, [false, false, false, false, true, true, true, true]);
+});
+
+test('à l\'arrêt : sans vitesse ni précision, dérive de 3 m → seuil de 5 m, à l\'arrêt après 3 s', () => {
+  assert.equal(NAV.PARK_DRIFT_MIN_M, 5);
+  const p = NAV_ROUTE.coordinates[3];
+  const fixes = Array.from({ length: 8 }, (_, i) => {
+    const q = destinationPoint(p, i * 137, 3 * (i % 2)); // 3 m de dérive d'une position à l'autre
+    return { lon: q[0], lat: q[1], speed: null, heading: null, timestamp: T0 + i * 1000 };
+  });
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+  assert.ok(r.views.slice(1).every((v) => v.parkSpeedKmh === 0), r.views.map((v) => v.parkSpeedKmh).join(','));
+  assert.equal(parkedSeries(r.views, fixes).at(-1), true);
+  // Au-delà de 5 m en 1 s (18 km/h) : en mouvement.
+  const q = destinationPoint(p, 90, 8);
+  const go = [fixes[0], { ...fixes[0], lon: q[0], lat: q[1], timestamp: T0 + 1000 }];
+  const g = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), go);
+  assert.ok(g.views[1].parkSpeedKmh > PARK.KMH);
+});
+
+test('à l\'arrêt : trou de plus de 10 s sans vitesse = inconnue, en mouvement', () => {
+  const p = NAV_ROUTE.coordinates[3];
+  const a = { lon: p[0], lat: p[1], accuracy: 5, speed: null, heading: null, timestamp: T0 };
+  const b = { ...a, timestamp: T0 + 12_000 };
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), [a, b]);
+  assert.equal(r.views[1].parkSpeedKmh, null);
+});
+
+test('à l\'arrêt : vitesse du GPS connue, prise telle quelle', () => {
+  const p = NAV_ROUTE.coordinates[3];
+  const fixes = Array.from({ length: 5 }, (_, i) => still(p, T0 + i * 1000));
+  const r = runFixes(updateNavigation, startNavigation(NAV_ROUTE, { now: T0 }), fixes);
+  assert.ok(r.views.every((v) => v.parkSpeedKmh === 0));
+  assert.deepEqual(parkedSeries(r.views, fixes), [false, false, false, true, true]);
+});
+
