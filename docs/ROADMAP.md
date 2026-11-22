@@ -156,7 +156,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   défaut, Clair), appliquée sous le voile sombre sans rechargement ; photos IGN 0,6 / 0,8 / 0,9 ; textes AA aux trois
   niveaux, tracé ambre et routes ≥ 3:1 sur le fond Clair. Phase d'interface : voix, recalcul et alertes inchangés.
 
-- [ ] **Phase 2e — Retouches du guidage** (petite, seule, après la 2d, v37)
+- [x] **Phase 2e — Retouches du guidage** (petite, seule, après la 2d, v37)
   Barre d'échelle cachée pendant le guidage (en paysage elle dépassait sous le panneau du bas), visible hors guidage ;
   attribution OpenFreeMap / OpenStreetMap toujours visible. Bandeau de manœuvre : aucun texte coupé ni tronqué, en
   portrait comme en paysage ; consigne réduite proprement (70 % de sa taille au plus bas, lisible en cabine), puis

@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette | guidage
+                                   #   | euro | tolls | failed | palette | guidage | bandeau
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -25,7 +25,7 @@ coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vra
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi
 21 h 57), ADR (`adr` : fiche, notes, « Éviter le tunnel », bandeau, fichier absent, code vide, profil, vrai service worker
-« Gabarit v36 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
+« Gabarit v37 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
 rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
@@ -59,3 +59,9 @@ Normal → Clair à 412×900 et 1280×800, fond jamais clair pendant le changeme
 niveau, réglage mémorisé, sans rechargement ; guidage à chaque niveau (captures `2d-nuit-*`), photos 0,6 / 0,8 / 0,9.
 La nuit attendue ailleurs est le niveau Normal (`MAP_PALETTE.night`, photos 0,8).
 
+Phase 2e (`bandeau`) : 412×900, 900×412, 760×360, 1280×800, consigne « Rue de Tortelet, D 120 E » et consigne longue
+« … D 120 E en direction de … », 2 alertes actives (4 h 25 de conduite, rafales), puis police agrandie (130 % ; 160 % à
+760×360 : consigne réduite à 70 %, pile du haut qui défile). Contrôle (`bannerClip`) : consigne entière dans le bandeau
+et dans la pile du haut, taille ≥ 70 % de l'origine, badge « D 120 E » sur une ligne, aucune référence avec espace
+sécable ; échelle visible hors guidage, cachée en guidage, revenue après ; attribution toujours visible (le style de
+test `streets: true` porte une attribution) ; « Autres itinéraires » grisé opaque.
