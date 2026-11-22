@@ -21,7 +21,7 @@ Le propriétaire n'a pas de terminal : tout passe par ce dépôt et GitHub Pages
 ```
 node --test
 ```
-(lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert.
+(lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert. Un hook Stop le relance tout seul à la fin de chaque tour où le code a changé.
 
 Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relancer après toute modif d'interface) — mode d'emploi et scénarios : skill `gabarit-tests-interface`.
 

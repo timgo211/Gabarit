@@ -11,5 +11,18 @@
       "Read(./tools/ui-shots/**)"
     ]
   },
-  "model": "opusplan"
+  "model": "opusplan",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verifier.sh",
+            "timeout": 180
+          }
+        ]
+      }
+    ]
+  }
 }
