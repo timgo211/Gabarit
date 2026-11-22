@@ -2,9 +2,10 @@ name: Données OSM (tunnels ADR, aires PL, accès)
 
 # Copie mensuelle des données OpenStreetMap (licence ODbL) lues sans réseau par l'appli : tunnels signalés aux
 # matières dangereuses (data/tunnels-adr.json, phase 5b), aires et parkings PL (data/aires-osm/, phase 9b) et voies à
-# accès conditionnel (data/acces-osm/, phase 5d). Un seul téléchargement des extraits par pays de Geofabrik et un
-# seul filtrage osmium pour les trois (voir tools/osm-update.mjs). Échec : rien n'est enregistré, l'ancienne copie
-# reste.
+# accès conditionnel (data/acces-osm/, phase 5d), plus le réseau des taxes PL régionales (data/taxes-pl-osm.json,
+# phase 5h ter : extrait France découpé au cadre des taxes). Un seul téléchargement des extraits par pays de Geofabrik
+# et un seul filtrage osmium pour les trois premiers (voir tools/osm-update.mjs). Échec : rien n'est enregistré,
+# l'ancienne copie reste.
 # Lancement à la main avec « r411 » coché : lecture seule du Code de la route, art. R411-8 (pouvoir de police), texte
 # écrit dans le journal pour être cité dans src/lib/access-conditional.js ; aucune copie de données ce jour-là.
 # Lancée aussi à la main (onglet Actions › Données OSM › Run workflow) et à chaque envoi qui modifie l'outil de copie,
@@ -25,6 +26,9 @@ on:
       - src/lib/tunnels-convert.js
       - src/lib/areas-osm-data.js
       - src/lib/access-convert.js
+      - src/lib/hgv-tolls-convert.js
+      - src/lib/hgv-tolls-geo.js
+      - data/taxes-pl.json
       - .github/workflows/osm-data.yml
 
 permissions:
@@ -110,14 +114,14 @@ jobs:
         run: node tools/osm-update.mjs
       - name: Enregistrer si changé
         run: |
-          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly
-          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly; then
+          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json
+          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json; then
             echo "Aucun changement."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly
-          git commit -m "Données : tunnels ADR, aires PL et accès conditionnels OpenStreetMap (mise à jour automatique)"
+          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json
+          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels et réseau des taxes PL OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push

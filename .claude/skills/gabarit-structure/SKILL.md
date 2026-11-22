@@ -31,6 +31,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     références de route dans le cadre de la région, heure de passage, statuts confirmé / annoncé / à vérifier, taux
     de la grille officielle pour la classe du profil) ; lignes « Changements au 1er janvier 2027 » des fiches pays
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
+  - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
+    comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)
   - phase 8 : `coords.js` (coordonnées GPS saisies : décimal et degrés-minutes-secondes)
   - phase 5 (réglementation) : `zfe.js` (ZFE : lecture de `data/zfe.json`, vignette, horaires, passage du tracé,
     polygones à éviter, guidage), `zfe-convert.js` (BNZFE → `data/zfe.json`), `holidays.js` (jours fériés),
@@ -100,6 +102,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   « name, ref » des étiquettes OSM du 21/11/2026), `ors-directions-alsace.json` (Mulhouse → A 36, A 35 → M 35 de l'Eurométropole → Strasbourg), `ors-directions-belfort-mulhouse.json` et
   `ors-directions-besancon-belfort.json` (A 36 puis D 83 dans Belfort), `ors-directions-metz-nancy.json`
   (A 31), `ors-directions-muenchen-innsbruck.json` (countryinfo DE 74 / AT 11), écrites d'après la doc ORS
+- fixture phase 5h ter : `osm-tolls.geojsonseq` (voies au format de l'export osmium sur les tracés Alsace et
+  Metz–Nancy : deux chaussées de l'A35 dont une à rebours à 20 m, M35 et ancienne « A 35 » dans l'Eurométropole,
+  bretelle, A36 et A31 toll=yes, route sans référence)
 - fixture phase 5c : `ors-directions-fr-ch-it.json` (Saint-Julien → Genève → Grand-Saint-Bernard → Aoste, countryinfo
   70 / 193 / 97, écrite d'après la doc ORS)
 - fixture phase 5 B : `open-meteo-wind.json` (3 points, format de la doc : liste de structures, heures UNIX)

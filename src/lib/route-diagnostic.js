@@ -5,12 +5,21 @@
 //
 // ORS (GraphHopper v4.17, EncodingManager.applyWayTags) nomme une étape d'après l'étiquette OSM `name`, suivie de
 // « , » et de `ref` quand elle existe (ref seule si la voie n'a pas de nom) : « Autoroute des Cigognes, A 35 ».
+// Phase 5h ter : méthode de repérage des taxes PL (géométrie OSM ou noms d'étape) et, pour chaque étape sans nom de
+// plus de 5 km, un point tous les 10 km (arrondi à 0,001°, soit environ 100 m ; jamais à moins de 1 km du départ ou
+// de l'arrivée) pour retrouver la route sur une carte.
 
-import { prepareLine } from './nav-geo.js';
+import { prepareLine, pointAt } from './nav-geo.js';
 import { roadRefs } from './route-samples.js';
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const km = (m) => (m / 1000).toFixed(1).replace('.', ',');
+const UNNAMED_MIN_M = 5000;
+const UNNAMED_STEP_M = 10000;
+const ENDS_M = 1000;
+const fine = (c) => `${c[1].toFixed(3)}, ${c[0].toFixed(3)}`;
+const shortDate = (iso) => (typeof iso === 'string' ? iso.split('-').reverse().join('/') : '?');
+const methodLabel = (m, date) => (m === 'osm' ? `géométrie OSM (copie du ${shortDate(date)})` : 'noms d\'étape (réseau OSM non chargé)');
 const pt = (c) => (Array.isArray(c) && isNum(c[0]) && isNum(c[1]) ? `${c[1].toFixed(2)}, ${c[0].toFixed(2)}` : '?');
 
 /**
@@ -39,6 +48,13 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
     const name = typeof s?.name === 'string' && s.name ? s.name : '(sans nom)';
     const refs = roadRefs(s?.name);
     lines.push(`  ${a === null ? '?' : km(a)}–${b === null ? '?' : km(b)} | ${name} | ${refs.length ? refs.join(', ') : '—'} | ${wp ? pt(coords[wp[0]]) : '?'}`);
+    // Étape sans nom (ORS renvoie « - » ou rien) de plus de 5 km : un point tous les 10 km.
+    if (a !== null && b !== null && (name === '(sans nom)' || name.trim() === '-') && b - a > UNNAMED_MIN_M) {
+      for (let d = a + UNNAMED_STEP_M; d < b; d += UNNAMED_STEP_M) {
+        if (d < ENDS_M || d > line.total - ENDS_M) continue;
+        lines.push(`    point km ${km(d)} : ${fine(pointAt(line, d).point)}`);
+      }
+    }
   }
   if (!steps.length) lines.push('  (aucune étape)');
   if (rules) {
@@ -48,8 +64,12 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
       lines.push(`  ${p.name} [${p.id}] : km ${km(p.enter)}–${km(p.exit)}${p.banned ? ', interdite' : ''}${p.onVoie ? ', tronçon spécial' : ''}`);
     }
     const tolls = rules.tolls?.passages ?? [];
+    const methods = rules.tolls?.method ?? null;
+    if (methods?.length) lines.push(`Méthode taxes PL : ${methods.map((m) => `${m.short} : ${methodLabel(m.method, m.networkDate)}`).join(' ; ')}`);
     lines.push(`Taxes PL (${tolls.length}) :${tolls.length ? '' : ' aucune'}`);
-    for (const p of tolls) lines.push(`  ${p.tax.short} : km ${km(p.enter)}–${km(p.exit)} (${p.roads.join(', ')})`);
+    for (const p of tolls) {
+      lines.push(`  ${p.tax.short} : km ${km(p.enter)}–${km(p.exit)} (${p.roads.join(', ')})${p.method ? ` — ${methodLabel(p.method, p.networkDate)}` : ''}`);
+    }
   }
   return lines.join('\n');
 }

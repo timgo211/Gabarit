@@ -493,7 +493,17 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     routes = list.filter((r) => Array.isArray(r?.coordinates) && r.coordinates.length > 1);
     selected = Math.min(Math.max(0, index), Math.max(0, routes.length - 1));
     routeBbox = routesBbox(routes);
-    if (!map || !routes.length) return;
+    if (!routes.length) {
+      // Liste vide (calcul en échec) : tracés et repères de départ / d'arrivée retirés.
+      removeRouteLayers();
+      for (const key of ['start', 'end']) {
+        markers[key]?.remove();
+        markers[key] = null;
+        marks[key] = null;
+      }
+      return;
+    }
+    if (!map) return;
     removeRouteLayers();
     if (styleReady()) addRouteLayers();
     else map.once('style.load', addRouteLayers);

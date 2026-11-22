@@ -1,6 +1,9 @@
 // Copie mensuelle des données OpenStreetMap lues sans réseau par l'appli : tunnels signalés aux matières dangereuses
-// (phase 5b, data/tunnels-adr.json), aires et parkings PL (phase 9b, data/aires-osm/) et voies à accès conditionnel
-// (phase 5d, data/acces-osm/ : tranches horaires, poids limité par tranche). Lancé par
+// (phase 5b, data/tunnels-adr.json), aires et parkings PL (phase 9b, data/aires-osm/), voies à accès conditionnel
+// (phase 5d, data/acces-osm/ : tranches horaires, poids limité par tranche) et réseau des taxes PL régionales
+// (phase 5h ter, data/taxes-pl-osm.json : R-Pass et écocontribution du Grand Est, extrait France seulement, découpé
+// au cadre des taxes par osmium extract, puis filtré à part : les routes primaires de toute l'Europe ne passent pas
+// dans le filtrage commun). Lancé par
 // .github/workflows/osm-data.yml (le 1er du mois, à la main, ou quand ce fichier change) ; Node 22, sans dépendance
 // npm ; osmium-tool installé par l'Action (apt).
 //
@@ -32,11 +35,19 @@ import {
   AREAS_DATA, areaElementFromFeature, buildCoverage, convertAreas, elementKey, parseGeojsonLine, parsePoly,
 } from '../src/lib/areas-osm-data.js';
 import { accessElementFromFeature, convertAccess, osmiumAccessFilter } from '../src/lib/access-convert.js';
+import { tollWayFromFeature } from '../src/lib/hgv-tolls-geo.js';
+import { convertTollNetwork, osmiumTollsFilter, tollsBbox } from '../src/lib/hgv-tolls-convert.js';
+import { parseTollData } from '../src/lib/hgv-tolls.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'data', 'tunnels-adr.json');
 const AREAS_DIR = join(ROOT, 'data', 'aires-osm');
 const ACCESS_DIR = join(ROOT, 'data', 'acces-osm');
+const TOLLS_OUT = join(ROOT, 'data', 'taxes-pl-osm.json');
+// Réseau des taxes PL : périmètre (cadres, contours IGN, zones exclues) lu dans data/taxes-pl.json.
+const TOLL_DATA = parseTollData(JSON.parse(readFileSync(join(ROOT, 'data', 'taxes-pl.json'), 'utf8')));
+const TOLL_BBOX = tollsBbox(TOLL_DATA);
+const TOLL_REGION = 'europe/france';
 // Contours .poly de Geofabrik (© contributeurs OpenStreetMap, ODbL) : secours si leur téléchargement échoue.
 const POLY_DIR = join(ROOT, 'data', 'osm-poly');
 const POLY_DATES = join(POLY_DIR, 'dates.json');
@@ -76,6 +87,30 @@ async function filterFile(file, dir, tunnels, areas, ways) {
   rmSync(kept, { force: true });
   rmSync(seq, { force: true });
   return { nt, na, nw, lines, size };
+}
+
+/**
+ * Réseau des taxes PL (phase 5h ter) : extrait découpé au cadre des taxes (osmium extract -b), routes motorway à
+ * tertiary (osmium tags-filter), export GeoJSON lu ligne à ligne ; voies portant une référence gardées
+ * (tollWayFromFeature). Lancé sur l'extrait France seulement (et sur chaque fichier local en essai).
+ */
+async function filterTolls(file, dir, tollWays) {
+  if (!TOLL_BBOX) return { n: 0, lines: 0 };
+  const box = join(dir, 'taxes-box.osm.pbf');
+  const kept = join(dir, 'taxes.osm.pbf');
+  const seq = join(dir, 'taxes.geojsonseq');
+  execFileSync('osmium', ['extract', '--overwrite', '-s', 'simple', '-b', TOLL_BBOX.join(','), '-o', box, file], { stdio: 'inherit' });
+  execFileSync('osmium', ['tags-filter', '--overwrite', '-o', kept, box, ...osmiumTollsFilter()], { stdio: 'inherit' });
+  execFileSync('osmium', ['export', '--overwrite', '-f', 'geojsonseq', '--add-unique-id=type_id', '-o', seq, kept], { stdio: 'inherit' });
+  let n = 0; let lines = 0;
+  const rl = createInterface({ input: createReadStream(seq, { encoding: 'utf8' }), crlfDelay: Infinity });
+  for await (const line of rl) {
+    lines += 1;
+    const w = tollWayFromFeature(parseGeojsonLine(line));
+    if (w) { tollWays.set(w.id, w); n += 1; }
+  }
+  for (const f of [box, kept, seq]) rmSync(f, { force: true });
+  return { n, lines };
 }
 
 /** Date de l'extrait (en-tête osmosis_replication_timestamp du fichier .pbf), ou null. */
@@ -219,6 +254,7 @@ async function main() {
   const tunnels = new Map();
   const areas = new Map();
   const ways = new Map();
+  const tollWays = new Map();
   const polys = [];
   const freshPolys = new Map();
   let updated = null;
@@ -227,7 +263,8 @@ async function main() {
       for (const f of args) {
         if (f.endsWith('.poly')) { polys.push(parsePoly(readFileSync(f, 'utf8'))); continue; }
         const r = await filterFile(f, dir, tunnels, areas, ways);
-        console.log(`${f} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires, ${r.nw} voies à accès conditionnel.`);
+        const t = await filterTolls(f, dir, tollWays);
+        console.log(`${f} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires, ${r.nw} voies à accès conditionnel, ${t.n} routes à référence dans le cadre des taxes PL.`);
       }
     } else {
       for (const region of TUNNELS_CONVERT.GEOFABRIK) {
@@ -244,6 +281,11 @@ async function main() {
         const date = extractDate(file);
         if (date && (!updated || date < updated)) updated = date; // date la plus ancienne des extraits
         const r = await filterFile(file, dir, tunnels, areas, ways);
+        if (region === TOLL_REGION) {
+          const t3 = Date.now();
+          const t = await filterTolls(file, dir, tollWays);
+          console.log(`${region} : ${t.n} routes à référence dans le cadre des taxes PL ${TOLL_BBOX.join(',')} (${t.lines} objets exportés, ${Math.round((Date.now() - t3) / 1000)} s).`);
+        }
         rmSync(file, { force: true });
         console.log(`${region} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires, ${r.nw} voies à accès conditionnel (extrait du ${date ?? '?'}, `
           + `${mb.toFixed(0)} Mo téléchargés en ${Math.round((t1 - t0) / 1000)} s, filtrage + export ${Math.round((Date.now() - t1) / 1000)} s, `
@@ -269,15 +311,29 @@ async function main() {
   // Voies à accès conditionnel (phase 5d)
   const acc = convertAccess([...ways.values()], { updated: day, grid, countries });
   for (const line of acc.log) console.log(line);
-  // Rien n'est écrit si l'un des deux jeux est vide (ancienne copie gardée).
+  // Réseau des taxes PL (phase 5h ter) : journal par référence (km avant découpage, km gardés après
+  // découpage, km exclus pour péage poids lourd), total ECPL, répartition toll / toll:hgv de l'A31 au sud de Toul.
+  const tolls = convertTollNetwork([...tollWays.values()], TOLL_DATA, { updated: day });
+  for (const line of tolls.log) console.log(line);
+  const tollTaxes = Object.keys(tolls.json.taxes);
+  const tollsMissing = TOLL_DATA.taxes.filter((t) => !tolls.json.taxes[t.id]).map((t) => t.short);
+  // Rien n'est écrit si l'un des jeux est vide (ancienne copie gardée).
   if (!data.tunnels.length) throw new Error('Aucun tunnel lu : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
   if (!conv.index.count || !grid.cells) throw new Error('Aucune aire ou zone couverte vide : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
   if (!acc.index.count) throw new Error('Aucune voie à accès conditionnel lue : data/tunnels-adr.json, data/aires-osm/ et data/acces-osm/ non modifiés.');
+  // Copie complète : chaque taxe doit avoir son réseau. Essai local (fichiers en arguments) : réseau écrit seulement
+  // s'il contient toutes les taxes, sinon avertissement.
+  if (tollsMissing.length && !args.length) throw new Error(`Réseau des taxes PL vide (${tollsMissing.join(', ')}) : aucune donnée OSM modifiée.`);
   const text = `${JSON.stringify(data)}\n`;
   writeFileSync(OUT, text);
   console.log(`data/tunnels-adr.json : ${data.tunnels.length} tubes, ${kb(Buffer.byteLength(text))} (extraits du ${data.updated}).`);
   writeTiles(AREAS_DIR, conv.index, conv.tiles, 'aires');
   writeTiles(ACCESS_DIR, acc.index, acc.tiles, 'voies à accès conditionnel');
+  if (!tollsMissing.length) {
+    const tt = `${JSON.stringify(tolls.json)}\n`;
+    writeFileSync(TOLLS_OUT, tt);
+    console.log(`data/taxes-pl-osm.json : ${tollTaxes.join(', ')}, ${kb(Buffer.byteLength(tt))} (extraits du ${day}).`);
+  } else console.log(`⚠ data/taxes-pl-osm.json non modifié : réseau absent pour ${tollsMissing.join(', ')}.`);
   if (freshPolys.size) {
     mkdirSync(POLY_DIR, { recursive: true });
     const dates = existsSync(POLY_DATES) ? JSON.parse(readFileSync(POLY_DATES, 'utf8')) : {};

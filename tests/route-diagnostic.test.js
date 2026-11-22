@@ -21,7 +21,7 @@ test('diagnostic : étapes (km, nom ORS, références lues, point arrondi), pays
   assert.match(t, /^Pays \(countryinfo\) : FR$/m);
   assert.match(t, /^ {2}\d+,\d–\d+,\d \| Route de Strasbourg, D 83 \| D83 \| 48\.22, 7\.40$/m);
   assert.match(t, /^ {2}\d+,\d–\d+,\d \| Autoroute des Cigognes, N 83 \| N83 \| /m);
-  assert.match(t, /^Taxes PL \(1\) :\n {2}R-Pass : km \d+,\d–\d+,\d \(D83, N83\)$/m);
+  assert.match(t, /^Taxes PL \(1\) :\n {2}R-Pass : km \d+,\d–\d+,\d \(D83, N83\) — noms d.étape \(réseau OSM non chargé\)$/m);
   assert.match(t, /^ZFE \(0\) : aucune$/m);
   assert.doesNotMatch(t, /cle|clé|api_key|44 t/i);
 });
