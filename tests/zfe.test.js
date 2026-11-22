@@ -9,7 +9,7 @@ import { fixture } from './helpers.js';
 import { convertBnzfe, parseZfeIds, simplifyPath } from '../src/lib/zfe-convert.js';
 import {
   parseZfeData, zfeAlongRoute, critairCode, bannedBy, categoryOf, thresholdText, parseHours, hoursActive, hoursText,
-  avoidPolygonsFor, describeZfePassage, guidanceZfe, zfeBannerText, inZone, safeUrl, ZFE,
+  avoidPolygonsFor, describeZfePassage, guidanceZfe, ZFE_MOTORWAY_TO_CHECK, motorwayCheckText, zfeBannerText, inZone, safeUrl, ZFE,
 } from '../src/lib/zfe.js';
 import { haversine } from '../src/lib/nav-geo.js';
 
@@ -230,4 +230,25 @@ test('guidage : bandeau sous 20 km, annonce une fois vers 5 km, rien pour une ZF
   const ok = zfeAlongRoute(route, { data, vehicle: semi('1'), departure: D(2026, 11, 19, 10) });
   assert.equal(guidanceZfe(ok, at - 3000, {}).view, null);
   assert.equal(zfeBannerText({ name: 'X' }, 4230), 'ZFE X dans 4,2 km : interdite à ce véhicule');
+});
+
+// Phase 2g : ZFE du Grand Nancy traversée par l'A31 : inclusion de l'autoroute non tranchée → « à vérifier ».
+test('phase 2g : passage par autoroute dans la ZFE du Grand Nancy → interdiction gardée + « à vérifier »', () => {
+  assert.ok(ZFE_MOTORWAY_TO_CHECK['245400676-ZFE-001']);
+  const nancy = parseZfeData({
+    zones: [{ id: '245400676-ZFE-001', name: 'Métropole du Grand Nancy', start: '2025-01-01', end: null, pl: { critair: 'V5', hours: '24/7' }, vul: { critair: 'V5', hours: '24/7' }, polygons: [square(6.1, 48.65, 6.25, 48.74)] }],
+    voies: [],
+  });
+  const a31 = { ...line([6.05, 48.7], [6.3, 48.7]), steps: [{ name: 'A 31, E 23', wayPoints: [0, 1] }] };
+  const p = zfeAlongRoute(a31, { data: nancy, vehicle: semi('NC'), departure: D(2026, 11, 22, 10) });
+  assert.equal(p.length, 1);
+  assert.equal(p[0].banned, true, 'prudence : interdiction gardée');
+  assert.deepEqual(p[0].motorways, ['A31']);
+  assert.match(describeZfePassage(p[0], semi('NC')), /Passage par A 31 : inclusion de l'autoroute dans la ZFE à vérifier dans l'arrêté\. La signalisation fait foi\.$/);
+  const street = { ...line([6.05, 48.7], [6.3, 48.7]), steps: [{ name: 'Boulevard de l\'Europe', wayPoints: [0, 1] }] };
+  const q = zfeAlongRoute(street, { data: nancy, vehicle: semi('NC'), departure: D(2026, 11, 22, 10) });
+  assert.equal(motorwayCheckText(q[0]), '');
+  // Autre ZFE sur autoroute : rien d'ajouté.
+  const lyon = { ...q[0], id: 'TEST-ZFE-001', motorways: ['A6'] };
+  assert.equal(motorwayCheckText(lyon), '');
 });
