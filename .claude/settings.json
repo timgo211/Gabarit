@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./data/aires-osm/**)",
+      "Read(./data/acces-osm/**)",
+      "Read(./data/hiver/**)",
+      "Read(./data/osm-poly/**)",
+      "Read(./data/zfe.json)",
+      "Read(./data/aires-pl.json)",
+      "Read(./node_modules/**)",
+      "Read(./tools/ui-shots/**)"
+    ]
+  }
+}
