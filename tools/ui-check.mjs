@@ -1110,8 +1110,9 @@ async function areasCheck(browser, base) {
     })));
     await drive(ctx, page, line, 50, 4);
     const r1 = await navRows();
-    check(r1.length === 3 && r1[0].name === 'Aire PL de Test-Est' && /\d\d:\d\d/.test(r1[0].eta) && r1[0].places === '40 places PL',
-      `${width} px : encart « Prochaines aires » (3 lignes : nom, distance, heure, places)`, JSON.stringify(r1[0]));
+    // Phase 2d : toutes les aires du sens de circulation (15 au plus), dans l'ordre de la route.
+    check(r1.length >= 3 && r1.length <= 15 && r1[0].name === 'Aire PL de Test-Est' && /\d\d:\d\d/.test(r1[0].eta) && r1[0].places === '40 places PL',
+      `${width} px : liste des aires (nom, distance, heure, places)`, `${r1.length} ligne(s) ; ${JSON.stringify(r1[0])}`);
     check(r1.every((r) => r.name !== 'Aire de l\'Autre-Sens'), `${width} px : aire de l'autre sens hors de l'encart`);
     await noHorizontalScroll(page, `${width} px guidage, encart des aires`);
     const over = await page.evaluate(() => [...document.querySelectorAll('#nav-areas *')]
@@ -1125,18 +1126,22 @@ async function areasCheck(browser, base) {
     const r2 = await navRows();
     const km = (t) => (t === 'Ici' ? 0 : Number.parseFloat(t.replace(',', '.')) * (t.endsWith(' km') ? 1000 : 1));
     check(km(r2[0].dist) < km(r1[0].dist), `${width} px : distance mise à jour à chaque position`, `${r1[0].dist} → ${r2[0].dist}`);
-    // Toucher une aire en roulant : fiche en lecture, « Mon avis » désactivé.
+    // Toucher une aire en roulant : fiche courte seulement (phase 2d), « Fiche complète » grisée, rien ne s'ouvre.
     await page.locator('#nav-areas-list .nav-area').first().click();
-    await page.waitForSelector('#dlg-area[open]');
-    check(await page.isDisabled('[data-avis="ok"]'), `${width} px : « Mon avis » désactivé en roulant`);
-    await page.click('#dlg-area [data-close]');
-    // À l'arrêt : avis possible.
+    await page.waitForTimeout(300);
+    check(await page.isVisible('#nav-area-card') && await page.getAttribute('#btn-nav-area-sheet', 'aria-disabled') === 'true',
+      `${width} px : en roulant, fiche courte et « Fiche complète » grisée`);
+    await page.click('#btn-nav-area-sheet', { force: true });
+    check(!(await page.isVisible('#dlg-area')), `${width} px : en roulant, aucune fiche complète ouverte`);
+    // À l'arrêt (moins de 5 km/h pendant 3 s) : fiche complète, avis possible.
     const here = r2.length ? line[6] : line[0];
-    for (let i = 0; i < 3; i += 1) {
+    for (let i = 0; i < 9; i += 1) {
       await setGeo(page, { lon: here[0], lat: here[1], accuracy: 5, speed: 0 });
       await page.waitForTimeout(1000);
     }
+    if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
     await page.locator('#nav-areas-list .nav-area').first().click();
+    await page.click('#btn-nav-area-sheet');
     await page.waitForSelector('#dlg-area[open]');
     check(await page.isEnabled('[data-avis="ok"]'), `${width} px : « Mon avis » possible à l'arrêt en guidage`);
     await page.click('#dlg-area [data-close]');
