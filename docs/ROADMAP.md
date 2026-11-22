@@ -144,7 +144,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   colonne à gauche. Nuit : interface sombre, photos IGN assombries, mode auto au lever / coucher du soleil à la
   position (calcul NOAA), bascule sans éclair blanc. Phase d'interface : voix, recalcul et alertes inchangés.
 
-- [ ] **Phase 2d — Retouches du guidage (nuit plus claire, liste des aires)** (seule, après les tests tablette de la 2c, v35)
+- [x] **Phase 2d — Retouches du guidage (nuit plus claire, liste des aires)** (seule, après les tests tablette de la 2c, v35)
   Liste défilante « Aires et parkings PL » à la place de l'encart à 3 lignes : jusqu'à 15 aires du trajet dans l'ordre
   de la route (déjà placées, aucun appel réseau), une ligne = un bouton ≥ 56 px (pictogramme aire officielle / parking
   OSM, nom, distance, heure d'arrivée, places PL), texte jamais coupé, défilement au doigt sans saisie, mise à jour sans
