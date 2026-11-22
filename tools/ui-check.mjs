@@ -1166,8 +1166,11 @@ async function areasCheck(browser, base) {
       await setGeo(page, { lon: here[0], lat: here[1], accuracy: 5, speed: 0 });
       await page.waitForTimeout(1000);
     }
-    // À l'arrêt : repère touché → fiche courte seulement ; fiche complète par « Fiche complète ».
-    await marker.dispatchEvent('click');
+    // À l'arrêt : repère touché → fiche courte seulement ; fiche complète par « Fiche complète ». Repère de la première
+    // aire de la liste à cette position (celle d'avant a pu être dépassée).
+    if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
+    const hereId = await page.getAttribute('#nav-areas-list .nav-area', 'data-id');
+    await page.locator(`.area-marker[data-id="${hereId}"]`).dispatchEvent('click');
     await page.waitForTimeout(300);
     check(await page.isVisible('#nav-area-card') && !(await page.isVisible('#dlg-area')),
       `${width} px : à l'arrêt, repère touché → fiche courte seulement`);
