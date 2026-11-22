@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createStore, memoryStorage, emptyData, exportData, importData, activeVehicle, addTrip, API_KEY_KEY, MAX_TRIPS,
-  parseDieselPrice, sanitizeData,
+  parseDieselPrice, sanitizeData, TOMTOM_KEY_KEY, DATA_KEY,
 } from '../src/lib/store.js';
 
 test('données vides par défaut avec un véhicule actif', () => {
@@ -39,6 +39,22 @@ test('l\'export ne contient jamais la clé ORS', () => {
   assert.ok(!json.includes('CLE-FACTICE'));
   assert.equal(storage.getItem(API_KEY_KEY), 'CLE-FACTICE-NE-DOIT-PAS-SORTIR');
   assert.equal(JSON.parse(json).app, 'gabarit');
+});
+
+test('phase 12 : la clé TomTom est rangée à part, jamais exportée ni reprise à l\'import', () => {
+  const storage = memoryStorage();
+  const s = createStore(storage);
+  s.setTomTomKey('  TT-FACTICE-NE-DOIT-PAS-SORTIR  ');
+  assert.equal(s.getTomTomKey(), 'TT-FACTICE-NE-DOIT-PAS-SORTIR');
+  assert.equal(storage.getItem(TOMTOM_KEY_KEY), 'TT-FACTICE-NE-DOIT-PAS-SORTIR');
+  assert.equal(storage.getItem(DATA_KEY), null);
+  const json = exportData({ ...s.load(), tomtomKey: 'TT-FACTICE-NE-DOIT-PAS-SORTIR' });
+  assert.ok(!json.includes('TT-FACTICE'));
+  const back = importData(JSON.stringify({ ...JSON.parse(json), tomtomKey: 'TT-IMPORTEE' }));
+  assert.ok(!JSON.stringify(back).includes('TT-IMPORTEE'));
+  s.setTomTomKey('');
+  assert.equal(storage.getItem(TOMTOM_KEY_KEY), null);
+  assert.equal(s.getApiKey(), '');
 });
 
 test('import d\'un export : aller-retour', () => {

@@ -10,6 +10,12 @@ export const PELIAS_BASE = 'https://api.heigit.org/pelias/v1';
 /** Prévisions météo Open-Meteo (vent fort, phase 5) : sans clé, usage non commercial (open-meteo.com/en/terms). */
 export const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1';
 
+/**
+ * Contrôle camion TomTom (phase 12, facultatif, en attente : voir src/lib/tomtom.js) : Routing API v1, clé en
+ * paramètre « key ». docs.tomtom.com/routing-api/documentation/tomtom-maps/v1/calculate-route (lu le 22/11/2026).
+ */
+export const TOMTOM_ROUTING_BASE = 'https://api.tomtom.com/routing/1';
+
 /** ORS refuse maximum_speed < 80 km/h. */
 export const ORS_MIN_MAX_SPEED = 80;
 

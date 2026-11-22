@@ -1,6 +1,6 @@
 // Données locales (véhicules, lieux, signalements, trajets, avis sur les aires, réglages) + export/import JSON.
 // Stockage injectable (localStorage dans le navigateur, objet en mémoire dans les tests).
-// La clé ORS est rangée à part et n'est JAMAIS exportée.
+// Les clés ORS et TomTom (phase 12) sont rangées à part et ne sont JAMAIS exportées.
 
 import { normalizeVehicle, validateVehicle, defaultVehicle, parseNumber } from './vehicle.js';
 import { THEME_MODES } from './theme.js';
@@ -16,6 +16,8 @@ import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
+/** Clé TomTom (contrôle camion, phase 12, facultative) : même traitement que la clé ORS. */
+export const TOMTOM_KEY_KEY = 'gabarit.tomtomKey';
 export const SCHEMA_VERSION = 1;
 export const MAX_TRIPS = 50;
 
@@ -117,7 +119,7 @@ export function sanitizeData(raw) {
   };
 }
 
-/** JSON d'export : toutes les données, jamais la clé ORS. */
+/** JSON d'export : toutes les données, jamais les clés ORS ni TomTom. */
 export function exportData(data, now = new Date()) {
   const clean = sanitizeData(data);
   return JSON.stringify({ app: 'gabarit', exportedAt: now.toISOString(), ...clean }, null, 2);
@@ -167,6 +169,14 @@ export function createStore(storage) {
       const k = String(key ?? '').trim();
       if (k) storage.setItem(API_KEY_KEY, k);
       else storage.removeItem(API_KEY_KEY);
+    },
+    getTomTomKey() {
+      return (storage.getItem(TOMTOM_KEY_KEY) ?? '').trim();
+    },
+    setTomTomKey(key) {
+      const k = String(key ?? '').trim();
+      if (k) storage.setItem(TOMTOM_KEY_KEY, k);
+      else storage.removeItem(TOMTOM_KEY_KEY);
     },
   };
 }

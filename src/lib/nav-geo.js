@@ -60,7 +60,7 @@ export function prepareLine(coordinates) {
 }
 
 /** Projection de p sur le segment [a, b] (approximation plane locale, précise à quelques cm sur quelques km). */
-function projectOnSegment(p, a, b) {
+export function projectOnSegment(p, a, b) {
   const kx = Math.cos(p[1] * RAD) * EARTH_RADIUS_M * RAD;
   const ky = EARTH_RADIUS_M * RAD;
   const ax = (a[0] - p[0]) * kx;
