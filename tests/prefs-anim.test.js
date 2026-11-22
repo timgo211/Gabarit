@@ -2,18 +2,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ARROW_COLORS, sanitizeArrowColor, arrowColors, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, VOICE_RATE,
+  ARROW_COLORS, AUTO_ARROW, sanitizeArrowColor, arrowColors, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, VOICE_RATE,
 } from '../src/lib/prefs.js';
 import { planMove, frameAt, shortestTurn, ANIM, holdStill, samePadding } from '../src/lib/nav-anim.js';
 import { frenchVoices, pickVoice } from '../src/lib/nav-guidance.js';
 import { emptyData, sanitizeData } from '../src/lib/store.js';
 
-test('couleur de la flèche : 4 choix + automatique (bleu le jour, orange la nuit)', () => {
+test("couleur de la flèche : 4 choix + automatique (noire bordée d'ambre le jour, ambre bordée de noir la nuit)", () => {
   assert.deepEqual(Object.keys(ARROW_COLORS), ['bleu', 'vert', 'orange', 'violet']);
   for (const c of ['auto', 'bleu', 'vert', 'orange', 'violet']) assert.equal(sanitizeArrowColor(c), c);
   for (const c of ['rouge', '', null, 3, 'constructor', '__proto__']) assert.equal(sanitizeArrowColor(c), 'auto');
-  assert.equal(arrowColors('auto', 'day'), ARROW_COLORS.bleu);
-  assert.equal(arrowColors('auto', 'night'), ARROW_COLORS.orange);
+  assert.deepEqual([arrowColors('auto', 'day').fill, arrowColors('auto', 'day').stroke], ['#14161c', '#e8a93b']);
+  assert.deepEqual([arrowColors('auto', 'night').fill, arrowColors('auto', 'night').stroke], ['#e8a93b', '#14161c']);
+  assert.equal(arrowColors('auto', 'day'), AUTO_ARROW.day);
+  assert.equal(arrowColors('bleu', 'day'), ARROW_COLORS.bleu, 'les autres choix ne changent pas');
   assert.equal(arrowColors('violet', 'night'), ARROW_COLORS.violet);
   for (const c of Object.values(ARROW_COLORS)) assert.match(c.fill, /^#[0-9a-f]{6}$/);
 });

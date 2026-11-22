@@ -45,6 +45,8 @@ Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relan
 - URL d'API dans `src/lib/config.js`, sans slash final : `api.heigit.org/openrouteservice/v2` et `/pelias/v1`.
 - ORS : profil `driving-hgv`, `options.vehicle_type: "hgv"`, `profile_params.restrictions`, `maximum_speed` ≥ 80.
 - Interface et messages en français, pensés pour la cabine (gros boutons, contraste, mode nuit).
+- Couleurs Panier Perdu (2c-a) : noir #14161C, ambre #E8A93B, crème #EDEAE3 ; variables de `src/styles.css` seulement
+  (contraste AA vérifié par `tests/contrast.test.js`), fond de carte dans `src/lib/map-palette.js`. Couleurs réglementaires inchangées.
 - Toute modif de fichier mis en cache → incrémenter `VERSION` dans `sw.js` et ajouter le fichier à `APP_FILES`.
 - Version en bas de Réglages (`#app-version`) : demandée au service worker qui contrôle la page (`GET_VERSION`, `src/lib/app-version.js`), seule source `VERSION` de `sw.js` ; sans réponse → « version inconnue ».
 - Nouvelle logique → dans `src/lib/` avec ses tests ; règles réglementaires citées en commentaire avec la source officielle.

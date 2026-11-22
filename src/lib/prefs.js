@@ -8,7 +8,14 @@ export const ARROW_COLORS = Object.freeze({
   orange: { label: 'Orange', fill: '#f08a00', stroke: '#000000' },
   violet: { label: 'Violet', fill: '#7b2fbf', stroke: '#ffffff' },
 });
-/** « auto » : bleu le jour, orange la nuit (comme avant la phase 7c). */
+/**
+ * « auto » (phase 2c-a, couleurs Panier Perdu) : noire bordée d'ambre le jour (fond crème), ambre bordée de noir la
+ * nuit (fond presque noir). Pas un choix de la liste : seulement la valeur par défaut.
+ */
+export const AUTO_ARROW = Object.freeze({
+  day: Object.freeze({ label: 'Auto (jour)', fill: '#14161c', stroke: '#e8a93b' }),
+  night: Object.freeze({ label: 'Auto (nuit)', fill: '#e8a93b', stroke: '#14161c' }),
+});
 export const DEFAULT_ARROW_COLOR = 'auto';
 
 export function sanitizeArrowColor(x) {
@@ -18,7 +25,7 @@ export function sanitizeArrowColor(x) {
 /** Couleurs de la flèche à appliquer selon le choix et le thème. */
 export function arrowColors(choice, theme) {
   const c = sanitizeArrowColor(choice);
-  if (c === 'auto') return theme === 'night' ? ARROW_COLORS.orange : ARROW_COLORS.bleu;
+  if (c === 'auto') return theme === 'night' ? AUTO_ARROW.night : AUTO_ARROW.day;
   return ARROW_COLORS[c];
 }
 

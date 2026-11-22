@@ -1,49 +1,61 @@
 /* Gabarit — interface cabine : gros boutons, fort contraste, jour/nuit, portrait/paysage. */
 
 :root {
-  --bg: #ffffff;
-  --fg: #0b0f14;
-  --muted: #3d4a57;
-  --panel: #f2f4f7;
-  --card: #ffffff;
-  --border: #9aa6b2;
-  --accent: #ffb000;
-  --accent-fg: #0b0f14;
-  --primary: #0b57d0;
-  --primary-fg: #ffffff;
-  --danger: #b3261e;
-  --danger-fg: #ffffff;
-  --ok: #146c2e;
-  --warn: #9a4a00;
-  --error-bg: #fde7e5;
-  --error-fg: #7a0d07;
-  --route: #0b57d0;
-  --route-casing: #ffffff;
-  --route-alt: #7d8894;
-  --route-alt-casing: #ffffff;
+  /* Couleurs Panier Perdu (phase 2c-a) : noir #14161C, ambre #E8A93B, crème #EDEAE3. Contrastes WCAG AA vérifiés par
+     tests/contrast.test.js (texte 4,5:1, bords et gros texte 3:1). */
+  --bg: #FAF8F3;
+  --fg: #14161C;
+  --muted: #5C5F69;
+  --panel: #EDEAE3;
+  --card: #FAF8F3;
+  --border: #7E7A70;
+  --sep: #D8D5CD;
+  --focus: #14161C;
+  --accent: #E8A93B;
+  --accent-fg: #14161C;
+  --primary: #14161C;
+  --primary-fg: #EDEAE3;
+  --danger: #B04040;
+  --danger-fg: #FFFFFF;
+  --ok: #276B3E;
+  --warn: #7A4A12;
+  --error-bg: #F6E3DF;
+  --error-fg: #7A1F1F;
+  --route: #E8A93B;
+  --route-casing: #14161C;
+  --route-alt: #A9A79E;
+  --route-alt-casing: #14161C;
+  /* Barre du haut, bas d'écran et têtes de dialogue : noires de jour comme de nuit. */
+  --chrome-bg: #14161C;
+  --chrome-fg: #EDEAE3;
+  --chrome-muted: #A9A79E;
+  --chrome-btn: #1C1F28;
+  --chrome-border: #6B6E78;
   --radius: 12px;
   --tap: 56px;
   color-scheme: light;
 }
 
 :root[data-theme="night"] {
-  --bg: #05080b;
-  --fg: #f2f4f7;
-  --muted: #b7c2cd;
-  --panel: #0f1720;
-  --card: #16212c;
-  --border: #4b5a69;
-  --primary: #ffb000;
-  --primary-fg: #0b0f14;
-  --danger: #ff6b5e;
-  --danger-fg: #0b0f14;
-  --ok: #6fdc8c;
-  --warn: #ffc56b;
-  --error-bg: #3b0d0a;
-  --error-fg: #ffd9d4;
-  --route: #ffb000;
+  --bg: #14161C;
+  --fg: #EDEAE3;
+  --muted: #A9A79E;
+  --panel: #1C1F28;
+  --card: #1C1F28;
+  --border: #6B6E78;
+  --sep: #2B2E37;
+  --focus: #E8A93B;
+  --primary: #E8A93B;
+  --primary-fg: #14161C;
+  --danger: #E08080;
+  --danger-fg: #14161C;
+  --ok: #8FD6A4;
+  --warn: #F0B850;
+  --error-bg: #3A1A1A;
+  --error-fg: #F5D6D6;
+  --route: #E8A93B;
   --route-casing: #000000;
-  --route-alt: #6b7785;
+  --route-alt: #6B6E78;
   --route-alt-casing: #000000;
   color-scheme: dark;
 }
@@ -75,8 +87,8 @@ html, body {
   gap: 8px;
   padding: 8px 12px;
   padding-top: max(8px, env(safe-area-inset-top));
-  background: #0f1720;
-  color: #fff;
+  background: var(--chrome-bg);
+  color: var(--chrome-fg);
 }
 .brand { flex: 0 0 auto; margin: 0 auto 0 0; font-size: 1.4rem; color: var(--accent); letter-spacing: .02em; }
 
@@ -129,8 +141,8 @@ html, body {
   text-align: center;
   padding: 4px 8px;
   padding-bottom: max(4px, env(safe-area-inset-bottom));
-  background: #0f1720;
-  color: #d7dee5;
+  background: var(--chrome-bg);
+  color: var(--chrome-muted);
 }
 
 /* Boutons */
@@ -152,13 +164,13 @@ html, body {
   user-select: none;
 }
 .btn:active { transform: scale(.97); }
-.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.btn:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .btn[disabled] { opacity: .5; }
 .btn-icon { padding: 0; font-size: 1.4rem; }
 .btn-primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn-danger { background: var(--danger); color: var(--danger-fg); border-color: var(--danger); }
 .btn-big { width: 100%; min-height: 64px; font-size: 1.2rem; }
-.topbar .btn { background: #1d2a37; color: #fff; border-color: #4b5a69; }
+.topbar .btn { background: var(--chrome-btn); color: var(--chrome-fg); border-color: var(--chrome-border); }
 .btn-chip { flex: 0 1 auto; min-width: 0; max-width: 55%; overflow: hidden; white-space: nowrap; padding: 0 12px; }
 .btn-chip #active-vehicle-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .topbar .btn { flex: 0 0 auto; }
@@ -260,7 +272,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .country-source { color: var(--muted); font-size: .8rem; }
 .country-footer { margin: 8px 0 0; font-weight: 600; font-size: .85rem; }
 .cbadge { display: inline-block; font-size: .75rem; padding: 1px 6px; border-radius: 8px; margin-right: 6px; border: 1px solid currentColor; font-style: normal; }
-.cbadge-warn { background: var(--danger); color: #fff; border-color: var(--danger); }
+.cbadge-warn { background: var(--danger); color: var(--danger-fg); border-color: var(--danger); }
 .btn-avoid-zfe, .btn-avoid-tunnel, .btn-avoid-local { margin-top: 10px; }
 .route-failures { margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
 
@@ -273,10 +285,10 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .dialog::backdrop { background: rgba(0,0,0,.6); }
 .dialog-head {
   position: sticky; top: 0; z-index: 1; display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 12px; background: #0f1720; color: #fff;
+  padding: 8px 12px; background: var(--chrome-bg); color: var(--chrome-fg);
 }
 .dialog-head h2 { margin: 0; font-size: 1.3rem; }
-.dialog-head .btn { background: #1d2a37; color: #fff; border-color: #4b5a69; }
+.dialog-head .btn { background: var(--chrome-btn); color: var(--chrome-fg); border-color: var(--chrome-border); }
 .dialog-body { padding: 12px; display: grid; gap: 12px; }
 .card { background: var(--card); border: 2px solid var(--border); border-radius: var(--radius); padding: 12px; }
 .card h3 { margin: 0 0 8px; font-size: 1.1rem; }
@@ -319,29 +331,28 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 
 /* ───────── Guidage ───────── */
 :root {
-  /* Jour (phase 7c) : bandeau et barre clairs, texte noir, pictogramme bleu (contraste ≥ 4,5:1). */
-  --nav-bg: #f5f7fa;
-  --nav-fg: #0b0f14;
-  --nav-accent: #0b57d0;
-  --nav-card: rgba(255, 255, 255, .97);
-  --nav-card-fg: #0b0f14;
-  --nav-sep: rgba(11, 15, 20, .22);
-  --nav-alert-bg: #b3261e;
-  --nav-alert-fg: #ffffff;
+  /* Phase 2c-a : bandeau de manœuvre noir, pictogrammes ambre, texte crème, de jour comme de nuit.
+     Cartes du guidage (consigne suivante, barre du bas, boutons de carte) : suivent le thème. */
+  --nav-bg: #14161C;
+  --nav-fg: #EDEAE3;
+  --nav-accent: #E8A93B;
+  --nav-sep: #2B2E37;
+  --nav-card: rgba(250, 248, 243, .97);
+  --nav-card-fg: #14161C;
+  --nav-card-sep: rgba(20, 22, 28, .22);
+  --nav-alert-bg: #B04040;
+  --nav-alert-fg: #FFFFFF;
   --nav-rule-bg: #ffd54f;
   --nav-rule-fg: #1a1200;
-  --arrow-fill: #0b57d0;
-  --arrow-stroke: #ffffff;
+  --arrow-fill: #14161C;
+  --arrow-stroke: #E8A93B;
 }
 :root[data-theme="night"] {
-  --nav-bg: #05080b;
-  --nav-fg: #ffffff;
-  --nav-accent: #ffb000;
-  --nav-sep: rgba(242, 244, 247, .25);
-  --nav-card: rgba(15, 23, 32, .96);
-  --nav-card-fg: #f2f4f7;
-  --nav-alert-bg: #ff6b5e;
-  --nav-alert-fg: #0b0f14;
+  --nav-card: rgba(28, 31, 40, .96);
+  --nav-card-fg: #EDEAE3;
+  --nav-card-sep: #2B2E37;
+  --nav-alert-bg: #E08080;
+  --nav-alert-fg: #14161C;
   --nav-rule-bg: #ffb000;
   --nav-rule-fg: #0b0f14;
 }
@@ -410,7 +421,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-drive {
   justify-self: start; max-width: 100%; min-width: 0; display: flex; align-items: center; gap: 8px;
   padding: 6px 6px 6px 12px; border-radius: var(--radius); background: var(--nav-card); color: var(--nav-card-fg);
-  border: 2px solid var(--nav-sep); box-shadow: 0 4px 14px rgba(0,0,0,.35);
+  border: 2px solid var(--nav-card-sep); box-shadow: 0 4px 14px rgba(0,0,0,.35);
 }
 .nav-drive[data-level="soon"] { border-color: var(--nav-rule-bg); }
 .nav-drive[data-level="over"] { background: var(--nav-alert-bg); color: var(--nav-alert-fg); border-color: var(--nav-alert-bg); }
@@ -455,7 +466,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-mapbtns { margin-left: auto; flex: 0 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .nav-mapbtn {
   height: var(--mapbtn); min-height: var(--mapbtn); min-width: var(--mapbtn); padding: 0 14px; justify-content: flex-start;
-  background: var(--nav-card); color: var(--nav-card-fg); border-color: var(--nav-sep);
+  background: var(--nav-card); color: var(--nav-card-fg); border-color: var(--nav-card-sep);
   box-shadow: 0 2px 10px rgba(0,0,0,.35);
 }
 .nav-mapbtn > span[aria-hidden] { font-size: calc(var(--mapbtn) * .42); line-height: 1; }
@@ -476,13 +487,15 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
 }
 .nav-stats div { min-width: 0; padding: 2px 6px; }
-.nav-stats div + div { border-left: 1px solid var(--nav-sep); } /* traits fins entre Reste, Temps, Arrivée, Vitesse */
+.nav-stats div + div { border-left: 1px solid var(--nav-card-sep); } /* traits fins entre Reste, Temps, Arrivée, Vitesse */
 .nav-stats dt { font-size: .75rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* Valeur + unité plus petite ; réduite encore par fitText() (src/ui/dom.js) si elle ne tient pas. */
 .nav-stats dd {
   margin: 0; font-size: clamp(1.05rem, 5.4vw, 1.35rem); font-weight: 800; white-space: nowrap; overflow: hidden;
   font-variant-numeric: tabular-nums; line-height: 1.2;
 }
+/* Temps restant et heure d'arrivée en vert (2c-a). */
+#nav-time, #nav-eta { color: var(--ok); }
 .nav-stats dd .unit { font-size: .68em; font-weight: 700; margin-left: .12em; }
 .nav-buttons { display: flex; gap: 8px; flex: 0 1 auto; margin-left: auto; }
 .nav-buttons .btn { min-height: 64px; font-size: 1.1rem; }
@@ -496,7 +509,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 /* Repère du véhicule */
 .me-marker { width: 48px; height: 48px; }
 .me-marker svg { width: 100%; height: 100%; display: block; overflow: visible; }
-.me-halo { fill: var(--arrow-fill); fill-opacity: .18; stroke: #ffffff; stroke-width: 2; }
+.me-halo { fill: var(--arrow-fill); fill-opacity: .18; stroke: var(--arrow-stroke); stroke-width: 2; }
 /* Couleur choisie dans Réglages (phase 7c), appliquée par src/app.js dans --arrow-fill / --arrow-stroke. */
 .me-arrow { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3; stroke-linejoin: round; }
 .me-dot { fill: var(--arrow-fill); stroke: var(--arrow-stroke); stroke-width: 3; display: none; }
@@ -534,7 +547,7 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   font: inherit; color: var(--fg); background: var(--card); cursor: pointer;
   border: 2px solid var(--border); border-left: 8px solid var(--area); border-radius: var(--radius);
 }
-.area-row:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.area-row:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .area-row.other-side { border-left-color: var(--area-other); color: var(--muted); }
 .area-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; }
 .area-row-name { font-weight: 800; min-width: 0; overflow-wrap: anywhere; }

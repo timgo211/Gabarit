@@ -13,6 +13,7 @@ import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib
 import { planMove, frameAt, holdStill } from '../lib/nav-anim.js';
 import { haversine } from '../lib/nav-geo.js';
 import { overviewPadding } from '../lib/navigation.js';
+import { recolorStyle, mapPaintPatches, ROUTE_WIDTH } from '../lib/map-palette.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -24,6 +25,12 @@ const ZFE_SOURCE = 'zfe';
 const ZFE_LAYERS = ['zfe-fill', 'zfe-line'];
 const SAT_SOURCE = 'ign-ortho';
 const SAT_LAYER = 'ign-ortho';
+/** Couches de Gabarit, jamais recolorées avec le fond (phase 2c-a). */
+const OWN_LAYERS = [...ROUTE_LAYERS, ...ZFE_LAYERS, SAT_LAYER];
+/** Bord du tracé sur les photos IGN, jour et nuit (noir Panier Perdu). */
+const SAT_CASING = '#14161C';
+/** Repères : départ vert, arrivée rouge (repères universels), point choisi violet ; hors palette exprès. */
+const MARK_COLORS = Object.freeze({ start: '#146c2e', end: '#b3261e', pin: '#7b2fbf' });
 /** Contexte WebGL perdu : délai avant de recréer la carte s'il n'est pas rendu (retour au premier plan / page visible). */
 const RESTORE_WAIT_VISIBLE_MS = 1500;
 const RESTORE_WAIT_LOST_MS = 3000;
@@ -163,11 +170,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function routeColors() {
     const css = getComputedStyle(document.documentElement);
     const color = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
+    const photos = !!lastView?.photos;
     return {
-      'route-alt-casing': color('--route-alt-casing', '#fff'),
-      'route-alt-line': color('--route-alt', '#7d8894'),
-      'route-casing': color('--route-casing', '#fff'),
-      'route-line': color('--route', '#0b57d0'),
+      'route-alt-casing': photos ? SAT_CASING : color('--route-alt-casing', '#14161C'),
+      'route-alt-line': color('--route-alt', '#A9A79E'),
+      'route-casing': photos ? SAT_CASING : color('--route-casing', '#14161C'),
+      'route-line': color('--route', '#E8A93B'),
     };
   }
 
@@ -180,19 +188,19 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     // Ordre d'empilement : autres itinéraires (gris) dessous, itinéraire choisi dessus, zone de toucher invisible au-dessus.
     map.addLayer({
       id: 'route-alt-casing', type: 'line', source: 'route', filter: ['!', isSelected], layout,
-      paint: { 'line-color': c['route-alt-casing'], 'line-width': 9 },
+      paint: { 'line-color': c['route-alt-casing'], 'line-width': ROUTE_WIDTH.altCasing },
     });
     map.addLayer({
       id: 'route-alt-line', type: 'line', source: 'route', filter: ['!', isSelected], layout,
-      paint: { 'line-color': c['route-alt-line'], 'line-width': 5 },
+      paint: { 'line-color': c['route-alt-line'], 'line-width': ROUTE_WIDTH.altLine },
     });
     map.addLayer({
       id: 'route-casing', type: 'line', source: 'route', filter: isSelected, layout,
-      paint: { 'line-color': c['route-casing'], 'line-width': 11 },
+      paint: { 'line-color': c['route-casing'], 'line-width': ROUTE_WIDTH.casing },
     });
     map.addLayer({
       id: 'route-line', type: 'line', source: 'route', filter: isSelected, layout,
-      paint: { 'line-color': c['route-line'], 'line-width': 7 },
+      paint: { 'line-color': c['route-line'], 'line-width': ROUTE_WIDTH.line },
     });
     map.addLayer({
       id: 'route-hit', type: 'line', source: 'route', layout,
@@ -251,8 +259,24 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     const view = map ? satelliteView({ layer, center: [c.lng, c.lat], navigating }) : { photos: false, message: '', button: false };
     if (map?.getLayer(SAT_LAYER)) map.setLayoutProperty(SAT_LAYER, 'visibility', view.photos ? 'visible' : 'none');
     if (!lastView || lastView.photos !== view.photos || lastView.message !== view.message || lastView.button !== view.button) {
+      const photosChanged = lastView?.photos !== view.photos;
       lastView = view;
+      if (photosChanged) paintRoutes();
       opts.onLayerView?.(view);
+    }
+  }
+
+  /** Couleurs des tracés déjà dessinés (changement plan ↔ photos : bord noir sur les photos). */
+  function paintRoutes() {
+    if (!map) return;
+    for (const [id, color] of Object.entries(routeColors())) if (map.getLayer(id)) map.setPaintProperty(id, 'line-color', color);
+  }
+
+  /** Fond de carte aux couleurs Panier Perdu (src/lib/map-palette.js), au premier chargement d'un style. */
+  function recolorBase() {
+    const layers = map?.getStyle()?.layers;
+    for (const p of mapPaintPatches(layers, theme, OWN_LAYERS)) {
+      try { map.setPaintProperty(p.id, p.prop, p.value); } catch { /* couche ou propriété refusée : laissée */ }
     }
   }
 
@@ -269,7 +293,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function transformStyle(prev, next) {
     const c = routeColors();
     const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
-    return carryOverlay(prev, next, { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
+    return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS), { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
   }
 
   /** Crée la carte MapLibre (au démarrage, ou pour remplacer une carte dont le contexte WebGL est perdu). */
@@ -290,6 +314,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     }
     map.on('click', onMapClick);
     wireLongPress();
+    map.on('style.load', recolorBase); // couleurs Panier Perdu (setStyle avec transformStyle : recolorStyle)
     map.on('style.load', addSatelliteLayer); // aussi après une reconstruction complète du style
     map.on('style.load', addZfeLayers);
     map.on('moveend', applyLayer);
@@ -304,12 +329,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       map.triggerRepaint();
     });
     map.once('style.load', addRouteLayers);
-    if (marks.start) marker('start', marks.start, '#146c2e');
-    if (marks.end) marker('end', marks.end, '#b3261e');
+    if (marks.start) marker('start', marks.start, MARK_COLORS.start);
+    if (marks.end) marker('end', marks.end, MARK_COLORS.end);
     if (marks.me) vehicle(marks.me, marks.meBearing);
-    if (marks.pin) marker('pin', marks.pin, '#7b2fbf');
-    if (marks.pinTo) marker('pinTo', marks.pinTo, '#7b2fbf');
-    if (marks.pinFrom) marker('pinFrom', marks.pinFrom, '#7b2fbf');
+    if (marks.pin) marker('pin', marks.pin, MARK_COLORS.pin);
+    if (marks.pinTo) marker('pinTo', marks.pinTo, MARK_COLORS.pin);
+    if (marks.pinFrom) marker('pinFrom', marks.pinFrom, MARK_COLORS.pin);
     drawAreas();
   }
 
@@ -508,8 +533,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (styleReady()) addRouteLayers();
     else map.once('style.load', addRouteLayers);
     const line = routes[selected].coordinates;
-    marker('start', line[0], '#146c2e');
-    marker('end', line[line.length - 1], '#b3261e');
+    marker('start', line[0], MARK_COLORS.start);
+    marker('end', line[line.length - 1], MARK_COLORS.end);
     if (fit) fitRoute();
   }
 
@@ -617,7 +642,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     },
     /** Repère d'un point choisi par appui long : 'pin' (choix en cours), 'pinTo' (arrivée), 'pinFrom' (départ). */
     showPin(lonlat, key = 'pin') {
-      marker(key, lonlat, '#7b2fbf');
+      marker(key, lonlat, MARK_COLORS.pin);
     },
     clearPin(key = 'pin') {
       markers[key]?.remove();

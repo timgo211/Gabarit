@@ -11,3 +11,6 @@ export function resolveTheme(mode, date = new Date()) {
   const h = date.getHours();
   return h >= NIGHT_START_HOUR || h < NIGHT_END_HOUR ? 'night' : 'day';
 }
+
+/** Couleur de la barre du haut, de la barre d'état et de l'écran de chargement (Panier Perdu, jour et nuit). */
+export const CHROME_COLOR = '#14161C';
