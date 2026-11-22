@@ -14,10 +14,12 @@
 // 2. si ORS ne renvoie qu'un itinéraire : variantes « Plus court » et « Sans péage » en parallèle
 //    (« Plus rapide » à la place de « Sans péage » quand les péages sont déjà évités ou que le Recommandé n'en a pas) ;
 // 3. doublons (tracés quasi identiques) supprimés ; le Recommandé reste toujours la référence des écarts.
+// Recommandé en code 2009 : diagnostic (sens inverse, point de passage, sans restrictions) dans le même budget,
+// voir diagnose2009.
 
 import { buildDirectionsRequest, buildRestrictions } from './ors-request.js';
 import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bboxOf } from './ors-response.js';
-import { ERROR_KINDS } from './ors-errors.js';
+import { ERROR_KINDS, failedSegment } from './ors-errors.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
@@ -31,6 +33,17 @@ export const RESTRICTION_HINT_TEXT = 'Départ ou arrivée peut-être joignable s
  * camion ne peut pas repartir (sens unique, zone piétonne, sortie interdite, à vérifier). Jamais en voix.
  */
 export const DEAD_END_HINT_TEXT = 'Départ ou arrivée peut-être dans une rue sans sortie possible pour le camion (sens unique, zone piétonne). Essaie un point plus accessible (appui long). La signalisation fait foi.';
+/**
+ * Phase 2f : code 2009 à l'aller alors que le trajet inverse (arrivée → départ, même profil) passe. Constat tablette
+ * v35 à v37 : Metz centre (6.17963 49.11516) → Nancy / Toul en 2009, Nancy → Metz passe. Jamais en voix.
+ */
+export const START_NO_EXIT_TEXT = 'Le départ semble sans sortie pour un camion (sens unique, zone piétonne, sortie interdite) : le trajet inverse passe. Pose le départ sur une route voisine plus large (appui long). La signalisation fait foi.';
+/**
+ * Phase 2f : requête avec un point de passage au milieu, en échec sur le premier tronçon (départ) ou le second
+ * (arrivée). Le point de passage est accroché à la route la plus proche sans garantie : formulé au conditionnel.
+ */
+export const START_UNREACHABLE_TEXT = 'Le départ semble isolé du reste du réseau pour ton camion (sens unique, zone piétonne, sortie interdite ou limite de gabarit). Pose le départ sur une route voisine plus large (appui long). La signalisation fait foi.';
+export const END_UNREACHABLE_TEXT = "L'arrivée semble inaccessible à ton camion (sens unique, zone piétonne, accès interdit ou limite de gabarit). Pose l'arrivée sur une route voisine plus large (appui long). La signalisation fait foi.";
 
 export const ROUTE_OPTIONS = Object.freeze({
   /** Itinéraires demandés à alternative_routes (principal compris). */
@@ -65,6 +78,12 @@ export const VARIANTS = Object.freeze({
 const ALTERNATIVES_FALLBACK_KINDS = new Set([
   ERROR_KINDS.TOO_FAR, ERROR_KINDS.BAD_REQUEST, ERROR_KINDS.SERVER, ERROR_KINDS.UNKNOWN,
 ]);
+
+/**
+ * Échecs de la requête avec point de passage qui ne concluent rien sans rien interrompre : point de passage non
+ * accroché (2010, ou erreur 2099 que RoutingRequest.java renvoie pour un point introuvable dans un tronçon).
+ */
+const VIA_INCONCLUSIVE_KINDS = new Set([ERROR_KINDS.POINT_NOT_FOUND, ERROR_KINDS.SERVER, ERROR_KINDS.UNKNOWN]);
 
 /** Raison courte d'une variante non calculée (affichée discrètement sous les fiches). */
 const FAILURE_REASONS = {
@@ -174,6 +193,76 @@ export function nameAlternatives(options) {
 }
 
 /**
+ * Diagnostic d'un code 2009 (aucun itinéraire), phases 5h ter et 2f, dans le budget de 3 requêtes du calcul
+ * (alternative_routes compris). Ajoute une précision au message de `err` ; aucun résultat n'est affiché ni guidé,
+ * le profil n'est jamais changé et aucun point n'est déplacé : la signalisation fait foi.
+ * (a) Trajet inverse (arrivée → départ), même profil : s'il passe, le départ semble sans sortie pour le camion.
+ * (b) Sinon, point de passage au milieu du trajet (rayon d'accroche maximal du serveur, radiuses -1) : ORS s'arrête
+ *     au premier tronçon impossible et le nomme (failedSegment) ; tronçon 1 → départ, tronçon 2 → arrivée.
+ *     L'accroche du point de passage n'est pas garantie (route isolée possible) : messages au conditionnel ;
+ *     point de passage non accroché (2010) ou tronçons tous possibles → rien de conclu, étape suivante.
+ * (c) Sinon, si le budget le permet, sans les restrictions du profil : ORS accroche les points sur une voie permise
+ *     au gabarit (ORSRouter.createSnapFilter) mais son test de sous-réseau ignore les limites de poids, hauteur ou
+ *     largeur ; passe → limite de gabarit, échoue aussi → rue sans sortie. Profil sans restriction : la requête
+ *     d'origine valait déjà ce diagnostic.
+ * Diagnostic en échec pour une autre raison (quota, réseau) : message d'origine, raison dans err.diagnosticNote.
+ * @returns {Promise<number>} nombre de requêtes du calcul après le diagnostic
+ */
+export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests }) {
+  const hint = (kind, text) => {
+    err.hint = kind;
+    err.restrictionHint = kind === 'restrictions';
+    err.message = `${err.message ? `${err.message} ` : ''}${text}`;
+  };
+  const left = () => requests < ROUTE_OPTIONS.MAX_REQUESTS;
+  /** Envoie une requête de diagnostic : { ok:true } | { ok:false, noRoute:boolean, kind, detail }. */
+  const probe = async (params) => {
+    requests += 1;
+    try {
+      parseAllDirections(await send(buildDirectionsRequest({ vehicle, avoidFerries, avoidTolls, ...params })));
+      return { ok: true };
+    } catch (e) {
+      const noRoute = e?.code === 2009 || e instanceof NoRouteError;
+      return { ok: false, noRoute, kind: errorKind(e), code: e?.code ?? null, detail: String(e?.detail || e?.message || '') };
+    }
+  };
+  const interrupted = (r) => {
+    err.diagnosticNote = `Diagnostic interrompu : ${FAILURE_REASONS[r.kind] ?? 'erreur du service'}.`;
+  };
+
+  // (a) Sens inverse.
+  if (!left()) return requests;
+  const back = await probe({ start: end, end: start });
+  if (back.ok) { hint('start-no-exit', START_NO_EXIT_TEXT); return requests; }
+  if (!back.noRoute) { interrupted(back); return requests; }
+
+  // (b) Point de passage au milieu (moyenne des coordonnées : assez précis pour un repère, pas pour un guidage).
+  if (!left()) return requests;
+  const mid = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
+  const via = await probe({ start, end, via: [mid], radiuses: [-1, -1, -1] });
+  if (!via.ok && via.noRoute) {
+    const seg = failedSegment(via.detail);
+    if (seg === 1) { hint('start-unreachable', START_UNREACHABLE_TEXT); return requests; }
+    if (seg === 2) { hint('end-unreachable', END_UNREACHABLE_TEXT); return requests; }
+  } else if (!via.ok && !VIA_INCONCLUSIVE_KINDS.has(via.kind)) {
+    interrupted(via);
+    return requests;
+  }
+
+  // (c) Sans les restrictions du profil.
+  if (!Object.keys(buildRestrictions(vehicle)).length) { hint('dead-end', DEAD_END_HINT_TEXT); return requests; }
+  if (!left()) {
+    err.diagnosticNote = 'Diagnostic sans conclusion (point de passage non accroché ou trajet possible par le milieu).';
+    return requests;
+  }
+  const bare = await probe({ start, end, noRestrictions: true });
+  if (bare.ok) hint('restrictions', RESTRICTION_HINT_TEXT);
+  else if (bare.noRoute) hint('dead-end', DEAD_END_HINT_TEXT);
+  else interrupted(bare);
+  return requests;
+}
+
+/**
  * Calcule les itinéraires proposés (3 requêtes au plus).
  * @param {{ start:number[], end:number[], vehicle:object, avoidTolls?:boolean, avoidFerries?:boolean,
  *   send:(req:{url:string,method:string,body:object})=>Promise<object> }} p
@@ -204,30 +293,8 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     }
     if (!main) main = await ask(VARIANTS.recommended);
   } catch (err) {
-    // Code 2009 (aucun itinéraire) : une seule requête de diagnostic sans les restrictions du profil, dans le budget.
-    // ORS accroche les points sur une voie permise au gabarit (ORSRouter.createSnapFilter), mais son test de
-    // sous-réseau ignore les limites de poids, hauteur ou largeur : un point de centre-ville peut n'être relié au
-    // reste qu'au-delà d'une limite. Le résultat n'est jamais affiché ni guidé ; seul le message change.
-    // Échec aussi sans restrictions (code 2009 ou réponse sans tracé), ou profil sans restriction (la requête
-    // d'origine valait déjà ce diagnostic) : point sans sortie possible pour le camion. Autre échec du diagnostic
-    // (réseau, quota) : message d'origine.
-    const hint = (kind, text) => {
-      err.hint = kind;
-      err.restrictionHint = kind === 'restrictions';
-      err.message = `${err.message ? `${err.message} ` : ''}${text}`;
-    };
     if (err?.code === 2009) {
-      if (!Object.keys(buildRestrictions(vehicle)).length) hint('dead-end', DEAD_END_HINT_TEXT);
-      else if (requests < ROUTE_OPTIONS.MAX_REQUESTS) {
-        requests += 1;
-        try {
-          const probe = parseAllDirections(await send(buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, noRestrictions: true })));
-          if (probe.length) hint('restrictions', RESTRICTION_HINT_TEXT);
-          else hint('dead-end', DEAD_END_HINT_TEXT);
-        } catch (probeErr) {
-          if (probeErr?.code === 2009 || probeErr instanceof NoRouteError) hint('dead-end', DEAD_END_HINT_TEXT);
-        }
-      }
+      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests });
     }
     throw err;
   }

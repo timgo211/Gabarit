@@ -166,6 +166,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   dimanche 22 h » si le départ du trajet calculé tombe pendant l'interdiction, « à partir de samedi 22 h » sinon.
   Bouton « Autres itinéraires » grisé : gris opaque (la carte ne se voit plus au travers).
 
+- [x] **Phase 2f — Départ impossible (erreur ORS 2009)** (petite, seule, après la 2e, v38)
+  Constat tablette v35 à v37 : Metz centre (6.17963 49.11516, géocodage) → Nancy / Toul en HTTP 404 code 2009,
+  Nancy → Metz et Thionville → Toul passent ; seul le message générique « Aucun itinéraire autorisé » s'affichait.
+  Cause dans le code : la précision 5h ter dépendait d'une seule requête de diagnostic ; si elle échouait pour une
+  autre raison (quota, réseau, 5xx), le message d'origine restait sans rien dire. Diagnostic d'un 2009, toujours dans
+  le budget de 3 requêtes (alternative_routes compris), jamais affiché ni guidé, profil et points inchangés :
+  (a) trajet inverse, même profil : s'il passe → « Le départ semble sans sortie pour un camion » ; (b) sinon point de
+  passage au milieu (`radiuses` à -1, un par point, sans alternative_routes) : ORS nomme le premier tronçon impossible
+  → départ ou arrivée en cause, au conditionnel (accroche du point de passage non garantie) ; (c) sinon, s'il reste
+  une requête, sans les restrictions (messages 5h ter). Diagnostic interrompu : message d'origine, raison ajoutée à la
+  ligne technique. « La signalisation fait foi. »
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

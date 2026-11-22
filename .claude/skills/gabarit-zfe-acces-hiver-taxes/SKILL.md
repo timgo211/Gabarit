@@ -112,12 +112,15 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   d'étape, carte OpenStreetMap du réseau non chargée) ». Crédits `#tolls-credit` dans Réglages. Diagnostic :
   « Méthode taxes PL », méthode de chaque passage, `point km X : lat, lon` (0,001°) tous les 10 km sur les étapes sans
   nom (« - ») de plus de 5 km, jamais à moins de 1 km du départ ou de l'arrivée. Calcul en échec :
-  `map.showRoutes([])` retire tracés et repères de départ / d'arrivée. Code 2009 (`computeRouteOptions`) : une
-  requête sans `profile_params.restrictions` (`noRestrictions`), dans le budget de 3, si le profil a des
-  restrictions ; elle passe → `RESTRICTION_HINT_TEXT` ajouté au message (jamais affichée, guidée ni dite) ; elle
-  échoue aussi (2009 ou sans tracé) ou profil sans restriction → `DEAD_END_HINT_TEXT` (« rue sans sortie possible pour
-  le camion », constat tablette : Metz rue Coislin → Nancy / Toul en 2009, Nancy → Metz y arrive) ; autre échec du
-  diagnostic (quota, réseau) → message d'origine. Version du diagnostic : `requestVersionLabel` (même demande au
+  `map.showRoutes([])` retire tracés et repères de départ / d'arrivée. Code 2009 : `diagnose2009`
+  (route-options.js, phase 2f), dans le budget de 3 (alternative_routes compris), rien d'affiché, guidé ni dit, profil
+  et points jamais modifiés : (a) trajet inverse, même profil, passe → `START_NO_EXIT_TEXT` (Metz centre → Nancy /
+  Toul en 2009, Nancy → Metz passe) ; (b) point de passage au milieu (`via`, `radiuses: [-1, -1, -1]`, jamais avec
+  alternative_routes), tronçon lu par `failedSegment` (ors-errors.js) : 1 → `START_UNREACHABLE_TEXT`, 2 →
+  `END_UNREACHABLE_TEXT`, au conditionnel (accroche du point de passage non garantie) ; 2010/5xx du point de passage →
+  rien de conclu ; (c) s'il reste une requête, sans restrictions (`noRestrictions`) → `RESTRICTION_HINT_TEXT` ou
+  `DEAD_END_HINT_TEXT` (profil sans restriction → `DEAD_END_HINT_TEXT` sans requête). Autre échec (quota, réseau) →
+  message d'origine, raison dans `err.diagnosticNote` (ajoutée par `serviceDetailText`). Version du diagnostic : `requestVersionLabel` (même demande au
   service worker que Réglages ; avant, #app-version vide tant que Réglages n'était pas ouvert → « version inconnue »). Cause
   (ORS `ORSRouter.createSnapFilter`) : accrochage sur une voie permise au gabarit, mais test de sous-réseau sans les
   limites de poids / hauteur ; `radiuses` (400 m par défaut, `maximum_snapping_radius`) n'y change rien (2010 sinon).

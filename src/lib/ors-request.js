@@ -38,14 +38,25 @@ export function buildRestrictions(vehicle) {
  *   start/end en [longitude, latitude] ; preference absente → défaut ORS (« recommended ») ;
  *   alternatives = nombre d'itinéraires voulus (2 ou 3, itinéraire principal compris) → alternative_routes.target_count.
  *   noRestrictions = sans profile_params.restrictions (diagnostic d'un code 2009 seulement).
+ *   via = points de passage entre départ et arrivée, radiuses = un rayon d'accroche par point (m, -1 = rayon maximal
+ *   du serveur) : diagnostic d'un code 2009 seulement (phase 2f). Doc ORS (ors-api/.../RouteRequest.java) : radiuses,
+ *   « the value of -1 specifies using the maximum possible search radius. The number of radiuses correspond to the
+ *   number of waypoints » ; alternative_routes n'accepte que 2 points, donc jamais avec via.
  * @returns {{ url:string, method:'POST', body:object }}
  */
 export function buildDirectionsRequest({
   start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, alternatives = 0, avoidPolygons = null,
-  noRestrictions = false,
+  noRestrictions = false, via = [], radiuses = null,
 }) {
   if (!isLonLat(start)) throw new TypeError('Point de départ invalide.');
   if (!isLonLat(end)) throw new TypeError("Point d'arrivée invalide.");
+  if (!Array.isArray(via) || !via.every(isLonLat)) throw new TypeError('Point de passage invalide.');
+  if (via.length && alternatives) throw new TypeError('Itinéraires alternatifs : 2 points seulement (pas de point de passage).');
+  const coordinates = [start, ...via, end];
+  if (radiuses !== null && !(Array.isArray(radiuses) && radiuses.length === coordinates.length
+    && radiuses.every((r) => r === -1 || (typeof r === 'number' && Number.isFinite(r) && r > 0)))) {
+    throw new TypeError('Rayons d\'accroche : un par point, positifs ou -1.');
+  }
   if (!vehicle) throw new TypeError('Aucun profil véhicule actif.');
   if (preference !== null && preference !== undefined && !ORS_PREFERENCES.includes(preference)) {
     throw new TypeError("Préférence d'itinéraire inconnue.");
@@ -70,7 +81,7 @@ export function buildDirectionsRequest({
   if (Object.keys(restrictions).length) options.profile_params = { restrictions };
 
   const body = {
-    coordinates: [start, end],
+    coordinates,
     instructions: true,
     language: 'fr',
     units: 'm',
@@ -84,6 +95,7 @@ export function buildDirectionsRequest({
   if (preference) body.preference = preference;
   // weight_factor (1,4) et share_factor (0,6) : valeurs par défaut d'ORS.
   if (alternatives) body.alternative_routes = { target_count: alternatives };
+  if (radiuses) body.radiuses = [...radiuses];
 
   return { url: `${ORS_BASE}/directions/driving-hgv/geojson`, method: 'POST', body };
 }

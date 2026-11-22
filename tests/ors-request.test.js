@@ -128,3 +128,19 @@ test('préférence et alternative_routes (phase 2b)', () => {
   assert.throws(() => buildDirectionsRequest({ start, end, vehicle: v, alternatives: 4 }), /alternatifs/);
   assert.throws(() => buildDirectionsRequest({ start, end, vehicle: v, alternatives: 1 }), /alternatifs/);
 });
+
+test('phase 2f : point de passage et rayons d\'accroche (diagnostic 2009 seulement)', () => {
+  const start = [6.17963, 49.11516];
+  const end = [6.17829, 48.6903];
+  const mid = [6.17896, 48.90273];
+  const { body } = buildDirectionsRequest({ start, end, vehicle: {}, via: [mid], radiuses: [-1, -1, -1] });
+  assert.deepEqual(body.coordinates, [start, mid, end]);
+  assert.deepEqual(body.radiuses, [-1, -1, -1]);
+  const plain = buildDirectionsRequest({ start, end, vehicle: {} }).body;
+  assert.deepEqual(plain.coordinates, [start, end]);
+  assert.equal(plain.radiuses, undefined, 'calcul normal : rayon par défaut du serveur');
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: {}, via: [mid], alternatives: 3 }), /2 points seulement/);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: {}, via: [mid], radiuses: [-1, -1] }), /un par point/);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: {}, radiuses: [0, 350] }), /un par point/);
+  assert.throws(() => buildDirectionsRequest({ start, end, vehicle: {}, via: [[200, 0]] }), /passage invalide/);
+});
