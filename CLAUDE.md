@@ -54,6 +54,8 @@ Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relan
   Hors itinéraire (`NAV`) : détection seulement à ≥ 10 km/h avec une précision ≤ 30 m ; à l'arrêt hors du tracé,
   recalcul seulement proposé (bouton « Recalculer d'ici », `requestReroute`) : l'itinéraire ne change jamais sans
   accord hors d'une vraie sortie de route en roulant.
+- Ponts sans hauteur connue (12a, `bridge-check.js`, copie `data/ponts-osm/` de l'Action « Données OSM », jamais
+  précachée) : fiche et carte à l'arrêt seulement, jamais dits à voix haute ni dans le guidage ; « à vérifier ».
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
   Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.

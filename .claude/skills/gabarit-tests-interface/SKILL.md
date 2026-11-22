@@ -65,3 +65,10 @@ Phase 2e (`bandeau`) : 412×900, 900×412, 760×360, 1280×800, consigne « Rue 
 et dans la pile du haut, taille ≥ 70 % de l'origine, badge « D 120 E » sur une ligne, aucune référence avec espace
 sécable ; échelle visible hors guidage, cachée en guidage, revenue après ; attribution toujours visible (le style de
 test `streets: true` porte une attribution) ; « Autres itinéraires » grisé opaque.
+
+- `ponts` (phase 12a) : itinéraire synthétique sous le viaduc de Colombier (`ors-directions-colombier.json`), copie
+  `data/ponts-osm/` construite par les fonctions de l'Action (`bridgesCopy: 'fixture'`). 412×900 et 900×412 de jour,
+  412×900 et 360×760 de nuit : ligne « Passage sous un pont… » priorité haute, pont bas à 3,5 m, pont au-dessus d'un
+  passage maxheight ignoré, résumé et part A/N sur la fiche, 2 repères `.bridge-marker`, ligne technique du diagnostic,
+  repère touché → message. Guidage (412×900) : aucun repère, rien sur les ponts à l'écran ni à voix haute. Réglage
+  `bridgeWarnings: false` (option `settings` d'`open`) → rien ; copie absente → « données non chargées ».
