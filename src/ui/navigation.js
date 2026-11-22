@@ -461,7 +461,7 @@ export function createNavigation(ctx) {
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
 
     // « Autres itinéraires » : seulement à l'arrêt (sous 5 km/h pendant 3 s).
-    s.park = parkedState(s.park, view.speedKmh, Date.now());
+    s.park = parkedState(s.park, view.parkSpeedKmh, Date.now());
     ui.alt.setAttribute('aria-disabled', String(!s.park.parked));
     renderAreaButtons();
 
@@ -1054,9 +1054,19 @@ export function createNavigation(ctx) {
     get active() {
       return !!s;
     },
-    /** Vitesse du guidage (km/h), ou null (pas de position). */
+    /**
+     * Vitesse du guidage pour « Mon avis » (km/h) : celle du GPS ou déduite des positions ; null si inconnue (pas de
+     * position, premier point sans vitesse) : avis refusé (canReport).
+     */
     get speedKmh() {
-      return s?.view ? s.view.speedKmh : null;
+      return s?.view ? (s.view.parkSpeedKmh ?? null) : null;
+    },
+    /** Repère d'aire touché sur la carte en guidage : liste et fiche courte, jamais la fiche complète en roulant. */
+    pickArea(id) {
+      if (!s) return;
+      if (!s.areasOpen) setAreasOpen(true);
+      pickArea(id);
+      touchAreas();
     },
     /** Aires arrivées après « Démarrer » (requête Overpass plus lente) : le moteur les place sur le tracé. */
     setAreas(areas) {

@@ -152,6 +152,7 @@ const areas = createAreas({
   update,
   getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
   getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
+  onNavPick: (id) => navigation.pickArea(id), // phase 2d : repère touché en guidage
   onPool: (pool) => {
     navigation.setAreas(pool);
     renderChoice(); // pause conseillée replacée sur une aire du trajet

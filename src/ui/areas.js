@@ -69,7 +69,7 @@ export async function fetchOverpass(query, signal) {
 /**
  * @param {{ map:object, storage:Storage, getData:()=>object, update:(fn)=>void,
  *   getDrive:()=>{ navigating:boolean, speedKmh:number|null }, getRoute:()=>object|null,
- *   onPool:(pool:object[])=>void }} ctx
+ *   onPool:(pool:object[])=>void, onNavPick?:(id:string)=>void }} ctx
  *   getRoute : itinéraire choisi en ce moment (il peut changer pendant la requête).
  */
 export function createAreas(ctx) {
@@ -300,7 +300,11 @@ export function createAreas(ctx) {
     });
   }
   dlg.addEventListener('close', () => { openId = null; });
-  ctx.map.onAreaPick(openSheet);
+  // Repère touché : en guidage, liste et fiche courte (fiche complète seulement à l'arrêt, R412-6-2) ; sinon la fiche.
+  ctx.map.onAreaPick((id) => {
+    if (ctx.getDrive().navigating && ctx.onNavPick) ctx.onNavPick(id);
+    else openSheet(id);
+  });
 
   return {
     load,

@@ -44,6 +44,12 @@ export const NAV = Object.freeze({
   OFF_ROUTE_MAX_ACCURACY_M: 30,
   /** Vitesse calculée entre deux positions au-delà de 150 km/h : saut de position (bruit), ignorée. */
   MAX_COMPUTED_SPEED: 150 / 3.6,
+  /**
+   * « À l'arrêt » des boutons réservés à l'arrêt (phase 2d, R412-6-2) : sans vitesse du GPS, vitesse déduite des deux
+   * dernières positions ; un déplacement sous max(précision annoncée, 5 m) est de la dérive (même sans précision
+   * annoncée : sinon la dérive d'un GPS à l'arrêt ne tomberait jamais sous 5 km/h).
+   */
+  PARK_DRIFT_MIN_M: 5,
   /** Proposition « Recalculer d'ici » après 3 positions hors tracé, à l'arrêt. */
   STOPPED_OFF_FIXES: 3,
   /** Au plus un recalcul toutes les 30 s (quota gratuit HeiGIT : 2 000 itinéraires/jour, 40/min). */
@@ -263,6 +269,15 @@ export function updateNavigation(state, fix) {
   }
   if (raw !== null) s.speed = s.speed === null ? raw : s.speed + NAV.SPEED_SMOOTHING * (raw - s.speed);
   const speed = s.speed ?? 0;
+  // Vitesse pour « à l'arrêt » (affichage seulement) : null = inconnue (premier point, trou de plus de 10 s, saut
+  // irréaliste), comptée comme « en mouvement » par parkedState (src/lib/nav-layout.js).
+  let parkRaw = isNum(fix.speed) && fix.speed >= 0 ? fix.speed : null;
+  if (parkRaw === null && s.lastFix && dt > 0 && dt <= 10) {
+    const moved = haversine(s.lastFix, p);
+    parkRaw = moved > Math.max(accuracy, NAV.PARK_DRIFT_MIN_M) ? moved / dt : 0;
+    if (parkRaw > NAV.MAX_COMPUTED_SPEED) parkRaw = null;
+  }
+  const parkSpeedKmh = parkRaw === null ? null : parkRaw * 3.6;
 
   const loc = locateOnLine(line, p, s.segIndex);
   s.segIndex = loc.segIndex;
@@ -415,6 +430,11 @@ export function updateNavigation(state, fix) {
     zoom: zoomForSpeed(speed * 3.6),
     pitch: NAV.PITCH,
     speedKmh: speed * 3.6,
+    /**
+     * Vitesse pour les boutons réservés à l'arrêt (km/h) : vitesse du GPS, sinon déduite des deux dernières
+     * positions (dérive sous max(précision, 5 m) = 0) ; null si inconnue (= en mouvement).
+     */
+    parkSpeedKmh,
     onRoute,
     distanceFromRoute: loc.distance,
     /** Distance parcourue sur le tracé (m) : partie déjà faite dessinée en gris (phase 2c), affichage seulement. */

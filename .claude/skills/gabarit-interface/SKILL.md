@@ -83,3 +83,9 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   palettes `NIGHT_PALETTES` / `NIGHT_BUBBLES` de `src/lib/map-palette.js` (gris de la gamme Panier Perdu seulement),
   `map.setNightLevel` : voile `.map-veil` puis `setPaintProperty`, jamais setStyle. Interface (variables CSS) identique aux
   trois niveaux. Tests : textes AA aux trois niveaux, tracé ambre et routes ≥ 3:1 sur le fond Clair (`contrast.test.js`).
+- « À l'arrêt » (`parkedState`, boutons réservés à l'arrêt, « Mon avis ») : vitesse du GPS, sinon déduite des deux
+  dernières positions (`view.parkSpeedKmh` du moteur, dérive sous max(précision, `NAV.PARK_DRIFT_MIN_M` = 5 m) = 0) ;
+  inconnue (premier point, trou > 10 s, saut) = en mouvement. La vitesse du moteur (`speedKmh` : zoom, voix, recalcul)
+  n'en dépend pas. En guidage, un repère d'aire touché ouvre la liste et la fiche courte (`navigation.pickArea`),
+  jamais la fiche complète.
+

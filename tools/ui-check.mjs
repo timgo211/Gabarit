@@ -1152,14 +1152,25 @@ async function areasCheck(browser, base) {
       `${width} px : en roulant, fiche courte et « Fiche complète » grisée`);
     await page.click('#btn-nav-area-sheet', { force: true });
     check(!(await page.isVisible('#dlg-area')), `${width} px : en roulant, aucune fiche complète ouverte`);
+    // Repère d'aire touché sur la carte en roulant : liste et fiche courte, jamais la fiche complète (R412-6-2).
+    const firstId = await page.getAttribute('#nav-areas-list .nav-area', 'data-id');
+    await navAreas(page); // liste fermée
+    const marker = page.locator(`.area-marker[data-id="${firstId}"]`);
+    await marker.dispatchEvent('click');
+    await page.waitForTimeout(300);
+    check(await page.isVisible('#nav-areas') && await page.isVisible('#nav-area-card') && !(await page.isVisible('#dlg-area')),
+      `${width} px : en roulant, repère touché → liste et fiche courte, pas de fiche complète`);
     // À l'arrêt (moins de 5 km/h pendant 3 s) : fiche complète, avis possible.
     const here = r2.length ? line[6] : line[0];
     for (let i = 0; i < 9; i += 1) {
       await setGeo(page, { lon: here[0], lat: here[1], accuracy: 5, speed: 0 });
       await page.waitForTimeout(1000);
     }
-    if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
-    await page.locator('#nav-areas-list .nav-area').first().click();
+    // À l'arrêt : repère touché → fiche courte seulement ; fiche complète par « Fiche complète ».
+    await marker.dispatchEvent('click');
+    await page.waitForTimeout(300);
+    check(await page.isVisible('#nav-area-card') && !(await page.isVisible('#dlg-area')),
+      `${width} px : à l'arrêt, repère touché → fiche courte seulement`);
     await page.click('#btn-nav-area-sheet');
     await page.waitForSelector('#dlg-area[open]');
     check(await page.isEnabled('[data-avis="ok"]'), `${width} px : « Mon avis » possible à l'arrêt en guidage`);

@@ -52,7 +52,26 @@ test('à l\'arrêt : sous 5 km/h pendant 3 s', () => {
   assert.equal(p.parked, true);
   p = parkedState(p, 6, 5000);
   assert.equal(p.parked, false);
-  assert.equal(parkedState(null, null, 0).since, 0);
+});
+
+test('à l\'arrêt : vitesse inconnue (null, NaN, absente) = en mouvement, jamais à l\'arrêt (R412-6-2)', () => {
+  for (const x of [null, NaN, undefined, Infinity, '0']) {
+    let p = null;
+    for (let t = 0; t <= 10_000; t += 1000) p = parkedState(p, x, t);
+    assert.deepEqual(p, { since: null, parked: false }, String(x));
+  }
+  // Premier point sans vitesse : en mouvement.
+  assert.equal(parkedState(null, null, 0).parked, false);
+  // Vitesse perdue au milieu d'un arrêt : compteur remis à zéro, 3 s de nouveau.
+  let p = parkedState(null, 0, 0);
+  p = parkedState(p, 0, PARK.MS);
+  assert.equal(p.parked, true);
+  p = parkedState(p, null, PARK.MS + 1000);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, PARK.MS + 2000);
+  assert.equal(p.parked, false);
+  p = parkedState(p, 0, 2 * PARK.MS + 2000);
+  assert.equal(p.parked, true);
 });
 
 test('caméra : véhicule à 78 % de la hauteur en portrait, à droite de la colonne en paysage, écran seulement', () => {

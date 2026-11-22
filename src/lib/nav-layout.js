@@ -96,14 +96,16 @@ export function splitAlerts(list, max = MAX_ALERTS) {
 }
 
 /**
- * Arrêt « franc » pour les boutons réservés à l'arrêt : vitesse < 5 km/h depuis au moins 3 s.
+ * Arrêt « franc » pour les boutons réservés à l'arrêt : vitesse connue < 5 km/h depuis au moins 3 s.
+ * Vitesse inconnue (null, NaN : premier point, GPS sans vitesse et pas de vitesse déduite) = en mouvement : aucune
+ * saisie ni changement d'itinéraire possible en roulant (Code de la route, art. R412-6-2).
  * @param {{ since:number|null }|null} prev
- * @param {number|null} kmh
+ * @param {number|null} kmh vitesse du GPS ou déduite des deux dernières positions (view.parkSpeedKmh)
  * @param {number} now ms
  * @returns {{ since:number|null, parked:boolean }}
  */
 export function parkedState(prev, kmh, now) {
-  const slow = !(kmh >= PARK.KMH); // vitesse inconnue (premier point, GPS sans vitesse) : comptée comme à l'arrêt
+  const slow = typeof kmh === 'number' && Number.isFinite(kmh) && kmh < PARK.KMH;
   if (!slow) return { since: null, parked: false };
   const since = prev?.since ?? now;
   return { since, parked: now - since >= PARK.MS };
