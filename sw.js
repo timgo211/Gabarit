@@ -91,6 +91,7 @@ const APP_FILES = [
   './src/lib/zfe.js',
   './src/ui/access.js',
   './src/ui/bridges.js',
+  './src/ui/restrictions.js',
   './src/ui/api.js',
   './src/ui/areas.js',
   './src/ui/dom.js',

@@ -1062,6 +1062,10 @@ export function createNavigation(ctx) {
     get active() {
       return !!s;
     },
+    /** À l'arrêt en guidage (parkedState : < 5 km/h pendant 3 s ; vitesse inconnue = en mouvement). */
+    get parked() {
+      return !!s?.park?.parked;
+    },
     /**
      * Vitesse du guidage pour « Mon avis » (km/h) : celle du GPS ou déduite des positions ; null si inconnue (pas de
      * position, premier point sans vitesse) : avis refusé (canReport).

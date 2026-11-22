@@ -165,6 +165,7 @@ export function createSettings(ctx) {
     setStatus(adrStatus, '');
     syncChoices(ctx.getData().settings);
     showVersion();
+    ctx.onOpen?.(); // phase 12b : Mes restrictions relue (liste, boutons grisés en roulant)
     dlg.showModal();
   }
 

@@ -241,3 +241,11 @@ export function fromBridge(item, { now = new Date() } = {}) {
     origin: 'osm-bridge', osmId: item.id,
   };
 }
+
+/**
+ * Ajout ou modification permis ? Hors guidage : oui (écran d'avant le départ) ; en guidage : seulement à l'arrêt
+ * (parkedState, vitesse inconnue = en mouvement). Code de la route art. R412-6-2 : aucune saisie en roulant.
+ */
+export function canEditRestrictions({ navigating = false, parked = false } = {}) {
+  return !navigating || parked === true;
+}
