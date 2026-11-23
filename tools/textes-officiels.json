@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services).",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles).",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -479,9 +479,255 @@
         "fuseau|timezone|UTC"
       ],
       "head": 300
+    },
+    {
+      "id": "sat7d-vl",
+      "title": "7d restes (v58) — Flandre : orthophotos Digitaal Vlaanderen, conditions d'usage et tuiles",
+      "urls": [
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/geografische-webdiensten/gebruiksrecht-van-de-geografische-webdiensten",
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/geografische-webdiensten",
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/earth-observation-data-science-eodas/orthofotos"
+      ],
+      "follow": "(gebruiksrecht|gebruiksvoorwaarden|licentie|modellicentie)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "head": 200,
+      "headers": [
+        {
+          "label": "BE-VL OMWRGBMRVL WMTS GetCapabilities",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetCapabilities",
+          "head": 6000
+        },
+        {
+          "label": "BE-VL OMW WMS GetCapabilities",
+          "url": "https://geo.api.vlaanderen.be/OMW/wms?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "BE-VL OMWRGBMRVL WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-VL OMW WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMW/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-VL OMWRGBMRVL WMTS GoogleMapsVL (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=omwrgbmrvl&STYLE=&FORMAT=image/png&TILEMATRIXSET=GoogleMapsVL&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat7d-wa",
+      "title": "7d restes (v58) — Wallonie : orthophotos SPW, conditions et tuiles",
+      "urls": [
+        "https://geoportail.wallonie.be/home/a-propos/conditions-generales-d-utilisation.html",
+        "https://geoportail.wallonie.be/acces-donnees.html",
+        "https://geoportail.wallonie.be/catalogue/donnees/orthophotos.html"
+      ],
+      "follow": "(conditions|licence|cc-by|CC-BY|acces-donnees)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "head": 200,
+      "headers": [
+        {
+          "label": "BE-WA ORTHO_LAST WMS GetCapabilities",
+          "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "BE-WA ORTHO_LAST WMS 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        },
+        {
+          "label": "BE-WA ORTHO_LAST REST export 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/rest/services/IMAGERIE/ORTHO_LAST/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpg&f=image",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat7d-bw",
+      "title": "7d restes (v58) — Bade-Wurtemberg : DOP20 LGL, conditions (open data ?) et tuiles",
+      "urls": [
+        "https://www.lgl-bw.de/Produkte/Open-Data/",
+        "https://www.lgl-bw.de/Produkte/Luftbilder-und-Orthophotos/",
+        "https://opengeodata.lgl-bw.de/"
+      ],
+      "follow": "(open-?data|lizenz|nutzungsbedingungen|dop)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "ocr": "deu",
+      "head": 200,
+      "headers": [
+        {
+          "label": "DE-BW DOP20 WMS GetCapabilities",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/wms/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "DE-BW DOP20 WMS 3857 (Freiburg)",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/wms/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=IMAGES_DOP_20_RGB&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 7.85,
+          "lat": 47.995,
+          "z": 17
+        },
+        {
+          "label": "DE-BW DOP20 WMS 1.1.1 (Freiburg)",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=IMAGES_DOP_20_RGB&STYLES=&FORMAT=image/jpeg&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 7.85,
+          "lat": 47.995,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat7d-by",
+      "title": "7d restes (v58) — Bavière : DOP40 open data LDBV, conditions et tuiles",
+      "urls": [
+        "https://geodaten.bayern.de/opengeodata/OpenDataDetail.html?pn=dop40",
+        "https://geodaten.bayern.de/opengeodata/",
+        "https://www.ldbv.bayern.de/produkte/weitere/opendata.html"
+      ],
+      "follow": "(lizenz|nutzungsbedingungen|opendata|CC-BY)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "ocr": "deu",
+      "head": 200,
+      "headers": [
+        {
+          "label": "DE-BY DOP40 WMS GetCapabilities",
+          "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop40?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "DE-BY DOP40 WMS 3857 (München)",
+          "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop40?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=by_dop40c&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 11.575,
+          "lat": 48.137,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat7d-sl",
+      "title": "7d restes (v58) — Sarre : orthophotos LVGL, conditions et tuiles",
+      "urls": [
+        "https://geoportal.saarland.de/article/Nutzungsbedingungen/",
+        "https://geoportal.saarland.de/article/Open_Data/",
+        "https://www.saarland.de/lvgl/DE/portale/geobasisdaten"
+      ],
+      "follow": "(nutzungsbedingungen|lizenz|open_?data|dl-de)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "ocr": "deu",
+      "head": 200,
+      "headers": [
+        {
+          "label": "DE-SL truedop WMS GetCapabilities",
+          "url": "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        },
+        {
+          "label": "DE-SL dop WMS GetCapabilities",
+          "url": "https://geoportal.saarland.de/freewms/dop2023?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "DE-SL truedop WMS 3857 (Saarbrücken)",
+          "url": "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=sl_dop20_rgb&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.996,
+          "lat": 49.234,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat7d-he",
+      "title": "7d restes (v58) — Hesse : DOP20 HVBG, conditions (open data) et tuiles",
+      "urls": [
+        "https://gds.hessen.de/",
+        "https://hvbg.hessen.de/geoinformation/open-data",
+        "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-VermGeoInfGHEV6P18"
+      ],
+      "follow": "(open-?data|lizenz|nutzungsbedingungen|dl-de|kostenfrei)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|Nutzungsrecht|gebruiksrecht|gebruiksvoorwaarden|conditions",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Data|open data",
+        "Quellenvermerk|Namensnennung|bronvermelding|attribution|mention|kostenfrei|gratis|gratuit|Gebühr|payant|commercial"
+      ],
+      "ocr": "deu",
+      "head": 200,
+      "headers": [
+        {
+          "label": "DE-HE ogc-free-images GetCapabilities",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ],
+      "tiles": [
+        {
+          "label": "DE-HE DOP20 WMS 3857 (Frankfurt)",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=he_dop20_rgb&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 8.682,
+          "lat": 50.11,
+          "z": 17
+        },
+        {
+          "label": "DE-HE DOP WMS 1.1.1 (Frankfurt)",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=he_dop_rgb&STYLES=&FORMAT=image/jpeg&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 8.682,
+          "lat": 50.11,
+          "z": 17
+        }
+      ]
     }
   ],
   "run": [
-    "carburants"
+    "sat7d-vl",
+    "sat7d-wa",
+    "sat7d-bw",
+    "sat7d-by",
+    "sat7d-sl",
+    "sat7d-he"
   ]
 }
