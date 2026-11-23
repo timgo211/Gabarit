@@ -963,9 +963,77 @@
           "z": 17
         }
       ]
+    },
+    {
+      "id": "sat7d-lic-vl",
+      "title": "7d restes (v58), 4e tour — Flandre : conditions (extraits courts)",
+      "urls": [
+        "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetCapabilities",
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/geografische-webdiensten/gebruiksrecht-van-de-geografische-webdiensten",
+        "https://www.vlaanderen.be/datavindplaats/catalogus/orthofotomozaiek-middenschalig-winteropnamen-kleur-meest-recent-vlaanderen"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions g|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kostenfrei|kosteloos|gratuit|gratis|AccessConstraints|Fees|besonderer Erlaubnis|Open ?Data"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 3,
+      "head": 0,
+      "ocr": "deu"
+    },
+    {
+      "id": "sat7d-lic-wa",
+      "title": "7d restes (v58), 4e tour — Wallonie : conditions (extraits courts)",
+      "urls": [
+        "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geoportail.wallonie.be/home/a-propos/conditions-generales-d-utilisation.html"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions g|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kostenfrei|kosteloos|gratuit|gratis|AccessConstraints|Fees|besonderer Erlaubnis|Open ?Data"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 2,
+      "head": 0,
+      "ocr": "deu"
+    },
+    {
+      "id": "sat7d-lic-sl",
+      "title": "7d restes (v58), 4e tour — Sarre : conditions (extraits courts)",
+      "urls": [
+        "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://geoportal.saarland.de/article/Nutzungsbedingungen/"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions g|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kostenfrei|kosteloos|gratuit|gratis|AccessConstraints|Fees|besonderer Erlaubnis|Open ?Data"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 2,
+      "head": 0,
+      "ocr": "deu"
+    },
+    {
+      "id": "sat7d-lic-bw",
+      "title": "7d restes (v58), 4e tour — Bade-Wurtemberg : conditions (extraits courts)",
+      "urls": [
+        "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&REQUEST=GetCapabilities&VERSION=1.1.1",
+        "https://www.lgl-bw.de/Produkte/Open-Data/"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions g|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kostenfrei|kosteloos|gratuit|gratis|AccessConstraints|Fees|besonderer Erlaubnis|Open ?Data"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 2,
+      "head": 0,
+      "ocr": "deu"
     }
   ],
   "run": [
-    "sat7d-tuiles-seules"
+    "sat7d-lic-vl",
+    "sat7d-lic-wa",
+    "sat7d-lic-sl",
+    "sat7d-lic-bw"
   ]
 }
