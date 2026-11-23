@@ -2190,7 +2190,10 @@ async function bridgesCheck(browser, base) {
     // Repère touché : texte en message, jamais dit.
     await page.locator('.bridge-marker.high').first().click({ force: true });
     await page.waitForTimeout(300);
-    check(/à vérifier\. La signalisation fait foi\./.test(await page.textContent('#message')), `${tag} : repère touché → texte du pont`);
+    // Phase 12b : le repère ouvre le panneau du pont (texte, aide, « Éviter ce passage »).
+    check(await page.isVisible('#bridge-panel') && /à vérifier\. La signalisation fait foi\./.test(await page.textContent('#bridge-panel-text')),
+      `${tag} : repère touché → texte du pont`);
+    await page.click('#btn-bridge-close');
     await noHorizontalScroll(page, `${tag} ponts`);
     const notesNode = page.locator('.rules-notes').first();
     await notesNode.scrollIntoViewIfNeeded();
