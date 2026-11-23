@@ -99,6 +99,8 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   option calculée l'évite ; toutes → choix gardé + `ALL_TUNNELS_NOTE`. Sans requête de plus ; fiche, jamais la voix.
 - Péages PL à l'étranger (5h, v49, `foreign-tolls.js`) : Autriche (GO-Maut 2026) seulement, taux du profil (champ
   « Essieux » `axles`, non précisé = les deux cas) et estimation « à vérifier, pas une facture », ligne grise, jamais dite.
+- Contours des taxes PL (`data/taxes-pl.json`, v50) : Admin Express COG 2026 (Action « Contours IGN ») ; tout changement
+  de contours doit laisser vert `tests/taxes-contours.test.js` (résultats 5h ter figés), sinon contours non remplacés.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
