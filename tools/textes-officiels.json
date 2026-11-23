@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses.",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties.",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -10,7 +10,14 @@
         "https://www.bison-fute.gouv.fr/tunnel-du-mont-blanc-74-categorie,10307.html"
       ],
       "follow": "(2010-60|2010_60|DDT-2010|DDT_2010|rampe|Rampe|mont-blanc|Mont-Blanc|Mont_Blanc|2009-3425|2020-0825|/content/download/)",
-      "keywords": ["2010-60", "3077", "3082", "2919", "rampe", "num[ée]ros? ONU"],
+      "keywords": [
+        "2010-60",
+        "3077",
+        "3082",
+        "2919",
+        "rampe",
+        "num[ée]ros? ONU"
+      ],
       "ocr": "fra",
       "head": 300
     },
@@ -26,7 +33,13 @@
         "https://www.regione.vda.it/amministrazione/leggi/bollettino_ufficiale_new/archive/2010/6-2010-2.pdf",
         "https://www.regione.vda.it/amministrazione/leggi/bollettino_ufficiale_new/archive/2010/7-2010-2.pdf"
       ],
-      "keywords": ["26 gennaio 2010, n\\.? ?33|n\\.? ?33 del 26", "Monte Bianco", "3077", "3082", "2919"],
+      "keywords": [
+        "26 gennaio 2010, n\\.? ?33|n\\.? ?33 del 26",
+        "Monte Bianco",
+        "3077",
+        "3082",
+        "2919"
+      ],
       "ocr": "ita+fra",
       "head": 200
     },
@@ -42,7 +55,15 @@
         "https://dserver.bundestag.de/brd/2025/0443-25.pdf"
       ],
       "follow": "(mautsaetze|Mautsaetze|mautsätze).*(2026|2025)",
-      "keywords": ["Anlage 1|Mautteils", "Gewichtsklasse|18 Tonnen|7,5 Tonnen", "Achs", "Schadstoffklasse|EURO VI|Euro 6", "CO2-Emissionsklasse 1|CO2-Klasse 1", "2026", "Stand|Fundstelle|zuletzt ge"],
+      "keywords": [
+        "Anlage 1|Mautteils",
+        "Gewichtsklasse|18 Tonnen|7,5 Tonnen",
+        "Achs",
+        "Schadstoffklasse|EURO VI|Euro 6",
+        "CO2-Emissionsklasse 1|CO2-Klasse 1",
+        "2026",
+        "Stand|Fundstelle|zuletzt ge"
+      ],
       "ocr": "deu",
       "head": 400
     },
@@ -56,7 +77,14 @@
         "https://media.asfinag.at/media/pcnehccs/go-maut-tarife-2026_streckenmaut_de.pdf",
         "https://ris.bka.gv.at/Dokumente/BgblAuth/BGBLA_2025_II_298/BGBLA_2025_II_298.rtf"
       ],
-      "keywords": ["Kategorie 4\\+|4 und mehr|category 4", "EURO ?VI|Euro ?6", "CO2-Emissionsklasse 1|CO2 emission class 1|CO₂", "Infrastruktur|infrastructure", "1\\. ?Jänner 2026|1 January 2026|gültig", "Sondermaut|Streckenmaut|section toll"],
+      "keywords": [
+        "Kategorie 4\\+|4 und mehr|category 4",
+        "EURO ?VI|Euro ?6",
+        "CO2-Emissionsklasse 1|CO2 emission class 1|CO₂",
+        "Infrastruktur|infrastructure",
+        "1\\. ?Jänner 2026|1 January 2026|gültig",
+        "Sondermaut|Streckenmaut|section toll"
+      ],
       "ocr": "deu",
       "head": 1500
     },
@@ -69,7 +97,13 @@
         "https://www.burgenland.at/themen/mobilitaet/"
       ],
       "follow": "(maut|Maut|Lkw|LKW|Benuetzungsgebuehr|Benützungsgebühr)",
-      "keywords": ["Maut", "Benützungsgebühr|Benuetzungsgebuehr", "Landesstra", "3,5 ?t", "2027"],
+      "keywords": [
+        "Maut",
+        "Benützungsgebühr|Benuetzungsgebuehr",
+        "Landesstra",
+        "3,5 ?t",
+        "2027"
+      ],
       "ocr": "deu",
       "head": 200
     },
@@ -83,9 +117,317 @@
         "https://strasbourg.tribunal-administratif.fr/decisions-de-justice/dernieres-decisions"
       ],
       "follow": "(delib|recours|tribunal|actualit|r-pass|R-Pass|ecotaxe|écotaxe)",
-      "keywords": ["CD-2025-4-7-1", "recours", "tribunal administratif", "suspen", "R-Pass"],
+      "keywords": [
+        "CD-2025-4-7-1",
+        "recours",
+        "tribunal administratif",
+        "suspen",
+        "R-Pass"
+      ],
       "ocr": "fra",
       "head": 300
+    },
+    {
+      "id": "sat-lu",
+      "title": "Luxembourg : orthophotos BD-L-ORTHO (geoportail.lu, ACT) — conditions et tuile",
+      "urls": [
+        "https://data.public.lu/fr/datasets/bd-l-ortho-webservices-wms-et-wmts/",
+        "https://data.public.lu/en/datasets/bd-l-ortho-webservices-wms-et-wmts/",
+        "https://act.public.lu/fr/cartographie/geoportail.html",
+        "https://www.geoportail.lu/fr/propos/conditions-generales/"
+      ],
+      "follow": "(conditions|licen|legal|cgu|terms)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne"
+      ],
+      "head": 300,
+      "tiles": [
+        {
+          "label": "LU ortho_latest (Luxembourg)",
+          "url": "https://wmts.geoportail.lu/opendata/wmts/ortho_latest/GLOBAL_WEBMERCATOR_4_V3/{z}/{x}/{y}.jpeg",
+          "lon": 6.13,
+          "lat": 49.611,
+          "z": 17
+        },
+        {
+          "label": "LU ortho_latest wmts1",
+          "url": "https://wmts1.geoportail.lu/opendata/wmts/ortho_latest/GLOBAL_WEBMERCATOR_4_V3/{z}/{x}/{y}.jpeg",
+          "lon": 6.13,
+          "lat": 49.611,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-be-vl",
+      "title": "Belgique, Flandre : orthophotos Digitaal Vlaanderen (OMWRGBMRVL) — conditions et tuile",
+      "urls": [
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/geografische-webdiensten/gebruiksvoorwaarden-van-de-geografische-webdiensten",
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/open-data/modellicentie-gratis-hergebruik",
+        "https://download.vlaanderen.be/Producten/Detail?id=1545",
+        "https://www.vlaanderen.be/datavindplaats/catalogus/orthofotomozaiek-middenschalig-winteropnamen-kleur-meest-recent-vlaanderen"
+      ],
+      "follow": "(gebruiksvoorwaarden|licentie|voorwaarden)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne"
+      ],
+      "head": 300,
+      "tiles": [
+        {
+          "label": "BE-VL OMWRGBMRVL GoogleMapsVL (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=omwrgbmrvl&STYLE=&FORMAT=image/png&tileMatrixSet=GoogleMapsVL&tileMatrix={z}&tileRow={y}&tileCol={x}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-VL OMWRGBMRVL jpeg",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=omwrgbmrvl&STYLE=&FORMAT=image/jpeg&tileMatrixSet=GoogleMapsVL&tileMatrix={z}&tileRow={y}&tileCol={x}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-be-wa",
+      "title": "Belgique, Wallonie : orthophotos SPW (ORTHO_LAST) — conditions et tuile",
+      "urls": [
+        "https://geoportail.wallonie.be/home/a-propos/conditions-generales-d-utilisation.html",
+        "https://geoportail.wallonie.be/catalogue/2b6a0d1d-d0b8-4d2b-a1d7-a3a3d1f1d9b5.html",
+        "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?request=GetCapabilities&service=WMS",
+        "https://wiki.openstreetmap.org/wiki/File:OSM_license_for_SPW_WMS_usage.pdf"
+      ],
+      "follow": "(conditions|licen|CC-BY|cc-by)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne",
+        "AccessConstraints|Fees"
+      ],
+      "head": 300,
+      "tiles": [
+        {
+          "label": "BE-WA ORTHO_LAST WMS 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-be-bru",
+      "title": "Belgique, Bruxelles : orthophotos UrbIS (CIRB / Paradigm) et NGI — conditions et tuile",
+      "urls": [
+        "https://bric.brussels/en/our-solutions/urbis-solutions/Licence_Open_data_Fr_v4.pdf",
+        "https://datastore.brussels/web/urbis-download",
+        "https://geoservices-grid.irisnet.be/geoserver/urbisgrid/ows?SERVICE=WMS&REQUEST=GetCapabilities",
+        "https://www.ngi.be/website/fr/conditions-generales/",
+        "https://www.ngi.be/website/fr/offre-numerique/ortho/"
+      ],
+      "follow": "(licen|conditions|ortho)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne",
+        "Ortho20\\\\d\\\\d"
+      ],
+      "head": 300,
+      "tiles": [
+        {
+          "label": "BE-BRU UrbIS Ortho WMS 3857 (Bruxelles)",
+          "url": "https://geoservices-grid.irisnet.be/geoserver/urbisgrid/ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=Ortho&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 4.352,
+          "lat": 50.846,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-ch",
+      "title": "Suisse : swisstopo SWISSIMAGE (geo.admin.ch) — conditions et tuile",
+      "urls": [
+        "https://www.geo.admin.ch/fr/conditions-generales-dutilisation-geoservices-federaux",
+        "https://www.geo.admin.ch/en/general-terms-of-use-fsdi",
+        "https://www.swisstopo.admin.ch/fr/conditions-d-utilisation-geodonnees-gratuites",
+        "https://www.swisstopo.admin.ch/fr/geodata/images/ortho/swissimage10.html"
+      ],
+      "follow": "(conditions|terms|nutzungsbedingungen|fair|utilisation)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne",
+        "fair use|Fair Use|utilisation équitable|limite|requêtes|requests",
+        "swisstopo"
+      ],
+      "head": 300,
+      "tiles": [
+        {
+          "label": "CH SWISSIMAGE WMTS 3857 (Berne)",
+          "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg",
+          "lon": 7.444,
+          "lat": 46.948,
+          "z": 17
+        },
+        {
+          "label": "CH SWISSIMAGE (Vallorbe)",
+          "url": "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg",
+          "lon": 6.4,
+          "lat": 46.72,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-es",
+      "title": "Espagne : PNOA (IGN España / IDEE) — conditions et tuile",
+      "urls": [
+        "https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf",
+        "https://www.ign.es/web/ign/portal/qsm-cnig",
+        "https://www.idee.es/web/idee/segun-tipo-de-servicio",
+        "https://pnoa.ign.es/"
+      ],
+      "follow": "(licencia|condiciones|aviso-legal)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne",
+        "CC BY 4\\\\.0|CC-BY 4\\\\.0",
+        "PNOA cedido|cedido por|scne"
+      ],
+      "ocr": "spa+fra",
+      "head": 300,
+      "tiles": [
+        {
+          "label": "ES PNOA TMS (Madrid)",
+          "url": "https://tms-pnoa-ma.idee.es/1.0.0/pnoa-ma/{z}/{x}/{-y}.jpeg",
+          "lon": -3.703,
+          "lat": 40.417,
+          "z": 17
+        },
+        {
+          "label": "ES PNOA WMTS (Madrid)",
+          "url": "https://www.ign.es/wmts/pnoa-ma?service=WMTS&request=GetTile&version=1.0.0&Format=image/jpeg&layer=OI.OrthoimageCoverage&style=default&tilematrixset=GoogleMapsCompatible&TileMatrix={z}&TileRow={y}&TileCol={x}",
+          "lon": -3.703,
+          "lat": 40.417,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat-de",
+      "title": "Allemagne : orthophotos des Länder (WMS) — conditions et tuiles",
+      "urls": [
+        "https://www.govdata.de/dl-de/by-2-0",
+        "https://www.govdata.de/dl-de/zero-2-0",
+        "https://www.bezreg-koeln.nrw.de/system/files/media/document/file/lizenzbedingungen_geobasis_nrw.pdf",
+        "https://geodaten.bayern.de/opengeodata/",
+        "https://www.lvermgeo.rlp.de/geodaten-geoshop/open-data",
+        "https://geoportal.saarland.de/article/Nutzungsbedingungen/",
+        "https://www.rv.hessenrecht.hessen.de/bshe/document/jlr-VermGeoInfGHEV6P18",
+        "https://www.lgl-bw.de/Produkte/Open-Data/",
+        "https://wiki.openstreetmap.org/wiki/DE:Permissions/Luftbild_Baden-W%C3%BCrttemberg"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licencia|licentie",
+        "CC0|CC[ -]BY|Creative Commons|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|Open Government",
+        "attribution|Quellenvermerk|Namensnennung|citar|bronvermelding|mention|source",
+        "commercial|kommerziell|comercial|commercieel|gratuit|kostenfrei|gratis|frei",
+        "Application|App|Web|Internet|online|en ligne",
+        "Quellenvermerk|Namensnennung|©"
+      ],
+      "ocr": "deu",
+      "head": 300,
+      "tiles": [
+        {
+          "label": "DE-SL Saarland truedop (Saarbrücken)",
+          "url": "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=sl_dop20_rgb&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.996,
+          "lat": 49.234,
+          "z": 17
+        },
+        {
+          "label": "DE-RP Rheinland-Pfalz dop20 (Trier)",
+          "url": "https://geo4.service24.rlp.de/wms/rp_dop20.fcgi?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=rp_dop20&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.641,
+          "lat": 49.756,
+          "z": 17
+        },
+        {
+          "label": "DE-BW Baden-Württemberg DOP20 (Freiburg)",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=IMAGES_DOP_20_RGB&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 7.85,
+          "lat": 47.995,
+          "z": 17
+        },
+        {
+          "label": "DE-HE Hessen DOP20 (Frankfurt)",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=he_dop20_rgb&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 8.682,
+          "lat": 50.11,
+          "z": 17
+        },
+        {
+          "label": "DE-NW NRW DOP (Köln)",
+          "url": "https://www.wms.nrw.de/geobasis/wms_nw_dop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=nw_dop_rgb&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.958,
+          "lat": 50.941,
+          "z": 17
+        },
+        {
+          "label": "DE-BY Bayern DOP40 open data (München)",
+          "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop40?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=by_dop40c&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 11.575,
+          "lat": 48.137,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "osm-sorties",
+      "title": "Wiki OSM : sorties (Tag:highway=motorway_junction, Key:junction:ref, Key:exit_to)",
+      "urls": [
+        "https://wiki.openstreetmap.org/wiki/Tag:highway%3Dmotorway_junction",
+        "https://wiki.openstreetmap.org/wiki/Key:junction:ref",
+        "https://wiki.openstreetmap.org/wiki/Key:exit_to",
+        "https://wiki.openstreetmap.org/wiki/FR:Tag:highway%3Dmotorway_junction"
+      ],
+      "keywords": [
+        "ref=",
+        "name=",
+        "exit_to",
+        "junction:ref",
+        "destination",
+        "deprecated|discouraged|obsolète"
+      ],
+      "head": 200
     }
+  ],
+  "run": [
+    "sat-lu",
+    "sat-be-vl",
+    "sat-be-wa",
+    "sat-be-bru",
+    "sat-ch",
+    "sat-es",
+    "sat-de",
+    "osm-sorties"
   ]
 }
