@@ -1,9 +1,11 @@
-// Couche de fond (phase 7) : zone couverte par les photos IGN, choix mémorisé, plan forcé en guidage.
+// Couche de fond (phases 7 et 7d) : zones couvertes par les photos (IGN, orthophotos voisines), choix mémorisé, guidage.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   isInFrance, sanitizeMapLayer, satelliteView, IGN_ORTHO, SATELLITE_OUTSIDE_TEXT, MAP_LAYERS, DEFAULT_MAP_LAYER,
+  SATELLITE_SOURCES, SATELLITE_READ, satelliteSourceAt, satelliteCredits,
 } from '../src/lib/map-layers.js';
+import { SATELLITE_ZONES } from '../src/lib/satellite-zones.js';
 import { cacheStrategy } from '../src/lib/sw-routing.js';
 
 const IN = {
@@ -34,19 +36,83 @@ test('choix de couche mémorisé : plan par défaut', () => {
   for (const x of [undefined, null, '', 'SATELLITE', 'hybride', 3]) assert.equal(sanitizeMapLayer(x), 'plan');
 });
 
-test('satellite : photos en France, message hors de France ; en guidage aussi (phase 7c), sans les boutons de l\'arrêt', () => {
-  assert.deepEqual(satelliteView({ layer: 'plan', center: IN.Paris }), { photos: false, message: '', button: true });
-  assert.deepEqual(satelliteView({ layer: 'satellite', center: IN.Paris }), { photos: true, message: '', button: true });
-  assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Bruxelles }),
-    { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true });
-  assert.equal(SATELLITE_OUTSIDE_TEXT, 'Vue satellite disponible en France uniquement');
+test('satellite : photos en France, message hors de toute source ; en guidage aussi (phase 7c), sans les boutons de l\'arrêt', () => {
+  assert.deepEqual(satelliteView({ layer: 'plan', center: IN.Paris }), { photos: false, message: '', button: true, source: null });
+  assert.deepEqual(satelliteView({ layer: 'satellite', center: IN.Paris }), { photos: true, message: '', button: true, source: 'ign' });
+  assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Turin }),
+    { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true, source: null });
+  assert.equal(SATELLITE_OUTSIDE_TEXT, 'Vue satellite indisponible à cet endroit');
   assert.deepEqual(satelliteView({ layer: 'satellite', center: IN.Paris, navigating: true }),
-    { photos: true, message: '', button: false });
+    { photos: true, message: '', button: false, source: 'ign' });
   assert.deepEqual(satelliteView({ layer: 'plan', center: IN.Paris, navigating: true }),
-    { photos: false, message: '', button: false });
-  assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Bruxelles, navigating: true }),
-    { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: false });
+    { photos: false, message: '', button: false, source: null });
+  assert.deepEqual(satelliteView({ layer: 'satellite', center: OUT.Turin, navigating: true }),
+    { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: false, source: null });
   assert.equal(satelliteView({ layer: 'satellite', center: null }).photos, false);
+});
+
+// ───────── Phase 7d : orthophotos hors de France ─────────
+const ABROAD = {
+  Luxembourg: [[6.1296, 49.6116], 'lu'], Esch: [5.98, 49.495], Bruxelles: [[4.3517, 50.8503], 'be-bru'],
+  Berne: [[7.4474, 46.948], 'ch'], Lausanne: [[6.6323, 46.5197], 'ch'], Genève: [[6.1432, 46.2044], 'ch'], Bâle: [[7.5886, 47.5596], 'ch'],
+  Madrid: [[-3.7038, 40.4168], 'es'], Barcelone: [[2.1734, 41.3851], 'es'], 'Saint-Sébastien': [[-1.9812, 43.3183], 'es'],
+  Cologne: [[6.958, 50.941], 'de-nw'], Aix: [[6.0839, 50.7753], 'de-nw'], Trèves: [[6.641, 49.756], 'de-rp'], Mayence: [[8.2473, 49.9929], 'de-rp'],
+};
+
+test('7d : source choisie selon la position (une ville par pays codé, France prioritaire)', () => {
+  for (const [name, v] of Object.entries(ABROAD)) {
+    if (!Array.isArray(v[0])) continue;
+    assert.equal(satelliteSourceAt(v[0])?.id, v[1], name);
+    assert.deepEqual(satelliteView({ layer: 'satellite', center: v[0] }), { photos: true, message: '', button: true, source: v[1] }, name);
+  }
+  for (const [name, p] of Object.entries(IN)) assert.equal(satelliteSourceAt(p)?.id, 'ign', name);
+});
+
+test('7d : hors de toute source codée → aucune source, message (Flandre, Wallonie, Bavière, Sarre, Italie, mer, Andorre)', () => {
+  const none = {
+    Gand: [3.7174, 51.0543], Namur: [4.8719, 50.4674], Munich: [11.575, 48.137], Sarrebruck: [7.0, 49.2402],
+    Fribourg: [7.85, 47.995], Francfort: [8.682, 50.11], Turin: OUT.Turin, Sardaigne: OUT.Sardaigne, Londres: OUT.Londres,
+    Andorre: OUT.Andorre, 'Golfe de Gascogne': [-4, 45.5],
+  };
+  for (const [name, p] of Object.entries(none)) {
+    assert.equal(satelliteSourceAt(p), null, name);
+    assert.deepEqual(satelliteView({ layer: 'satellite', center: p }), { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true, source: null }, name);
+  }
+  for (const p of [null, [], [NaN, 1], ['6', '49']]) assert.equal(satelliteSourceAt(p), null);
+});
+
+test('7d : frontière entre deux sources (France / Suisse à Vallorbe, France / Espagne à Hendaye, France / Luxembourg)', () => {
+  assert.equal(satelliteSourceAt([6.3786, 46.7123])?.id, 'ch', 'Vallorbe (CH)');
+  assert.equal(satelliteSourceAt([6.3417, 46.7820])?.id, 'ign', 'Jougne (FR)');
+  assert.equal(satelliteSourceAt([-1.7616, 43.3598])?.id, 'ign', 'Hendaye (FR)');
+  assert.equal(satelliteSourceAt([-1.7891, 43.3381])?.id, 'es', 'Irun (ES)');
+  assert.equal(satelliteSourceAt([6.1667, 49.4667])?.id, 'ign', 'Thionville (FR)');
+  assert.equal(satelliteSourceAt([6.1131, 49.5847])?.id, 'lu', 'Strassen (LU)');
+});
+
+test('7d : chaque source a une attribution, une licence lue, aucune clé, tuiles jamais mises en cache', () => {
+  assert.equal(SATELLITE_SOURCES[0].id, 'ign', 'la France d\'abord');
+  assert.deepEqual(SATELLITE_SOURCES.map((x) => x.id), ['ign', 'lu', 'be-bru', 'ch', 'es', 'de-nw', 'de-rp']);
+  assert.equal(new Set(SATELLITE_SOURCES.map((x) => x.layer)).size, SATELLITE_SOURCES.length);
+  assert.equal(SATELLITE_READ, 'lu le 23/11/2026 (journal de l\'Action Textes officiels)');
+  for (const src of SATELLITE_SOURCES) {
+    assert.ok(src.attribution && src.attributionText && src.licence && /^https:\/\//.test(src.licenceUrl), src.id);
+    assert.equal(src.tiles.length, 1, src.id);
+    const [url] = src.tiles;
+    assert.match(url, /^https:\/\//, src.id);
+    assert.ok(/\{bbox-epsg-3857\}/.test(url) || (/\{z\}/.test(url) && /\{x\}/.test(url) && /\{y\}/.test(url)), src.id);
+    assert.doesNotMatch(url, /apikey|api_key|[?&]key=|token/i, src.id);
+    const tile = url.replace('{z}', '17').replace('{y}', '45000').replace('{x}', '66000').replace('{bbox-epsg-3857}', '0,0,1,1');
+    assert.equal(cacheStrategy('GET', tile, 'https://timgo211.github.io'), 'bypass', src.id);
+    assert.ok(src.zone === null || SATELLITE_ZONES[src.zone]?.length > 0, `${src.id} : zone`);
+  }
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'ch').attributionText, /swisstopo/);
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'es').attributionText, /© Instituto Geográfico Nacional de España/);
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-rp').attributionText, /^©GeoBasis-DE \/ LVermGeoRP2026, dl-de\/by-2-0, www\.lvermgeo\.rlp\.de$/);
+  const credits = satelliteCredits();
+  assert.equal(credits.length, SATELLITE_SOURCES.length);
+  assert.ok(credits.every((c) => /^.+ : .+ — .+$/.test(c.text)));
+  assert.match(credits[0].text, /^France : © IGN – Géoplateforme — Licence Ouverte/);
 });
 
 test('tuiles IGN : WMTS Géoplateforme sans clé, jamais mises en cache par le service worker', () => {

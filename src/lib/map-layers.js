@@ -1,4 +1,5 @@
-// Couche de fond (phases 7 et 7c) : « Plan » (fond vectoriel OpenFreeMap / VersaTiles) ou « Satellite » (photos aériennes IGN).
+// Couche de fond (phases 7, 7c et 7d) : « Plan » (fond vectoriel OpenFreeMap / VersaTiles) ou « Satellite » (photos
+// aériennes IGN en France, orthophotos ouvertes voisines ailleurs, phase 7d).
 // Logique pure : choix mémorisé, zone couverte, message. L'affichage est dans src/ui/map.js.
 //
 // Photos aériennes : couche ORTHOIMAGERY.ORTHOPHOTOS de la Géoplateforme IGN (data.geopf.fr), gratuite et sans clé,
@@ -10,9 +11,18 @@
 // copies générées depuis ce GetCapabilities (geopandas/xyzservices providers.json, iTowns Ortho.json) et recoupées
 // avec osmlab/editor-layer-index (BDOrthoIGN : zoom maximal 19, zone couverte).
 //
-// Hors de France : aucune source satellite gratuite dont les conditions autorisent clairement cet usage sans compte
-// ni clé (Esri World Imagery : compte ArcGIS exigé ; Sentinel-2 cloudless d'EOX : 10 m par pixel, inutile pour
-// repérer une entrée camion, licence non commerciale). On garde donc le plan, avec un message.
+// Hors de France (phase 7d) : orthophotos nationales ou régionales ouvertes, codées seulement si leurs conditions
+// d'usage ont été lues (licence, attribution, usage dans une appli web publique) ET si une tuile réelle a répondu
+// (HTTP 200, image, en-tête CORS access-control-allow-origin pour https://timgo211.github.io : MapLibre charge les
+// tuiles raster par fetch). Lecture et essai : Action « Textes officiels » (tools/textes-officiels.json, entrées sat-*),
+// journal du 23/11/2026. Registre SATELLITE_SOURCES ci-dessous ; zones : src/lib/satellite-zones.js (Natural Earth,
+// domaine public). Ailleurs (et pour les sources non codées) : plan gardé, avec un message. Non codées le 23/11/2026 :
+// Flandre (texte de la licence « Gebruiksrecht geografische webdiensten » introuvable, pages 404), Wallonie (aucune
+// condition lisible), NGI (service national non essayé), Bade-Wurtemberg (service DOP20 accordé à OSM « unter
+// besonderer Erlaubnis »), Bavière, Sarre (conditions non lues), Hesse (service sans réponse).
+// Esri World Imagery : compte ArcGIS exigé ; Sentinel-2 cloudless d'EOX : 10 m par pixel, licence non commerciale.
+
+import { SATELLITE_ZONES } from './satellite-zones.js';
 
 export const MAP_LAYERS = Object.freeze(['plan', 'satellite']);
 export const DEFAULT_MAP_LAYER = 'plan';
@@ -26,7 +36,108 @@ export const IGN_ORTHO = Object.freeze({
   attribution: '<a href="https://www.ign.fr/" target="_blank" rel="noopener">© IGN – Géoplateforme</a>',
 });
 
-export const SATELLITE_OUTSIDE_TEXT = 'Vue satellite disponible en France uniquement';
+/** Message hors de toute source codée (v7d : plus seulement la France ; liste dans Réglages › crédits). */
+export const SATELLITE_OUTSIDE_TEXT = 'Vue satellite indisponible à cet endroit';
+
+const READ_ON = 'lu le 23/11/2026 (journal de l\'Action Textes officiels)';
+/** Requête WMS d'une tuile 256 px en Web Mercator (MapLibre remplace {bbox-epsg-3857}). */
+const wms = (base, layer, format) => `${base}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${layer}&STYLES=`
+  + `&FORMAT=${format}&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`;
+
+/**
+ * Sources de photos aériennes, dans l'ordre de priorité (la France d'abord). `zone` : clé de SATELLITE_ZONES
+ * (null : zone de la France, isInFrance). `attribution` : texte affiché sur la carte (contrôle MapLibre) et dans
+ * Réglages › crédits. Aucune n'a de clé ; aucune tuile n'est mise en cache (sw-routing.js : autre origine = réseau).
+ */
+export const SATELLITE_SOURCES = Object.freeze([
+  Object.freeze({
+    id: 'ign', layer: 'ign-ortho', place: 'France', zone: null,
+    tiles: IGN_ORTHO.tiles, tileSize: 256, minzoom: 2, maxzoom: 19, attribution: IGN_ORTHO.attribution,
+    attributionText: '© IGN – Géoplateforme',
+    licence: 'Licence Ouverte Etalab 2.0', licenceUrl: 'https://www.etalab.gouv.fr/licence-ouverte-open-licence/',
+  }),
+  // Luxembourg : BD-L-ORTHO, Administration du cadastre et de la topographie (ACT), WMTS opendata geoportail.lu.
+  // https://data.public.lu/fr/datasets/bd-l-ortho-webservices-wms-et-wmts/ (lu le 23/11/2026, journal de l'Action
+  // Textes officiels) : « Licence Creative Commons Zero (CC0) », producteur « Administration du cadastre et de la
+  // topographie ». Tuile ortho_latest : HTTP 200 image/jpeg, access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'lu', layer: 'sat-lu', place: 'Luxembourg', zone: 'LU',
+    tiles: ['https://wmts.geoportail.lu/opendata/wmts/ortho_latest/GLOBAL_WEBMERCATOR_4_V3/{z}/{x}/{y}.jpeg'],
+    tileSize: 256, minzoom: 2, maxzoom: 19,
+    attribution: '© ACT Luxembourg (BD-L-ORTHO, CC0)', attributionText: '© ACT Luxembourg (BD-L-ORTHO, CC0)',
+    licence: 'CC0', licenceUrl: 'https://data.public.lu/fr/datasets/bd-l-ortho-webservices-wms-et-wmts/',
+  }),
+  // Belgique, Région de Bruxelles-Capitale : orthophotos UrbIS (Paradigm, ex-CIRB), WMS urbisgrid, couche « Ortho ».
+  // GetCapabilities https://geoservices-grid.irisnet.be/geoserver/urbisgrid/ows?SERVICE=WMS&REQUEST=GetCapabilities
+  // (lu le 23/11/2026, journal de l'Action Textes officiels) : « Creative Commons (CC-0) - no conditions for reuse,
+  // the data is in the public domain », « No limitations to public access ». Tuile WMS EPSG:3857 : HTTP 200
+  // image/jpeg, access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'be-bru', layer: 'sat-be-bru', place: 'Bruxelles', zone: 'BE-BRU',
+    tiles: [wms('https://geoservices-grid.irisnet.be/geoserver/urbisgrid/ows', 'Ortho', 'image/jpeg')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: '© Brussels UrbIS – Paradigm (CC0)', attributionText: '© Brussels UrbIS – Paradigm (CC0)',
+    licence: 'CC0', licenceUrl: 'https://creativecommons.org/publicdomain/zero/1.0/legalcode',
+  }),
+  // Suisse : swisstopo SWISSIMAGE, WMTS geo.admin.ch. Conditions générales de l'IFDG
+  // https://www.geo.admin.ch/en/general-terms-of-use-fsdi (lues le 23/11/2026, journal de l'Action Textes
+  // officiels) : « Use of the geoservices of the FSDI does not require registration and is free-of-charge. » ;
+  // « The integration of geoservices in web applications with an average of 20,000 users per day … corresponds to fair
+  // use. » ; source « © Data: swisstopo ». SWISSIMAGE (swisstopo.admin.ch, swissimage10) : centre des grands lacs en
+  // images RapidEye, mention « Includes material © (2016-2018) Planet. All rights reserved ». Tuile : HTTP 200
+  // image/jpeg, access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'ch', layer: 'sat-ch', place: 'Suisse', zone: 'CH',
+    tiles: ['https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg'],
+    tileSize: 256, minzoom: 2, maxzoom: 19,
+    attribution: '© Data: swisstopo ; Includes material © (2016-2018) Planet. All rights reserved',
+    attributionText: '© Data: swisstopo ; Includes material © (2016-2018) Planet. All rights reserved',
+    licence: 'Conditions de l\'IFDG (gratuit, sans inscription, usage raisonnable)',
+    licenceUrl: 'https://www.geo.admin.ch/en/general-terms-of-use-fsdi',
+  }),
+  // Espagne : PNOA (Plan Nacional de Ortofotografía Aérea), IGN España, WMTS www.ign.es/wmts/pnoa-ma.
+  // https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf et https://www.ign.es/web/ign/portal/info-aviso-legal
+  // (lus le 23/11/2026, journal de l'Action Textes officiels) : usage « libre y gratuito, siempre que se mencione el
+  // origen y propiedad de los datos » ; « licencia CC-BY 4.0 » ; services web : « siempre que se mencionen la autoría
+  // y propiedad del IGN del siguiente modo: «© Instituto Geográfico Nacional de España» », mention visible « a pie de
+  // mapa ». Tuile WMTS GoogleMapsCompatible : HTTP 200 image/jpeg, access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'es', layer: 'sat-es', place: 'Espagne', zone: 'ES',
+    tiles: ['https://www.ign.es/wmts/pnoa-ma?service=WMTS&request=GetTile&version=1.0.0&Format=image/jpeg'
+      + '&layer=OI.OrthoimageCoverage&style=default&tilematrixset=GoogleMapsCompatible&TileMatrix={z}&TileRow={y}&TileCol={x}'],
+    tileSize: 256, minzoom: 2, maxzoom: 19,
+    attribution: 'PNOA © Instituto Geográfico Nacional de España (CC BY 4.0 scne.es)',
+    attributionText: 'PNOA © Instituto Geográfico Nacional de España (CC BY 4.0 scne.es)',
+    licence: 'CC BY 4.0', licenceUrl: 'https://www.ign.es/resources/licencia/Condiciones_licenciaUso_IGN.pdf',
+  }),
+  // Allemagne, Rhénanie-du-Nord-Westphalie : DOP Geobasis NRW, WMS wms_nw_dop. Conditions
+  // https://www.bezreg-koeln.nrw.de/system/files/media/document/file/lizenzbedingungen_geobasis_nrw.pdf (lues le
+  // 23/11/2026, journal de l'Action Textes officiels) : « Datenlizenz Deutschland – Zero » ; « Jede Nutzung ist ohne
+  // Einschränkungen oder Bedingungen zulässig. » Tuile WMS EPSG:3857 : HTTP 200 image/jpeg,
+  // access-control-allow-origin « https://timgo211.github.io ».
+  Object.freeze({
+    id: 'de-nw', layer: 'sat-de-nw', place: 'Rhénanie-du-Nord-Westphalie', zone: 'DE-NW',
+    tiles: [wms('https://www.wms.nrw.de/geobasis/wms_nw_dop', 'nw_dop_rgb', 'image/jpeg')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: '© Geobasis NRW (dl-de/zero-2-0)', attributionText: '© Geobasis NRW (dl-de/zero-2-0)',
+    licence: 'Datenlizenz Deutschland – Zero 2.0', licenceUrl: 'https://www.govdata.de/dl-de/zero-2-0',
+  }),
+  // Allemagne, Rhénanie-Palatinat : DOP20 LVermGeo RP, WMS rp_dop20. https://www.lvermgeo.rlp.de/geodaten-geoshop/open-data
+  // (lu le 23/11/2026, journal de l'Action Textes officiels) : « Datenlizenz Deutschland – Namensnennung – Version 2.0
+  // geldleistungsfrei zum Download und zur Online-Nutzung » ; mention « ©GeoBasis-DE / LVermGeoRP<Jahr des
+  // Datenbezugs>, dl-de/by-2-0, www.lvermgeo.rlp.de ». Tuile WMS EPSG:3857 : HTTP 200 image/png,
+  // access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'de-rp', layer: 'sat-de-rp', place: 'Rhénanie-Palatinat', zone: 'DE-RP',
+    tiles: [wms('https://geo4.service24.rlp.de/wms/rp_dop20.fcgi', 'rp_dop20', 'image/png')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: '©GeoBasis-DE / LVermGeoRP2026, dl-de/by-2-0, www.lvermgeo.rlp.de',
+    attributionText: '©GeoBasis-DE / LVermGeoRP2026, dl-de/by-2-0, www.lvermgeo.rlp.de',
+    licence: 'Datenlizenz Deutschland – Namensnennung 2.0', licenceUrl: 'https://www.govdata.de/dl-de/by-2-0',
+  }),
+]);
+/** Date de lecture des conditions de toutes les sources étrangères (phase 7d). */
+export const SATELLITE_READ = READ_ON;
 
 /**
  * France métropolitaine, contour simplifié (lon, lat), un peu large sur la mer, au plus près des frontières terrestres
@@ -70,6 +181,25 @@ function inPolygon([x, y], ring) {
   return inside;
 }
 
+/** Point dans une zone de SATELLITE_ZONES : un des polygones, hors de ses trous. */
+function inZone([lon, lat], polygons) {
+  return (polygons ?? []).some(([outer, ...holes]) => inPolygon([lon, lat], outer) && !holes.some((h) => inPolygon([lon, lat], h)));
+}
+
+/**
+ * Source de photos à ce point (phase 7d) : la première du registre dont la zone le contient (France d'abord), sinon
+ * null (plan et message).
+ */
+export function satelliteSourceAt(lonlat) {
+  if (!Array.isArray(lonlat) || lonlat.length < 2 || !Number.isFinite(lonlat[0]) || !Number.isFinite(lonlat[1])) return null;
+  return SATELLITE_SOURCES.find((src) => (src.zone === null ? isInFrance(lonlat) : inZone(lonlat, SATELLITE_ZONES[src.zone]))) ?? null;
+}
+
+/** Crédits des photos pour Réglages : « Lieu : attribution — licence ». */
+export function satelliteCredits() {
+  return SATELLITE_SOURCES.map((src) => ({ id: src.id, text: `${src.place} : ${src.attributionText} — ${src.licence}`, url: src.licenceUrl }));
+}
+
 /** Vrai si le point [lon, lat] est dans la zone couverte par les photos aériennes IGN. */
 export function isInFrance(lonlat) {
   if (!Array.isArray(lonlat) || lonlat.length < 2) return false;
@@ -101,19 +231,21 @@ export function sanitizeMapLayer(x) {
 export const GUIDANCE_START_LAYER = 'plan';
 
 /**
- * Ce que la carte doit montrer. Satellite hors de France : plan + message ; le choix reste et les photos reviennent
- * quand la carte revient au-dessus de la France. `button` : boutons « Plan / Satellite » de l'arrêt (en guidage,
- * l'écran de guidage a son propre bouton).
+ * Ce que la carte doit montrer. Satellite hors de toute source codée : plan + message ; le choix reste et les photos
+ * reviennent quand la carte revient au-dessus d'une zone couverte. `source` : id de la source (phase 7d) choisie
+ * d'après le centre de la carte. `button` : boutons « Plan / Satellite » de l'arrêt (en guidage, l'écran de guidage a
+ * son propre bouton).
  * @param {{ layer:string, center:number[]|null, navigating?:boolean }} p
- * @returns {{ photos:boolean, message:string, button:boolean }}
+ * @returns {{ photos:boolean, message:string, button:boolean, source:string|null }}
  */
 export function satelliteView({ layer, center, navigating = false }) {
   const satellite = sanitizeMapLayer(layer) === 'satellite';
-  const inFrance = isInFrance(center);
+  const src = satellite ? satelliteSourceAt(center) : null;
   return {
-    photos: satellite && inFrance,
-    message: satellite && !inFrance ? SATELLITE_OUTSIDE_TEXT : '',
+    photos: !!src,
+    message: satellite && !src ? SATELLITE_OUTSIDE_TEXT : '',
     button: !navigating,
+    source: src?.id ?? null,
   };
 }
 

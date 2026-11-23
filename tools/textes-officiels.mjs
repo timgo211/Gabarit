@@ -5,6 +5,10 @@
 // Méthode écrite pour chaque document : « html », « pdf-texte » (pdftotext) ou « ocr » (tesseract) — un chiffre lu par
 // OCR n'est jamais codé sans recoupement (seconde lecture indépendante ou contrôle de cohérence).
 //
+// Entrée « tiles » (phase 7d) : tuiles réelles demandées avec l'en-tête Origin du site publié ; le journal donne statut
+// HTTP, type de contenu, taille et en-tête CORS access-control-allow-origin (MapLibre charge les tuiles raster par fetch).
+// Champ « run » du fichier : liste des entrées lues (toutes si absent).
+//
 // Usage : node tools/textes-officiels.mjs [fichier.json] [id…]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -89,9 +93,49 @@ function extracts(text, keywords) {
   return out;
 }
 
+const ORIGIN = 'https://timgo211.github.io';
+
+/** Case Web Mercator (x, y) au zoom z du point [lon, lat]. */
+function tileOf(lon, lat, z) {
+  const n = 2 ** z;
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const r = (lat * Math.PI) / 180;
+  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+  return { x, y, n };
+}
+
+/** URL d'une tuile : {z} {x} {y} {-y} (TMS) et {bbox-epsg-3857} (WMS), comme MapLibre. */
+function tileUrl(template, lon, lat, z) {
+  const { x, y, n } = tileOf(lon, lat, z);
+  const size = 40075016.68557849 / n;
+  const minx = -20037508.342789244 + x * size;
+  const maxy = 20037508.342789244 - y * size;
+  const bbox = [minx, maxy - size, minx + size, maxy].map((v) => v.toFixed(2)).join(',');
+  return template.replace('{z}', z).replace('{x}', x).replace('{y}', y).replace('{-y}', n - 1 - y)
+    .replace('{bbox-epsg-3857}', bbox);
+}
+
+function checkTile(t) {
+  const url = tileUrl(t.url, t.lon, t.lat, t.z ?? 17);
+  try {
+    const out = execFileSync('curl', [
+      '-sS', '-L', '-4', '--max-time', '60', '-A', UA, '-H', `Origin: ${ORIGIN}`, '-H', `Referer: ${ORIGIN}/Gabarit/`,
+      '-D', '-', '-o', `${WORK}/tile`, '-w', '\n%{http_code} %{content_type} %{size_download}', url,
+    ], { maxBuffer: 1 << 22 }).toString();
+    const lines = out.trim().split('\n');
+    const [code, type, size] = lines.pop().split(' ');
+    const acao = lines.filter((l) => /^access-control-allow-origin:/i.test(l)).map((l) => l.split(':').slice(1).join(':').trim());
+    const ok = code === '200' && /^image\//.test(type) && acao.some((v) => v === '*' || v === ORIGIN);
+    console.log(`\n── tuile ${t.label} : ${url}\n   HTTP ${code}, ${type}, ${size} o, access-control-allow-origin : ${acao.join(' | ') || 'absent'} → ${ok ? 'UTILISABLE' : 'NON UTILISABLE'}`);
+  } catch (err) {
+    console.log(`\n── tuile ${t.label} : ${url}\n   échec : ${String(err?.stderr || err?.message || err).trim().slice(0, 200)} → NON UTILISABLE`);
+  }
+}
+
 async function readEntry(entry) {
   console.log(`\n████ ${entry.id} — ${entry.title}`);
-  const queue = [...entry.urls];
+  for (const t of entry.tiles ?? []) checkTile(t);
+  const queue = [...(entry.urls ?? [])];
   const seen = new Set();
   let docs = 0;
   while (queue.length && docs < MAX_DOCS) {
@@ -137,6 +181,6 @@ const list = JSON.parse(await readFile(file, 'utf8'));
 await mkdir(WORK, { recursive: true });
 console.log(`Lecture du ${new Date().toISOString()} (UTC)`);
 for (const entry of list.entries) {
-  if (only.length && !only.includes(entry.id)) continue;
+  if (only.length ? !only.includes(entry.id) : Array.isArray(list.run) && !list.run.includes(entry.id)) continue;
   await readEntry(entry);
 }

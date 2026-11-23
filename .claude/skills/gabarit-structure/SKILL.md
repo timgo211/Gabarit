@@ -15,7 +15,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   - itinéraires proposés : `route-options.js` (Recommandé + `alternative_routes` ou variantes, budget de requêtes,
     doublons, noms, écarts, textes des fiches, tracé touché sur la carte)
   - phase 7 : `map-layers.js` (Plan / Satellite IGN, zone France, guidage démarré en plan, `carryOverlay` au changement
-    de thème), `share.js` (lien d'itinéraire dans le #, validation des liens reçus, GPX 1.1, lien OpenStreetMap, choix
+    de thème ; phase 7d : registre `SATELLITE_SOURCES` des orthophotos voisines, `satelliteSourceAt`, `satelliteCredits`),
+    `satellite-zones.js` (7d, généré par `tools/satellite-zones.mjs` depuis Natural Earth, domaine public : zones LU,
+    BE-BRU, CH, ES, DE-NW, DE-RP), `share.js` (lien d'itinéraire dans le #, validation des liens reçus, GPX 1.1, lien OpenStreetMap, choix
     partage / copie / téléchargement, guide d'installation `INSTALL_STEPS`)
   - phase 7c : `prefs.js` (couleur de la flèche, vitesse / volume / nom de la voix), `nav-anim.js` (interpolation de la
     flèche entre deux positions GPS) ; nom de la route (`currentRoadName`) et `overviewBbox` (vue d'ensemble)
@@ -120,6 +122,12 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `ors-directions-uturn.json` reprennent les textes français d'ORS `ors_fr-FR.resources` ;
   `ors-directions-alternatives.json` = 3 itinéraires, `ors-variant-*.json` = variantes, Recommandé et Plus court identiques)
 - `tools/ui-check.mjs` : vérification de l'interface dans Chromium (voir « Tester »)
+- `tools/satellite-zones.mjs` (7d) : zones des photos aériennes hors de France (`src/lib/satellite-zones.js`) depuis les
+  GeoJSON Natural Earth 1:10m (raw.githubusercontent.com/nvkelso/natural-earth-vector, joignable du conteneur), lancé à
+  la main avec les ID des sources codées ; simplification ~300 m.
+- `tools/textes-officiels.mjs` : entrées `tiles` (7d) : tuile réelle demandée avec `Origin: https://timgo211.github.io`,
+  journal : statut, type, taille, `access-control-allow-origin` → UTILISABLE / NON UTILISABLE ; champ `run` du JSON :
+  entrées lues (toutes si absent).
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :

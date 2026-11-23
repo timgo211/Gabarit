@@ -14,9 +14,19 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Téléphone (≤ 600 px) : rien ne dépasse en largeur (`min-width: 0` sur les éléments flexibles, champs compris) ;
   tablette inchangée.
   Tester un comportement de guidage = une trace de positions simulées dans `tests/navigation.test.js` ou `nav-sim.test.js`.
-- Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN),
-  France seulement (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
+- Vue satellite : IGN `ORTHOIMAGERY.ORTHOPHOTOS` (WMTS `data.geopf.fr`, PM, JPEG, zoom 2–19, sans clé, attribution IGN)
+  en France (`isInFrance`), choix à l'arrêt dans `settings.mapLayer`. Guidage : démarre toujours en plan ; un
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
+- Phase 7d (satellite hors de France) : registre `SATELLITE_SOURCES` de `src/lib/map-layers.js` (France d'abord, puis
+  Luxembourg ACT CC0, Bruxelles UrbIS CC0, Suisse swisstopo, Espagne PNOA IGN CC BY 4.0, NRW dl-de/zero, Rhénanie-Palatinat
+  dl-de/by) ; source choisie d'après le centre de la carte (`satelliteSourceAt`, zones `satellite-zones.js`). Une
+  source n'est codée que si ses conditions sont lues (citées en commentaire avec URL et date) ET qu'une tuile réelle a
+  répondu 200 image/* avec `access-control-allow-origin` (Action « Textes officiels », entrée `tiles`). Carte : une
+  couche par source (`sat-<id>`, IGN garde `ign-ortho`), toutes dans `below` de `carryOverlay`, nuit à 3 niveaux sur
+  toutes ; bascule sans trou (`showSatLayer` : nouvelle couche visible, ancienne masquée au premier `idle`, 1,5 s au
+  plus). Hors de toute source : plan + « Vue satellite indisponible à cet endroit », jamais une couche vide.
+  Attribution : contrôle MapLibre (sources visibles) et Réglages › Sources et licences (`#satellite-credit-list`,
+  `satelliteCredits`, textContent). Tuiles jamais en cache (autre origine = réseau, `sw-routing.js`).
 - Écran de guidage (phase 2c, façon GPS de téléphone, `src/ui/navigation.js` + décisions dans `src/lib/nav-layout.js`) :
   bandeau de manœuvre en haut (rayon 24 px, marges 12 px, noir jour et nuit : flèche, distance, badge de route
   `roadLabel` de `src/lib/road-badge.js` + nom de rue, ou la consigne entière si elle donne une direction, `bannerText`),

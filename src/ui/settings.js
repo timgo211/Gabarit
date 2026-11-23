@@ -3,6 +3,7 @@
 // prix du gazole, export/import des données, simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
+import { satelliteCredits } from '../lib/map-layers.js';
 import { requestVersionLabel, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
 import { exportData, importData, parseDieselPrice } from '../lib/store.js';
@@ -38,7 +39,22 @@ function setStatus(node, text, ok) {
  *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
+/** Phase 7d : crédits des photos aériennes (texte seulement, lien vers la licence). */
+function renderSatelliteCredits() {
+  const list = document.querySelector('#satellite-credit-list');
+  if (!list) return;
+  list.replaceChildren(...satelliteCredits().map((c) => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.href = c.url; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = c.text;
+    li.append(a);
+    return li;
+  }));
+}
+
 export function createSettings(ctx) {
+  renderSatelliteCredits();
   const dlg = $('#dlg-settings');
   const keyInput = $('#key-input');
   const keyStatus = $('#key-status');

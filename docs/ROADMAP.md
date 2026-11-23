@@ -525,9 +525,15 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Ensuite
 
-- [ ] **Phase 7d — Satellite hors de France**
-  Orthophotos ouvertes nationales, après vérification de leurs conditions : Luxembourg (geoportail.lu), Belgique (NGI /
-  régions), Allemagne (selon le Land), Suisse (swisstopo SWISSIMAGE), Espagne (PNOA, IGN España). Sinon, message actuel.
+- [x] **Phase 7d — Satellite hors de France** (v52)
+  Orthophotos ouvertes, codées seulement si conditions lues et tuile réelle + CORS vérifiées (Action « Textes
+  officiels », 23/11/2026) : Luxembourg (ACT, CC0), Bruxelles (UrbIS, CC0), Suisse (swisstopo SWISSIMAGE), Espagne
+  (PNOA, IGN España, CC BY 4.0), Rhénanie-du-Nord-Westphalie (dl-de/zero), Rhénanie-Palatinat (dl-de/by). Source
+  choisie selon le centre de la carte, bascule sans trou, nuit à 3 niveaux, crédits dans Réglages. Ailleurs : « Vue
+  satellite indisponible à cet endroit ».
+  - [ ] Reste : Flandre (licence « Gebruiksrecht geografische webdiensten » introuvable), Wallonie (aucune condition
+    lisible), NGI (service national à essayer), Bade-Wurtemberg (DOP20 accordé à OSM seulement), Bavière, Sarre
+    (conditions non lues), Hesse (service sans réponse) : relire par l'Action avant de coder.
 
 - [ ] **Phase 4 — Carburant**
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu

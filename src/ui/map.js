@@ -12,7 +12,7 @@
 
 import { MAP_STYLES } from '../lib/config.js';
 import { routesBbox, pickRouteAt } from '../lib/route-options.js';
-import { IGN_ORTHO, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
+import { SATELLITE_SOURCES, satelliteView, sanitizeMapLayer, carryOverlay } from '../lib/map-layers.js';
 import { planMove, frameAt, holdStill, stillPoint, stillDrift } from '../lib/nav-anim.js';
 import { haversine } from '../lib/nav-geo.js';
 import { overviewPadding } from '../lib/navigation.js';
@@ -37,10 +37,12 @@ const TAP_MARGIN_PX = 10;
 /** ZFE (phase 5) : contours sous les libellés, au-dessus des photos ; rouge si interdite au véhicule. */
 const ZFE_SOURCE = 'zfe';
 const ZFE_LAYERS = ['zfe-fill', 'zfe-line'];
-const SAT_SOURCE = 'ign-ortho';
-const SAT_LAYER = 'ign-ortho';
+/** Photos aériennes (phases 7 et 7d) : une source raster et une couche par source du registre (« ign-ortho », « sat-lu »…). */
+const SAT_LAYERS = SATELLITE_SOURCES.map((src) => src.layer);
+/** Bascule d'une source à l'autre : l'ancienne couche reste jusqu'au rendu de la nouvelle (1,5 s au plus). */
+const SAT_SWAP_MAX_MS = 1500;
 /** Couches de Gabarit, jamais recolorées avec le fond (phase 2c-a). */
-const OWN_LAYERS = [...ROUTE_LAYERS, ...ZFE_LAYERS, SAT_LAYER];
+const OWN_LAYERS = [...ROUTE_LAYERS, ...ZFE_LAYERS, ...SAT_LAYERS];
 /** Bord du tracé sur les photos IGN, jour et nuit (noir Panier Perdu). */
 const SAT_CASING = '#14161C';
 /** Repères : départ vert, arrivée rouge (repères universels), point choisi violet ; hors palette exprès. */
@@ -112,6 +114,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let stop = null;
   let layer = sanitizeMapLayer(opts.layer);
   let lastView = null;
+  /** Couche de photos visible (phase 7d), bascule en cours. */
+  let shownSat = null;
+  let swapTimer = null;
   let styleUrl = null;
   let lost = false;
   let restoreTimer = null;
@@ -287,24 +292,49 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
    * ajoutés au-dessus, et les marqueurs (éléments HTML) restent toujours visibles par-dessus.
    */
   function addSatelliteLayer() {
-    if (!map || map.getSource(SAT_SOURCE)) { applyLayer(); return; }
-    map.addSource(SAT_SOURCE, {
-      type: 'raster', tiles: IGN_ORTHO.tiles, tileSize: IGN_ORTHO.tileSize,
-      minzoom: IGN_ORTHO.minzoom, maxzoom: IGN_ORTHO.maxzoom, attribution: IGN_ORTHO.attribution,
-    });
+    if (!map) return;
     const style = map.getStyle();
     const firstSymbol = style?.layers?.find((l) => l.type === 'symbol')?.id;
-    const beforeId = firstSymbol ?? (map.getLayer(ROUTE_LAYERS[4]) ? ROUTE_LAYERS[4] : undefined);
-    map.addLayer({ id: SAT_LAYER, type: 'raster', source: SAT_SOURCE, layout: { visibility: 'none' }, paint: satellitePaint(theme, nightLevel) }, beforeId);
+    const beforeId = firstSymbol ?? (map.getLayer('route-casing') ? 'route-casing' : undefined);
+    for (const src of SATELLITE_SOURCES) {
+      if (map.getSource(src.layer)) continue;
+      map.addSource(src.layer, {
+        type: 'raster', tiles: src.tiles, tileSize: src.tileSize, minzoom: src.minzoom, maxzoom: src.maxzoom, attribution: src.attribution,
+      });
+      map.addLayer({ id: src.layer, type: 'raster', source: src.layer, layout: { visibility: 'none' }, paint: satellitePaint(theme, nightLevel) }, beforeId);
+    }
+    shownSat = null; // style neuf : couches toutes masquées
     applyLayer();
+  }
+
+  /**
+   * Couche de photos montrée (phase 7d) : la nouvelle source s'affiche d'abord, l'ancienne n'est masquée qu'une fois
+   * la nouvelle dessinée (« idle », 1,5 s au plus) : pas de clignotement à la frontière.
+   */
+  function showSatLayer(id) {
+    if (!map || shownSat === id) return;
+    const prev = shownSat;
+    shownSat = id;
+    clearTimeout(swapTimer);
+    if (id && map.getLayer(id)) map.setLayoutProperty(id, 'visibility', 'visible');
+    const hideOthers = () => {
+      clearTimeout(swapTimer);
+      if (!map) return;
+      for (const l of SAT_LAYERS) if (l !== shownSat && map.getLayer(l)) map.setLayoutProperty(l, 'visibility', 'none');
+    };
+    if (prev && id) {
+      swapTimer = setTimeout(hideOthers, SAT_SWAP_MAX_MS);
+      map.once('idle', hideOthers);
+    } else hideOthers();
   }
 
   /** Montre ou masque les photos selon le choix, le centre de la carte et le guidage. */
   function applyLayer() {
     const c = map?.getCenter();
     // Pas de carte (hors ligne, MapLibre absent) : pas de bouton.
-    const view = map ? satelliteView({ layer, center: [c.lng, c.lat], navigating }) : { photos: false, message: '', button: false };
-    if (map?.getLayer(SAT_LAYER)) map.setLayoutProperty(SAT_LAYER, 'visibility', view.photos ? 'visible' : 'none');
+    const view = map ? satelliteView({ layer, center: [c.lng, c.lat], navigating }) : { photos: false, message: '', button: false, source: null };
+    const src = SATELLITE_SOURCES.find((x) => x.id === view.source);
+    if (map?.getLayer(src?.layer ?? SAT_LAYERS[0]) || !view.photos) showSatLayer(view.photos ? src.layer : null);
     if (!lastView || lastView.photos !== view.photos || lastView.message !== view.message || lastView.button !== view.button) {
       const photosChanged = lastView?.photos !== view.photos;
       lastView = view;
@@ -363,8 +393,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     const layers = map?.getStyle()?.layers;
     if (!layers) return;
     if (!navigating) recolorBase(); // couleurs des libellés de la palette rendues (bulles retirées)
-    if (map.getLayer(SAT_LAYER)) {
-      for (const [prop, value] of Object.entries(satellitePaint(theme, nightLevel))) map.setPaintProperty(SAT_LAYER, prop, value);
+    for (const id of SAT_LAYERS) {
+      if (!map.getLayer(id)) continue;
+      for (const [prop, value] of Object.entries(satellitePaint(theme, nightLevel))) map.setPaintProperty(id, prop, value);
     }
     paintLabels();
     if (navigating) putBubble();
@@ -401,7 +432,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function transformStyle(prev, next) {
     const c = routeColors();
     const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
-    return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS, nightLevel), { below: [SAT_LAYER, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
+    return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS, nightLevel), { below: [...SAT_LAYERS, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
   }
 
   /** Crée la carte MapLibre (au démarrage, ou pour remplacer une carte dont le contexte WebGL est perdu). */
