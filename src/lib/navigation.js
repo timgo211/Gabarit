@@ -269,6 +269,23 @@ export function startNavigation(route, {
 }
 
 /**
+ * Reprise d'un guidage sauvegardé (v53, src/lib/route-save.js) : même état qu'au départ, placé à la progression
+ * gardée ; consignes déjà passées marquées annoncées (pas de « Guidage démarré » ni d'annonce rejouée). La position
+ * suivante est replacée sur le tracé comme d'habitude ; loin du tracé, règles habituelles (sortie de route en roulant,
+ * « Recalculer d'ici » proposé à l'arrêt).
+ * @param {object} state startNavigation
+ * @param {{ along:number, segIndex?:number|null }} progress
+ */
+export function resumeNavigation(state, progress) {
+  const along = isNum(progress?.along) ? Math.min(Math.max(0, progress.along), state.route.line.total) : 0;
+  const announced = { ...state.announced };
+  state.route.maneuvers.forEach((m, i) => { if (isNum(m.at) && m.at <= along) announced[i] = 'now'; });
+  const segIndex = Number.isInteger(progress?.segIndex) && progress.segIndex >= 0
+    && progress.segIndex < state.route.line.coords.length - 1 ? progress.segIndex : null;
+  return { ...state, along, segIndex, announced, started: true, resumed: true };
+}
+
+/**
  * Traite une position.
  * @returns {{ state:object, view:object|null, events:{type:'speak'|'reroute'|'arrived', text?:string, interrupt?:boolean, from?:number[]}[] }}
  */
@@ -517,6 +534,7 @@ export function updateNavigation(state, fix) {
       text: maneuverText(m, { uturnSafe: nm.index === s.uturnIndex }),
       name: m.name,
       exitNumber: m.exitNumber,
+      exit: m.exit ?? null,
       distance: nm.distance,
       icon: maneuverIcon(m.type, m.exitNumber),
     };

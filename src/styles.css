@@ -418,6 +418,14 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   overflow-wrap: normal; word-break: normal; hyphens: manual;
 }
 .nav-instr.long { font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
+/* v53 : ligne de sortie sous la consigne (une ligne, « … »). */
+.nav-exit {
+  display: flex; align-items: center; min-width: 0; margin-top: 4px; font-size: 1.05rem; font-weight: 700;
+  white-space: nowrap; overflow: hidden; color: var(--nav-fg);
+}
+.nav-exit[hidden] { display: none; }
+.nav-exit .nav-badge { flex: 0 0 auto; }
+.nav-exit-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .nav-badge {
   display: inline-block; margin-right: .3em; padding: 0 .3em; border-radius: 6px; border: 2px solid var(--badge-border);
   background: var(--badge-bg); color: var(--badge-fg); line-height: 1.15; white-space: nowrap; vertical-align: .04em;
@@ -469,25 +477,31 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   box-shadow: 0 4px 14px rgba(0,0,0,.35);
 }
 
-/* Pastille de la rue en cours, juste au-dessus du véhicule (posée par layoutGuidance). */
+/* Pastille de la rue en cours, juste sous le véhicule (v53, posée par layoutGuidance / roadPillBox) : écusson du
+   numéro de route (couleurs réglementaires) puis le nom, une ligne, « … » si trop long. */
 .nav-road {
-  position: absolute; transform: translate(-50%, -100%); max-width: calc(100% - 2 * var(--round) - 48px);
-  padding: 6px 16px; border-radius: 999px; font-weight: 800; font-size: 1.05rem;
+  position: absolute; transform: translate(-50%, 0); max-width: calc(100% - 2 * var(--round) - 48px);
+  display: flex; align-items: center; gap: 0; padding: 6px 16px; border-radius: 999px; font-weight: 800; font-size: 1.05rem;
   background: var(--street-bg); color: var(--street-fg); box-shadow: 0 2px 10px rgba(0,0,0,.35);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;
+  white-space: nowrap; overflow: hidden; pointer-events: none;
 }
+.nav-road[hidden] { display: none; }
+.nav-road .nav-badge { flex: 0 0 auto; }
+.nav-road-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
-/* Boutons ronds (colonne de droite et panneau du bas) : 64 px, 56 px au moins. */
+/* Boutons ronds : colonne de droite 48 px, 40 px au moins (v53, --round posé par layoutGuidance) ; panneau du bas
+   64 px (56 px en écran bas). */
 .nav-mapbtns {
   position: absolute; right: 12px; top: 45%; display: grid; gap: var(--gap);
   grid-template-columns: repeat(var(--cols), var(--round)); grid-auto-rows: var(--round); justify-content: end;
 }
 .nav-round {
-  width: var(--round); height: var(--round); min-width: 56px; min-height: 56px; padding: 0; border-radius: 50%;
+  width: var(--round); height: var(--round); min-width: 40px; min-height: 40px; padding: 0; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font: inherit;
   background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.3);
 }
 .nav-round[hidden] { display: none; }
+.nav-bottom .nav-round { width: 64px; height: 64px; min-width: 56px; min-height: 56px; }
 .nav-round .sym { width: 52%; height: 52%; display: block; }
 .nav-round[aria-disabled="true"] { background: var(--nav-off-bg); color: var(--nav-off-fg); border-color: var(--nav-off-border); }
 .nav-round:focus-visible, .nav-chip:focus-visible, .nav-summary:focus-visible, .nav-more:focus-visible {
@@ -510,12 +524,12 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 /* Compteur de vitesse (bas gauche) ; panneau de limitation seulement si la limite PL est connue. */
 .nav-speedo { position: absolute; left: 12px; bottom: 120px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
 .nav-speed-pill {
-  min-width: 76px; height: 76px; padding: 0 12px; border-radius: 38px; display: flex; flex-direction: column;
+  min-width: 57px; height: 57px; padding: 0 9px; border-radius: 29px; display: flex; flex-direction: column;
   align-items: center; justify-content: center; line-height: 1;
   background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 2px 10px rgba(0,0,0,.3);
 }
-.nav-speed { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.nav-speed-unit { font-size: .75rem; font-weight: 700; color: var(--muted); }
+.nav-speed { font-size: 1.43rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nav-speed-unit { font-size: .62rem; font-weight: 700; color: var(--muted); }
 .nav-speedo.over .nav-speed { color: var(--danger); }
 /* Dépassement (phase 11a) : alerte visuelle seulement, bord du compteur épaissi ; le panneau garde ses couleurs. */
 .nav-speedo.over .nav-speed-pill { border: 4px solid var(--danger); }
@@ -634,8 +648,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-tight .nav-summary { min-height: 56px; }
 .nav-tight .nav-bottom .nav-round { width: 56px; height: 56px; }
 .nav-tight .nav-bottom { padding-top: 2px; padding-bottom: max(4px, env(safe-area-inset-bottom)); gap: 2px; }
-.nav-tight .nav-speed-pill { min-width: 64px; height: 64px; }
-.nav-tight .nav-speed { font-size: 1.5rem; }
+.nav-tight .nav-speed-pill { min-width: 48px; height: 48px; }
+.nav-tight .nav-speed { font-size: 1.13rem; }
 
 /* Repère du véhicule (v45 : flèche ou camion vu de dessus, src/ui/vehicle-icon.js) : sur un halo rond posé à plat sur la carte (ovale avec l'inclinaison), ombre douce. */
 .me-marker { width: 60px; height: 60px; }
@@ -796,3 +810,10 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .segmented-row label { padding: 0 6px; gap: 6px; white-space: nowrap; font-size: .95rem; }
   .segmented-row input[type="radio"] { width: 22px; height: 22px; }
 }
+
+/* v53 : « Reprendre l'itinéraire ? » (sauvegarde de plus de 12 h), à l'arrêt seulement. */
+.resume-panel { margin: 8px 0; padding: 12px; border-radius: 12px; background: var(--card); border: 2px solid var(--primary); }
+.resume-panel[hidden] { display: none; }
+.resume-question { margin: 0 0 8px; font-weight: 800; font-size: 1.1rem; }
+.resume-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.resume-btns .btn { flex: 1 1 140px; min-height: 56px; }

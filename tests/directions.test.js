@@ -11,13 +11,13 @@ import {
   DIRECTIONS, cleanDestination, convertDirections, directionFromFeature, directionSizeProblem, osmiumDirectionsFilter,
 } from '../src/lib/directions-convert.js';
 import {
-  DIRECTION, directionText, directionsForManeuvers, mergeDirectionTiles, parseDirectionTile,
+  DIRECTION, directionText, directionsForManeuvers, mergeDirectionTiles, parseDirectionTile, withDirections, exitText,
 } from '../src/lib/directions.js';
 import { parseGeojsonLine } from '../src/lib/areas-osm-data.js';
 import { parseDirections } from '../src/lib/ors-response.js';
 import { buildManeuvers, maneuverText, announcementText } from '../src/lib/nav-guidance.js';
 import { prepareLine } from '../src/lib/nav-geo.js';
-import { bannerText } from '../src/lib/nav-layout.js';
+import { bannerText, exitLine } from '../src/lib/nav-layout.js';
 
 const features = readFileSync(new URL('./fixtures/osm-directions-sortie.geojsonseq', import.meta.url), 'utf8')
   .split('\n').map(parseGeojsonLine).filter(Boolean);
@@ -41,7 +41,7 @@ test('étiquettes : bretelles seulement, destination et destination:ref, lanes s
   assert.equal(byId.get('w4004'), null, 'destination:lanes seule');
   assert.equal(byId.get('w4005'), null, 'pas une bretelle');
   assert.deepEqual(byId.get('w4006').coords[0], [6.199, 49.099], 'oneway=-1 : sens retourné');
-  assert.deepEqual(osmiumDirectionsFilter(), ['w/destination', 'w/destination:ref']);
+  assert.deepEqual(osmiumDirectionsFilter(), ['w/destination', 'w/destination:ref', 'w/junction:ref', 'w/exit_to', 'n/highway=motorway_junction']);
 });
 
 test('copie : cases, textes partagés, taille, rien écrit au-delà', () => {
@@ -112,4 +112,66 @@ test('guidage : directions calculées une fois par itinéraire, arrivées après
   assert.equal(rerouteDone(late, route).state.route.maneuvers[1].direction.text, 'Metz, Nancy (A 31)');
   const plain = updateNavigation(startNavigation(route, { now: 1000 }), fix);
   assert.equal(plain.view.maneuver.text, 'Restez à droite');
+});
+
+// ───────── v53 : ligne « Sortie 12 · Vallorbe » du bandeau ─────────
+// Fixture SYNTHÉTIQUE osm-sorties.geojsonseq : nœud de sortie n5001 (12, Vallorbe) au début de w4001, n5002 à 30 m
+// (ambiguïté), n5003 sans numéro ni nom, bretelle w4007 (junction:ref 12, exit_to Vallorbe;Orbe) sans destination.
+const exitFeatures = readFileSync(new URL('./fixtures/osm-sorties.geojsonseq', import.meta.url), 'utf8')
+  .split('\n').map(parseGeojsonLine).filter(Boolean);
+
+function copyWithExits(linkIds, nodeIds) {
+  const list = [
+    ...features.filter((f) => linkIds.includes(f.id)),
+    ...exitFeatures.filter((f) => linkIds.includes(f.id) || nodeIds.includes(f.id)),
+  ].map(directionFromFeature).filter(Boolean);
+  const conv = convertDirections(list, { updated: '2026-11-23', countries: ['france'] });
+  const tiles = [...conv.tiles.values()].map((t) => parseDirectionTile(JSON.parse(JSON.stringify(t))));
+  return { conv, data: mergeDirectionTiles(tiles) };
+}
+
+test('sorties : nœuds motorway_junction (ref, name), junction:ref et exit_to des bretelles copiés', () => {
+  const byId = new Map(exitFeatures.map((f) => [f.id, directionFromFeature(f)]));
+  assert.deepEqual(byId.get('n5001'), { junction: true, ref: '12', name: 'Vallorbe', at: [6.1, 49.02] });
+  assert.equal(byId.get('n5003'), null, 'ni numéro ni nom');
+  assert.equal(byId.get('w4007').exitRef, '12');
+  assert.equal(byId.get('w4007').exitTo, 'Vallorbe, Orbe');
+  const { conv, data } = copyWithExits(['w4001'], ['n5001']);
+  assert.equal(conv.index.junctions, 1);
+  assert.equal(data.junctions.length, 1);
+  assert.deepEqual(data.junctions[0].at, [6.1, 49.02]);
+  // Copie d'avant la v53 (sans `j` ni `e`) : lisible, aucune sortie.
+  const old = parseDirectionTile({ t: ['Metz'], d: [[0, -1, 0, 610000, 4902000, 70, 70]] });
+  assert.equal(old.links.length, 1);
+  assert.deepEqual(old.junctions, []);
+});
+
+test('sorties : un seul nœud à 60 m du début de la bretelle → « Sortie 12 · Vallorbe » ; deux → rien ; voix inchangée', () => {
+  const dirs = directionsForManeuvers(route, maneuvers, copyWithExits(['w4001'], ['n5001']).data);
+  assert.deepEqual(dirs.get(1), { text: 'Metz, Nancy (A 31)', speak: true, exit: { ref: '12', name: 'Vallorbe' } });
+  const m = withDirections(maneuvers, dirs)[1];
+  assert.equal(exitText(m.exit), 'Sortie 12 · Vallorbe');
+  assert.equal(announcementText({ maneuver: m, stage: 'now', distance: 0 }), 'Restez à droite, direction Metz, Nancy (A 31).',
+    'la sortie n\'est jamais dite');
+  const line = exitLine(m, 'A 9');
+  assert.equal(line.text, 'Sortie 12 · Vallorbe');
+  assert.deepEqual(line.badges.map((b) => b.ref), ['A\u00a09'], 'espace insécable (roadLabel)');
+  assert.deepEqual(exitLine(m, 'Route de Vallorbe').badges, [], 'pas de numéro de route : pas d\'écusson');
+  assert.equal(exitLine(maneuvers[1], 'A 9'), null, 'pas de sortie connue : pas de ligne');
+  const two = directionsForManeuvers(route, maneuvers, copyWithExits(['w4001'], ['n5001', 'n5002']).data);
+  assert.deepEqual(two.get(1), { text: 'Metz, Nancy (A 31)', speak: true }, 'deux nœuds : pas de sortie');
+});
+
+test('sorties : sans nœud, junction:ref et exit_to de la bretelle ; consigne « direction » gardée, sortie montrée', () => {
+  const dirs = directionsForManeuvers(route, maneuvers, copyWithExits(['w4007'], []).data);
+  assert.deepEqual(dirs.get(1), { text: '', speak: true, exit: { ref: '12', name: 'Vallorbe, Orbe' } });
+  const m = withDirections(maneuvers, dirs)[1];
+  assert.equal(m.direction, undefined, 'pas de « direction X » sans destination');
+  assert.equal(maneuverText(m), 'Restez à droite');
+  const ms = maneuvers.map((x, i) => (i === 1 ? { ...x, instruction: 'Prenez la sortie en direction de Metz' } : x));
+  const d2 = directionsForManeuvers(route, ms, copyWithExits(['w4001'], ['n5001']).data);
+  assert.deepEqual(d2.get(1), { text: '', speak: true, exit: { ref: '12', name: 'Vallorbe' } });
+  assert.equal(exitText({ ref: '12' }), 'Sortie 12');
+  assert.equal(exitText({ name: 'Vallorbe' }), 'Vallorbe');
+  assert.equal(exitText(null), '');
 });

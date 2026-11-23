@@ -33,7 +33,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   « Puis » (≤ 200 m, `THEN_MAX_GAP_M`, comme la voix), 2 alertes au plus (`guidanceAlerts` : système, tunnel, ZFE, accès,
   interdiction, conduite dépassée, frontière, vent, pause bientôt) et « +N » (≥ 56 px, ouvre les détails). Temps de
   conduite : carte seulement « bientôt » / « dépassé » et s'il reste une place, sinon dans les détails.
-  Colonne de boutons ronds à droite (`buttonColumn` : 64 px, plancher 56, 45–85 % de la hauteur, remonte sous le
+  Colonne de boutons ronds à droite (`buttonColumn` : 48 px, plancher 40 — v53, ces boutons ronds seulement ; panneau du bas 64 / 56 px —, 45–85 % de la hauteur, remonte sous le
   bandeau, deux colonnes en dernier recours) : boussole, Recentrer (seulement carte déplacée), loupe (rangée « Aires
   PL », « Plan / Satellite », fermée seule après 8 s, aucune saisie), son, autres itinéraires (actif seulement à
   l'arrêt, `parkedState` : < 5 km/h pendant 3 s ; v44 : vue d'ensemble + panneau `#nav-alts`), place du signalement
@@ -44,7 +44,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   chaque changement (le panneau du bas rétrécit aussi). `layoutGuidance` place tout (rien ne se chevauche), jamais
   la caméra. Vérifié par `node tools/ui-check.mjs guidage` (et `foot`, `drive`, `long`).
 - Caméra du guidage : `followPadding` ne dépend que de la taille de l'écran (véhicule à 78 % de la hauteur en
-  portrait, 75 % et à droite de la colonne en paysage) : une alerte ou le compteur qui change à l'arrêt ne redessine
+  portrait, 75 % et à droite de la colonne en paysage ; v53 : plus haut si la pastille de la rue ne tient pas dessous,
+  `PILL_ROOM` 150 px portrait / 40 px paysage) : une alerte ou le compteur qui change à l'arrêt ne redessine
   jamais la carte (`parked`). Boussole : `navigateTo({ northUp })`, comparé par `holdStill`.
 - Carte en guidage : tracé épais `ROUTE_WIDTH_NAV` (bord 2 px), partie parcourue grise (source `route-done`, mise à jour
   par `traveledUpdate` : en roulant, tous les 25 m), noms des rues en bulles (`streetBubblePatches`, image
@@ -139,6 +140,23 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   (`settings.speedVoice`, désactivé par défaut : « Limite X » une fois par tronçon, étiquette OSM sans conditions,
   jamais une règle générale) et texte fixe `#speed-hint`. Fiche : `.route-card-speed` « Limites de vitesse connues :
   N % du trajet » (ou « inconnues ») ; note « conditions… à vérifier » ; diagnostic « Limites de vitesse : … ».
+- v53, écran de navigation :
+  - pastille de la rue SOUS le véhicule, centrée (`roadPillBox` : bornée par le compteur, la colonne de boutons et la
+    colonne de gauche ; cachée si elle toucherait le panneau du bas) ; écusson du numéro de route à gauche
+    (`roadLabel` du nom d'étape ORS, `BADGE_COLORS` réglementaires) ; sans numéro, le nom seul ; « … » si trop long ;
+  - ligne de sortie `#nav-exit` sous la consigne : écusson de la route suivie + « Sortie 12 · Vallorbe » (`exitLine`,
+    `m.exit` de `directions.js` : bretelle unique au cap cohérent ET un seul nœud `motorway_junction` à 60 m de son
+    début, sinon `junction:ref` / `exit_to` de la bretelle) ; élément manquant caché ; jamais dite ;
+  - flèches sur le tracé (`src/ui/route-arrows.js`, dessins maison, bord #14161C) : chevrons blancs `route-chevrons`
+    (symbol-placement line, 90 px, zoom ≥ 13) et pastilles des manœuvres `route-turns` (source `route-turns`,
+    `maneuverMarks` calculé une fois par itinéraire, `map.showTurns`), sous la partie parcourue, guidage seulement ;
+  - compteur 57 px (police 1,43 rem) ; panneau de limitation et mention « règle » inchangés ;
+  - mémoire de l'itinéraire (`src/lib/route-save.js` + `src/ui/route-save.js`, IndexedDB `gabarit-route`) : itinéraire
+    en préparation et guidage GPS (jamais la simulation) gardés sur visibilitychange / pagehide et à chaque
+    changement, 30 s au plus en guidage ; profil par identifiant, aucune clé ; < 12 h → repris tel quel (guidage :
+    `resumeNavigation`, « Guidage repris. ») ; > 12 h → `#resume-panel` « Reprendre l'itinéraire ? » seulement à
+    l'arrêt (`createPlanPark`) ; format différent, illisible, profil supprimé → effacé ; effacé à l'arrivée et par
+    ✕ + « Quitter ». Navigation en arrière-plan (voix, GPS) : non faite (impossible en PWA, voir la PR v53).
 - Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
   de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
   `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.

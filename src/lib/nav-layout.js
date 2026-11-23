@@ -4,20 +4,35 @@
 // Code de la route, art. R412-6-2 (legifrance.gouv.fr) : pendant la marche, l'écran ne sert qu'à la navigation ;
 // aucune saisie, et ce qui change l'itinéraire (autres itinéraires) n'est actif qu'à l'arrêt.
 
-import { pointAt, segmentAt, haversine } from './nav-geo.js';
+import { pointAt, segmentAt, haversine, bearing } from './nav-geo.js';
+import { STEP_TYPES } from './nav-guidance.js';
 import { roadLabel, keepRefsTogether } from './road-badge.js';
+import { exitText } from './directions.js';
 import { isLongInstruction } from './format.js';
 
 /** Alertes empilées sous le bandeau : 2 au plus, les autres dans le panneau du bas déplié. */
 export const MAX_ALERTS = 2;
 /** « À l'arrêt » pour les boutons réservés à l'arrêt : sous 5 km/h pendant 3 s. */
 export const PARK = Object.freeze({ KMH: 5, MS: 3000 });
-/** Hauteur du véhicule sur l'écran (fraction depuis le haut) : bas de l'écran pour voir loin devant. */
+/**
+ * Hauteur du véhicule sur l'écran (fraction depuis le haut) : bas de l'écran pour voir loin devant ; au plus haut
+ * de quoi poser la pastille de la rue dessous (v53, followPadding).
+ */
 export const VEHICLE_Y = Object.freeze({ portrait: 0.78, landscape: 0.75 });
 /** Paysage : bandeau et panneau du bas dans une colonne à gauche (fraction de la largeur). */
 export const LANDSCAPE_COLUMN = 0.4;
-/** Colonne de boutons ronds : entre 45 % et 85 % de la hauteur, 64 px (56 px au moins). */
-export const BUTTONS = Object.freeze({ from: 0.45, to: 0.85, size: 64, min: 56, gap: 12, minGap: 6 });
+/**
+ * Colonne de boutons ronds : entre 45 % et 85 % de la hauteur, 48 px (40 px au moins). v53 : environ 25 % plus petits
+ * qu'avant (64 / 56 px) ; 40 px reste la zone tactile minimale de ces boutons ronds seulement.
+ */
+export const BUTTONS = Object.freeze({ from: 0.45, to: 0.85, size: 48, min: 40, gap: 9, minGap: 5 });
+/**
+ * Pastille de la rue (v53) : juste sous le repère du véhicule (60 px, centré sur sa position), centrée sur lui.
+ * GAP : écart sous le repère ; HEIGHT : hauteur réservée à la pastille (une ligne) ; MARGIN : écart aux autres éléments.
+ */
+export const ROAD_PILL = Object.freeze({ ICON_HALF: 30, GAP: 8, HEIGHT: 40, MARGIN: 8 });
+/** Place réservée sous la pastille (px) : panneau du bas et mention du bas en portrait, marge et mention en paysage. */
+export const PILL_ROOM = Object.freeze({ portrait: 150, landscape: 40 });
 /** Tracé parcouru (gris) : redessiné tous les 25 m, seulement en roulant (≥ 3 km/h, comme la flèche). */
 export const TRAVELED = Object.freeze({ STEP_M: 25, MIN_KMH: 3 });
 
@@ -35,6 +50,20 @@ export function bannerText(maneuver) {
   if (!named || /\bdirection\b/i.test(full)) return { badges: [], text: full, long: isLongInstruction(full), full };
   const street = keepRefsTogether(label.street);
   return { badges: label.badges, text: street, long: isLongInstruction(street), full };
+}
+
+/**
+ * Ligne de sortie du bandeau (v53) : écusson de la route suivie (numéro du nom d'étape ORS, roadLabel) et « Sortie 12 ·
+ * Vallorbe » (m.exit, directions.js : bretelle unique au cap cohérent, un seul nœud de sortie). Rien sans sortie
+ * connue ; élément manquant caché. Jamais dit (voix inchangée, règle 11b).
+ * @param {{ exit?:{ ref?:string, name?:string }|null }|null} maneuver vue du moteur
+ * @param {string|null} roadName route actuelle (view.roadName)
+ * @returns {{ badges:object[], text:string }|null}
+ */
+export function exitLine(maneuver, roadName) {
+  const text = exitText(maneuver?.exit ?? null);
+  if (!text) return null;
+  return { badges: roadLabel(roadName).badges.slice(0, 1), text: keepRefsTogether(text) };
 }
 
 /** Ordre d'importance des alertes (plus petit = plus important). */
@@ -180,7 +209,10 @@ export function followPadding({ width, height }) {
   const w = Math.max(0, Math.round(width || 0));
   const h = Math.max(0, Math.round(height || 0));
   const land = isLandscape({ width: w, height: h });
-  const y = land ? VEHICLE_Y.landscape : VEHICLE_Y.portrait;
+  // v53 : place pour la pastille de la rue sous le véhicule, au-dessus du panneau du bas (portrait) ou du bord
+  // (paysage) : sur un petit écran le véhicule remonte un peu. Toujours d'après la seule taille de l'écran.
+  const room = (land ? PILL_ROOM.landscape : PILL_ROOM.portrait) + ROAD_PILL.ICON_HALF + ROAD_PILL.GAP + ROAD_PILL.HEIGHT + ROAD_PILL.MARGIN;
+  const y = h > 0 ? Math.min(land ? VEHICLE_Y.landscape : VEHICLE_Y.portrait, (h - room) / h) : VEHICLE_Y.portrait;
   // Centre de la zone utile = position du véhicule : (top + (h - bottom)) / 2 = y·h, avec bottom = 0.
   const top = Math.max(0, Math.round((2 * y - 1) * h));
   const left = land ? Math.round(w * LANDSCAPE_COLUMN) : 0;
@@ -224,6 +256,50 @@ export function speedStatus(kmh, limitKmh = null, source = null) {
   const v = Number.isFinite(kmh) && kmh >= 0 ? Math.round(kmh) : null;
   const limit = Number.isFinite(limitKmh) && limitKmh > 0 ? Math.round(limitKmh) : null;
   return { value: v === null ? '—' : String(v), limit, over: v !== null && limit !== null && v > limit, rule: limit !== null && source === 'rule' };
+}
+
+/**
+ * Place de la pastille de la rue (v53) : haut juste sous le véhicule, centrée sur lui ; largeur bornée par la colonne
+ * de gauche (paysage), le compteur (s'il est à la même hauteur) et la colonne de boutons ; cachée si elle toucherait
+ * le panneau du bas. La caméra n'en dépend jamais (followPadding).
+ * @param {{ vx:number, vy:number, leftLimit:number, colLeft:number, sheetTop:number,
+ *   speedo?:{ top:number, bottom:number, right:number }|null, buttonsTop?:number }} p px depuis le coin de l'écran
+ * @returns {{ left:number, top:number, maxWidth:number, fits:boolean }}
+ */
+export function roadPillBox({ vx, vy, leftLimit = 0, colLeft, sheetTop, speedo = null, buttonsTop = null }) {
+  const top = Math.round(vy + ROAD_PILL.ICON_HALF + ROAD_PILL.GAP);
+  const bottom = top + ROAD_PILL.HEIGHT;
+  let left = leftLimit;
+  if (speedo && speedo.top < bottom && speedo.bottom > top) left = Math.max(left, speedo.right);
+  // Colonne de boutons : seulement si elle descend jusqu'à la pastille.
+  const right = buttonsTop === null || buttonsTop < bottom ? colLeft : Infinity;
+  const room = Math.min(vx - left, right - vx) - ROAD_PILL.MARGIN;
+  const maxWidth = Math.max(0, Math.round(2 * Math.min(room, 10000)));
+  const fits = bottom + ROAD_PILL.MARGIN <= sheetTop && maxWidth >= 80;
+  return { left: Math.round(vx), top, maxWidth, fits };
+}
+
+/** Flèches sur le tracé (v53) : chevrons cachés en deçà du zoom 13 (trop serrés), espacés de 90 px. */
+export const ROUTE_ARROWS = Object.freeze({ MIN_ZOOM: 13, SPACING_PX: 90, TURN_MIN_ZOOM: 11, AHEAD_M: 20 });
+
+/**
+ * Pastilles de manœuvre (v53) : un point par manœuvre (ni départ ni arrivée), cap de la route juste après (20 m).
+ * Calculé une fois par itinéraire (départ, recalcul), jamais par position.
+ * @param {{ coords:number[][], cum:number[], total:number }} line prepareLine
+ * @param {{ type:number, at:number }[]} maneuvers buildManeuvers
+ * @returns {{ type:'FeatureCollection', features:object[] }}
+ */
+export function maneuverMarks(line, maneuvers) {
+  const features = [];
+  if (!line?.coords?.length || !Array.isArray(maneuvers)) return { type: 'FeatureCollection', features };
+  maneuvers.forEach((m, i) => {
+    if (!m || !Number.isFinite(m.at) || i === 0 || m.type === STEP_TYPES.DEPART || m.type === STEP_TYPES.GOAL) return;
+    const p = pointAt(line, m.at).point;
+    const ahead = pointAt(line, Math.min(line.total, m.at + ROUTE_ARROWS.AHEAD_M)).point;
+    if (haversine(p, ahead) < 1) return;
+    features.push({ type: 'Feature', properties: { bearing: Math.round(bearing(p, ahead)) }, geometry: { type: 'Point', coordinates: p } });
+  });
+  return { type: 'FeatureCollection', features };
 }
 
 /** Faut-il redessiner la partie parcourue ? Seulement en roulant, tous les 25 m (ou en arrière : recalcul). */

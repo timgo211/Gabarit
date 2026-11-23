@@ -34,11 +34,13 @@ import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
   setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, markStopAsWork, NAV,
+  resumeNavigation,
 } from '../lib/navigation.js';
 import {
   systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus, traveledUpdate,
-  traveledCoords, bannerText, isLandscape, areaListBox, LANDSCAPE_COLUMN,
+  traveledCoords, bannerText, exitLine, maneuverMarks, isLandscape, areaListBox, roadPillBox, LANDSCAPE_COLUMN,
 } from '../lib/nav-layout.js';
+import { roadLabel, keepRefsTogether } from '../lib/road-badge.js';
 import { describeNextArea, nextAreasChanged, areaRowsPlan, AREA_LIST } from '../lib/areas-route.js';
 import { avoidForReroute } from '../lib/zfe.js';
 import { tollText } from '../lib/route-options.js';
@@ -62,7 +64,7 @@ const TOAST_MS = 4000;
 /** Panneau du bas tiré de plus de 24 px : ouvert (vers le haut) ou fermé (vers le bas). */
 const DRAG_PX = 24;
 const INSET = 12;
-/** Écart entre le véhicule et le bas de la pastille de la rue (px). */
+/** Écart entre le véhicule et le bas du message bref (px) ; la pastille de la rue est sous le véhicule (v53). */
 const PILL_ABOVE_PX = 40;
 const RULE_KINDS = new Set(['tunnel', 'zfe', 'access', 'ban', 'border', 'wind']);
 
@@ -80,6 +82,7 @@ export function createNavigation(ctx) {
     icon: $('#nav-icon'),
     dist: $('#nav-dist'),
     instr: $('#nav-instr'),
+    exit: $('#nav-exit'),
     then: $('#nav-then'),
     alerts: $('#nav-alerts'),
     alert: $('#nav-alert'),
@@ -167,25 +170,41 @@ export function createNavigation(ctx) {
     fitText(node);
   }
 
+  /** Écusson d'une référence de route (couleurs réglementaires de src/lib/road-badge.js, jamais la palette). */
+  function badgeSpan(x) {
+    const span = document.createElement('span');
+    span.className = 'nav-badge';
+    span.textContent = x.ref;
+    span.style.setProperty('--badge-bg', x.bg);
+    span.style.setProperty('--badge-fg', x.fg);
+    span.style.setProperty('--badge-border', x.border);
+    return span;
+  }
+
   /** Bandeau : badges de route et nom de rue (ou consigne entière), jamais coupé au milieu d'un mot. */
   function setBanner(b) {
     const key = JSON.stringify([b.badges.map((x) => x.ref), b.text]);
     if (ui.instr.dataset.key !== key) {
       ui.instr.dataset.key = key;
-      const parts = b.badges.map((x) => {
-        const span = document.createElement('span');
-        span.className = 'nav-badge';
-        span.textContent = x.ref;
-        span.style.setProperty('--badge-bg', x.bg);
-        span.style.setProperty('--badge-fg', x.fg);
-        span.style.setProperty('--badge-border', x.border);
-        return span;
-      });
+      const parts = b.badges.map(badgeSpan);
       ui.instr.replaceChildren(...parts, document.createTextNode(b.text));
       ui.instr.classList.toggle('long', b.long);
       ui.instr.setAttribute('aria-label', b.full || b.text);
     }
     fitText(ui.instr, BANNER_MIN_SCALE);
+  }
+
+  /** Ligne de sortie (v53) : écusson + « Sortie 12 · Vallorbe », mise à jour seulement si elle change. */
+  function renderExit(line) {
+    const key = line ? JSON.stringify([line.badges.map((x) => x.ref), line.text]) : '';
+    if (ui.exit.dataset.key === key) return;
+    ui.exit.dataset.key = key;
+    if (!line) { ui.exit.hidden = true; ui.exit.replaceChildren(); return; }
+    const text = document.createElement('span');
+    text.className = 'nav-exit-text';
+    text.textContent = line.text;
+    ui.exit.replaceChildren(...line.badges.map(badgeSpan), text);
+    ui.exit.hidden = false;
   }
 
   function setInstruction(text) {
@@ -391,15 +410,23 @@ export function createNavigation(ctx) {
       ui.search.style.maxWidth = `${Math.max(0, Math.round(colLeft - 8 - (land ? columnRight + INSET : INSET)))}px`;
     }
 
-    // Véhicule (followPadding) et pastille de la rue juste au-dessus.
+    // Véhicule (followPadding) ; pastille de la rue juste en dessous (v53, roadPillBox), message bref au-dessus.
     const pad = cameraPadding();
     const vx = pad.left + (w - pad.left - pad.right) / 2;
     const vy = (pad.top + h - pad.bottom) / 2;
     const pillBottom = vy - PILL_ABOVE_PX;
-    ui.road.style.left = `${Math.round(vx)}px`;
-    ui.road.style.top = `${Math.round(pillBottom)}px`;
+    const sp = ui.speedo.getBoundingClientRect();
+    const pill = roadPillBox({
+      vx, vy, leftLimit: land ? columnRight : 0, colLeft,
+      sheetTop: land ? h - INSET : sheetTop,
+      speedo: sp.width ? { top: sp.top - r.top, bottom: sp.bottom - r.top, right: sp.right - r.left } : null,
+      buttonsTop: col.top,
+    });
+    ui.road.style.left = `${pill.left}px`;
+    ui.road.style.top = `${pill.top}px`;
+    ui.road.style.maxWidth = `${pill.maxWidth}px`;
+    s.roadFits = pill.fits;
     const room = Math.min(vx - (land ? columnRight : 0), colLeft - vx) - 16;
-    ui.road.style.maxWidth = `${Math.max(0, Math.round(2 * room))}px`;
 
     // Liste des aires (phase 2d) : portrait, au-dessus du compteur, 40 % de la hauteur au plus, jamais sur la pile du
     // bandeau ; paysage, dans la colonne de gauche entre le bandeau et le panneau du bas (src/lib/nav-layout.js).
@@ -425,18 +452,30 @@ export function createNavigation(ctx) {
       ui.toast.style.maxWidth = `${Math.round(listW)}px`;
     } else {
       ui.toast.style.left = `${Math.round(vx)}px`;
-      ui.toast.style.maxWidth = ui.road.style.maxWidth; // entre la colonne de gauche (paysage) et les boutons
+      ui.toast.style.maxWidth = `${Math.max(0, Math.round(2 * room))}px`; // entre la colonne de gauche (paysage) et les boutons
     }
     renderRoad();
   }
 
-  /** Pastille de la rue : seulement en suivi, détails fermés. */
+  /**
+   * Pastille de la rue : seulement en suivi, détails fermés. v53 : écusson du numéro de route à gauche (roadLabel,
+   * couleurs réglementaires de road-badge.js), puis le nom ; sans numéro, le nom seul.
+   */
   function renderRoad() {
     const name = s?.view?.roadName ?? '';
-    if (ui.road.textContent !== name) ui.road.textContent = name;
+    if (ui.road.dataset.key !== name) {
+      ui.road.dataset.key = name;
+      const label = roadLabel(name);
+      const street = keepRefsTogether(label.street);
+      const text = document.createElement('span');
+      text.className = 'nav-road-text';
+      text.textContent = street;
+      ui.road.replaceChildren(...label.badges.slice(0, 1).map(badgeSpan), ...(street ? [text] : []));
+      ui.road.setAttribute('aria-label', name);
+    }
     // Portrait, ou paysage avec la liste sur la carte : elle couvre le véhicule.
     const listOver = !!s?.areasOpen && (!root.classList.contains('land') || !!s.areasInMap);
-    ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || listOver || !ui.toast.hidden;
+    ui.road.hidden = !name || !s?.follow || s.detailsOpen || s.searchOpen || listOver || !ui.toast.hidden || s.roadFits === false;
   }
 
   // ───────── Rendu d'une position ─────────
@@ -446,17 +485,20 @@ export function createNavigation(ctx) {
       setIcon({ kind: 'goal' });
       ui.dist.textContent = '';
       setInstruction('Destination atteinte');
+      renderExit(null);
       renderThen(null);
       ui.stop.setAttribute('aria-label', 'Terminer le guidage');
     } else if (view.maneuver) {
       setIcon(view.maneuver.icon);
       setStat(ui.dist, formatNavDistance(view.maneuver.distance));
       setBanner(bannerText(view.maneuver));
+      renderExit(exitLine(view.maneuver, view.roadName));
       renderThen(view.then);
     } else {
       setIcon({ kind: 'arrow', angle: 0 });
       ui.dist.textContent = '';
       setInstruction('Suivez l\'itinéraire');
+      renderExit(null);
       renderThen(null);
     }
     setStat(ui.remaining, formatDistance(view.remainingDistance));
@@ -659,6 +701,7 @@ export function createNavigation(ctx) {
       if (e.type === 'speak') ctx.voice.speak(e.text, { interrupt: !!e.interrupt });
       else if (e.type === 'reroute') reroute(e.from);
       else if (e.type === 'arrived') {
+        ctx.onArrived?.(); // v53 : sauvegarde de l'itinéraire effacée
         clearTimeout(s.releaseTimer);
         s.releaseTimer = setTimeout(() => ctx.wakeLock.disable(), RELEASE_SCREEN_AFTER_ARRIVAL_MS);
       }
@@ -705,6 +748,7 @@ export function createNavigation(ctx) {
       s.doneAlong = null;
       ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
       ctx.map.showTraveled([]);
+      ctx.map.showTurns(maneuverMarks(s.state.route.line, s.state.route.maneuvers));
       // Simulation : le nouvel itinéraire part d'une fausse position, il ne remplace pas l'itinéraire réel.
       if (s.sim) s.sim.setRoute(route.coordinates);
       else ctx.onRouteChange?.(route);
@@ -860,15 +904,18 @@ export function createNavigation(ctx) {
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
     driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
+    resume = null,
   }) {
     if (s) stop();
     const now = Date.now();
+    const begun = startNavigation(route, {
+      destination: params.end, now, areas, announceAreas, rules,
+      driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
+    });
     s = {
       // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
-      state: startNavigation(route, {
-        destination: params.end, now, areas, announceAreas, rules,
-        driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
-      }),
+      // v53 : reprise d'un guidage sauvegardé (src/lib/route-save.js) à la progression gardée, GPS réel seulement.
+      state: resume && !simulate ? resumeNavigation(begun, resume) : begun,
       drivingSavedAt: now,
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0, areasShown: null,
       areasTimer: null, areaPicked: null, areasById: new Map(),
@@ -918,7 +965,8 @@ export function createNavigation(ctx) {
     renderVoice();
     ctx.map.setNavigating(true);
     ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
-    ctx.voice.speak(s.sim ? 'Simulation du trajet.' : 'Guidage démarré.', { interrupt: true });
+    ctx.map.showTurns(maneuverMarks(s.state.route.line, s.state.route.maneuvers));
+    ctx.voice.speak(s.sim ? 'Simulation du trajet.' : s.state.resumed ? 'Guidage repris.' : 'Guidage démarré.', { interrupt: true });
     ctx.wakeLock.enable();
     requestAnimationFrame(() => layoutGuidance());
 
@@ -971,7 +1019,8 @@ export function createNavigation(ctx) {
     if (s.view?.arrived) stop();
     else setConfirm(true);
   });
-  ui.quit.addEventListener('click', () => stop());
+  // v53 : quitter (✕ puis « Quitter ») efface la sauvegarde de l'itinéraire.
+  ui.quit.addEventListener('click', () => { ctx.onQuit?.(); stop(); });
   ui.keep.addEventListener('click', () => setConfirm(false));
   ui.reroute.addEventListener('click', () => {
     if (!s) return;
@@ -1072,6 +1121,10 @@ export function createNavigation(ctx) {
     stop,
     get active() {
       return !!s;
+    },
+    /** Progression le long du tracé (v53, sauvegarde de l'itinéraire), null hors guidage. */
+    get progress() {
+      return s ? { along: s.state.along, segIndex: s.state.segIndex, arrived: !!s.state.arrived } : null;
     },
     /** Message bref sur l'écran de guidage (v44 : choix d'itinéraire fermé en roulant), jamais dit à voix haute. */
     notify(text) {

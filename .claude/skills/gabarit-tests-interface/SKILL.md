@@ -111,7 +111,11 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   GPS émulé point par point : limite plafonnée par la règle générale (60, 90) → mention « règle » (`#nav-limit-src`,
   couleur `--muted`) sous le panneau ; limite écrite dans OSM (50) ou sans panneau → aucune mention ; couleurs du
   panneau inchangées, rien dit, aucun chevauchement.
-- `directions` (phase 11b) : itinéraire synthétique `ors-directions-sortie.json` (autoroute puis « Restez à droite »),
+- `reprise` (v53) : itinéraire en préparation gardé puis repris sans calcul ; guidage GPS, page cachée puis rechargée →
+  « Guidage repris. », progression gardée ; sauvegarde vieillie de 13 h : rien demandé à vitesse inconnue ou en
+  roulant, « Reprendre l'itinéraire ? » à l'arrêt, « Reprendre » relance ; ✕ + « Quitter » efface. 412×900 jour,
+  900×412 nuit. Boutons ronds de la colonne : ≥ 40 px (v53), panneau du bas ≥ 56 px.
+- `directions` (phase 11b ; v53 : ligne « Sortie 12 · Vallorbe » avec la copie 'fixture', jamais dite, cachée sinon) : itinéraire synthétique `ors-directions-sortie.json` (autoroute puis « Restez à droite »),
   copie `data/directions-osm/` construite par les fonctions de l'Action (`directionsCopy` : 'fixture', 'proche' = avec
   une bretelle au cap opposé, 'ambigu' = deux bretelles au même cap, null = 404). GPS émulé à 90 km/h depuis 1,1 km
   de la sortie : bandeau « Restez à droite, direction Metz, Nancy (A 31) » entier, dit à voix haute ; 'proche' :

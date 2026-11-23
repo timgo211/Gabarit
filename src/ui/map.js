@@ -22,11 +22,19 @@ import {
 } from '../lib/map-palette.js';
 import { vehicleElement } from './vehicle-icon.js';
 import { sanitizeVehicleIcon } from '../lib/prefs.js';
+import { ROUTE_ARROWS } from '../lib/nav-layout.js';
+import { CHEVRON_IMAGE, TURN_IMAGE, chevronImage, turnImage } from './route-arrows.js';
+
+const EMPTY_FC = Object.freeze({ type: 'FeatureCollection', features: [] });
 
 const FRANCE_CENTER = [2.35, 46.6];
 const ROUTE_LAYERS = [
-  'route-hit', 'route-done-line', 'route-done-casing', 'route-line', 'route-casing', 'route-alt-line', 'route-alt-casing',
+  'route-hit', 'route-done-line', 'route-done-casing', 'route-turns', 'route-chevrons', 'route-line', 'route-casing',
+  'route-alt-line', 'route-alt-casing',
 ];
+/** Flèches sur le tracé en guidage (v53) : pastilles des manœuvres (source à part), chevrons sur le tracé choisi. */
+const TURNS_SOURCE = 'route-turns';
+const ARROW_LAYERS = ['route-turns', 'route-chevrons'];
 /** Partie du tracé déjà parcourue (guidage, phase 2c) : source à part, grise, au-dessus du tracé. */
 const DONE_SOURCE = 'route-done';
 /** Changement de thème : voile posé avant setStyle, retiré au premier rendu complet (1,5 s au plus). */
@@ -122,6 +130,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let restoreTimer = null;
   /** Partie parcourue (guidage) : [[lon, lat]…], vide hors guidage. */
   let done = [];
+  /** Pastilles des manœuvres du guidage (v53). */
+  let turns = EMPTY_FC;
   /** Guidage : caméra nord en haut (boussole) au lieu du cap en haut. */
   let northUp = false;
   let veilTimer = null;
@@ -245,6 +255,25 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       id: 'route-line', type: 'line', source: 'route', filter: isSelected, layout,
       paint: { 'line-color': c['route-line'], 'line-width': w['route-line'] },
     });
+    // v53 : chevrons blancs dans le sens de la marche (cachés de loin) et pastilles des manœuvres, sous la partie
+    // parcourue (grise) ; seulement en guidage. Dessinés par MapLibre le long de la ligne : rien par position.
+    putArrowImages();
+    map.addSource(TURNS_SOURCE, { type: 'geojson', data: turns });
+    const shown = navigating ? 'visible' : 'none';
+    map.addLayer({
+      id: 'route-chevrons', type: 'symbol', source: 'route', filter: isSelected, minzoom: ROUTE_ARROWS.MIN_ZOOM,
+      layout: {
+        visibility: shown, 'symbol-placement': 'line', 'symbol-spacing': ROUTE_ARROWS.SPACING_PX, 'icon-image': CHEVRON_IMAGE,
+        'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+      },
+    });
+    map.addLayer({
+      id: 'route-turns', type: 'symbol', source: TURNS_SOURCE, minzoom: ROUTE_ARROWS.TURN_MIN_ZOOM,
+      layout: {
+        visibility: shown, 'icon-image': TURN_IMAGE, 'icon-rotate': ['get', 'bearing'], 'icon-rotation-alignment': 'map',
+        'icon-pitch-alignment': 'map', 'icon-allow-overlap': true, 'icon-ignore-placement': true,
+      },
+    });
     map.addLayer({
       id: 'route-done-casing', type: 'line', source: DONE_SOURCE, layout,
       paint: { 'line-color': c['route-done-casing'], 'line-width': w['route-done-casing'] },
@@ -273,6 +302,23 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     for (const id of ROUTE_LAYERS) if (map.getLayer(id)) map.removeLayer(id);
     if (map.getSource('route')) map.removeSource('route');
     if (map.getSource(DONE_SOURCE)) map.removeSource(DONE_SOURCE);
+    if (map.getSource(TURNS_SOURCE)) map.removeSource(TURNS_SOURCE);
+  }
+
+  /** Images des flèches (v53), ajoutées une fois par style. */
+  function putArrowImages() {
+    if (!map) return;
+    for (const [id, draw] of [[CHEVRON_IMAGE, chevronImage], [TURN_IMAGE, turnImage]]) {
+      if (map.hasImage(id)) continue;
+      const img = draw();
+      try { if (img) map.addImage(id, img, { pixelRatio: 2 }); } catch { /* image refusée : pas de flèche */ }
+    }
+  }
+
+  /** Flèches visibles seulement en guidage. */
+  function applyArrowVisibility() {
+    if (!map) return;
+    for (const id of ARROW_LAYERS) if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', navigating ? 'visible' : 'none');
   }
 
   /** Toucher un tracé (à l'arrêt, plusieurs itinéraires) le sélectionne. */
@@ -459,7 +505,10 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     map.on('style.load', addZfeLayers);
     map.on('style.load', applyGuidanceStyle);
     // Style changé (thème) : l'image de la bulle n'existe plus, elle est redessinée à la demande.
-    map.on('styleimagemissing', (e) => { if (e.id === STREET_BUBBLE.image) putBubble(); });
+    map.on('styleimagemissing', (e) => {
+      if (e.id === STREET_BUBBLE.image) putBubble();
+      if (e.id === CHEVRON_IMAGE || e.id === TURN_IMAGE) putArrowImages();
+    });
     map.on('moveend', applyLayer);
     map.on('webglcontextlost', () => {
       lost = true;
@@ -794,6 +843,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     showRoute(coordinates, bbox, opts = {}) {
       showRoutes([{ coordinates, bbox }], 0, opts);
     },
+    /** Pastilles des manœuvres du guidage (v53, maneuverMarks) : une fois par itinéraire. */
+    showTurns(fc) {
+      turns = fc?.type === 'FeatureCollection' ? fc : EMPTY_FC;
+      map?.getSource(TURNS_SOURCE)?.setData(turns);
+    },
     /** Change l'itinéraire mis en avant, sans bouger la carte. */
     selectRoute(index) {
       if (!Number.isInteger(index) || index < 0 || index >= routes.length) return;
@@ -893,6 +947,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       map.resize();
       done = [];
       map.getSource(DONE_SOURCE)?.setData(doneData());
+      if (!on) { turns = EMPTY_FC; map.getSource(TURNS_SOURCE)?.setData(turns); }
+      applyArrowVisibility();
       if (styleReady()) applyGuidanceStyle();
       if (!on) {
         northUp = false;
