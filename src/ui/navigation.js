@@ -512,13 +512,14 @@ export function createNavigation(ctx) {
     setStat(ui.remaining, formatDistance(view.remainingDistance));
     setStat(ui.time, formatDuration(view.remainingDuration));
     setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
-    const sp = speedStatus(view.speedKmh, view.speedLimit ?? null, view.speedLimitSource ?? null);
+    const sp = speedStatus(view.speedKmh, view.speedLimit ?? null, view.speedLimitSource ?? null, view.speedLimitAmbiguous === true);
     if (ui.speed.textContent !== sp.value) ui.speed.textContent = sp.value;
     ui.limit.hidden = sp.limit === null;
     // v51 : limite d'une règle générale (pas écrite dans OSM) : mention « règle » sous le panneau, couleur neutre.
     ui.limitSrc.hidden = !sp.rule;
     if (sp.limit !== null && ui.limit.textContent !== String(sp.limit)) ui.limit.textContent = String(sp.limit);
     ui.speedo.classList.toggle('over', sp.over);
+    ui.speedo.classList.toggle('over-rule', sp.overRule); // v57 : règle ambiguë, jamais rouge
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
 
     // « Autres itinéraires » : seulement à l'arrêt (sous 5 km/h pendant 3 s).
@@ -976,7 +977,7 @@ export function createNavigation(ctx) {
     ui.more.hidden = true;
     ui.limit.hidden = true;
     ui.limitSrc.hidden = true;
-    ui.speedo.classList.remove('over');
+    ui.speedo.classList.remove('over', 'over-rule');
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';
     setInstruction(s.sim ? 'Simulation…' : 'Recherche du signal GPS…');

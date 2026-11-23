@@ -4205,6 +4205,64 @@ async function historyCheck(browser, base) {
   }
 }
 
+/**
+ * v57 : limite d'une règle générale. Semi de 44 t sur l'itinéraire de Colombier (copie data/vitesses-osm/ de test),
+ * GPS émulé à 108 km/h : limite de règle hors autoroute (ambiguë, 60) dépassée → compteur jamais rouge, bord pointillé
+ * neutre, mention « règle » ; règle d'autoroute (90) ou étiquette OSM dépassée → rouge comme avant ; panneau B14
+ * toujours dans ses couleurs ; rien dit. 412×900 jour, 1280×800 nuit, 900×412 nuit.
+ */
+async function ruleLimitsCheck(browser, base) {
+  const col = fixture('ors-directions-colombier.json');
+  const line = col.features[0].geometry.coordinates;
+  const semi44 = { id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90 };
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night'], [900, 412, 'night']]) {
+    const tag = `limites ${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, vehicle: semi44, directions: () => col, overpass: () => ({ elements: [] }), speedsCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(800);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    const seen = [];
+    let shot = false;
+    for (const c of line) {
+      await setGeo(page, { lon: c[0], lat: c[1], accuracy: 5, speed: 30, heading: 90 });
+      await page.waitForTimeout(800);
+      const st = await page.evaluate(() => {
+        const sp = document.querySelector('#nav-speedo');
+        const pill = getComputedStyle(document.querySelector('.nav-speed-pill'));
+        const lim = document.querySelector('#nav-limit');
+        const cs = getComputedStyle(lim);
+        return {
+          limit: lim.hidden ? null : Number(lim.textContent), speed: Number(document.querySelector('#nav-speed').textContent),
+          rule: !document.querySelector('#nav-limit-src').hidden, over: sp.classList.contains('over'), soft: sp.classList.contains('over-rule'),
+          border: `${pill.borderTopStyle} ${pill.borderTopColor}`, num: getComputedStyle(document.querySelector('#nav-speed')).color,
+          danger: getComputedStyle(document.documentElement).getPropertyValue('--danger').trim(),
+          colors: [cs.backgroundColor, cs.borderTopColor, cs.color].join(),
+        };
+      });
+      seen.push(st);
+      if (st.soft && !shot) { shot = true; await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-limite-regle.png`) }); }
+    }
+    const soft = seen.filter((x) => x.soft);
+    check(soft.length > 0, `${tag} : règle hors autoroute dépassée vue sur le trajet`, JSON.stringify(seen.map((x) => `${x.limit}${x.rule ? 'R' : ''}${x.over ? '!' : x.soft ? '~' : ''}`)));
+    check(soft.every((x) => x.rule && !x.over && /dashed/.test(x.border)), `${tag} : règle ambiguë → jamais rouge, bord pointillé, mention « règle »`, JSON.stringify(soft[0] ?? null));
+    const toRgb = (hex) => { const h = hex.replace('#', ''); return `rgb(${parseInt(h.slice(0, 2), 16)}, ${parseInt(h.slice(2, 4), 16)}, ${parseInt(h.slice(4, 6), 16)})`; };
+    check(soft.every((x) => x.num !== toRgb(x.danger) && !x.border.includes(toRgb(x.danger))), `${tag} : aucune couleur d'alerte pour la règle ambiguë`, JSON.stringify(soft[0] ?? null));
+    const hard = seen.filter((x) => x.limit !== null && x.speed > x.limit && !x.soft);
+    check(hard.length > 0 && hard.every((x) => x.over), `${tag} : étiquette OSM ou règle d'autoroute dépassée → rouge comme avant`, JSON.stringify(hard.map((x) => `${x.limit}${x.rule ? 'R' : ''}`)));
+    check(seen.filter((x) => x.limit !== null).every((x) => x.colors === 'rgb(255, 255, 255),rgb(200, 16, 46),rgb(0, 0, 0)'), `${tag} : panneau dans ses couleurs réglementaires`);
+    const spoken = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /Limite|règle/i.test(t));
+    check(spoken.length === 0, `${tag} : rien dit`, spoken.join(' | '));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${tag} : rien ne se chevauche`, foot.out.join(' ; '));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function fuelCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
   const line = nav.features[0].geometry.coordinates;
@@ -4342,7 +4400,7 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck };
+    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

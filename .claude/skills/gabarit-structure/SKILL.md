@@ -112,6 +112,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     `stopsDone`, `tripSoFar`, `carry` de « Autres itinéraires ») ; export `exportData(data, now, history)` /
     `readExport` (`store.js`) ; `area-notes.js` (notes d'aires, `areaNotes`) ; tests `tests/trip-history.test.js` ;
     ui-check `historique`
+  - v57 : `ambiguous` de `wayLimit` / `speedLimitsAlongRoute` / `limitAt` (`speed-limit.js`), `overRule` de
+    `speedStatus` (`nav-layout.js`) ; tests `tests/speed-ambiguous.test.js` ; ui-check `limites`
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

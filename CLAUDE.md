@@ -70,6 +70,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   (`speed-rules.js`), sinon inconnue (aucun panneau, rien d'inventé ; agglomération jamais déduite). Calculée une fois
   par itinéraire. Alerte visuelle ; « Limite X » dit seulement si `settings.speedVoice` (non par défaut) et étiquette OSM.
 - Limite d'une règle générale (v51) : mention « règle » neutre sous le panneau, couleurs du panneau inchangées.
+  v57 : règle hors autoroute (ambiguë : 80 des nationales, 60 articulé) dépassée → compteur jamais rouge (bord pointillé
+  neutre, `overRule`) ; règle d'autoroute (90, 80 ADR > 12 t) ou étiquette OSM → rouge comme avant. Visuel, jamais dit.
 - Directions (11b, `directions.js`, copie `data/directions-osm/` mêmes Action et cases, jamais précachée) : « direction X »
   seulement si UNE bretelle à 60 m du point de manœuvre au cap cohérent ; dit seulement sans autre bretelle à 60 m ;
   sinon consigne inchangée (jamais devinée). `maneuverText(m, { spoken })` : affiché ≠ dit.

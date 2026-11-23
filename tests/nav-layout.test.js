@@ -123,8 +123,8 @@ test('pastille de la rue (v53) : sous le véhicule, centrée, bornée par le com
 });
 
 test('vitesse : panneau seulement si la limite est connue, dépassement', () => {
-  assert.deepEqual(speedStatus(87.4), { value: '87', limit: null, over: false, rule: false });
-  assert.deepEqual(speedStatus(95, 90), { value: '95', limit: 90, over: true, rule: false });
+  assert.deepEqual(speedStatus(87.4), { value: '87', limit: null, over: false, overRule: false, rule: false });
+  assert.deepEqual(speedStatus(95, 90), { value: '95', limit: 90, over: true, overRule: false, rule: false });
   // v51 : limite d'une règle générale → mention « règle » ; limite OSM ou inconnue → rien.
   assert.equal(speedStatus(70, 80, 'rule').rule, true);
   assert.equal(speedStatus(70, 80, 'osm').rule, false);
