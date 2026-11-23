@@ -130,7 +130,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null,
+  bridgesCopy = null, settings = null, restrictions = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -167,7 +167,7 @@ async function open(browser, base, {
       }
     });
   }
-  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on, nightLevel: nl, extra }) => {
+  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on, nightLevel: nl, extra, restr }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
     localStorage.setItem('gabarit.orsKey', 'cle-factice-de-test');
@@ -175,8 +175,9 @@ async function open(browser, base, {
       version: 1, vehicles: [v ?? { id: 'v1', name: 'Semi-remorque frigorifique 44 t', height: 4, width: 2.55, length: 16.5,
         weight: 44, axleload: 11.5, maxSpeed: 90 }],
       activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: on, ...(nl ? { nightMapLevel: nl } : {}), ...(extra ?? {}) },
+      ...(restr ? { restrictions: restr } : {}),
     }));
-  }, { theme, layer, vehicle, voice, nightLevel, extra: settings });
+  }, { theme, layer, vehicle, voice, nightLevel, extra: settings, restr: restrictions });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async (route) => {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
@@ -2189,7 +2190,10 @@ async function bridgesCheck(browser, base) {
     // Repère touché : texte en message, jamais dit.
     await page.locator('.bridge-marker.high').first().click({ force: true });
     await page.waitForTimeout(300);
-    check(/à vérifier\. La signalisation fait foi\./.test(await page.textContent('#message')), `${tag} : repère touché → texte du pont`);
+    // Phase 12b : le repère ouvre le panneau du pont (texte, aide, « Éviter ce passage »).
+    check(await page.isVisible('#bridge-panel') && /à vérifier\. La signalisation fait foi\./.test(await page.textContent('#bridge-panel-text')),
+      `${tag} : repère touché → texte du pont`);
+    await page.click('#btn-bridge-close');
     await noHorizontalScroll(page, `${tag} ponts`);
     const notesNode = page.locator('.rules-notes').first();
     await notesNode.scrollIntoViewIfNeeded();
@@ -2222,6 +2226,94 @@ async function bridgesCheck(browser, base) {
   await none.page.waitForTimeout(800);
   check(/Ponts sans hauteur : données non chargées/.test(await none.page.textContent('#route-notes')), 'copie absente → « données non chargées »');
   await none.ctx.close();
+}
+
+/**
+ * Phase 12b : Mes restrictions. « Éviter ce passage » depuis le repère du viaduc de Colombier (point de croisement),
+ * liste dans Réglages, recalcul avec avoid_polygons et « Évite 1 restriction saisie par toi », échec 2009 avec la
+ * phrase au conditionnel, rien en guidage, boutons refusés en roulant ; jour / nuit, portrait / paysage.
+ */
+async function restrictionsCheck(browser, base) {
+  const col = fixture('ors-directions-colombier.json');
+  const line = col.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const bodies = [];
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, overpass: () => ({ elements: [] }), bridgesCopy: 'fixture',
+      directions: (b) => { bodies.push(b); return col; },
+    });
+    // Départ et arrivée saisis en coordonnées autour du viaduc (zone du trajet), sans géocodage.
+    const coordsRoute = async () => {
+      for (const [field, p] of [['from', line[0]], ['to', line.at(-1)]]) {
+        await page.fill(`#${field}-input`, `${p[1]}, ${p[0]}`);
+        await page.waitForSelector(`#${field}-list li`);
+        await page.dispatchEvent(`#${field}-list li`, 'pointerdown');
+      }
+      await page.click('#btn-route');
+      await page.waitForSelector('.route-card', { timeout: 10000 });
+      await page.waitForTimeout(1200);
+    };
+    await coordsRoute();
+    check(bodies.every((b) => !b.options?.avoid_polygons), `${tag} : sans restriction, aucun avoid_polygons`);
+    await page.locator('.bridge-marker.high').first().click({ force: true });
+    await page.waitForSelector('#bridge-panel:not([hidden])', { timeout: 5000 });
+    check(/bloque aussi la route du dessus/.test(await page.textContent('#bridge-panel-help')), `${tag} : aide « Éviter ce passage » (pont routier)`);
+    await page.click('#btn-bridge-avoid');
+    await page.waitForTimeout(200);
+    check(/évité au prochain calcul/.test(await page.textContent('#bridge-panel-status')), `${tag} : passage enregistré`);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).restrictions);
+    check(stored.length === 1 && stored[0].type === 'avoid' && stored[0].origin === 'osm-bridge', `${tag} : restriction enregistrée (origine pont OSM)`, JSON.stringify(stored));
+    await noHorizontalScroll(page, `${tag} panneau du pont`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-pont-eviter.png`) });
+    // Nouveau calcul : polygone autour du point de croisement, ligne « Évite 1 restriction saisie par toi ».
+    bodies.length = 0;
+    await page.click('#btn-route');
+    await page.waitForTimeout(1500);
+    const poly = bodies[0]?.options?.avoid_polygons;
+    const ring = poly?.coordinates?.[0]?.[0] ?? [];
+    const cx = ring.slice(0, -1).reduce((a, p) => a + p[0], 0) / Math.max(1, ring.length - 1);
+    const cy = ring.slice(0, -1).reduce((a, p) => a + p[1], 0) / Math.max(1, ring.length - 1);
+    check(poly?.type === 'MultiPolygon' && bodies.every((b) => b.options?.avoid_polygons) && Math.abs(cx - line[0][0]) < 0.0001,
+      `${tag} : recalcul avec avoid_polygons au point de croisement`, `${cx.toFixed(5)}, ${cy.toFixed(5)}`);
+    check((await page.textContent('#route-notes')).includes('Évite 1 restriction saisie par toi.'), `${tag} : « Évite 1 restriction saisie par toi »`);
+    // Réglages › Mes restrictions : liste.
+    await page.click('#btn-settings');
+    await page.waitForSelector('#restr-list li.restr-item', { timeout: 5000 });
+    check(/À éviter/.test(await page.textContent('#restr-list')) && /150 km/.test(await page.textContent('#restrictions-help')), `${tag} : liste et aide de Mes restrictions`);
+    check(!(await page.isDisabled('#btn-restr-add')), `${tag} : « Ajouter » actif à l'arrêt`);
+    await page.locator('#restrictions-card').scrollIntoViewIfNeeded();
+    await noHorizontalScroll(page, `${tag} Mes restrictions`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-mes-restrictions.png`) });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    if (theme === 'day') {
+      // Guidage en roulant : rien sur les restrictions, ajout refusé.
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      check(await page.isHidden('#bridge-panel'), `${tag} : panneau du pont fermé en guidage`);
+      await setGeo(page, { lon: line[3][0], lat: line[3][1], accuracy: 5, speed: 14 });
+      await page.waitForTimeout(800);
+      await page.evaluate(() => document.querySelector('#btn-restr-add').click());
+      const after = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).restrictions.length);
+      check(after === 1 && /arrêt seulement/.test(await page.textContent('#restr-status')), `${tag} : ajout refusé en roulant`);
+      check(!/restriction/i.test(await page.textContent('#nav')), `${tag} : rien sur les restrictions dans le guidage`);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((t) => /restriction|pont/i.test(t)), `${tag} : rien à voix haute`, spoken.join(' | '));
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // 2009 avec une restriction dans la zone : phrase au conditionnel.
+  const r = [{ id: 'r1', lat: 45.7618, lon: 4.84, type: 'avoid', date: '2026-11-22', origin: 'manual' }];
+  const err = { __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 (4.8357000 45.7640000) and 2 (4.8467000 45.7597000).' } };
+  const f = await open(browser, base, { width: 412, height: 900, directions: () => err, restrictions: r });
+  await computeRoute(f.page).catch(() => {});
+  await f.page.waitForSelector('#message:not([hidden])', { timeout: 10000 }).catch(() => {});
+  const msg = await f.page.textContent('#message');
+  check(/Une restriction saisie bloque peut-être le seul passage\./.test(msg), 'échec 2009 avec restriction : phrase au conditionnel', msg);
+  await f.ctx.close();
 }
 
 /** Éléments visibles du bandeau du haut qui passent sous la barre du bas (ou sortent du bandeau borné). */
@@ -3089,7 +3181,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck };
+    ponts: bridgesCheck, restrictions: restrictionsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

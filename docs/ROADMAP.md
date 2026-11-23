@@ -447,6 +447,25 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   moyenne (nationale), autoroute comptée seulement ; jamais dit ni affiché en guidage. Réglage « Signaler les ponts
   sans hauteur connue » (activé). Ligne technique « Ponts sans hauteur : N (haute x, moyenne y, autoroutes ignorées z) ».
 
+- [x] **Phase 12b — Mes restrictions** (v41)
+  Passages saisis par le chauffeur (hauteur en m, poids en t, à éviter ; note, date, origine saisie ou pont OSM),
+  gardés sur l'appareil et dans l'export JSON (vérifiés à l'import : doublons, valeurs absurdes). Ajout à l'arrêt
+  seulement : depuis un repère de pont de la 12a (« Éviter ce passage », au point où le tracé passe dessous) ou depuis
+  Réglages › Mes restrictions (« Ajouter au centre de la carte ») ; liste, modification, suppression. À chaque calcul,
+  chaque restriction qui concerne le profil (hauteur + 0,1 m ≥ valeur, PTAC > valeur, « éviter ») et proche du trajet
+  devient un polygone de 30 m évité (avec les ZFE) ; au-delà de 150 km à vol d'oiseau (limite d'ORS), rien n'est envoyé
+  et la fiche le dit, « à vérifier ». Fiche : « Évite N restrictions saisies par toi » ; échec : « Une restriction saisie
+  bloque peut-être le seul passage. » Rien dans le guidage ni dans la voix.
+
+- [ ] **Phase 12 TomTom / HERE : abandonnée (conditions d'usage)** — TomTom §11.6.10 et HERE Platform Terms art. 3.c
+  interdisent de comparer leur service à ORS et de guider avec leur tracé. Ticket TomTom CS0017293 ouvert pour un accord
+  écrit ; sans réponse positive, rien n'est branché (branche claude/kind-newton-a6agfs laissée telle quelle).
+- [ ] **Mapillary (panneaux)** : à étudier après lecture des conditions.
+- [ ] **Contribuer à OSM** : maxheight sur le pont de Colombier (chemin 243477938) et maxweight de la Rue du Viaduc
+  (chemin 190520091), relevés sur place.
+- [ ] **Données départementales (transport.data.gouv.fr)** : limites de hauteur et de poids publiées par les
+  départements, à recenser.
+
 ## Ensuite
 
 - [ ] **Phase 7d — Satellite hors de France**

@@ -762,6 +762,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
      * Ponts sans hauteur connue (phase 12a) : [{ key, lonlat, level, label }] ; repères à l'arrêt seulement (retirés
      * pendant le guidage, R412-6-2).
      */
+    /** Centre de la carte [lon, lat] (phase 12b : « Ajouter au centre de la carte »), null sans carte. */
+    center() {
+      const c = map?.getCenter();
+      return c ? [c.lng, c.lat] : null;
+    },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
       drawBridges();

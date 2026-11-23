@@ -72,3 +72,8 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   passage maxheight ignoré, résumé et part A/N sur la fiche, 2 repères `.bridge-marker`, ligne technique du diagnostic,
   repère touché → message. Guidage (412×900) : aucun repère, rien sur les ponts à l'écran ni à voix haute. Réglage
   `bridgeWarnings: false` (option `settings` d'`open`) → rien ; copie absente → « données non chargées ».
+- `restrictions` (phase 12b) : départ et arrivée saisis en coordonnées autour du viaduc synthétique ; « Éviter ce
+  passage » → restriction d'origine pont OSM, recalcul avec `avoid_polygons` centré sur le croisement, « Évite 1
+  restriction saisie par toi », liste et aide dans Réglages (412×900 jour, 900×412 nuit) ; guidage : panneau fermé,
+  ajout refusé en roulant, rien à l'écran ni à voix haute ; 2009 avec une restriction (option `restrictions` d'`open`)
+  → « Une restriction saisie bloque peut-être le seul passage. »

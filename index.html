@@ -167,6 +167,15 @@
       </form>
 
       <div id="message" class="message" role="alert" hidden></div>
+      <div id="bridge-panel" class="bridge-panel" hidden>
+        <p id="bridge-panel-text"></p>
+        <p id="bridge-panel-help" class="hint"></p>
+        <div class="row">
+          <button type="button" id="btn-bridge-avoid" class="btn btn-primary">Éviter ce passage</button>
+          <button type="button" id="btn-bridge-close" class="btn">Fermer</button>
+        </div>
+        <p id="bridge-panel-status" class="status" role="status"></p>
+      </div>
       <div id="summary" class="summary" aria-live="polite" hidden></div>
       <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
       <div id="route-notes" class="route-notes" hidden></div>
@@ -305,6 +314,26 @@
         <h3>Ponts</h3>
         <label class="toggle"><input type="checkbox" id="bridge-warnings"> Signaler les ponts sans hauteur connue</label>
         <p class="hint">Ponts d'OpenStreetMap au-dessus du trajet sans hauteur renseignée : listés sur la fiche et repérés sur la carte avant le départ, jamais pendant le guidage ni à voix haute. À vérifier : la signalisation fait foi.</p>
+      </section>
+
+      <section class="card" id="restrictions-card">
+        <h3>Mes restrictions</h3>
+        <p class="hint" id="restrictions-help"></p>
+        <label for="restr-type" class="field-label">Type</label>
+        <select id="restr-type">
+          <option value="height">Hauteur limitée (m)</option>
+          <option value="weight">Poids limité (t)</option>
+          <option value="avoid">Passage à éviter</option>
+        </select>
+        <label for="restr-value" class="field-label">Valeur</label>
+        <input id="restr-value" type="text" inputmode="decimal" autocomplete="off" placeholder="ex. 3,8">
+        <label for="restr-note" class="field-label">Note (facultative)</label>
+        <input id="restr-note" type="text" maxlength="120" autocomplete="off" placeholder="ex. pont SNCF">
+        <div class="row">
+          <button type="button" id="btn-restr-add" class="btn btn-primary">Ajouter au centre de la carte</button>
+        </div>
+        <p id="restr-status" class="status" role="status"></p>
+        <ul id="restr-list" class="restr-list" aria-label="Restrictions enregistrées"></ul>
       </section>
 
       <section class="card">

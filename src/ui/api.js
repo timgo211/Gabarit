@@ -5,7 +5,7 @@ import {
 } from '../lib/ors-request.js';
 import { parseDirections, NoRouteError } from '../lib/ors-response.js';
 import { classifyError, ERROR_KINDS, messageFor } from '../lib/ors-errors.js';
-import { computeRouteOptions } from '../lib/route-options.js';
+import { computeRouteOptions, withBlockedHint } from '../lib/route-options.js';
 
 /** Erreur portant un message déjà traduit pour l'utilisateur. */
 export class ApiError extends Error {
@@ -82,14 +82,15 @@ export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoi
  * Itinéraires proposés au calcul (Recommandé + alternatives ou variantes, 3 requêtes au plus) : voir route-options.js.
  * @returns {{ options:object[], failures:object[], requests:number }}
  */
-export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries }) {
+export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons = null }) {
   requireKey(apiKey);
   try {
     return await computeRouteOptions({
-      start, end, vehicle, avoidTolls, avoidFerries, send: (req) => postDirections(apiKey, req),
+      start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons, send: (req) => postDirections(apiKey, req),
     });
   } catch (err) {
-    if (err instanceof NoRouteError) throw noRouteError();
+    // Phase 12b : restrictions saisies évitées → « Une restriction saisie bloque peut-être le seul passage. »
+    if (err instanceof NoRouteError) throw withBlockedHint(noRouteError(), avoidPolygons);
     throw err;
   }
 }
