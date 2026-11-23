@@ -492,13 +492,15 @@ const km = (m) => `km ${Math.round(m / 1000)}`;
 
 /**
  * Phase 2g : ZFE dont l'inclusion des autoroutes n'a pas pu être tranchée à la source officielle.
- * Grand Nancy (245400676-ZFE-001) : la BNZFE du 26/03/2026 (data.gouv.fr, voies.geojson) ne contient aucun tronçon
- * d'exception pour cette ZFE ; l'arrêté de la Métropole (grandnancy.eu, lien `url` de la zone) n'a pas pu être lu le
- * 22/11/2026 (site injoignable depuis l'outil de développement). Passage sur autoroute dans la zone : interdiction
- * gardée par prudence, mention « à vérifier » ajoutée. Lever cette mention seulement d'après l'arrêté.
+ * Grand Nancy (245400676-ZFE-001) : BNZFE du 26/03/2026 (static.data.gouv.fr, voies.geojson, lue le 23/11/2026) :
+ * 1 167 tronçons publiés par la Métropole, tous « pl_critair V5, 24/7, du 01/01/2025 au 31/12/2034 » comme l'aire,
+ * aucun tronçon d'exception (Crit'Air vide) ; les tronçons n'ont pas de nom de route, l'A31 n'y est donc ni reconnue
+ * ni exclue. L'arrêté de la Métropole (grandnancy.eu, lien `url` de la zone) n'a pas pu être lu (site injoignable
+ * depuis l'outil de développement). Passage sur autoroute dans la zone : interdiction gardée par prudence, mention
+ * « à vérifier » ajoutée. Lever cette mention seulement d'après l'arrêté.
  */
 export const ZFE_MOTORWAY_TO_CHECK = Object.freeze({
-  '245400676-ZFE-001': 'BNZFE du 26/03/2026 sans exception ; arrêté non lu le 22/11/2026',
+  '245400676-ZFE-001': 'BNZFE du 26/03/2026 : 1 167 tronçons V5 sans exception (lue le 23/11/2026) ; arrêté non lu',
 });
 
 /** Ligne de la fiche d'itinéraire pour un passage interdit. */
