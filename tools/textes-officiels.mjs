@@ -9,7 +9,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 
-const UA = 'Mozilla/5.0 (X11; Linux x86_64) Gabarit (lecture de textes officiels)';
+const UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36';
 const MAX_DOCS = 12;        // documents lus au plus par entrée (liens suivis compris)
 const MAX_EXTRACTS = 8;     // extraits imprimés au plus par mot-clé et par document
 const SPAN = 1200;          // caractères autour d'un mot-clé
@@ -55,14 +55,21 @@ function pdfText(file, langs) {
   return { method: 'ocr', text };
 }
 
+// curl (certificats du système, IPv4 d'abord, en-têtes de navigateur) : plusieurs sites refusent le client de Node
+// (certificat intermédiaire manquant, IPv6 sans réponse, page « navigateur obsolète »).
 async function fetchDoc(url) {
+  const out = `${WORK}/body`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': UA, 'Accept-Language': 'fr,de,it,en' }, redirect: 'follow',
-      signal: AbortSignal.timeout(60_000) });
-    const buf = Buffer.from(await res.arrayBuffer());
-    return { status: res.status, type: res.headers.get('content-type') || '', buf, finalUrl: res.url };
+    const meta = execFileSync('curl', [
+      '-sS', '-L', '-4', '--compressed', '--max-time', '90', '--retry', '2', '-A', UA,
+      '-H', 'Accept: text/html,application/xhtml+xml,application/pdf,*/*;q=0.8', '-H', 'Accept-Language: fr,de;q=0.9,it;q=0.8,en;q=0.7',
+      '-o', out, '-w', '%{http_code} %{content_type} %{url_effective}', url,
+    ], { maxBuffer: 1 << 20 }).toString().trim().split(' ');
+    const [code, type = '', finalUrl = url] = meta;
+    const { readFileSync } = await import('node:fs');
+    return { status: Number(code), type, buf: readFileSync(out), finalUrl };
   } catch (err) {
-    return { status: 0, error: String(err?.cause?.code || err?.message || err) };
+    return { status: 0, error: String(err?.stderr || err?.message || err).trim().slice(0, 200) };
   }
 }
 
