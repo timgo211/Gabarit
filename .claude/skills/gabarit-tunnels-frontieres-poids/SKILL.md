@@ -82,3 +82,6 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   vérifiées → vides. Autres pays : `speeds.bands` des fiches (`isConfirmed`, source nationale) ; voie rapide = la plus
   basse des valeurs autoroute / route ; valeur « agglomération » jamais utilisée ; ADR : `delta` vérifié seulement
   (ES), sinon aucune règle. Remorque non précisée : tranche la plus basse.
+  France vérifiée le 23/11/2026 (R413-8, R413-9, PDF codes.droit.org lu par l'Action) : autoroute 90 ; voie rapide et
+  route 80, 60 au-delà de 12 t avec remorque ou articulé (remorque non précisée → 60) ; jamais le 90 des routes à
+  chaussées séparées (non reconnaissable dans OSM) ; matières dangereuses au-delà de 12 t : 80 / 60.

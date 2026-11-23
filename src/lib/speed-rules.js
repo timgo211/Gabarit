@@ -30,14 +30,44 @@ export function roadKind(cls) {
 /**
  * Règles françaises pour les véhicules de PTAC > 3,5 t (hors transports en commun).
  * bands : { over, upTo (t, null = sans borne), trailer : 'any' | 'with' | 'none', motorway, express, road } ;
- * adr : { motorway, express, road } ou null.
- * Rempli d'après le Code de la route (art. R413-8) lu par l'Action « Données OSM » (case r413) ; voir le texte cité.
+ * adr : { over (t), motorway, express, road } ou null.
+ *
+ * Code de la route, texte lu le 23/11/2026 (Légifrance bloqué depuis le conteneur : PDF du code sur codes.droit.org,
+ * reproduction de Légifrance, écrit dans le journal de l'Action « Données OSM », case r413, run 45130964965) :
+ * Art. R413-8 (décret n° 2014-3 du 3 janvier 2014, art. 1) : « La vitesse des véhicules dont le poids total autorisé
+ * en charge est supérieur à 3,5 tonnes ou des ensembles de véhicules dont le poids total roulant autorisé est
+ * supérieur à 3,5 tonnes, à l'exception des véhicules de transport en commun, est limitée à :
+ * 1° 90 km/h sur les autoroutes ;
+ * 2° 80 km/h sur les routes à caractère prioritaire et signalées comme telles. Toutefois, cette vitesse maximale est
+ * relevée à 90 km/h pour les véhicules dont le poids total est inférieur ou égal à 12 tonnes sur les routes à deux
+ * chaussées séparées par un terre-plein central ;
+ * 3° 80 km/h sur les autres routes. Toutefois, cette vitesse maximale est abaissée à 60 km/h pour les véhicules
+ * articulés ou avec remorque dont le poids total est supérieur à 12 tonnes.
+ * 4° 50 km/h en agglomération. […] »
+ * Art. R413-9 (décret n° 2017-16 du 6 janvier 2017, art. 5) : « La vitesse des véhicules transportant des matières
+ * dangereuses, dont le poids total autorisé en charge ou le poids total roulant autorisé est supérieur à 12 tonnes
+ * […] est limitée à : 1° 80 km/ h sur les autoroutes ; 2° 60 km/ h sur les autres routes. Toutefois, cette vitesse
+ * maximale est relevée à 70 km/ h sur les routes à caractère prioritaire et signalées comme telles, pour les
+ * véhicules possédant des caractéristiques particulières définies par arrêté […] ; 3° 50 km/ h en agglomération. »
+ * (Art. R413-8-1, transport de personnes de 3,5 à 12 t : valeurs plus hautes, non retenues : le profil ne dit pas si
+ * le véhicule transporte des personnes, la plus basse s'applique.)
+ *
+ * Lecture prudente (aucune limite plus haute que la vraie) : OSM ne dit ni si une route est « à caractère prioritaire
+ * et signalée comme telle », ni si elle a deux chaussées séparées → voie rapide (trunk) et route : 80 km/h (jamais le
+ * 90 du 2°) ; au-delà de 12 t avec remorque ou articulé (semi-remorque) : 60 km/h (3°, une route prioritaire au sens
+ * du 2° n'est pas reconnaissable) ; remorque non précisée au-delà de 12 t : les deux tranches → la plus basse (60).
+ * Matières dangereuses au-delà de 12 t : 80 sur autoroute, 60 ailleurs (le 70 dépend d'un arrêté et du véhicule).
+ * Agglomération (4°) : jamais utilisée (voir plus haut).
  */
 export const FR_SPEED_RULES = Object.freeze({
-  verified: null,
-  source: null,
-  bands: Object.freeze([]),
-  adr: null,
+  verified: '2026-11-23',
+  source: 'Code de la route, art. R413-8 et R413-9',
+  bands: Object.freeze([
+    Object.freeze({ over: 3.5, upTo: 12, trailer: 'any', motorway: 90, express: 80, road: 80 }),
+    Object.freeze({ over: 12, upTo: null, trailer: 'none', motorway: 90, express: 80, road: 80 }),
+    Object.freeze({ over: 12, upTo: null, trailer: 'with', motorway: 90, express: 60, road: 60 }),
+  ]),
+  adr: Object.freeze({ over: 12, motorway: 80, express: 60, road: 60 }),
 });
 
 function frBands(vehicle, fr) {
@@ -62,10 +92,14 @@ export function generalLimit({ country, cls, vehicle, countries = null, fr = FR_
     const vals = bands.map((b) => b[kind]).filter(isNum);
     if (vals.length !== bands.length) return null;
     let kmh = Math.min(...vals);
+    // Matières dangereuses : règle propre au-delà de son seuil de poids (R413-9 : plus de 12 t) ; règle absente → aucune.
     if (hazmat) {
-      const a = fr.adr?.[kind];
-      if (!isNum(a)) return null;
-      kmh = Math.min(kmh, a);
+      if (!fr.adr) return null;
+      const a = fr.adr[kind];
+      if (vehicle.weight > (isNum(fr.adr.over) ? fr.adr.over : 0)) {
+        if (!isNum(a)) return null;
+        kmh = Math.min(kmh, a);
+      }
     }
     return { kmh, source: fr.source };
   }

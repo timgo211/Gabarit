@@ -216,3 +216,26 @@ test('guidage : limite du tronçon affichée, « Limite 50 » une fois au dépas
   }
   assert.deepEqual(said, [], 'limite avec conditions : jamais dite');
 });
+
+test('règles françaises vérifiées (R413-8, R413-9) : lecture prudente', () => {
+  assert.equal(FR_SPEED_RULES.verified, '2026-11-23');
+  const lim = (cls, vehicle) => generalLimit({ country: 'FR', cls, vehicle })?.kmh ?? null;
+  // Semi 44 t, remorque non précisée : autoroute 90, voie rapide et route 60 (la plus basse des tranches).
+  assert.equal(lim(0, { weight: 44, trailer: '' }), 90);
+  assert.equal(lim(1, { weight: 44, trailer: '' }), 60);
+  assert.equal(lim(2, { weight: 44, trailer: '' }), 60);
+  assert.equal(lim(2, { weight: 44, trailer: 'with' }), 60);
+  assert.equal(lim(2, { weight: 19, trailer: 'none' }), 80, 'porteur sans remorque');
+  assert.equal(lim(1, { weight: 7.5, trailer: '' }), 80, 'jamais le 90 des routes à chaussées séparées');
+  assert.equal(lim(0, { weight: 7.5 }), 90);
+  // Matières dangereuses au-delà de 12 t : 80 / 60 ; jusqu'à 12 t : règle générale.
+  assert.equal(lim(0, { weight: 44, hazmat: true }), 80);
+  assert.equal(lim(2, { weight: 19, trailer: 'none', hazmat: true }), 60);
+  assert.equal(lim(0, { weight: 10, hazmat: true }), 90);
+  assert.equal(lim(0, { weight: 3.5 }), null, '3,5 t : pas un PL');
+  // Un 130 d'autoroute devient 90 pour un PL ; un 50 de traversée reste 50 (étiquette OSM).
+  assert.deepEqual(wayLimit({ limit: 130, hgv: false, cond: false, cls: 0 }, 'FR', { weight: 44 }), { kmh: 90, source: 'rule', cond: false });
+  assert.deepEqual(wayLimit({ limit: 50, hgv: false, cond: false, cls: 3 }, 'FR', { weight: 44 }), { kmh: 50, source: 'osm', cond: false });
+  assert.equal(reducedThreshold('FR', 0), 90);
+  assert.equal(reducedThreshold('FR', 2), 80);
+});
