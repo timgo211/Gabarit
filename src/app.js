@@ -1,6 +1,6 @@
 // Point d'entrée : état, stockage, service worker, assemblage des écrans.
 
-import { $, showMessage } from './ui/dom.js';
+import { $, el, showMessage } from './ui/dom.js';
 import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.js';
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
@@ -666,6 +666,7 @@ function closeAlternatives(reason = '') {
   altChoice = null;
   const wasOpen = !altUi.panel.hidden;
   altUi.panel.hidden = true;
+  showAltsStopField(false); // v55 : champ retiré
   altUi.summary.hidden = true;
   altUi.notes.hidden = true;
   altUi.summary.replaceChildren();
@@ -692,6 +693,7 @@ async function openAlternatives(from, extraStop = null) {
   const my = ++altTicket;
   altChoice = null;
   altUi.panel.hidden = false;
+  showAltsStopField(true); // v55 : à l'arrêt seulement (vérifié ci-dessus)
   altUi.summary.hidden = true;
   altUi.notes.hidden = true;
   altUi.summary.replaceChildren(); // fiches d'un calcul précédent : jamais montrées après un échec
@@ -724,18 +726,29 @@ async function openAlternatives(from, extraStop = null) {
   }
 }
 $('#btn-alts-close').addEventListener('click', () => closeAlternatives());
-// v55 : « Ajouter une étape » dans « Autres itinéraires » (panneau ouvert à l'arrêt seulement, fermé en roulant).
-const altsStopInput = $('#alts-stop-input');
-attachAutocomplete(altsStopInput, $('#alts-stop-list'), {
-  getApiKey: () => store.getApiKey(), getFocus: () => navigation.progress ? altFrom : myPosition,
-  onError: (err) => { if (err) altUi.status.textContent = errorText(err); },
-  onPick: (place) => {
-    if (!place) return;
-    altsStopInput.value = '';
-    if (!navigation.parked) { closeAlternatives('moving'); return; }
-    if (altFrom) openAlternatives(altFrom, place);
-  },
-});
+// v55 : « Ajouter une étape » dans « Autres itinéraires » : champ créé à l'ouverture (à l'arrêt), retiré à la
+// fermeture (dès que le véhicule roule) ; aucun champ de saisie n'existe pendant le guidage en roulant (R412-6-2).
+const altsStopBox = $('#alts-stop');
+function showAltsStopField(on) {
+  altsStopBox.replaceChildren();
+  altsStopBox.hidden = !on;
+  if (!on) return;
+  const input = el('input', {
+    id: 'alts-stop-input', type: 'search', placeholder: 'Ville, adresse, entreprise…', enterkeyhint: 'search',
+    role: 'combobox', 'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': 'alts-stop-list',
+  });
+  const list = el('ul', { id: 'alts-stop-list', class: 'suggestions', role: 'listbox', hidden: true });
+  altsStopBox.append(el('label', { for: 'alts-stop-input', text: 'Ajouter une étape' }), el('div', { class: 'combo' }, [input]), list);
+  attachAutocomplete(input, list, {
+    getApiKey: () => store.getApiKey(), getFocus: () => altFrom ?? myPosition,
+    onError: (err) => { if (err) altUi.status.textContent = errorText(err); },
+    onPick: (place) => {
+      if (!place) return;
+      if (!navigation.parked) { closeAlternatives('moving'); return; }
+      if (altFrom) openAlternatives(altFrom, place);
+    },
+  });
+}
 altUi.go.addEventListener('click', () => {
   if (!altChoice || !navigation.active) return;
   if (!navigation.parked) { closeAlternatives('moving'); return; }

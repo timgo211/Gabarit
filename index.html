@@ -143,15 +143,9 @@
             <h2 id="nav-alts-title">Autres itinéraires</h2>
             <button type="button" id="btn-alts-close" class="btn">Fermer</button>
           </div>
-          <!-- v55 : étape ajoutée en route, à l'arrêt seulement (panneau fermé dès que le véhicule roule). -->
-          <div class="alts-stop">
-            <label for="alts-stop-input">Ajouter une étape</label>
-            <div class="combo">
-              <input id="alts-stop-input" type="search" placeholder="Ville, adresse, entreprise…" enterkeyhint="search"
-                     role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="alts-stop-list">
-            </div>
-            <ul id="alts-stop-list" class="suggestions" role="listbox" hidden></ul>
-          </div>
+          <!-- v55 : étape ajoutée en route, à l'arrêt seulement : champ créé à l'ouverture du panneau (à l'arrêt) et
+               retiré à sa fermeture (dès que le véhicule roule) ; jamais de champ de saisie en roulant. -->
+          <div id="alts-stop" class="alts-stop" hidden></div>
           <p id="nav-alts-status" class="status" role="status"></p>
           <div id="nav-alts-summary" class="summary" hidden></div>
           <button type="button" id="btn-alts-go" class="btn btn-primary nav-alts-go" hidden>Guider par cet itinéraire</button>
