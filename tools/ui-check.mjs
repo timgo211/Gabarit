@@ -935,6 +935,28 @@ async function repriseCheck(browser, base) {
     check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
   }
+  // IndexedDB refusé (navigation privée) ou plein (QuotaExceededError) : guidage normal, aucune erreur.
+  for (const mode of ['refusé', 'plein']) {
+    const tag = `IndexedDB ${mode}`;
+    const { page, ctx, errors } = await open(browser, base, { width: 412, height: 900, theme: 'day', voice: true, directions: () => nav });
+    await ctx.addInitScript((m) => {
+      if (m === 'refusé') indexedDB.open = () => { throw new DOMException('refusé', 'SecurityError'); };
+      else IDBObjectStore.prototype.put = () => { throw new DOMException('plein', 'QuotaExceededError'); };
+    }, mode);
+    await page.reload();
+    await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+    await computeRoute(page);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await drive(ctx, page, line, 50, 4);
+    await hide(page);
+    await page.waitForTimeout(500);
+    const instr = await page.textContent('#nav-instr');
+    check(await page.isVisible('#nav') && !!instr && !/Recherche du signal/.test(instr), `${tag} : guidage normal`, instr);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
 }
 
 async function contextLossCheck(browser, base) {

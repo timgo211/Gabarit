@@ -72,7 +72,7 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     fixture **synthétique** `osm-sorties.geojsonseq`
   - v53 : `route-save.js` (mémoire de l'itinéraire : `buildSave`, `checkSave`, `shouldSave`, `restoredChoice`,
     `withoutSecrets`), UI `src/ui/route-save.js` (IndexedDB), `resumeNavigation` de `navigation.js` ; tests
-    `tests/route-save.test.js` ; `src/ui/route-arrows.js` (chevrons et pastilles de manœuvre), `maneuverMarks`,
+    `tests/route-save.test.js`, `tests/route-store.test.js` (faux IndexedDB : absent, refusé, bloqué, plein) ; `src/ui/route-arrows.js` (chevrons et pastilles de manœuvre), `maneuverMarks`,
     `roadPillBox`, `exitLine` de `nav-layout.js`
   - phase 12a bis : `weight-convert.js` (Action : voies maxweight / maxweight:hgv en tonnes, drapeau desserte
     hgv=destination|delivery ou maxweight:conditional, mêmes filtrage osmium et cases de 1° que les ponts,

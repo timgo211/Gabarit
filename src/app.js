@@ -843,7 +843,10 @@ const routeStore = createRouteStore();
 let lastRouteSave = null;
 /** Faux après « Quitter » ou l'arrivée : rien n'est regardé jusqu'au prochain calcul ou choix d'itinéraire. */
 let routeSaveOn = false;
-function saveRoute({ force = false } = {}) {
+function saveRoute(opts) {
+  try { writeRoute(opts); } catch { /* sauvegarde impossible : le guidage continue */ }
+}
+function writeRoute({ force = false } = {}) {
   if (!choice || !routeSaveOn || navigation.simulating) return;
   const kind = navigation.active ? 'nav' : 'plan';
   const progress = navigation.progress;
@@ -856,12 +859,12 @@ function saveRoute({ force = false } = {}) {
   });
   if (!save) return;
   lastRouteSave = { at: now, key };
-  routeStore.put(save);
+  routeStore.put(save).catch(() => {});
 }
 function forgetRoute() {
   routeSaveOn = false;
   lastRouteSave = null;
-  routeStore.clear();
+  routeStore.clear().catch(() => {});
 }
 window.addEventListener('pagehide', () => saveRoute({ force: true }));
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveRoute({ force: true }); });
@@ -905,14 +908,14 @@ $('#resume-question').textContent = RESUME_QUESTION;
 routeStore.load().then((save) => {
   if (choice || navigation.active) return; // calcul déjà lancé entre-temps : la sauvegarde sera remplacée
   const decision = checkSave(save, { now: Date.now(), vehicles: data.vehicles });
-  if (decision.action === 'ignore') routeStore.clear();
+  if (decision.action === 'ignore') routeStore.clear().catch(() => {});
   else if (decision.action === 'restore') applyResume(save);
   else if (decision.action === 'ask') {
     pendingResume = save;
     resumePark.watch(true);
     renderResume();
   }
-});
+}).catch(() => { /* reprise impossible : l'appli démarre comme sans sauvegarde */ });
 
 /**
  * Appui long sur la carte (phase 8, à l'arrêt) : « Aller ici » ou « Partir d'ici » remplit le champ, sans rien
