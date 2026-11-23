@@ -24,6 +24,7 @@ node --test
 (lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert. Un hook Stop le relance tout seul à la fin de chaque tour où le code a changé.
 
 Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relancer après toute modif d'interface) — mode d'emploi et scénarios : skill `gabarit-tests-interface`.
+Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesurer le travail (compteur) à la place.
 
 ## Modèles (choisis automatiquement)
 - Mode plan → Opus ; exécution → Sonnet (`"model": "opusplan"` dans `.claude/settings.json`).
@@ -60,6 +61,9 @@ Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relan
   `RESTR_RADIUS_M` = 30 m par restriction applicable proche du trajet, avec les ZFE dans `avoid_polygons` ; limite ORS
   « 150 km à vol d'oiseau avec zones évitées » → au-delà, rien n'est envoyé et la fiche dit « non évitées… À vérifier ».
   Ajout / modification à l'arrêt seulement ; jamais « sûr » ; rien dans le guidage ni la voix.
+- Limites de poids (12a bis, `weight-check.js`, copie `data/poids-osm/` des mêmes Action et cases que les ponts, jamais
+  précachée, 5 Mo par fichier / 30 Mo en tout) : tronçon suivi (15 m, cap modulo 180°, jamais un croisement) dont la
+  limite est < PTAC ; fiche et carte à l'arrêt seulement, jamais dit ni dans le guidage ; « à vérifier ».
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
   Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.

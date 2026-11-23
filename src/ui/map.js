@@ -452,9 +452,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function bridgeElement(item) {
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = `bridge-marker ${item.level === 'high' ? 'high' : 'medium'}`;
+    node.className = `bridge-marker ${item.level === 'high' ? 'high' : 'medium'}${item.kind === 'weight' ? ' weight-marker' : ''}`;
     node.dataset.key = item.key;
-    node.textContent = '⚠';
+    node.textContent = item.kind === 'weight' && item.glyph ? item.glyph : '⚠'; // limite de poids (12a bis) : « 3,5 t »
     node.setAttribute('aria-label', item.label);
     node.title = item.label;
     for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());

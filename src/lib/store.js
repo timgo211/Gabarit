@@ -60,6 +60,7 @@ export function emptyData() {
       windVoice: true,
       windGust: WIND.GUST.default,
       bridgeWarnings: true,
+      weightWarnings: true,
       adr: emptyAdrSettings(),
     },
   };
@@ -116,6 +117,7 @@ export function sanitizeData(raw) {
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
       windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 70 par défaut
       bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
+      weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
       // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
       adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },

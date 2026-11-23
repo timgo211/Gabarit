@@ -16,7 +16,7 @@ export const RESTR_RADIUS_M = 30;
 
 export const RESTR = Object.freeze({
   TYPES: Object.freeze(['height', 'weight', 'avoid']),
-  ORIGINS: Object.freeze(['manual', 'osm-bridge']),
+  ORIGINS: Object.freeze(['manual', 'osm-bridge', 'osm-weight']),
   HEIGHT: Object.freeze({ min: 1, max: 6 }),
   WEIGHT: Object.freeze({ min: 1, max: 60 }),
   /** Marge du profil sur la hauteur : la restriction s'applique si hauteur + 0,1 m ≥ valeur. */
@@ -74,7 +74,7 @@ export function validateRestriction(raw, { now = new Date(), makeId = defaultId 
     id: typeof raw.id === 'string' && /^[\w-]{1,40}$/.test(raw.id) ? raw.id : makeId(),
     lat: round(lat, 6), lon: round(lon, 6), type: raw.type, value, note, date, origin,
   };
-  if (origin === 'osm-bridge' && Number.isInteger(raw.osmId) && raw.osmId > 0) out.osmId = raw.osmId;
+  if (origin !== 'manual' && Number.isInteger(raw.osmId) && raw.osmId > 0) out.osmId = raw.osmId;
   return out;
 }
 
@@ -241,6 +241,20 @@ export function fromBridge(item, { now = new Date() } = {}) {
     origin: 'osm-bridge', osmId: item.id,
   };
 }
+
+/**
+ * Restriction proposée par « Éviter ce passage » depuis une limite de poids d'OSM (phase 12a bis) : type poids,
+ * valeur = limite du tronçon, au milieu du passage sur le tracé (comme fromBridge au point de croisement).
+ */
+export function fromWeight(item, { now = new Date() } = {}) {
+  return {
+    lat: item.point[1], lon: item.point[0], type: 'weight', value: item.limit,
+    note: `Limite de poids OSM${item.local ? ' (desserte locale possible)' : ''}`, date: now.toISOString().slice(0, 10),
+    origin: 'osm-weight', osmId: item.id,
+  };
+}
+
+export const WEIGHT_AVOID_HELP = "« Éviter ce passage » enregistre une restriction de poids au milieu du passage sur l'itinéraire ; elle est évitée quand le PTAC du profil dépasse la limite.";
 
 /**
  * Ajout ou modification permis ? Hors guidage : oui (écran d'avant le départ) ; en guidage : seulement à l'arrêt

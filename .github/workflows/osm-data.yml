@@ -4,7 +4,8 @@ name: Données OSM (tunnels ADR, aires PL, accès)
 # matières dangereuses (data/tunnels-adr.json, phase 5b), aires et parkings PL (data/aires-osm/, phase 9b) et voies à
 # accès conditionnel (data/acces-osm/, phase 5d), plus le réseau des taxes PL régionales (data/taxes-pl-osm.json,
 # phase 5h ter : extrait France découpé au cadre des taxes) et les ponts sans hauteur connue (data/ponts-osm/,
-# phase 12a : extrait France, filtrage à part, 5 Mo par fichier et 60 Mo en tout au plus). Un seul téléchargement des extraits par pays de Geofabrik
+# phase 12a : extrait France, filtrage à part, 5 Mo par fichier et 60 Mo en tout au plus) avec les limites de poids
+# (data/poids-osm/, phase 12a bis : même filtrage et mêmes cases que les ponts, 5 Mo par fichier et 30 Mo en tout). Un seul téléchargement des extraits par pays de Geofabrik
 # et un seul filtrage osmium pour les trois premiers (voir tools/osm-update.mjs). Échec : rien n'est enregistré,
 # l'ancienne copie reste.
 # Lancement à la main avec « r411 » coché : lecture seule du Code de la route, art. R411-8 (pouvoir de police), texte
@@ -30,6 +31,7 @@ on:
       - src/lib/hgv-tolls-convert.js
       - src/lib/hgv-tolls-geo.js
       - src/lib/bridges-convert.js
+      - src/lib/weight-convert.js
       - data/taxes-pl.json
       - .github/workflows/osm-data.yml
 
@@ -116,14 +118,20 @@ jobs:
         run: node tools/osm-update.mjs
       - name: Enregistrer si changé
         run: |
-          git add -A -N data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm
-          if git diff --quiet -- data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm; then
+          # Chemins existants seulement : une copie non écrite (data/poids-osm/ trop gros à la première copie) ne
+          # bloque pas l'enregistrement des autres (git add échoue sur un chemin absent).
+          P=""
+          for p in data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm data/poids-osm; do
+            if [ -e "$p" ]; then P="$P $p"; fi
+          done
+          git add -A -N $P
+          if git diff --quiet -- $P; then
             echo "Aucun changement."
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm
-          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL et ponts OpenStreetMap (mise à jour automatique)"
+          git add -A $P
+          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL, ponts et limites de poids OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push

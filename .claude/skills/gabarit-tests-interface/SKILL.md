@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette | guidage | bandeau
+                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -72,6 +72,17 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   passage maxheight ignoré, résumé et part A/N sur la fiche, 2 repères `.bridge-marker`, ligne technique du diagnostic,
   repère touché → message. Guidage (412×900) : aucun repère, rien sur les ponts à l'écran ni à voix haute. Réglage
   `bridgeWarnings: false` (option `settings` d'`open`) → rien ; copie absente → « données non chargées ».
+- `poids` (phase 12a bis) : itinéraire synthétique de Colombier, copie `data/poids-osm/` construite par les fonctions
+  de l'Action (`weightsCopy: 'fixture'` ; par défaut 404, même si la vraie copie est dans le dépôt). 412×900 jour,
+  900×412 et 360×760 nuit : 3 lignes « Limite de poids… à vérifier » (dont « desserte locale possible »), route qui
+  croise et limite au-dessus du PTAC ignorées, résumé, 3 repères `.weight-marker` « 3,5 t », ligne technique
+  « Limites de poids : 3 », repère touché → panneau, « Éviter ce passage » → restriction poids `osm-weight` au point
+  du tracé ; Réglages : case cochée ; guidage : aucun repère, rien à l'écran ni à voix haute ; réglage désactivé ;
+  copie absente → « données non chargées ».
+- Environnement (constaté le 23/11/2026) : Chromium sans écran refuse la wake lock → « Écran non maintenu allumé »
+  dans le panneau du bas, plus haut que sur la tablette ; à 412×900 (`guidage`) le message bref passe alors sur les
+  alertes (✘ « nav-toast », vert avec une wake lock simulée). 760×360 à l'arrêt (alerte de conduite avec « Pas une
+  pause (travail) » sous le panneau du bas) : ✘ aussi en v37 et v38, même avec la wake lock simulée, non traité.
 - `restrictions` (phase 12b) : départ et arrivée saisis en coordonnées autour du viaduc synthétique ; « Éviter ce
   passage » → restriction d'origine pont OSM, recalcul avec `avoid_polygons` centré sur le croisement, « Évite 1
   restriction saisie par toi », liste et aide dans Réglages (412×900 jour, 900×412 nuit) ; guidage : panneau fermé,

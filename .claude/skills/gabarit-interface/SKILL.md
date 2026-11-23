@@ -105,6 +105,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   repères `.bridge-marker` (`map.showBridges`, retirés par `setNavigating(true)`, jamais en guidage), repère touché →
   message (texte du pont), jamais de voix ; Réglages › Ponts, case `#bridge-warnings` (`settings.bridgeWarnings`,
   activée par défaut). Texte fixe `BRIDGE.TEXT` ; « à vérifier », « la signalisation fait foi ».
+- Phase 12a bis : limites de poids — lignes `warn` de la fiche (5 au plus + « +N »), résumé « N limites de poids à
+  vérifier », repères `.bridge-marker.weight-marker` (texte « 3,5 t », même calque que les ponts, retirés en guidage),
+  repère touché → `#bridge-panel` (`restrictionsUi.openWeight`, aide `WEIGHT_AVOID_HELP`) ; Réglages › Limites de poids,
+  case `#weight-warnings` (`settings.weightWarnings`, activée par défaut). Jamais de voix ni de bandeau.
 - Phase 12b : Réglages › Mes restrictions (`#restrictions-card` : type, valeur, note, « Ajouter au centre de la carte »,
   liste Modifier / Supprimer) ; repère de pont touché → `#bridge-panel` (texte, aide `BRIDGE_AVOID_HELP`, « Éviter ce
   passage », fermé au démarrage du guidage). Boutons refusés si `canEditRestrictions` faux (en guidage hors

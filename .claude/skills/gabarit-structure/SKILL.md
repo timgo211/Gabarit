@@ -50,6 +50,15 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
     `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
     api.openstreetmap.org bloqué ; id 243477938 du constat)
+  - phase 12a bis : `weight-convert.js` (Action : voies maxweight / maxweight:hgv en tonnes, drapeau desserte
+    hgv=destination|delivery ou maxweight:conditional, mêmes filtrage osmium et cases de 1° que les ponts,
+    `data/poids-osm/`, 5 Mo / 30 Mo, simplification 3 → 8 → 20 m si trop gros, chemin 190520091 écrit dans le journal),
+    `weight-check.js` (appli : tronçons suivis par le tracé — points tous les 5 m, 15 m, cap modulo 180°, projection
+    sur le segment, 25 m ou 60 % d'un tronçon court — limite < PTAC, textes, `weightRules`) ; UI
+    `src/ui/weight-limits.js` (`createTileCopy` de `src/ui/bridges.js`) ; repères `.weight-marker` (« 3,5 t ») par
+    `map.showBridges` ; « Éviter ce passage » → `fromWeight` (restriction poids, origine `osm-weight`) ; fixture
+    `osm-poids-colombier.geojsonseq` (**synthétique** : étiquettes réelles du chemin 190520091 non lisibles depuis le
+    conteneur)
   - phase 12b : `restrictions.js` (Mes restrictions : modèle, validation, doublons à 5 m, `applies`, polygones de
     30 m, zone du trajet, limite des 150 km, `mergeAvoid`, textes, `fromBridge` au point de croisement) ; UI
     `src/ui/restrictions.js` (Réglages › Mes restrictions, panneau `#bridge-panel`) ; `withBlockedHint` dans
@@ -110,7 +119,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   gardés dans `data/osm-poly/` (hors `APP_FILES`, dates dans `dates.json`, écrits à chaque copie réussie) et utilisés
   si leur téléchargement échoue (journal : « copie du dépôt utilisée », avec la date) ; attribution ODbL dans Réglages ;
   phase 12a : ponts de l'extrait France (filtrage osmium à part, `filterBridges`) dans `data/ponts-osm/`, écrits
-  seulement dans les limites de taille (sinon ancienne copie gardée, journal « ⚠ data/ponts-osm/ non modifié »)
+  seulement dans les limites de taille (sinon ancienne copie gardée, journal « ⚠ data/ponts-osm/ non modifié ») ;
+  phase 12a bis : limites de poids dans le même filtrage (`data/poids-osm/`, « ⚠ data/poids-osm/ non modifié » si trop
+  gros) ; l'étape « Enregistrer » n'ajoute que les chemins qui existent (une copie absente ne bloque pas les autres)
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
   branche) de la liste Sécurité routière (xlsx du 22/10/2022) et des contours 2022 (2021 en secours) dans

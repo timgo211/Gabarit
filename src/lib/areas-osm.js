@@ -48,8 +48,12 @@ function segmentDistance(p, a, b, kx = Math.cos(p[1] * RAD) * 111320) {
   return Math.hypot(ax + t * dx, ay + t * dy);
 }
 
-/** Simplification de Douglas-Peucker (itérative), tolérance en mètres. */
-export function simplifyLine(input, tolerance) {
+/**
+ * Simplification de Douglas-Peucker (itérative), tolérance en mètres.
+ * `stats` (facultatif) : `stats.steps` reçoit le nombre de distances calculées (mesure du travail, indépendante de
+ * la charge de la machine ; les tests bornent ce nombre au lieu d'un temps d'horloge).
+ */
+export function simplifyLine(input, tolerance, stats) {
   if (!Array.isArray(input) || input.length <= 2) return Array.isArray(input) ? input.slice() : [];
   const kx = Math.cos(input[Math.floor(input.length / 2)][1] * RAD) * 111320;
   // Points plus proches que la tolérance du dernier gardé : retirés d'abord (tracés ORS très denses en ville).
@@ -65,6 +69,7 @@ export function simplifyLine(input, tolerance) {
   while (stack.length) {
     const [i, j] = stack.pop();
     let max = -1; let at = -1;
+    if (stats) stats.steps = (stats.steps || 0) + Math.max(0, j - i - 1);
     for (let k = i + 1; k < j; k += 1) {
       const d = segmentDistance(coords[k], coords[i], coords[j], kx);
       if (d > max) { max = d; at = k; }
@@ -94,11 +99,11 @@ export function combineRoutes(lines) {
 }
 
 /** Tracé simplifié pour la requête : au plus MAX_POINTS points ; renvoie aussi l'écart toléré (m). */
-export function queryLine(coords, { maxPoints = AREAS_OSM.MAX_POINTS } = {}) {
+export function queryLine(coords, { maxPoints = AREAS_OSM.MAX_POINTS, stats } = {}) {
   let line = coords;
   let tolerance = 0;
   for (const tol of AREAS_OSM.TOLERANCES_M) {
-    line = simplifyLine(coords, tol);
+    line = simplifyLine(coords, tol, stats);
     tolerance = tol;
     if (line.length <= maxPoints) break;
   }

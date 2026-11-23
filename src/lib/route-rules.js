@@ -16,6 +16,7 @@ import { euroRules } from './euro.js';
 import { winterRules } from './winter.js';
 import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
+import { weightRules as weightLimitRules } from './weight-check.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
@@ -104,7 +105,8 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
  */
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
-  access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true,
+  access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
+  weightWarnings = true,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -147,6 +149,10 @@ export function routeRules(route, {
   const brg = bridgeRules(route, { vehicle, bridges, enabled: bridgeWarnings });
   lines.push(...brg.lines.filter((l) => l.level === 'warn'));
   short.push(...brg.short);
+  // Limites de poids d'OSM (phase 12a bis) : « à vérifier », fiche et carte à l'arrêt seulement, jamais dit.
+  const wlim = weightLimitRules(route, { vehicle, weights: weightLimits, enabled: weightWarnings });
+  lines.push(...wlim.lines.filter((l) => l.level === 'warn'));
+  short.push(...wlim.short);
   for (const c of bans.conflicts) {
     lines.push({ level: 'warn', text: describeBanConflict(c) });
     short.push(banShortText(c, departure));
@@ -168,6 +174,7 @@ export function routeRules(route, {
   lines.push(...win.lines.filter((l) => l.level !== 'warn'));
   lines.push(...toll.lines.filter((l) => l.level !== 'warn'));
   lines.push(...brg.lines.filter((l) => l.level !== 'warn'));
+  lines.push(...wlim.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
@@ -181,7 +188,7 @@ export function routeRules(route, {
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
     countries: ctry, weight, winter: win, euro, tolls: toll,
-    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg,
+    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim,
   };
 }
 

@@ -55,6 +55,8 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   DE / CH 44 t) et `limits.height` (`max` en m), source nationale obligatoire, sinon « à vérifier » sans valeur (BE, LU :
   eJustice demande un captcha, Legilux en JavaScript) ; profil au-delà : `warn` sur la fiche, hauteur dépassée aussi
   dans les notes (« Hauteur max Pays »). Sites officiels à ajouter à l'environnement cloud « Gabarit ».
+- Limites de poids d'OSM sur le trajet (phase 12a bis, `weight-check.js`, panneau B13 comparé au PTAC du profil) :
+  règles dans `gabarit-interface` (affichage) et `gabarit-structure` (copie `data/poids-osm/`).
 - Normes Euro (phase 5g, `euro.js`) : profil `euroClass` ('' non précisé par défaut, '0'–'6', 'EEV' ; anciens profils
   → ''), servira à la 5h. Tunnels : seulement au-delà de 3,5 t de PTAC, tubes en dur de `KNOWN_TUNNELS` (pas de
   fichier ni d'Overpass) ; règles `TUNNEL_RULES` avec `status` 'confirmed' (texte officiel lu), 'operator'
