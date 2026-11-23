@@ -204,6 +204,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
     bretelles) ou la commune la plus proche (« Tournez à droite, direction Metz »). Données calculées une fois par
     itinéraire pour ménager les quotas.
+    - [x] **Phase 11a — Limitation de vitesse PL pendant le guidage** (v46) : ORS ne donne aucune limite dans
+      `extra_info` (doc lue le 23/11/2026) → copie mensuelle `data/vitesses-osm/` par l'Action « Données OSM » (mêmes
+      cases que les ponts, `maxspeed:hgv` / `maxspeed` des voies motorway à tertiary, 5 Mo / 40 Mo, copie réduite
+      au-delà, jamais précachée) ; `speed-limit.js` calculé une fois par itinéraire ; `maxspeed` plafonné par la règle
+      générale PL (`speed-rules.js`, France vérifiée sur le Code de la route, autres pays : fiches) ; sinon inconnue.
+      Panneau seulement si la limite est connue, alerte visuelle, « Limite X » à voix haute en option (étiquette OSM
+      seulement). Fiche « Limites de vitesse connues : N % du trajet ». Données : attente de la première copie
+      (Geofabrik France en 404 le 23/11/2026).
   - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
     `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
     tournée multi-arrêts de la phase 3.) (Reste de la phase 8.)

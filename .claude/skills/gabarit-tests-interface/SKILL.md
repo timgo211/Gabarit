@@ -99,3 +99,9 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   restriction saisie par toi », liste et aide dans Réglages (412×900 jour, 900×412 nuit) ; guidage : panneau fermé,
   ajout refusé en roulant, rien à l'écran ni à voix haute ; 2009 avec une restriction (option `restrictions` d'`open`)
   → « Une restriction saisie bloque peut-être le seul passage. »
+- `vitesse` (phase 11a) : itinéraire synthétique de Colombier, copie `data/vitesses-osm/` construite par les fonctions
+  de l'Action (`speedsCopy: 'fixture'` ; par défaut 404), fourgon de 3,5 t (étiquettes sans plafond : indépendant des
+  règles françaises). 412×900 jour (réglage désactivé puis activé), 900×412 nuit, 360×760 nuit, 1280×800 jour : ligne
+  `.route-card-speed`, cases lues, ligne technique, Réglages (case décochée, texte fixe), GPS émulé à 40 km/h → panneau
+  « 50 » aux couleurs réglementaires, 70 km/h → `over` (bord 4 px), rien dit par défaut, « Limite 50. » une fois avec
+  le réglage ; copie absente → « inconnues » et aucun panneau.

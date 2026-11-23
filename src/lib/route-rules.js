@@ -17,6 +17,7 @@ import { winterRules } from './winter.js';
 import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
 import { weightRules as weightLimitRules } from './weight-check.js';
+import { speedRules } from './speed-limit.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
@@ -118,7 +119,7 @@ export function confirmedTunnelBans(route, { vehicle, tunnels = null } = {}) {
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
   access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
-  weightWarnings = true,
+  weightWarnings = true, speeds = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -165,6 +166,9 @@ export function routeRules(route, {
   const wlim = weightLimitRules(route, { vehicle, weights: weightLimits, enabled: weightWarnings });
   lines.push(...wlim.lines.filter((l) => l.level === 'warn'));
   short.push(...wlim.short);
+  // Limitations de vitesse (phase 11a) : couverture sur la fiche, conditions « à vérifier », rien dit.
+  const spd = speedRules(route, { vehicle, speeds, countries });
+  lines.push(...spd.lines);
   for (const c of bans.conflicts) {
     lines.push({ level: 'warn', text: describeBanConflict(c) });
     short.push(banShortText(c, departure));
@@ -200,7 +204,7 @@ export function routeRules(route, {
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
     countries: ctry, weight, winter: win, euro, tolls: toll,
-    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim,
+    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
   };
 }
 

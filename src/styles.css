@@ -246,11 +246,11 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card[aria-checked="true"] { border-color: var(--route); border-left-color: var(--route); box-shadow: inset 0 0 0 1px var(--route); }
 .route-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .route-card-title { min-width: 0; overflow-wrap: anywhere; }
-.route-card-facts, .route-card-an, .route-card-note, .route-to, .summary-notes, .route-failures { overflow-wrap: anywhere; }
+.route-card-facts, .route-card-an, .route-card-speed, .route-card-note, .route-to, .summary-notes, .route-failures { overflow-wrap: anywhere; }
 .route-card-name { font-weight: 800; font-size: 1.15rem; }
 .route-card-also { color: var(--muted); font-weight: 600; font-size: .9rem; }
 .route-card-time { font-size: 1.6rem; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.route-card-facts, .route-card-an { font-size: .95rem; }
+.route-card-facts, .route-card-an, .route-card-speed { font-size: .95rem; }
 .route-card-delta { font-weight: 700; font-variant-numeric: tabular-nums; }
 .route-card-note { color: var(--warn); font-weight: 600; font-size: .9rem; }
 /* Réglementation (phase 5) : ZFE interdite, interdiction PL sur le trajet. */
@@ -510,6 +510,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-speed { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .nav-speed-unit { font-size: .75rem; font-weight: 700; color: var(--muted); }
 .nav-speedo.over .nav-speed { color: var(--danger); }
+/* Dépassement (phase 11a) : alerte visuelle seulement, bord du compteur épaissi ; le panneau garde ses couleurs. */
+.nav-speedo.over .nav-speed-pill { border: 4px solid var(--danger); }
 /* Panneau B14 (rond blanc à bord rouge, chiffres noirs) : couleurs réglementaires. */
 .nav-limit {
   width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;

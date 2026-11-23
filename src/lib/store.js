@@ -55,6 +55,7 @@ export function emptyData() {
       mapLayer: DEFAULT_MAP_LAYER,
       arrowColor: DEFAULT_ARROW_COLOR, vehicleIcon: DEFAULT_VEHICLE_ICON, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
+      speedVoice: false,
       ruleVoice: true,
       driveVoice: true,
       windVoice: true,
@@ -113,6 +114,7 @@ export function sanitizeData(raw) {
       voiceRate: sanitizeVoiceRate(s.voiceRate),
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
       areaVoice: s.areaVoice === true, // annonce vocale des aires PL (phase 9), désactivée par défaut
+      speedVoice: s.speedVoice === true, // « Limite X » au dépassement (phase 11a), désactivé par défaut
       ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE et interdictions PL (phase 5), activées par défaut
       driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut

@@ -5,11 +5,14 @@ name: Données OSM (tunnels ADR, aires PL, accès)
 # accès conditionnel (data/acces-osm/, phase 5d), plus le réseau des taxes PL régionales (data/taxes-pl-osm.json,
 # phase 5h ter : extrait France découpé au cadre des taxes) et les ponts sans hauteur connue (data/ponts-osm/,
 # phase 12a : extrait France, filtrage à part, 5 Mo par fichier et 60 Mo en tout au plus) avec les limites de poids
-# (data/poids-osm/, phase 12a bis : même filtrage et mêmes cases que les ponts, 5 Mo par fichier et 30 Mo en tout). Un seul téléchargement des extraits par pays de Geofabrik
+# (data/poids-osm/, phase 12a bis : même filtrage et mêmes cases que les ponts, 5 Mo par fichier et 30 Mo en tout) et les
+# limitations de vitesse (data/vitesses-osm/, phase 11a : même filtrage et mêmes cases, 5 Mo par fichier et 40 Mo en
+# tout, copie réduite au-delà). Un seul téléchargement des extraits par pays de Geofabrik
 # et un seul filtrage osmium pour les trois premiers (voir tools/osm-update.mjs). Échec : rien n'est enregistré,
 # l'ancienne copie reste.
 # Lancement à la main avec « r411 » coché : lecture seule du Code de la route, art. R411-8 (pouvoir de police), texte
-# écrit dans le journal pour être cité dans src/lib/access-conditional.js ; aucune copie de données ce jour-là.
+# écrit dans le journal pour être cité dans src/lib/access-conditional.js ; aucune copie de données ce jour-là. De même
+# avec « r413 » : art. R413-1 à R413-10 (vitesses maximales, phase 11a), cités dans src/lib/speed-rules.js.
 # Lancée aussi à la main (onglet Actions › Données OSM › Run workflow) et à chaque envoi qui modifie l'outil de copie,
 # sur n'importe quelle branche (première copie des aires créée sur la branche de la phase 9b, avant la fusion).
 
@@ -22,6 +25,10 @@ on:
         description: "Lire seulement le Code de la route, art. R411-8 (journal), sans copier les données"
         type: boolean
         default: false
+      r413:
+        description: "Lire seulement le Code de la route, art. R413-1 à R413-10 (vitesses, journal), sans copier les données"
+        type: boolean
+        default: false
   push:
     paths:
       - tools/osm-update.mjs
@@ -32,6 +39,8 @@ on:
       - src/lib/hgv-tolls-geo.js
       - src/lib/bridges-convert.js
       - src/lib/weight-convert.js
+      - src/lib/speed-convert.js
+      - src/lib/speed-rules.js
       - data/taxes-pl.json
       - .github/workflows/osm-data.yml
 
@@ -40,14 +49,14 @@ permissions:
 
 concurrency:
   # Lecture R411-8 à part : elle n'annule jamais une copie en cours.
-  group: osm-data-${{ github.ref }}-${{ inputs.r411 && 'r411' || 'copie' }}
+  group: osm-data-${{ github.ref }}-${{ inputs.r411 && 'r411' || inputs.r413 && 'r413' || 'copie' }}
   cancel-in-progress: true
 
 jobs:
   # Recoupement des tunnels de Fourvière, du Fréjus et du Mont-Blanc avec OpenStreetMap (API principale d'OSM et
   # Nominatim, sans Overpass) : journal seulement, n'empêche jamais la copie.
   known:
-    if: ${{ !inputs.r411 }}
+    if: ${{ !inputs.r411 && !inputs.r413 }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     continue-on-error: true
@@ -103,8 +112,53 @@ jobs:
             fi
           fi
 
+  # Code de la route, art. R413-1 à R413-10 (vitesses maximales, phase 11a) : Légifrance et service-public.gouv.fr
+  # sont bloqués depuis le conteneur de développement ; lus ici (PDF du code sur codes.droit.org, reproduction de
+  # Légifrance, puis la fiche service-public.gouv.fr des vitesses). Journal seulement, lancé à la main ; texte cité
+  # dans src/lib/speed-rules.js.
+  r413:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.r413 }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Installer pdftotext
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils
+      - name: Lire les articles R413-1 à R413-10
+        run: |
+          UA="Mozilla/5.0 (X11; Linux x86_64) Gabarit"
+          code=$(curl -sS -L -A "$UA" -o code.pdf -w '%{http_code}' "https://codes.droit.org/PDF/Code%20de%20la%20route.pdf" || echo 000)
+          echo "codes.droit.org : HTTP $code"
+          if [ "$code" = 200 ]; then
+            pdftotext code.pdf code.txt
+            head -c 300 code.txt; echo
+            grep -n -E "^(Article )?R\. ?413-(1|2|3|8|9|10) *$" code.txt | head -20
+            n=$(grep -n -E "^(Article )?R\. ?413-1 *$" code.txt | head -1 | cut -d: -f1)
+            if [ -n "$n" ]; then sed -n "$((n - 3)),$((n + 260))p" code.txt; else echo "Article R413-1 absent du PDF"; fi
+          fi
+          for u in "https://www.service-public.gouv.fr/particuliers/vosdroits/F19066" \
+                   "https://www.securite-routiere.gouv.fr/reglementation-liee-la-vitesse/limitations-de-vitesse"; do
+            code=$(curl -sS -L -A "$UA" -o page.html -w '%{http_code}' "$u" || echo 000)
+            echo "$u : HTTP $code"
+            if [ "$code" = 200 ]; then
+              python3 - <<'PY'
+          import html, re
+          t = open('page.html', encoding='utf-8', errors='replace').read()
+          t = re.sub(r'<(script|style)[^>]*>.*?</\1>', ' ', t, flags=re.S)
+          t = html.unescape(re.sub(r'<[^>]+>', ' ', t))
+          t = re.sub(r'\s+', ' ', t)
+          for k in ('3,5 tonnes', '3,5 t', 'poids lourd', 'Poids lourd'):
+              i = t.find(k)
+              if i >= 0:
+                  print(t[max(0, i - 600):i + 2500])
+                  break
+          else:
+              print('Aucun passage sur les poids lourds')
+          PY
+            fi
+          done
+
   update:
-    if: ${{ !inputs.r411 }}
+    if: ${{ !inputs.r411 && !inputs.r413 }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -121,7 +175,7 @@ jobs:
           # Chemins existants seulement : une copie non écrite (data/poids-osm/ trop gros à la première copie) ne
           # bloque pas l'enregistrement des autres (git add échoue sur un chemin absent).
           P=""
-          for p in data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm data/poids-osm; do
+          for p in data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm data/poids-osm data/vitesses-osm; do
             if [ -e "$p" ]; then P="$P $p"; fi
           done
           git add -A -N $P
@@ -132,6 +186,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A $P
-          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL, ponts et limites de poids OpenStreetMap (mise à jour automatique)"
+          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL, ponts, limites de poids et de vitesse OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push

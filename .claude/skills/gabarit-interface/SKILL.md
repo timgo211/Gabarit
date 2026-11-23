@@ -122,3 +122,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   liste Modifier / Supprimer) ; repère de pont touché → `#bridge-panel` (texte, aide `BRIDGE_AVOID_HELP`, « Éviter ce
   passage », fermé au démarrage du guidage). Boutons refusés si `canEditRestrictions` faux (en guidage hors
   `navigation.parked`). Fiche : « Évite N restrictions saisies par toi. » ; trajet > 150 km : `TOO_FAR_TEXT`.
+- Phase 11a : limitation de vitesse — compteur en bas à gauche (`speedStatus`), panneau `#nav-limit` (rond blanc, bord
+  #C8102E, chiffres noirs : couleurs réglementaires, jamais la palette) seulement si `view.speedLimit` est connu ;
+  dépassement (vitesse arrondie > limite) : classe `over` sur `#nav-speedo` (chiffre `--danger`, bord du compteur 4 px),
+  alerte visuelle seulement. Réglages › Guidage vocal : `#speed-voice` « Annoncer les dépassements de limite »
+  (`settings.speedVoice`, désactivé par défaut : « Limite X » une fois par tronçon, étiquette OSM sans conditions,
+  jamais une règle générale) et texte fixe `#speed-hint`. Fiche : `.route-card-speed` « Limites de vitesse connues :
+  N % du trajet » (ou « inconnues ») ; note « conditions… à vérifier » ; diagnostic « Limites de vitesse : … ».

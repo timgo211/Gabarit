@@ -78,8 +78,8 @@ function lineLength(coords) {
   return d;
 }
 
-/** Index des segments des tronçons dont la limite est sous le PTAC. */
-function indexSegments(ways) {
+/** Index des segments des tronçons (cases de WEIGHT.CELL_DEG) ; aussi utilisé par speed-limit.js (phase 11a). */
+export function indexSegments(ways) {
   const cells = new Map();
   const C = WEIGHT.CELL_DEG;
   for (const w of ways) {
@@ -105,7 +105,7 @@ function indexSegments(ways) {
  * un point au-delà du bout d'un tronçon n'est pas « sur » lui (sinon chaque passage serait allongé de 15 m à chaque
  * bout, et une route qui touche le tracé sur 8 m compterait pour 38 m).
  */
-function distToSegment(p, a, b) {
+export function distToSegment(p, a, b) {
   const kx = Math.cos(p[1] * RAD) * 111320; const ky = 110540;
   const ax = (a[0] - p[0]) * kx; const ay = (a[1] - p[1]) * ky;
   const bx = (b[0] - p[0]) * kx; const by = (b[1] - p[1]) * ky;

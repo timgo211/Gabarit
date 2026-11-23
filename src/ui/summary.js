@@ -76,6 +76,7 @@ function card(d, { checked, onSelect, rules }) {
     ]),
     el('span', { class: 'route-card-facts', text: facts.join(' · ') }),
     d.an ? el('span', { class: 'route-card-an', text: d.an }) : null,
+    rules?.speedLimits?.card ? el('span', { class: 'route-card-speed', text: rules.speedLimits.card }) : null,
     d.delta ? el('span', { class: 'route-card-delta', text: d.delta }) : null,
     d.note ? el('span', { class: 'route-card-note', text: d.note }) : null,
     rules?.short?.length ? el('span', { class: 'route-card-rules', text: `⚠ ${rules.short.join(' · ')}` }) : null,

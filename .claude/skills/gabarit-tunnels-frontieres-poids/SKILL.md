@@ -76,3 +76,12 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   classe absente de `mine` → « à vérifier ») ; CH (ORPL), DE (BFStrMG annexe 1, 35. BImSchV) ; AT et IT « à
   vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
   tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
+- Vitesses PL par type de route (phase 11a, `speed-rules.js`) : servent seulement à plafonner une étiquette `maxspeed`
+  d'OSM, jamais affichées seules. France : `FR_SPEED_RULES` (Code de la route, art. R413-8 et suivants, lus par la case
+  « r413 » de l'Action « Données OSM » ; Légifrance et service-public.gouv.fr bloqués depuis le conteneur) ; non
+  vérifiées → vides. Autres pays : `speeds.bands` des fiches (`isConfirmed`, source nationale) ; voie rapide = la plus
+  basse des valeurs autoroute / route ; valeur « agglomération » jamais utilisée ; ADR : `delta` vérifié seulement
+  (ES), sinon aucune règle. Remorque non précisée : tranche la plus basse.
+  France vérifiée le 23/11/2026 (R413-8, R413-9, PDF codes.droit.org lu par l'Action) : autoroute 90 ; voie rapide et
+  route 80, 60 au-delà de 12 t avec remorque ou articulé (remorque non précisée → 60) ; jamais le 90 des routes à
+  chaussées séparées (non reconnaissable dans OSM) ; matières dangereuses au-delà de 12 t : 80 / 60.
