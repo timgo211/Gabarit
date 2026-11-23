@@ -43,6 +43,8 @@
             <div class="nav-maneuver-text">
               <div id="nav-dist" class="nav-dist"></div>
               <div id="nav-instr" class="nav-instr">Recherche du signal GPS…</div>
+              <!-- v53 : écusson de la route + « Sortie 12 · Vallorbe » (copie data/directions-osm/, sortie sans ambiguïté). -->
+              <div id="nav-exit" class="nav-exit" hidden></div>
             </div>
           </div>
           <div id="nav-then" class="nav-then" hidden></div>
@@ -182,6 +184,14 @@
       </form>
 
       <div id="message" class="message" role="alert" hidden></div>
+      <!-- v53 : itinéraire sauvegardé il y a plus de 12 h ; question posée seulement à l'arrêt (R412-6-2). -->
+      <div id="resume-panel" class="resume-panel" role="group" aria-labelledby="resume-question" hidden>
+        <p id="resume-question" class="resume-question"></p>
+        <div class="resume-btns">
+          <button type="button" id="btn-resume-yes" class="btn btn-primary">Reprendre</button>
+          <button type="button" id="btn-resume-no" class="btn">Effacer</button>
+        </div>
+      </div>
       <div id="bridge-panel" class="bridge-panel" hidden>
         <p id="bridge-panel-text"></p>
         <p id="bridge-panel-help" class="hint"></p>

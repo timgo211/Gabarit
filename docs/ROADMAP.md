@@ -525,6 +525,13 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Ensuite
 
+- [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
+  Vallorbe » (copie data/directions-osm/ étendue aux nœuds de sortie) ; chevrons et pastilles de manœuvre sur le
+  tracé ; boutons ronds et compteur 25 % plus petits ; mémoire de l'itinéraire en arrière-plan (IndexedDB, reprise au
+  retour, question après 12 h à l'arrêt seulement).
+  - [ ] Navigation qui continue en arrière-plan (voix, GPS) : impossible en PWA sur Android Chrome (page gelée, GPS et
+    écran allumé arrêtés) ; seule voie : appli Android native. À décider.
+
 - [x] **Phase 7d — Satellite hors de France** (v52)
   Orthophotos ouvertes, codées seulement si conditions lues et tuile réelle + CORS vérifiées (Action « Textes
   officiels », 23/11/2026) : Luxembourg (ACT, CC0), Bruxelles (UrbIS, CC0), Suisse (swisstopo SWISSIMAGE), Espagne

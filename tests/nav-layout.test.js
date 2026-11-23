@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus,
-  traveledUpdate, traveledCoords, PARK, BUTTONS, areaListBox, AREA_LIST_BOX,
+  traveledUpdate, traveledCoords, PARK, BUTTONS, areaListBox, AREA_LIST_BOX, roadPillBox, ROAD_PILL,
 } from '../src/lib/nav-layout.js';
 import { prepareLine } from '../src/lib/nav-geo.js';
 
@@ -74,25 +74,52 @@ test('à l\'arrêt : vitesse inconnue (null, NaN, absente) = en mouvement, jamai
   assert.equal(p.parked, true);
 });
 
-test('caméra : véhicule à 78 % de la hauteur en portrait, à droite de la colonne en paysage, écran seulement', () => {
+test('caméra : véhicule à 78 % de la hauteur en portrait (moins si la pastille ne tient pas dessous), écran seulement', () => {
+  const t = followPadding({ width: 800, height: 1280 });
+  assert.ok(Math.abs((t.top + 1280) / 2 - 0.78 * 1280) <= 1, 'tablette : 78 %');
   const p = followPadding({ width: 412, height: 900 });
   assert.equal(p.left, 0);
-  assert.ok(Math.abs((p.top + 900) / 2 - 0.78 * 900) <= 1);
+  const vy = (p.top + 900) / 2;
+  assert.ok(vy < 0.78 * 900 && vy >= 0.7 * 900, `téléphone : véhicule remonté (${vy})`);
+  assert.ok(vy + ROAD_PILL.ICON_HALF + ROAD_PILL.GAP + ROAD_PILL.HEIGHT + ROAD_PILL.MARGIN <= 900 - 150 + 1, 'pastille au-dessus du panneau du bas');
   const l = followPadding({ width: 900, height: 412 });
   assert.equal(l.left, 360);
-  assert.ok(Math.abs((l.top + 412) / 2 - 0.75 * 412) <= 1);
+  const ly = (l.top + 412) / 2;
+  assert.ok(ly <= 0.75 * 412 && ly + 86 <= 412 - 40 + 1, `paysage : 75 % au plus, pastille au-dessus du bord (${ly})`);
+  const small = followPadding({ width: 760, height: 360 });
+  assert.ok((small.top + 360) / 2 + 86 <= 360 - 40 + 1, 'paysage bas : pastille au-dessus du bord');
   assert.deepEqual(followPadding({ width: 412, height: 900 }), p); // même taille, même marge
 });
 
-test('colonne de boutons : 64 px entre 45 et 85 %, remonte puis 56 px, deux colonnes en dernier', () => {
+test('colonne de boutons (v53) : 48 px entre 45 et 85 %, remonte puis 40 px, deux colonnes en dernier', () => {
+  assert.deepEqual({ size: BUTTONS.size, min: BUTTONS.min, gap: BUTTONS.gap }, { size: 48, min: 40, gap: 9 });
   const tall = buttonColumn({ height: 1280, count: 5 });
-  assert.equal(tall.size, BUTTONS.size);
-  assert.ok(tall.top >= 1280 * 0.45 && tall.top + 5 * 64 + 4 * 12 <= 1280 * 0.85 + 1);
+  assert.equal(tall.size, 48);
+  assert.ok(tall.top >= 1280 * 0.45 && tall.top + 5 * 48 + 4 * 9 <= 1280 * 0.85 + 1);
   const phone = buttonColumn({ height: 760, minTop: 200, count: 5 });
-  assert.ok(phone.size >= 56 && phone.top >= 200 && phone.columns === 1);
-  const low = buttonColumn({ height: 360, minTop: 10, count: 6 });
+  assert.ok(phone.size >= 40 && phone.top >= 200 && phone.columns === 1);
+  const short = buttonColumn({ height: 360, minTop: 10, count: 6 });
+  assert.equal(short.size, 40, 'rétrécit à 40 px avant deux colonnes');
+  const low = buttonColumn({ height: 300, minTop: 10, count: 6 });
   assert.equal(low.columns, 2);
-  assert.ok(low.size >= 56);
+  assert.ok(low.size >= 40, 'zone tactile de 40 px au moins');
+});
+
+test('pastille de la rue (v53) : sous le véhicule, centrée, bornée par le compteur et les boutons, cachée sur le panneau', () => {
+  // Portrait 412 × 900 : véhicule à 78 %, compteur à gauche à la même hauteur, colonne de boutons à 364 px.
+  const p = roadPillBox({ vx: 206, vy: 702, colLeft: 364, sheetTop: 820, speedo: { top: 700, bottom: 780, right: 90 }, buttonsTop: 405 });
+  assert.equal(p.left, 206);
+  assert.equal(p.top, 702 + ROAD_PILL.ICON_HALF + ROAD_PILL.GAP);
+  assert.equal(p.maxWidth, 2 * (206 - 90 - ROAD_PILL.MARGIN), 'le compteur limite la largeur');
+  assert.equal(p.fits, true);
+  // Compteur plus haut que la pastille : seule la colonne de boutons borne.
+  const q = roadPillBox({ vx: 206, vy: 702, colLeft: 364, sheetTop: 820, speedo: { top: 500, bottom: 560, right: 90 }, buttonsTop: 405 });
+  assert.equal(q.maxWidth, 2 * (364 - 206 - ROAD_PILL.MARGIN));
+  // Panneau du bas trop proche : cachée (jamais par-dessus).
+  assert.equal(roadPillBox({ vx: 206, vy: 702, colLeft: 364, sheetTop: 760 }).fits, false);
+  // Paysage : bornée par la colonne de gauche.
+  const l = roadPillBox({ vx: 560, vy: 300, leftLimit: 360, colLeft: 840, sheetTop: 412 });
+  assert.equal(l.maxWidth, 2 * (560 - 360 - ROAD_PILL.MARGIN));
 });
 
 test('vitesse : panneau seulement si la limite est connue, dépassement', () => {

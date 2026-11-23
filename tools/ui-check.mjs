@@ -422,6 +422,28 @@ async function computeRoute(page) {
   await page.waitForTimeout(1200);
 }
 
+/** v53 : place de la pastille de la rue par rapport au repère du véhicule ; écusson et nom. */
+async function pillUnderVehicle(page) {
+  return page.evaluate(() => {
+    const road = document.querySelector('#nav-road');
+    const me = document.querySelector('.me-marker');
+    if (!road || road.hidden || !me) return { ok: false, why: 'absente' };
+    const r = road.getBoundingClientRect();
+    const m = me.getBoundingClientRect();
+    const badge = road.querySelector('.nav-badge');
+    const text = road.querySelector('.nav-road-text');
+    const below = r.top >= m.top + m.height / 2;
+    const centered = Math.abs((r.left + r.right) / 2 - (m.left + m.right) / 2) <= 2;
+    const fs = parseFloat(getComputedStyle(road).fontSize);
+    const oneLine = getComputedStyle(road).whiteSpace === 'nowrap' && r.height <= fs * 1.6 + 16;
+    const badgeLeft = !badge || !text || badge.getBoundingClientRect().right <= text.getBoundingClientRect().left + 1;
+    return {
+      ok: below && centered && oneLine && badgeLeft, below, centered, oneLine, badgeLeft,
+      badge: badge?.textContent ?? null, text: text?.textContent ?? null, top: Math.round(r.top), meCenter: Math.round(m.top + m.height / 2),
+    };
+  });
+}
+
 async function noHorizontalScroll(page, label) {
   const r = await page.evaluate(() => {
     const w = window.innerWidth;
@@ -806,6 +828,137 @@ async function satelliteAbroadCheck(browser, base) {
   }
 }
 
+/**
+ * v53 : mémoire de l'itinéraire en arrière-plan. Guidage GPS lancé, page cachée (visibilitychange) puis rechargée
+ * (appli tuée par le système) : guidage repris tel quel (« Guidage repris. »), progression gardée. Sauvegarde vieillie
+ * de 13 h : en mouvement ou vitesse inconnue, aucune question ; à l'arrêt, « Reprendre l'itinéraire ? » ; « Reprendre »
+ * relance le guidage. ✕ puis « Quitter » : sauvegarde effacée, rien de repris au rechargement. Itinéraire en
+ * préparation (non lancé) : fiches reprises sans nouveau calcul. 412×900 jour, 900×412 nuit.
+ */
+async function repriseCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const readSave = (page) => page.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('gabarit-route', 1);
+    req.onupgradeneeded = () => req.result.createObjectStore('save');
+    req.onsuccess = () => {
+      const g = req.result.transaction('save').objectStore('save').get('current');
+      g.onsuccess = () => { resolve(g.result ?? null); req.result.close(); };
+      g.onerror = () => resolve(null);
+    };
+    req.onerror = () => resolve(null);
+  }));
+  const ageSave = (page, ms) => page.evaluate((age) => new Promise((resolve) => {
+    const req = indexedDB.open('gabarit-route', 1);
+    req.onsuccess = () => {
+      const st = req.result.transaction('save', 'readwrite').objectStore('save');
+      const g = st.get('current');
+      g.onsuccess = () => { const v = g.result; v.savedAt -= age; st.put(v, 'current').onsuccess = () => { req.result.close(); resolve(true); }; };
+    };
+  }), ms);
+  const hide = (page) => page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    document.dispatchEvent(new Event('visibilitychange'));
+  });
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, { width, height, theme, voice: true, directions: () => nav });
+    // Itinéraire en préparation : gardé, repris sans calcul après rechargement.
+    await computeRoute(page);
+    await hide(page);
+    await page.waitForTimeout(500);
+    let save = await readSave(page);
+    check(save?.kind === 'plan' && save.format === 1 && save.vehicleId === 'v1' && !JSON.stringify(save).includes('cle-factice'),
+      `${tag} : itinéraire en préparation gardé (profil par identifiant, aucune clé)`, JSON.stringify({ kind: save?.kind, vehicleId: save?.vehicleId }));
+    const calls = stats.directions;
+    await page.reload();
+    await page.waitForSelector('.route-card', { timeout: 10000 });
+    check(stats.directions === calls, `${tag} : fiches reprises sans nouveau calcul`, `${calls} → ${stats.directions}`);
+    check(await page.isVisible('#btn-nav-start'), `${tag} : « Démarrer » proposé après reprise`);
+
+    // Guidage GPS, puis page cachée et appli tuée : guidage repris.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await drive(ctx, page, line, 50, 6);
+    await hide(page);
+    await page.waitForTimeout(500);
+    save = await readSave(page);
+    check(save?.kind === 'nav' && save.progress?.along > 0, `${tag} : guidage gardé avec sa progression`, JSON.stringify(save?.progress));
+    const along = save?.progress?.along ?? 0;
+    await page.reload();
+    await page.waitForSelector('#nav:not([hidden])', { timeout: 10000 });
+    await page.waitForTimeout(800);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(spoken.includes('Guidage repris.') && !spoken.includes('Guidage démarré.'), `${tag} : guidage repris tout seul (moins de 12 h)`, spoken.join(' | '));
+    const resumed = await readSave(page);
+    check(resumed?.kind === 'nav' && Math.abs((resumed.progress?.along ?? -1) - along) < 1, `${tag} : progression gardée`, `${along} → ${resumed?.progress?.along}`);
+    await page.screenshot({ path: join(SHOTS, `reprise-${width}x${height}-guidage.png`) });
+
+    // Sauvegarde de plus de 12 h : en mouvement (vitesse inconnue), aucune question ; à l'arrêt, la question.
+    await ageSave(page, 13 * 3600 * 1000);
+    await setGeo(page, { lon: line[5][0], lat: line[5][1], accuracy: 5 });
+    await page.reload();
+    await page.waitForTimeout(2500);
+    check(!(await page.isVisible('#nav')) && !(await page.isVisible('#resume-panel')), `${tag} : plus de 12 h, vitesse inconnue → rien repris, rien demandé`);
+    for (let i = 0; i < 4; i += 1) {
+      await setGeo(page, { lon: line[5][0], lat: line[5][1], accuracy: 5, speed: 0 });
+      await page.waitForTimeout(2000);
+    }
+    check(await page.isVisible('#resume-panel') && /Reprendre l'itinéraire \?/.test(await page.textContent('#resume-panel')),
+      `${tag} : à l'arrêt, « Reprendre l'itinéraire ? »`);
+    await page.screenshot({ path: join(SHOTS, `reprise-${width}x${height}-question.png`) });
+    await noHorizontalScroll(page, `${tag} question de reprise`);
+    // En roulant : la question disparaît, la sauvegarde reste.
+    await setGeo(page, { lon: line[6][0], lat: line[6][1], accuracy: 5, speed: 15 });
+    await page.waitForTimeout(4500);
+    check(!(await page.isVisible('#resume-panel')) && !!(await readSave(page)), `${tag} : en roulant, question cachée, sauvegarde gardée`);
+    for (let i = 0; i < 4; i += 1) {
+      await setGeo(page, { lon: line[6][0], lat: line[6][1], accuracy: 5, speed: 0 });
+      await page.waitForTimeout(2000);
+    }
+    await page.click('#btn-resume-yes');
+    await page.waitForSelector('#nav:not([hidden])', { timeout: 10000 });
+    check(true, `${tag} : « Reprendre » relance le guidage`);
+
+    // ✕ puis « Quitter » : sauvegarde effacée, rien de repris.
+    await page.click('#btn-nav-stop');
+    await page.click('#btn-nav-quit');
+    await page.waitForTimeout(500);
+    check((await readSave(page)) === null, `${tag} : « Quitter » efface la sauvegarde`);
+    await hide(page);
+    await page.waitForTimeout(300);
+    check((await readSave(page)) === null, `${tag} : rien de regardé après « Quitter » (même en arrière-plan)`);
+    await page.reload();
+    await page.waitForTimeout(2000);
+    check(!(await page.isVisible('#nav')) && !(await page.isVisible('#resume-panel')), `${tag} : rechargement après « Quitter » : rien de repris`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // IndexedDB refusé (navigation privée) ou plein (QuotaExceededError) : guidage normal, aucune erreur.
+  for (const mode of ['refusé', 'plein']) {
+    const tag = `IndexedDB ${mode}`;
+    const { page, ctx, errors } = await open(browser, base, { width: 412, height: 900, theme: 'day', voice: true, directions: () => nav });
+    await ctx.addInitScript((m) => {
+      if (m === 'refusé') indexedDB.open = () => { throw new DOMException('refusé', 'SecurityError'); };
+      else IDBObjectStore.prototype.put = () => { throw new DOMException('plein', 'QuotaExceededError'); };
+    }, mode);
+    await page.reload();
+    await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+    await computeRoute(page);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await drive(ctx, page, line, 50, 4);
+    await hide(page);
+    await page.waitForTimeout(500);
+    const instr = await page.textContent('#nav-instr');
+    check(await page.isVisible('#nav') && !!instr && !/Recherche du signal/.test(instr), `${tag} : guidage normal`, instr);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function contextLossCheck(browser, base) {
   const { page, ctx } = await open(browser, base, { width: 412, height: 900, theme: 'night' });
   // Canevas vide = magenta (le fond de la carte nuit, #14161C, se confondrait avec celui de la page).
@@ -977,11 +1130,18 @@ async function comfortCheck(browser, base) {
     `${width} px : boutons ronds en guidage (Recentrer seulement si la carte a bougé)`);
     const road = await page.textContent('#nav-road');
     check(await page.isVisible('#nav-road') && /Route de Lyon|D 306/.test(road ?? ''), `${width} px : nom de la route en cours`, road);
+    // v53 : pastille SOUS le camion, centrée sur lui, écusson du numéro à gauche, une ligne.
+    const pill = await pillUnderVehicle(page);
+    check(pill.ok, `${width} px : pastille de la rue sous le camion, centrée, écusson à gauche`, JSON.stringify(pill));
     const bg = await page.evaluate(() => getComputedStyle(document.querySelector('.nav-maneuver')).backgroundColor);
     check(bg === 'rgb(20, 22, 28)', `${width} px : bandeau noir Panier Perdu, même de jour (2c-a)`, bg);
-    const round = await page.$$eval('#nav .nav-round', (n) => n.filter((b) => b.getClientRects().length)
+    // v53 : colonne de droite ≥ 40 px (environ 25 % plus petite), boutons du panneau du bas ≥ 56 px.
+    const round = await page.$$eval('#nav .nav-mapbtns .nav-round', (n) => n.filter((b) => b.getClientRects().length)
       .map((b) => Math.round(Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))));
-    check(round.length >= 5 && round.every((x) => x >= 56), `${width} px : boutons ronds d'au moins 56 px`, round.join(', '));
+    check(round.length >= 4 && round.every((x) => x >= 40), `${width} px : boutons ronds de la colonne d'au moins 40 px`, round.join(', '));
+    const low = await page.$$eval('#nav .nav-bottom .nav-round', (n) => n.filter((b) => b.getClientRects().length)
+      .map((b) => Math.round(Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))));
+    check(low.length >= 1 && low.every((x) => x >= 56), `${width} px : boutons du panneau du bas d'au moins 56 px`, low.join(', '));
     await noHorizontalScroll(page, `${width} px guidage (boutons de carte)`);
     const over = await overflowingNavText(page);
     check(over.length === 0, `${width} px guidage : textes dans leurs cases`, over.join(' ; '));
@@ -1445,7 +1605,7 @@ async function footCheck(browser, base) {
     const label = `${width}×${height}`;
     const closed = await footOverlaps(page);
     check(closed.out.length === 0, `${label} guidage, encart fermé : boutons hors du bandeau et de la barre du bas`, closed.out.join(' ; '));
-    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 56), `${label} : boutons ronds d'au moins 56 px`,
+    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 40), `${label} : boutons ronds d'au moins 40 px (v53)`,
       closed.sizes.join(', '));
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-pied-ferme.png`) });
     await navAreas(page);
@@ -2795,7 +2955,10 @@ function directionsCopyFiles(kind) {
   if (!kind) return null;
   const ids = kind === 'ambigu' ? ['w4001', 'w4002'] : kind === 'proche' ? ['w4001', 'w4003'] : ['w4001'];
   const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
-  const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-directions-sortie.geojsonseq'), 'utf8').split('\n')
+  // v53 : nœud de sortie n5001 (12, Vallorbe) au début de w4001 dans la copie « fixture ».
+  if (kind === 'fixture') ids.push('n5001');
+  const feats = ['osm-directions-sortie.geojsonseq', 'osm-sorties.geojsonseq']
+    .flatMap((f) => readFileSync(join(ROOT, 'tests', 'fixtures', f), 'utf8').split('\n'))
     .map(parseGeojsonLine).filter((f) => f && ids.includes(f.id));
   const { index, tiles } = convertDirections(feats.map(directionFromFeature).filter(Boolean),
     { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
@@ -2833,6 +2996,19 @@ async function directionsCheck(browser, base) {
     await drive(ctx, page, line.slice(10, 21), 90, 6);
     const instr = (await page.textContent('#nav-instr')).replace(/ /g, ' ').trim();
     const spoken = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /restez à droite/i.test(t));
+    // v53 : ligne « Sortie 12 · Vallorbe » sous la consigne (copie « fixture » seulement), une ligne, jamais dite.
+    const exit = await page.evaluate(() => {
+      const el = document.querySelector('#nav-exit');
+      const r = el.getBoundingClientRect();
+      const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.3;
+      return { hidden: el.hidden || !el.getClientRects().length, text: el.textContent.replace(/\u00a0/g, ' '), oneLine: r.height <= lh * 1.6 + 8 };
+    });
+    if (kind === 'fixture') {
+      check(!exit.hidden && /Sortie 12 · Vallorbe$/.test(exit.text) && exit.oneLine, `${tag} : ligne de sortie sous la consigne (une ligne)`, JSON.stringify(exit));
+      check(spoken.every((t) => !/Sortie 12|Vallorbe/.test(t)), `${tag} : sortie jamais dite`, spoken.join(' | '));
+      const pill = await pillUnderVehicle(page);
+      if (pill.why !== 'absente') check(pill.ok && /^A.31$/.test(pill.badge ?? ''), `${tag} : écusson « A 31 » dans la pastille de la rue`, JSON.stringify(pill));
+    } else check(exit.hidden, `${tag} : pas de sortie connue → pas de ligne`, JSON.stringify(exit));
     if (kind === 'fixture') {
       check(instr === FULL, `${tag} : bandeau avec la direction`, instr);
       const fits = await page.evaluate(() => { const el = document.querySelector('#nav-instr'); return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1; });
@@ -3023,7 +3199,7 @@ async function driveWindCheck(browser, base) {
       await page.waitForTimeout(1000);
     }
     foot = await footOverlaps(page);
-    check(foot.out.length === 0 && foot.sizes.every((h) => h >= 56), `${label} : à l'arrêt, boutons de carte toujours libres`, foot.out.join(' ; '));
+    check(foot.out.length === 0 && foot.sizes.every((h) => h >= 40), `${label} : à l'arrêt, boutons de carte toujours libres`, foot.out.join(' ; '));
     under = await bannerOverBottom(page);
     check(under.length === 0, `${label} : à l'arrêt, bandeau au-dessus de la barre du bas`, under.join(' ; '));
     check(!/Signal GPS perdu/.test(await page.textContent('#nav-alert')), `${label} : GPS émulé reçu à l'arrêt`);
@@ -3120,7 +3296,7 @@ async function guidanceMap(page) {
  * Phase 2c : écran de guidage façon GPS de téléphone. Téléphone (412×900, 900×412, et 760×360 de jour), tablette
  * (800×1280, 1280×800) ; jour, nuit (412×900 : mode auto, le soleil se couche à Lyon pendant le guidage, un 21
  * décembre ; ailleurs nuit choisie) et satellite de nuit ; GPS émulé (une position par seconde, vitesse fournie), 4 h 25 de conduite et rafales (alertes,
- * « +N »). Rien ne se chevauche, boutons ronds ≥ 56 px, texte jamais coupé, 2 alertes au plus, « Autres itinéraires »
+ * « +N »). Rien ne se chevauche, boutons ronds de la colonne ≥ 40 px (v53), texte jamais coupé, 2 alertes au plus, « Autres itinéraires »
  * grisé en roulant et actif après 3 s à l'arrêt, boussole (nord en haut), Recentrer après un glissé seulement,
  * confirmation pour quitter, tracé épais et partie parcourue, bulles des rues ; nuit : voile sombre pendant le
  * changement de style, tracé, partie parcourue, marqueur et bulles remis ; satellite de nuit assombri (0,6) ;
@@ -3182,7 +3358,7 @@ async function guidanceCheck(browser, base) {
     if (mode === 'satellite') check(m.brightness === SATELLITE_NIGHT_BRIGHTNESS.normal, `${label} : photos IGN assombries la nuit (Normal : 0,8)`, String(m.brightness));
     let foot = await footOverlaps(page);
     check(foot.out.length === 0, `${label} : en roulant, rien ne se chevauche`, foot.out.join(' ; '));
-    check(foot.sizes.length >= 4 && foot.sizes.every((x) => x >= 56), `${label} : boutons ronds d'au moins 56 px`, foot.sizes.join(', '));
+    check(foot.sizes.length >= 4 && foot.sizes.every((x) => x >= 40), `${label} : boutons ronds d'au moins 40 px (v53)`, foot.sizes.join(', '));
     const under = await bannerOverBottom(page);
     check(under.length === 0, `${label} : bandeau au-dessus du panneau du bas`, under.join(' ; '));
     const over = await overflowingNavText(page);
@@ -3771,6 +3947,9 @@ async function bannerCheck(browser, base) {
       check(alerts === 2, `${label} : 2 alertes actives`, String(alerts));
       const over = await overflowingNavText(page);
       check(over.length === 0, `${label} : textes dans leurs cases`, over.join(' ; '));
+      // v53 : pastille de la rue (si montrée) sous le camion, centrée, écusson à gauche.
+      const pill = await pillUnderVehicle(page);
+      if (pill.why !== 'absente') check(pill.ok, `${label} : pastille de la rue sous le camion`, JSON.stringify(pill));
       if (b.scrolled) {
         // Pile du haut qui défile (dernier recours) : son cadre reste au-dessus du panneau du bas.
         const gap = await page.evaluate(() => {
@@ -3811,7 +3990,7 @@ try {
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
-    recommande: recommendedTunnelCheck, autres: otherRoutesCheck, camion: truckIconCheck };
+    recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

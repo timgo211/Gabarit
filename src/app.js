@@ -44,6 +44,8 @@ import { createAreas } from './ui/areas.js';
 import { createWeather } from './ui/weather.js';
 import { placeAlongRoute } from './lib/areas-route.js';
 import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
+import { buildSave, checkSave, restoredChoice, saveKey, shouldSave, RESUME_QUESTION } from './lib/route-save.js';
+import { createRouteStore } from './ui/route-save.js';
 
 function pickStorage() {
   try {
@@ -146,7 +148,10 @@ navigation = createNavigation({
   },
   onAreaOpen: (id) => areas.openSheet(id),
   areaFacts: (id) => areas.shortFacts(id),
-  onView: () => areas.refreshDrive(),
+  onView: () => { areas.refreshDrive(); saveRoute(); },
+  // v53 : sauvegarde de l'itinéraire effacée à l'arrivée et quand le guidage est quitté (✕ puis « Quitter »).
+  onArrived: () => forgetRoute(),
+  onQuit: () => forgetRoute(),
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
   onAlternatives: (from) => openAlternatives(from),
   onParkChange: (parked) => { if (!parked) closeAlternatives('moving'); },
@@ -155,6 +160,7 @@ navigation = createNavigation({
   // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
   onDriving: (d) => saveDriving(storage, d),
   onEnd: (message) => {
+    saveRoute({ force: true }); // v53 : arrêt sans arrivée ni « Quitter » (GPS absent…) : itinéraire gardé en préparation
     closeAlternatives(); // v44
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
@@ -561,6 +567,8 @@ function showBridgesOnMap(r) {
 function selectRoute(index) {
   if (!choice || navigation.active || index === choice.selected || !choice.options[index]) return;
   choice = { ...choice, selected: index };
+  routeSaveOn = true;
+  saveRoute({ force: true });
   map.selectRoute(index);
   renderChoice();
   areas.select(choice.options[index].route);
@@ -568,7 +576,7 @@ function selectRoute(index) {
 }
 map.onRoutePick(selectRoute);
 
-function startGuidance(simulate = null) {
+function startGuidance(simulate = null, resume = null) {
   if (!choice) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
   const option = choice.options[choice.selected];
   showMessage(messageNode, '');
@@ -597,7 +605,9 @@ function startGuidance(simulate = null) {
     speeds: { data: speedLimits.state.status === 'ok' ? speedLimits.state.data : null, voice: data.settings.speedVoice === true },
     // Phase 11b : directions des panneaux dans les consignes (copie des cases du trajet).
     directions: directions.state.status === 'ok' ? directions.state.data : null,
+    resume, // v53 : reprise d'un guidage sauvegardé
   });
+  saveRoute({ force: true });
   return null;
 }
 navStartBtn.addEventListener('click', () => startGuidance(null));
@@ -744,6 +754,7 @@ const form = createRouteForm({
   // Saisie dans un champ : le point choisi par appui long est oublié, son repère retiré.
   onEdit: (which) => map.clearPin(which === 'to' ? 'pinTo' : 'pinFrom'),
   onSubmit: async (p) => {
+    endResumeQuestion(); // v53 : nouveau calcul, la question de reprise n'a plus lieu d'être
     const vehicle = activeVehicle(data);
     showMessage(messageNode, '');
     form.setBusy(true);
@@ -770,18 +781,9 @@ const form = createRouteForm({
         avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, fromLabel: p.fromLabel, toLabel: p.toLabel,
         startIsMyPosition: p.startIsMyPosition,
       };
-      // Fiches d'abord : le panneau grandit et la carte rétrécit ; le cadrage se fait ensuite sur la bonne taille.
-      renderChoice();
-      navStartBtn.hidden = false;
-      map.showRoutes(options.map((o) => o.route), selected);
-      areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
-      weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
-      access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
-      bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
-      weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
-      speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
-      directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/
-      winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
+      showChoice(selected);
+      routeSaveOn = true;
+      saveRoute({ force: true }); // v53 : itinéraire en préparation gardé
       const route = options[0].route;
       update((d) => addTrip(d, {
         date: new Date().toISOString(), from: p.fromLabel, to: p.toLabel, vehicleId: vehicle.id,
@@ -811,6 +813,109 @@ const form = createRouteForm({
 });
 
 createShare({ getChoice: () => choice, getMyPosition: () => myPosition });
+
+/**
+ * Itinéraires calculés (ou repris, v53) affichés : fiches, tracés, données du trajet (aires, météo, copies data/…),
+ * sans requête d'itinéraire.
+ */
+function showChoice(selected) {
+  const options = choice.options;
+  // Fiches d'abord : le panneau grandit et la carte rétrécit ; le cadrage se fait ensuite sur la bonne taille.
+  renderChoice();
+  navStartBtn.hidden = false;
+  map.showRoutes(options.map((o) => o.route), selected);
+  areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
+  weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
+  access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
+  bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
+  weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
+  speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
+  directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/
+  winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
+}
+
+// ───────── v53 : mémoire de l'itinéraire en arrière-plan (src/lib/route-save.js, IndexedDB) ─────────
+// Gardé : itinéraire en préparation et guidage en cours (GPS réel ; jamais une simulation), au passage en arrière-plan
+// (visibilitychange / pagehide) et à chaque changement d'état, au plus toutes les 30 s pendant le guidage. Effacé à
+// l'arrivée et par « Quitter ». Au démarrage : moins de 12 h → repris tel quel ; plus → « Reprendre l'itinéraire ? »
+// posé seulement à l'arrêt (vitesse inconnue = en mouvement, R412-6-2) ; sinon rien n'est demandé, la sauvegarde reste.
+const routeStore = createRouteStore();
+let lastRouteSave = null;
+/** Faux après « Quitter » ou l'arrivée : rien n'est regardé jusqu'au prochain calcul ou choix d'itinéraire. */
+let routeSaveOn = false;
+function saveRoute(opts) {
+  try { writeRoute(opts); } catch { /* sauvegarde impossible : le guidage continue */ }
+}
+function writeRoute({ force = false } = {}) {
+  if (!choice || !routeSaveOn || navigation.simulating) return;
+  const kind = navigation.active ? 'nav' : 'plan';
+  const progress = navigation.progress;
+  if (progress?.arrived) return;
+  const key = saveKey(kind, choice);
+  const now = Date.now();
+  if (!shouldSave(lastRouteSave, { now, key, force })) return;
+  const save = buildSave({
+    kind, choice, vehicleId: choice.vehicle?.id ?? '', along: progress?.along ?? null, segIndex: progress?.segIndex ?? null, now,
+  });
+  if (!save) return;
+  lastRouteSave = { at: now, key };
+  routeStore.put(save).catch(() => {});
+}
+function forgetRoute() {
+  routeSaveOn = false;
+  lastRouteSave = null;
+  routeStore.clear().catch(() => {});
+}
+window.addEventListener('pagehide', () => saveRoute({ force: true }));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveRoute({ force: true }); });
+
+const resumeUi = { panel: $('#resume-panel'), yes: $('#btn-resume-yes'), no: $('#btn-resume-no') };
+let pendingResume = null;
+const resumePark = createPlanPark({ onChange: () => renderResume() });
+/** Question « Reprendre l'itinéraire ? » : visible seulement à l'arrêt, jamais pendant un guidage. */
+function renderResume() {
+  resumeUi.panel.hidden = !pendingResume || !resumePark.parked || navigation.active;
+}
+function applyResume(save) {
+  const back = restoredChoice(save, data.vehicles);
+  if (!back) { forgetRoute(); return; }
+  choice = back;
+  routeSaveOn = true;
+  ensureTunnels(back.vehicle); // phase 5b : tunnels ADR lus comme au calcul
+  if (!back.startIsMyPosition && Array.isArray(back.start)) form.setPlace('from', { lon: back.start[0], lat: back.start[1], label: back.fromLabel });
+  form.setPlace('to', { lon: back.end[0], lat: back.end[1], label: back.toLabel });
+  showChoice(back.selected);
+  if (save.kind === 'nav') startGuidance(null, save.progress);
+  else showMessage(messageNode, 'Itinéraire repris (calculé avant la mise en arrière-plan).', 'info');
+}
+function endResumeQuestion() {
+  pendingResume = null;
+  resumePark.watch(false);
+  renderResume();
+}
+resumeUi.yes.addEventListener('click', () => {
+  if (!pendingResume || !resumePark.parked) return; // refusé hors de l'arrêt
+  const save = pendingResume;
+  endResumeQuestion();
+  applyResume(save);
+});
+resumeUi.no.addEventListener('click', () => {
+  if (!pendingResume || !resumePark.parked) return;
+  endResumeQuestion();
+  forgetRoute();
+});
+$('#resume-question').textContent = RESUME_QUESTION;
+routeStore.load().then((save) => {
+  if (choice || navigation.active) return; // calcul déjà lancé entre-temps : la sauvegarde sera remplacée
+  const decision = checkSave(save, { now: Date.now(), vehicles: data.vehicles });
+  if (decision.action === 'ignore') routeStore.clear().catch(() => {});
+  else if (decision.action === 'restore') applyResume(save);
+  else if (decision.action === 'ask') {
+    pendingResume = save;
+    resumePark.watch(true);
+    renderResume();
+  }
+}).catch(() => { /* reprise impossible : l'appli démarre comme sans sauvegarde */ });
 
 /**
  * Appui long sur la carte (phase 8, à l'arrêt) : « Aller ici » ou « Partir d'ici » remplit le champ, sans rien

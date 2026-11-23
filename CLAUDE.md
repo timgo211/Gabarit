@@ -73,6 +73,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Directions (11b, `directions.js`, copie `data/directions-osm/` mêmes Action et cases, jamais précachée) : « direction X »
   seulement si UNE bretelle à 60 m du point de manœuvre au cap cohérent ; dit seulement sans autre bretelle à 60 m ;
   sinon consigne inchangée (jamais devinée). `maneuverText(m, { spoken })` : affiché ≠ dit.
+- Écran de navigation v53 : boutons ronds de la colonne 48 px (zone tactile ≥ 40 px, ces boutons seulement), pastille
+  de la rue sous le véhicule, ligne de sortie (règle 11b, jamais dite), mémoire de l'itinéraire en IndexedDB (question
+  > 12 h seulement à l'arrêt). Détail : skill `gabarit-interface`.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - « Éviter le tunnel » (5b, v48 aussi classe Euro interdite 5g) : à l'arrêt seulement (`avoidTunnelAllowed`, relevés GPS
   hors guidage `plan-park.js`, vitesse inconnue = grisé), une requête dans le budget de 3 avec les diagnostics 2f
