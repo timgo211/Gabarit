@@ -28,8 +28,8 @@ const route = () => parseDirections(fixture('ors-directions-fr-ch-it.json'));
 
 test('ORS : countryinfo demandé dans la même requête (variantes et recalcul compris)', () => {
   const req = buildDirectionsRequest({ start: [6.08, 46.14], end: [7.32, 45.74], vehicle: semi, apiKey: 'x', alternatives: 3 });
-  assert.deepEqual(req.body.extra_info, ['tollways', 'countryinfo', 'roadaccessrestrictions']);
-  assert.equal(buildDirectionsRequest({ start: [6.08, 46.14], end: [7.32, 45.74], vehicle: semi, preference: 'shortest' }).body.extra_info.length, 3);
+  assert.deepEqual(req.body.extra_info, ['tollways', 'countryinfo', 'roadaccessrestrictions', 'waycategory', 'waytype']);
+  assert.equal(buildDirectionsRequest({ start: [6.08, 46.14], end: [7.32, 45.74], vehicle: semi, preference: 'shortest' }).body.extra_info.length, 5);
 });
 
 test('countryinfo lu : France → Suisse → Italie, km et heure de chaque frontière', () => {

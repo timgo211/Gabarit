@@ -30,7 +30,7 @@ export const SHARE = Object.freeze({
 });
 
 /** Variantes transmises dans un lien (clé de route-options.js ; alternatives d'ORS par rang). */
-export const SHARE_VARIANTS = Object.freeze(['recommended', 'shortest', 'no-toll', 'fastest', 'alternative-2', 'alternative-3']);
+export const SHARE_VARIANTS = Object.freeze(['recommended', 'shortest', 'no-toll', 'fastest', 'alternative-2', 'alternative-3', 'ors-default']);
 
 export const SHARED_ROUTE_TEXT = 'Itinéraire partagé : touche « Calculer l\'itinéraire ».';
 export const SHARED_ROUTE_NO_KEY_TEXT = 'Itinéraire partagé reçu. Pour le calculer, crée une clé gratuite sur heigit.org '

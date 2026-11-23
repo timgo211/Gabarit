@@ -19,7 +19,8 @@
 
 import { buildDirectionsRequest, buildRestrictions } from './ors-request.js';
 import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bboxOf } from './ors-response.js';
-import { ERROR_KINDS, failedSegment } from './ors-errors.js';
+import { ERROR_KINDS, failedSegment, NO_ROUTE_BASE_TEXT } from './ors-errors.js';
+import { pickRecommendedIndex, anShareText } from './road-class.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
@@ -69,7 +70,32 @@ export const VARIANTS = Object.freeze({
   }),
   noToll: Object.freeze({ key: 'no-toll', label: 'Sans péage', avoidTolls: true }),
   fastest: Object.freeze({ key: 'fastest', label: 'Plus rapide', preference: 'fastest' }),
+  /** Phase 2g : itinéraire de la préférence d'ORS quand un autre devient « Recommandé » (part A/N). */
+  orsDefault: Object.freeze({ key: 'ors-default', label: 'Préférence ORS' }),
 });
+
+/** Note du « Recommandé » choisi pour sa part A/N (phase 2g) : jamais une garantie. */
+export const AN_PREFERRED_NOTE = "Préféré pour sa part d'autoroute et de nationale. Une autoroute ou une nationale peut aussi avoir une limite : la signalisation fait foi.";
+
+/**
+ * Phase 2g : « Recommandé » = parmi les itinéraires calculés, la plus forte part A/N à 15 % de durée au plus du plus
+ * rapide (pickRecommendedIndex, road-class.js). Le choisi passe en tête et prend le nom « Recommandé » (son ancien
+ * nom en « aussi », sauf une simple alternative) ; la préférence d'ORS devient « Préférence ORS ». Clés et réglages de
+ * requête inchangés (recalcul en guidage, partage). Sinon, liste inchangée.
+ */
+export function promoteRecommended(options) {
+  const i = pickRecommendedIndex(options);
+  if (i <= 0) return options;
+  const best = options[i];
+  const ors = options[0];
+  const also = best.key === VARIANTS.alternative.key ? best.also : [best.label, ...best.also];
+  const promoted = {
+    ...best, label: VARIANTS.recommended.label, also, promoted: true,
+    note: [best.note, AN_PREFERRED_NOTE].filter(Boolean).join(' '),
+  };
+  const demoted = { ...ors, key: VARIANTS.orsDefault.key, label: VARIANTS.orsDefault.label };
+  return [promoted, demoted, ...options.filter((_, k) => k !== 0 && k !== i)];
+}
 
 /**
  * Échecs du Recommandé avec alternative_routes qui justifient de le redemander sans : limite de distance (2004),
@@ -192,6 +218,9 @@ export function nameAlternatives(options) {
   return options.map((o, i) => (o.key === VARIANTS.alternative.key ? { ...o, label: `Alternative ${i + 1}` } : o));
 }
 
+/** Diagnostics d'un 2009 qui concluent sur le départ ou l'arrivée : message sans le conseil péages / ferries. */
+export const PRECISE_HINTS = Object.freeze(new Set(['start-no-exit', 'start-unreachable', 'end-unreachable']));
+
 /**
  * Diagnostic d'un code 2009 (aucun itinéraire), phases 5h ter et 2f, dans le budget de 3 requêtes du calcul
  * (alternative_routes compris). Ajoute une précision au message de `err` ; aucun résultat n'est affiché ni guidé,
@@ -212,7 +241,9 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
   const hint = (kind, text) => {
     err.hint = kind;
     err.restrictionHint = kind === 'restrictions';
-    err.message = `${err.message ? `${err.message} ` : ''}${text}`;
+    // Phase 2g : diagnostic précis (départ ou arrivée en cause) → le conseil générique péages / ferries est retiré.
+    const base = PRECISE_HINTS.has(kind) ? NO_ROUTE_BASE_TEXT : err.message;
+    err.message = `${base ? `${base} ` : ''}${text}`;
   };
   const left = () => requests < ROUTE_OPTIONS.MAX_REQUESTS;
   /** Envoie une requête de diagnostic : { ok:true } | { ok:false, noRoute:boolean, kind, detail }. */
@@ -314,7 +345,7 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     });
     options = dedupeOptions(options);
   }
-  return { options: nameAlternatives(options), failures, requests };
+  return { options: promoteRecommended(nameAlternatives(options)), failures, requests };
 }
 
 /** Ligne discrète pour une variante non calculée. */
@@ -355,6 +386,7 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
     distance: formatDistance(r.distance),
     arrival: `Arrivée : ${formatArrival(now, r.duration)}`,
     toll: `Péage : ${tollText(r.tollDistance)}`,
+    an: anShareText(r), // phase 2g
     fuel,
     delta: reference && reference !== option ? deltaText(r, reference.route) : '',
   };

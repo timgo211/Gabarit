@@ -58,11 +58,15 @@ Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relan
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
   Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.
 - Chrome n'autorise la voix qu'après une action de l'utilisateur : première phrase dans le geste « Démarrer ».
-- Itinéraires alternatifs (`route-options.js`) : 3 requêtes ORS au plus par calcul. Le Recommandé (préférence par
-  défaut d'ORS) est toujours la première fiche et la référence des écarts. `alternative_routes` (`target_count` ≤ 3,
+- Itinéraires alternatifs (`route-options.js`) : 3 requêtes ORS au plus par calcul. Le Recommandé est toujours la
+  première fiche et la référence des écarts (préférence d'ORS, sauf choix A/N ci-dessous → « Préférence ORS »). `alternative_routes` (`target_count` ≤ 3,
   2 points seulement) uniquement si départ–arrivée ≤ 100 km **à vol d'oiseau** (ORS mesure ainsi, sinon erreur 2004) ;
   sinon, ou si ORS ne renvoie qu'un itinéraire : Plus court + Sans péage (Plus rapide si péages évités ou absents).
   Le choix se fait à l'arrêt ; le recalcul en guidage garde `preference`/péages de la variante choisie.
+- « Recommandé » (2g, `road-class.js`) : parmi les itinéraires déjà calculés, la plus forte part autoroute + nationale
+  (waycategory bit 1 = A ; N = waytype 1 + référence N de l'étape ; inconnu jamais N) à ≤ 15 % de durée du plus rapide
+  (`ROUTE_PREF`), égalité → le plus rapide ; > 30 % de km sans nom ni référence → part inconnue, ordre d'ORS gardé.
+  Péages hors calcul. Jamais une garantie : « la signalisation fait foi ».
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

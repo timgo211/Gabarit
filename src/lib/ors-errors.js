@@ -21,13 +21,20 @@ export const ERROR_KINDS = {
   UNKNOWN: 'unknown',
 };
 
+/**
+ * Début du message « aucun itinéraire » (phase 2g) : seul gardé quand le diagnostic d'un code 2009 a conclu
+ * (départ sans sortie, départ isolé, arrivée inaccessible) ; le conseil générique péages / ferries ne reste que
+ * si aucun diagnostic n'a conclu.
+ */
+export const NO_ROUTE_BASE_TEXT = 'Aucun itinéraire autorisé pour ce gabarit.';
+
 const MESSAGES = {
   'no-key': 'Aucune clé OpenRouteService. Ouvre Réglages pour la saisir.',
   'invalid-key': 'Clé OpenRouteService refusée. Vérifie-la dans Réglages (bouton « Tester »).',
   quota: 'Trop de demandes en une minute (limite OpenRouteService). Réessaie dans une minute.',
   'daily-quota': 'Quota du jour atteint. Le quota gratuit OpenRouteService se renouvelle 24 h après la première demande : réessaie plus tard.',
   'key-or-quota': 'Clé refusée ou quota du jour atteint. Vérifie la clé dans Réglages (bouton « Tester »), ou réessaie plus tard.',
-  'no-route': "Aucun itinéraire autorisé pour ce gabarit. Essaie d'autoriser péages/ferries ou vérifie le profil véhicule.",
+  'no-route': `${NO_ROUTE_BASE_TEXT} Essaie d'autoriser péages/ferries ou vérifie le profil véhicule.`,
   'point-not-found': 'Départ ou arrivée trop loin d\'une route accessible. Choisis un point plus proche d\'une route.',
   'too-far': 'Trajet trop long pour le service gratuit. Découpe-le en étapes.',
   'bad-request': 'Requête refusée par OpenRouteService. Vérifie les valeurs du profil véhicule.',

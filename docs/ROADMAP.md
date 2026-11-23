@@ -178,6 +178,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   une requête, sans les restrictions (messages 5h ter). Diagnostic interrompu : message d'origine, raison ajoutée à la
   ligne technique. « La signalisation fait foi. »
 
+- [x] **Phase 2g — Correctifs et priorité autoroute / nationale** (après la 2f, v39)
+  Message d'un 2009 au diagnostic précis sans le conseil péages / ferries. ZFE du Grand Nancy sur autoroute : « à
+  vérifier » (BNZFE sans exception, arrêté non lu). Classe de route de chaque tronçon dans la même requête
+  (waycategory : autoroute ; waytype 1 + référence N : nationale ; sans nom : inconnu, jamais nationale) ; fiche
+  « Autoroute et nationale : 82 % » ; « Recommandé » = plus forte part A/N parmi les itinéraires déjà calculés, à 15 %
+  de durée au plus du plus rapide (égalité → plus rapide ; plus de 30 % de km inconnus → ordre d'ORS). Jamais une
+  garantie : la signalisation fait foi.
+
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.

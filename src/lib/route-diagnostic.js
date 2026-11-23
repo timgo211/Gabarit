@@ -11,6 +11,7 @@
 
 import { prepareLine, pointAt } from './nav-geo.js';
 import { roadRefs } from './route-samples.js';
+import { roadStatsText } from './road-class.js';
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const km = (m) => (m / 1000).toFixed(1).replace('.', ',');
@@ -38,6 +39,7 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   if (Array.isArray(route.countries) && route.countries.length) {
     lines.push(`Pays (countryinfo) : ${route.countries.map((c) => c.code).join(' → ')}`);
   } else lines.push('Pays (countryinfo) : absent');
+  lines.push(roadStatsText(route)); // phase 2g : km A / N / autre / inconnus, part A/N
   lines.push('Étapes ORS (km début–fin | nom renvoyé | références lues | point de début) :');
   const steps = Array.isArray(route.steps) ? route.steps : [];
   const last = coords.length - 1;

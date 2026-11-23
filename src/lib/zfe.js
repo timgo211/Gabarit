@@ -367,11 +367,13 @@ export function zfeAlongRoute(route, { data, vehicle, departure = new Date(), el
         id: hit.zone.id, name: hit.zone.name, zone: hit.zone, enter: sm.along, exit: sm.along, time: date,
         banned: false, firstBanned: null, critair: hit.zone[category].critair, hours: hit.zone[category].hours,
         hoursRaw: hit.zone[category].hoursRaw, onVoie: false, url: hit.zone.url ?? hit.zone.info, destination: false,
+        motorways: [],
       };
       out.push(cur);
     }
     cur.exit = sm.along;
     if (hit.voie) cur.onVoie = true;
+    for (const r of sm.roads ?? []) if (/^A\d/.test(r) && !cur.motorways.includes(r)) cur.motorways.push(r);
     if (banned && !cur.banned) { cur.banned = true; cur.firstBanned = sm.along; cur.time = date; }
   }
   for (const p of out) p.destination = total - p.exit < ZFE.SAMPLE_M;
@@ -488,12 +490,33 @@ export function avoidForReroute(avoidPolygons, from, end) {
 
 const km = (m) => `km ${Math.round(m / 1000)}`;
 
+/**
+ * Phase 2g : ZFE dont l'inclusion des autoroutes n'a pas pu être tranchée à la source officielle.
+ * Grand Nancy (245400676-ZFE-001) : BNZFE du 26/03/2026 (static.data.gouv.fr, voies.geojson, lue le 23/11/2026) :
+ * 1 167 tronçons publiés par la Métropole, tous « pl_critair V5, 24/7, du 01/01/2025 au 31/12/2034 » comme l'aire,
+ * aucun tronçon d'exception (Crit'Air vide) ; les tronçons n'ont pas de nom de route, l'A31 n'y est donc ni reconnue
+ * ni exclue. L'arrêté de la Métropole (grandnancy.eu, lien `url` de la zone) n'a pas pu être lu (site injoignable
+ * depuis l'outil de développement). Passage sur autoroute dans la zone : interdiction gardée par prudence, mention
+ * « à vérifier » ajoutée. Lever cette mention seulement d'après l'arrêté.
+ */
+export const ZFE_MOTORWAY_TO_CHECK = Object.freeze({
+  '245400676-ZFE-001': 'BNZFE du 26/03/2026 : 1 167 tronçons V5 sans exception (lue le 23/11/2026) ; arrêté non lu',
+});
+
 /** Ligne de la fiche d'itinéraire pour un passage interdit. */
 export function describeZfePassage(p, vehicle) {
   const own = critairCode(vehicle?.critair);
   const mine = own === 'NC' ? 'votre véhicule : non classé' : `votre véhicule : Crit'Air ${own === 'EL' ? '0' : own.slice(1)}`;
   const where = p.destination ? `arrivée dans la zone (${km(p.enter)})` : `${km(p.enter)} → ${km(p.exit)}`;
-  return `ZFE ${p.name} interdite : ${thresholdText(p.critair)} (${categoryOf(vehicle) === 'pl' ? 'poids lourds' : 'utilitaires'}, ${hoursText(p.hours, p.hoursRaw)}) — ${mine}. ${where}.`;
+  const check = motorwayCheckText(p);
+  return `ZFE ${p.name} interdite : ${thresholdText(p.critair)} (${categoryOf(vehicle) === 'pl' ? 'poids lourds' : 'utilitaires'}, ${hoursText(p.hours, p.hoursRaw)}) — ${mine}. ${where}.${check ? ` ${check}` : ''}`;
+}
+
+/** « Passage par l'A 31 : inclusion de l'autoroute dans la ZFE à vérifier… » (ZFE_MOTORWAY_TO_CHECK), ou ''. */
+export function motorwayCheckText(p) {
+  if (!ZFE_MOTORWAY_TO_CHECK[p?.id] || !p.motorways?.length) return '';
+  const refs = p.motorways.map((r) => r.replace(/^A(\d+)/, 'A $1')).join(', ');
+  return `Passage par ${refs} : inclusion de l'autoroute dans la ZFE à vérifier dans l'arrêté. La signalisation fait foi.`;
 }
 
 /** Ligne de la fiche pour une ZFE traversée sans interdiction pour ce véhicule (à cette heure). */

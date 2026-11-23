@@ -254,7 +254,7 @@ test('fiche : durée, distance, arrivée, péage, gazole (litres et coût), éca
   assert.deepEqual(options.map((o) => o.key), ['recommended', 'shortest', 'no-toll']);
   assert.deepEqual(describeOption(rec, rec, { vehicle, dieselPrice: 1.85, now }), {
     name: 'Recommandé', also: '', note: '', duration: '9 min', distance: '5,2 km', arrival: 'Arrivée : 08:08',
-    toll: 'Péage : 3,5 km', fuel: 'Gazole : ≈ 2 L · ≈ 3,1 €', delta: '',
+    toll: 'Péage : 3,5 km', fuel: 'Gazole : ≈ 2 L · ≈ 3,1 €', delta: '', an: 'Autoroute et nationale : inconnue',
   });
   const shortest = options.find((o) => o.key === 'shortest');
   const d = describeOption(shortest, rec, { vehicle, dieselPrice: null, now });
@@ -325,6 +325,8 @@ test('phase 2f : Metz → Nancy en 2009, Nancy → Metz passe → « le départ 
     assert.equal(err.restrictionHint, false);
     assert.ok(err.message.startsWith('Aucun itinéraire autorisé pour ce gabarit.'));
     assert.ok(err.message.endsWith(START_NO_EXIT_TEXT));
+    assert.equal(err.message, `Aucun itinéraire autorisé pour ce gabarit. ${START_NO_EXIT_TEXT}`, 'phase 2g : sans le conseil péages/ferries');
+    assert.ok(!/péage|ferr/i.test(err.message));
     return true;
   });
   assert.equal(ors.sent.length, 2, 'Recommandé (alternative_routes) + sens inverse');
@@ -340,6 +342,7 @@ test('phase 2f : aller et retour en 2009, point de passage en échec sur le 2e t
   await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }), (err) => {
     assert.equal(err.hint, 'end-unreachable');
     assert.ok(err.message.endsWith(END_UNREACHABLE_TEXT));
+    assert.ok(!/péage|ferr/i.test(err.message), 'phase 2g');
     assert.ok(/semble/.test(END_UNREACHABLE_TEXT), 'accroche du point de passage non garantie : conditionnel');
     return true;
   });
@@ -359,6 +362,7 @@ test('phase 2f : point de passage en échec sur le 1er tronçon → départ en c
   await assert.rejects(computeRouteOptions({ start: METZ, end: NANCY, vehicle, send: ors.send }), (err) => {
     assert.equal(err.hint, 'start-unreachable');
     assert.ok(err.message.endsWith(START_UNREACHABLE_TEXT));
+    assert.ok(!/péage|ferr/i.test(err.message), 'phase 2g');
     return true;
   });
   assert.ok(/^Le départ semble/.test(START_UNREACHABLE_TEXT));
@@ -373,13 +377,14 @@ test('phase 2f : point de passage non accroché (2010) → sans restrictions si 
     assert.equal(err.hint, undefined);
     assert.ok(!err.message.includes('appui long'));
     assert.match(err.diagnosticNote, /sans conclusion/);
+    assert.match(err.message, /péages\/ferries/, 'phase 2g : aucun diagnostic conclu → conseil générique gardé');
     return true;
   });
   assert.equal(ors.sent.length, 3);
   // Profil sans restriction : la requête d'origine valait le diagnostic sans restrictions → « rue sans sortie ».
   const bare = { ...vehicle, height: null, width: null, length: null, weight: null, axleload: null, hazmat: false };
   const none = fakeOrs((b) => (isVia(b) ? fixture('ors-variant-recommended.json') : error2009()));
-  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle: bare, send: none.send }), (err) => err.hint === 'dead-end' && err.message.endsWith(DEAD_END_HINT_TEXT));
+  await assert.rejects(computeRouteOptions({ start: LYON, end: CLERMONT, vehicle: bare, send: none.send }), (err) => err.hint === 'dead-end' && err.message.endsWith(DEAD_END_HINT_TEXT) && /péages\/ferries/.test(err.message));
   assert.equal(none.sent.length, 3);
 });
 
