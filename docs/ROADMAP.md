@@ -189,8 +189,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 - [ ] **Bloc 2 — Guidage** (une seule conversation)
   Une seule passe de `tools/ui-check.mjs` avec le GPS émulé à la fin du bloc ; un seul incrément de `VERSION` dans
   `sw.js` pour tout le bloc.
-  - [ ] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
-    phase 2b), choix en un toucher. (Reste de la phase 7c.)
+  - [x] Dans la vue d'ensemble, à l'arrêt seulement : proposer d'autres itinéraires depuis ma position (comme en
+    phase 2b), choix en un toucher. (Reste de la phase 7c.) Fait en v44 : même calcul, mêmes règles et même fiche que
+    le départ (3 requêtes au plus), panneau fermé dès que le véhicule roule, échec = message sans rien guider.
   - [ ] Personnalisation : forme de la flèche, icône camion. (Reste de la phase 7c.)
   - [ ] « Éviter le tunnel » pour une classe Euro interdite (Mont-Blanc, Fréjus, phase 5g) : à l'arrêt, une requête
     ORS sur appui (comme le bouton ADR de la phase 5b : carré de 80 m, avoid_polygons, 150 km au plus). La phase 5g

@@ -65,6 +65,9 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   précachée, 5 Mo par fichier / 30 Mo en tout) : tronçon suivi (15 m, cap modulo 180°, jamais un croisement) dont la
   limite est < PTAC ; fiche et carte à l'arrêt seulement, jamais dit ni dans le guidage ; « à vérifier ».
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
+- « Autres itinéraires » (v44, `openAlternatives` d'`app.js`, panneau `#nav-alts`) : seulement à l'arrêt (`parkedState`),
+  depuis la dernière position reçue vers l'arrivée, profil actif, même calcul que le départ (`fetchRouteOptions`,
+  restrictions, tunnels v43) ; fermé dès que le véhicule roule (`onParkChange`) ; échec : message, rien de guidé.
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
   Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.
 - Chrome n'autorise la voix qu'après une action de l'utilisateur : première phrase dans le geste « Démarrer ».

@@ -2251,6 +2251,92 @@ async function bridgesCheck(browser, base) {
 }
 
 /**
+ * v44 : « Autres itinéraires » depuis la vue d'ensemble, à l'arrêt seulement. GPS émulé : en roulant, bouton grisé et
+ * « Disponible à l'arrêt », aucun calcul ; à l'arrêt (3 s), vue d'ensemble + panneau, calcul depuis la position reçue
+ * vers la même arrivée (3 requêtes au plus), fiches comme au départ, choix d'une autre fiche, « Guider par cet
+ * itinéraire » → le guidage repart sur cet itinéraire ; panneau fermé dès que le véhicule roule ; échec 2009 →
+ * message du départ, aucun tracé guidé. 412×900 jour, 900×412 nuit, 1280×800 jour.
+ */
+async function otherRoutesCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const alt3 = fixture('ors-directions-alternatives.json');
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const bodies = [];
+    let mode = 'nav';
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, overpass: () => ({ elements: [] }),
+      directions: (b) => {
+        bodies.push(b);
+        if (mode === 'fail') return { __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 (4.8 45.7) and 2 (4.9 45.8).' } };
+        return mode === 'alts' ? alt3 : nav;
+      },
+    });
+    await computeRoute(page);
+    const end = bodies[0].coordinates.at(-1);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    // En roulant : grisé, message, aucun calcul.
+    for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    check(await page.getAttribute('#btn-nav-alt', 'aria-disabled') === 'true', `${tag} : « Autres itinéraires » grisé en roulant`);
+    const n0 = bodies.length;
+    await page.click('#btn-nav-alt', { force: true }); // aria-disabled : le doigt peut quand même le toucher
+    await page.waitForTimeout(400);
+    check(/Disponible à l'arrêt/.test(await page.textContent('#nav-toast')) && await page.isHidden('#nav-alts') && bodies.length === n0,
+      `${tag} : en roulant → « Disponible à l'arrêt », aucun calcul`);
+    // À l'arrêt depuis 3 s : panneau, calcul depuis la position reçue.
+    const stopAt = line[3];
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: stopAt[0], lat: stopAt[1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    check(await page.getAttribute('#btn-nav-alt', 'aria-disabled') === 'false', `${tag} : actif à l'arrêt`);
+    mode = 'alts';
+    await page.click('#btn-nav-alt');
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    const sent = bodies.slice(n0);
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true', `${tag} : vue d'ensemble`);
+    check(sent.length >= 1 && sent.length <= 3 && sent.every((b) => Math.abs(b.coordinates[0][0] - stopAt[0]) < 1e-6
+      && Math.abs(b.coordinates[0][1] - stopAt[1]) < 1e-6 && String(b.coordinates.at(-1)) === String(end)),
+    `${tag} : 1 à 3 requêtes, de la position reçue vers la même arrivée`, JSON.stringify(sent.map((b) => b.coordinates)));
+    check(sent.every((b) => b.options?.vehicle_type === 'hgv'), `${tag} : profil camion`);
+    const cards = await page.locator('#nav-alts .route-card').count();
+    check(cards === 3 && /^Recommandé/.test((await page.locator('#nav-alts .route-card').first().textContent()).trim()), `${tag} : 3 fiches, « Recommandé » en tête`, String(cards));
+    check(await page.isVisible('#btn-alts-go') && /Réglementation|Véhicule/.test(await page.textContent('#nav-alts')), `${tag} : fiche et notes comme au départ`);
+    await noHorizontalScroll(page, `${tag} autres itinéraires`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-autres-itineraires.png`) });
+    await page.locator('#nav-alts .route-card').nth(1).click();
+    await page.waitForTimeout(300);
+    check(await page.getAttribute('#nav-alts .route-card >> nth=1', 'aria-checked') === 'true', `${tag} : 2e fiche choisie`);
+    const chosen = alt3.features[1].geometry.coordinates;
+    await page.click('#btn-alts-go');
+    await page.waitForTimeout(1200);
+    const routeNow = await page.evaluate(() => window.__maps.at(-1).getSource('route')?._data?.features?.[0]?.geometry?.coordinates?.length ?? null);
+    check(await page.isHidden('#nav-alts') && await page.isVisible('#nav') && routeNow === chosen.length,
+      `${tag} : « Guider par cet itinéraire » → guidage reparti sur la 2e fiche`, `${routeNow} / ${chosen.length}`);
+    // Panneau ouvert puis le véhicule roule : fermé, aucun changement.
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: chosen[0][0], lat: chosen[0][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    await page.click('#btn-nav-alt');
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: chosen[i][0], lat: chosen[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    check(await page.isHidden('#nav-alts') && /disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${tag} : panneau fermé dès que le véhicule roule, message`);
+    // Échec : message du calcul de départ, rien d'affiché ni guidé.
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: chosen[3][0], lat: chosen[3][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    mode = 'fail';
+    await page.click('#btn-nav-alt');
+    await page.waitForFunction(() => /itinéraire|camion|départ|arrivée/i.test(document.querySelector('#nav-alts-status')?.textContent ?? '') && !/Calcul des/.test(document.querySelector('#nav-alts-status').textContent), null, { timeout: 15000 }).catch(() => {});
+    const failText = await page.textContent('#nav-alts-status');
+    check(!/Calcul des/.test(failText) && await page.locator('#nav-alts .route-card').count() === 0 && await page.isHidden('#btn-alts-go'),
+      `${tag} : échec → message, aucune fiche ni guidage`, failText);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /autres itinéraires|aucun itinéraire/i.test(t)), `${tag} : rien dit à voix haute sur le choix ni l'échec`, spoken.join(' | '));
+    await page.click('#btn-alts-close');
+    await stopGuidance(page);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+/**
  * v43 : « Recommandé » jamais par un tunnel interdit confirmé. Deux itinéraires (Mont-Blanc, préférence d'ORS ;
  * contournement SYNTHÉTIQUE décalé de 0,2° vers l'ouest, deux fois plus long) : Euro 3 → contournement en tête avec la
  * ligne, Mont-Blanc en « Préférence ORS » ; Euro 6 → ordre d'ORS ; ADR code E → contournement ; un seul itinéraire
@@ -2791,10 +2877,15 @@ async function guidanceCheck(browser, base) {
     check(foot.out.length === 0, `${label} : à l'arrêt, rien ne se chevauche`, foot.out.join(' ; '));
     check((await overflowingNavText(page)).length === 0 && (await bannerOverBottom(page)).length === 0, `${label} : à l'arrêt, textes et bandeau à leur place`);
     await page.screenshot({ path: join(SHOTS, `2c-${mode}-${tag}-arret.png`) });
+    const altBefore = stats.directions;
     await page.click('#btn-nav-alt');
-    await page.waitForTimeout(700);
-    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
-      `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble`);
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    // v44 : vue d'ensemble et panneau « Autres itinéraires » (scénario « autres » pour le détail) : 1 à 3 requêtes
+    // voulues par l'appui, hors du compte « aucun recalcul » de la liste des aires.
+    const altReq = stats.directions - altBefore;
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && await page.isVisible('#nav-alts') && altReq >= 1 && altReq <= 3,
+      `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble et le choix (1 à 3 requêtes)`, String(altReq));
+    await page.click('#btn-alts-close');
     await page.click('#btn-nav-recenter');
 
     // Phase 2d : à l'arrêt, « Y aller » et « Fiche complète » actifs ; l'aire touchée est montrée sur la carte.
@@ -2810,8 +2901,8 @@ async function guidanceCheck(browser, base) {
     await page.click('#btn-nav-area-go');
     await page.waitForTimeout(700);
     check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
-      `${label} : « Y aller » à l'arrêt → vue d'ensemble, « Autres itinéraires : bientôt »`);
-    check(stats.directions === reqBefore, `${label} : liste des aires, aucun recalcul`, `${stats.directions - reqBefore} requête(s)`);
+      `${label} : « Y aller » à l'arrêt → vue d'ensemble, « Y aller : bientôt »`);
+    check(stats.directions - altReq === reqBefore, `${label} : liste des aires, aucun recalcul`, `${stats.directions - altReq - reqBefore} requête(s)`);
     await page.click('#btn-nav-recenter');
     if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
     await page.click('#btn-nav-areas-close');
@@ -3334,7 +3425,7 @@ try {
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck,
-    recommande: recommendedTunnelCheck };
+    recommande: recommendedTunnelCheck, autres: otherRoutesCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

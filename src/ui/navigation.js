@@ -469,8 +469,10 @@ export function createNavigation(ctx) {
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
 
     // « Autres itinéraires » : seulement à l'arrêt (sous 5 km/h pendant 3 s).
+    const wasParked = !!s.park?.parked;
     s.park = parkedState(s.park, view.parkSpeedKmh, Date.now());
     ui.alt.setAttribute('aria-disabled', String(!s.park.parked));
+    if (wasParked !== s.park.parked) ctx.onParkChange?.(s.park.parked); // v44 : choix d'itinéraire fermé en roulant
     renderAreaButtons();
 
     renderAlerts(view);
@@ -665,6 +667,8 @@ export function createNavigation(ctx) {
     if (!s) return;
     const r = updateNavigation(s.state, fix);
     if (!r.view) return;
+    // Position reçue (GPS ou simulation), point de départ de « Autres itinéraires » (v44).
+    if (typeof fix?.lon === 'number' && typeof fix?.lat === 'number' && Number.isFinite(fix.lon) && Number.isFinite(fix.lat)) s.lastFix = [fix.lon, fix.lat];
     s.state = r.state;
     s.view = r.view;
     s.gpsLost = false;
@@ -1008,7 +1012,7 @@ export function createNavigation(ctx) {
     if (!s) return;
     if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
     overview();
-    toast('Autres itinéraires : bientôt');
+    toast('Y aller : bientôt'); // v44 : « Autres itinéraires » fonctionne, « Y aller » pas encore
   });
   ui.areaSheet.addEventListener('click', () => {
     if (!s || !s.areaPicked) return;
@@ -1022,12 +1026,15 @@ export function createNavigation(ctx) {
     renderVoice();
     if (on) ctx.voice.speak('Voix activée.', { interrupt: true });
   });
-  // Autres itinéraires (Bloc 2) : à l'arrêt seulement ; pour l'instant, vue d'ensemble du trajet.
+  // Autres itinéraires (v44) : à l'arrêt seulement (parkedState, vitesse inconnue = en mouvement) ; vue d'ensemble,
+  // puis recalcul depuis la position reçue vers l'arrivée (app.js, mêmes règles que le calcul de départ).
   ui.alt.addEventListener('click', () => {
     if (!s) return;
     if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
     overview();
-    toast('Autres itinéraires : bientôt');
+    const from = s.lastFix ?? s.view?.position ?? null;
+    if (ctx.onAlternatives && from) ctx.onAlternatives(from);
+    else toast('Position inconnue : autres itinéraires indisponibles');
   });
   ui.more.addEventListener('click', () => setDetails(true));
   // Panneau du bas : toucher la poignée l'ouvre ou le ferme ; la tirer vers le haut l'ouvre, vers le bas le ferme.
@@ -1061,6 +1068,18 @@ export function createNavigation(ctx) {
     stop,
     get active() {
       return !!s;
+    },
+    /** Message bref sur l'écran de guidage (v44 : choix d'itinéraire fermé en roulant), jamais dit à voix haute. */
+    notify(text) {
+      if (s && text) toast(text);
+    },
+    /** Simulation en cours (v44 : le guidage choisi repart dans le même mode). */
+    get simulating() {
+      return !!s?.sim;
+    },
+    /** Vitesse de la simulation en cours (km/h), sinon null. */
+    get simSpeedKmh() {
+      return s?.sim ? s.sim.speedKmh : null;
     },
     /** À l'arrêt en guidage (parkedState : < 5 km/h pendant 3 s ; vitesse inconnue = en mouvement). */
     get parked() {

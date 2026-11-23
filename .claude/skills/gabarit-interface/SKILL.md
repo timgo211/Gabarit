@@ -26,7 +26,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   Colonne de boutons ronds à droite (`buttonColumn` : 64 px, plancher 56, 45–85 % de la hauteur, remonte sous le
   bandeau, deux colonnes en dernier recours) : boussole, Recentrer (seulement carte déplacée), loupe (rangée « Aires
   PL », « Plan / Satellite », fermée seule après 8 s, aucune saisie), son, autres itinéraires (actif seulement à
-  l'arrêt, `parkedState` : < 5 km/h pendant 3 s ; pour l'instant vue d'ensemble + « bientôt »), place du signalement
+  l'arrêt, `parkedState` : < 5 km/h pendant 3 s ; v44 : vue d'ensemble + panneau `#nav-alts`), place du signalement
   (`.nav-slot`, phase 3). Liste « Aires et parkings PL » (phase 2d) : voir plus bas. Compteur en bas à gauche (`speedStatus` ; panneau de limitation seulement si la limite PL
   est connue). Panneau du bas : ✕ (confirmation Quitter / Continuer, sauf à l'arrivée), temps restant (--ok),
   « km • heure » (--muted), vue d'ensemble ; poignée touchée ou tirée : détails en lecture seule. Paysage
@@ -105,6 +105,13 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   repères `.bridge-marker` (`map.showBridges`, retirés par `setNavigating(true)`, jamais en guidage), repère touché →
   message (texte du pont), jamais de voix ; Réglages › Ponts, case `#bridge-warnings` (`settings.bridgeWarnings`,
   activée par défaut). Texte fixe `BRIDGE.TEXT` ; « à vérifier », « la signalisation fait foi ».
+- v44 : « Autres itinéraires » — bouton rond à l'arrêt : vue d'ensemble puis `ctx.onAlternatives(dernière position
+  reçue)` ; `app.js` calcule comme au départ (profil actif, `restrictionsForTrip`, `isForbidden` v43, 3 requêtes au
+  plus) et affiche les fiches de `renderRouteChoice` dans `#nav-alts` (par-dessus le guidage, z-index 6), choix d'une
+  fiche, « Guider par cet itinéraire » (refusé hors de l'arrêt) → `startGuidance` (même mode : GPS ou simulation).
+  `navigation` appelle `onParkChange(false)` dès que le véhicule roule : panneau fermé, message. Échec : texte du
+  calcul de départ (diagnostic 2f), aucune fiche (vidées à chaque ouverture), rien de guidé. « Y aller » d'une aire :
+  « Y aller : bientôt ».
 - Phase 12a bis : limites de poids — lignes `warn` de la fiche (5 au plus + « +N »), résumé « N limites de poids à
   vérifier », repères `.bridge-marker.weight-marker` (texte « 3,5 t », même calque que les ponts, retirés en guidage),
   repère touché → `#bridge-panel` (`restrictionsUi.openWeight`, aide `WEIGHT_AVOID_HELP`) ; Réglages › Limites de poids,

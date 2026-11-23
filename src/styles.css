@@ -566,6 +566,17 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   background: var(--card); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
 }
 .nav-confirm[hidden] { display: none; }
+/* v44 : autres itinéraires depuis la position (à l'arrêt) : panneau par-dessus l'écran de guidage. */
+.nav-alts {
+  position: absolute; inset: 12px; z-index: 6; pointer-events: auto; overflow-y: auto; overscroll-behavior: contain;
+  display: grid; align-content: start; gap: 10px; padding: 12px; border-radius: 20px; min-width: 0;
+  background: var(--bg); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.nav-alts[hidden] { display: none; }
+.nav-alts-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.nav-alts-head h2 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
+.nav-alts-head .btn, .nav-alts-go { min-height: 56px; }
+.nav-alts .status:empty { display: none; }
 .nav-confirm-title { margin: 0; font-size: 1.3rem; font-weight: 800; text-align: center; }
 .nav-confirm-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .nav-confirm-buttons .btn { min-height: 64px; font-size: 1.15rem; }

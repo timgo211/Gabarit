@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande
+                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -83,6 +83,11 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   dans le panneau du bas, plus haut que sur la tablette ; à 412×900 (`guidage`) le message bref passe alors sur les
   alertes (✘ « nav-toast », vert avec une wake lock simulée). 760×360 à l'arrêt (alerte de conduite avec « Pas une
   pause (travail) » sous le panneau du bas) : ✘ aussi en v37 et v38, même avec la wake lock simulée, non traité.
+- `autres` (v44) : GPS émulé ; en roulant, bouton grisé, « Disponible à l'arrêt », aucune requête ; à l'arrêt 3 s :
+  vue d'ensemble, panneau, 1 à 3 requêtes de la position reçue vers la même arrivée (`vehicle_type` hgv), 3 fiches
+  « Recommandé » en tête, notes, 2e fiche choisie → « Guider par cet itinéraire » → source `route` = 2e tracé ;
+  panneau rouvert puis le véhicule roule → fermé ; 2009 → message du départ, aucune fiche ni bouton ; rien dit.
+  412×900 jour, 900×412 nuit, 1280×800 jour. `guidage` : le bouton ouvre la vue d'ensemble et le panneau.
 - `recommande` (v43) : deux itinéraires (Mont-Blanc + contournement synthétique décalé de 0,2°) : Euro 3 → le
   contournement est « Recommandé » avec la phrase, Mont-Blanc en « Préférence ORS », une seule requête, rien dit ;
   Euro 6 → ordre d'ORS ; ADR code E → contournement ; Mont-Blanc seul en Euro 3 → « Tous les itinéraires… »

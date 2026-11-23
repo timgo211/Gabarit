@@ -130,6 +130,18 @@
           </div>
         </div>
 
+        <!-- v44 : autres itinéraires depuis la position, à l'arrêt seulement ; fermé dès que le véhicule roule. -->
+        <section id="nav-alts" class="nav-alts" role="dialog" aria-labelledby="nav-alts-title" hidden>
+          <div class="nav-alts-head">
+            <h2 id="nav-alts-title">Autres itinéraires</h2>
+            <button type="button" id="btn-alts-close" class="btn">Fermer</button>
+          </div>
+          <p id="nav-alts-status" class="status" role="status"></p>
+          <div id="nav-alts-summary" class="summary" hidden></div>
+          <button type="button" id="btn-alts-go" class="btn btn-primary nav-alts-go" hidden>Guider par cet itinéraire</button>
+          <div id="nav-alts-notes" class="route-notes" hidden></div>
+        </section>
+
         <div id="nav-confirm" class="nav-confirm" role="alertdialog" aria-labelledby="nav-confirm-title" hidden>
           <p id="nav-confirm-title" class="nav-confirm-title">Quitter le guidage ?</p>
           <div class="nav-confirm-buttons">
