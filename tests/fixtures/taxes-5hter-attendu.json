@@ -1,0 +1,143 @@
+{
+ "note": "Résultats de la phase 5h ter avec les contours COG 2018 (figés le 23/11/2026, avant le remplacement par Admin Express récent) : doivent rester identiques.",
+ "Mulhouse → Strasbourg": {
+  "passages": [
+   {
+    "tax": "r-pass",
+    "method": "osm",
+    "enter": 0,
+    "exit": 90037,
+    "roads": [
+     "A35",
+     "A36"
+    ]
+   }
+  ],
+  "lines": [
+   "info: R-Pass (taxe PL de la Collectivité européenne d'Alsace) prévue à partir du 1er janvier 2027, de km 0 à km 90 (A36, A35 ; repérage sur la carte OpenStreetMap du 01/12/2026 (ODbL) et les contours IGN Admin Express (Licence Ouverte), limites exactes à vérifier). Réseau officiel : A35 et A36 (parties non concédées, hors Eurométropole de Strasbourg), RD83 entre Colmar et Sélestat, RD1363, RD502 et RD504 ; routes comptées seulement dans le Bas-Rhin et le Haut-Rhin (jamais vers Belfort ni en Moselle), RD83 seulement entre Colmar et Sélestat ; parties à péage (concédées, A355 comprise) exclues ; limite de la partie concédée de l'A36 et limites exactes des sections à vérifier sur la carte officielle. Délibération du Conseil d'Alsace n° CD-2025-4-7-1 du 20 octobre 2025 (code des impositions sur les biens et services, art. L.421-189) : PTAC de plus de 3,5 t, catégorie N ; tarif selon le poids total roulant autorisé (PTRA) et la classe Euro. Recours en cours devant le tribunal administratif de Strasbourg (effet suspensif non établi). Tarif annoncé, poids du profil 19 t, Euro VI (classe C (PTRA de 18 à 32 t)) : 11,5 centimes par km (dépliant officiel V02 du R-Pass (grille tarifaire), lu le 21/11/2026) ; réduction automatique à partir de 20 trajets par mois pour les abonnés. Aucun total calculé pour le trajet. Source : R-Pass, site officiel de la taxe PL de la Collectivité européenne d'Alsace (opérateur désigné par la CeA), lue le 21/11/2026. La signalisation fait foi."
+  ]
+ },
+ "Metz → Nancy": {
+  "passages": [
+   {
+    "tax": "ecpl",
+    "method": "osm",
+    "enter": 0,
+    "exit": 43979,
+    "roads": [
+     "A31"
+    ]
+   }
+  ],
+  "lines": [
+   "info: Écocontribution poids lourds (ECPL) de la Région Grand Est prévue à partir du 2 avril 2027, de km 0 à km 44 (A31 ; repérage sur la carte OpenStreetMap du 01/12/2026 (ODbL) et les contours IGN Admin Express (Licence Ouverte), limites exactes à vérifier). Réseau officiel : A30, A31 (de la frontière luxembourgeoise à la limite de la concession APRR au sud de Toul), A33, A313, RN4, RN44, RN431 et RN52 (section de Meurthe-et-Moselle) ; autoroutes à péage concédées exclues ; RN4 jusqu'à Phalsbourg d'après la presse ; limites exactes des sections à vérifier sur la carte officielle. Tarif au km selon le PTAC (moins de 12 t, 12 à 18 t, 18 à 32 t, plus de 32 t), la classe Euro et la classe d'émissions de CO2 (absente du profil) : grille sur le site officiel. Délibération régionale non lue. Aucun montant calculé. Source : ECPL, site officiel de l'écocontribution poids lourds de la Région Grand Est, lue le 21/11/2026. La signalisation fait foi."
+  ]
+ },
+ "Nancy → Metz": {
+  "passages": [
+   {
+    "tax": "ecpl",
+    "method": "osm",
+    "enter": 1349,
+    "exit": 45329,
+    "roads": [
+     "A31"
+    ]
+   }
+  ],
+  "lines": [
+   "info: Écocontribution poids lourds (ECPL) de la Région Grand Est prévue à partir du 2 avril 2027, de km 1 à km 45 (A31 ; repérage sur la carte OpenStreetMap du 01/12/2026 (ODbL) et les contours IGN Admin Express (Licence Ouverte), limites exactes à vérifier). Réseau officiel : A30, A31 (de la frontière luxembourgeoise à la limite de la concession APRR au sud de Toul), A33, A313, RN4, RN44, RN431 et RN52 (section de Meurthe-et-Moselle) ; autoroutes à péage concédées exclues ; RN4 jusqu'à Phalsbourg d'après la presse ; limites exactes des sections à vérifier sur la carte officielle. Tarif au km selon le PTAC (moins de 12 t, 12 à 18 t, 18 à 32 t, plus de 32 t), la classe Euro et la classe d'émissions de CO2 (absente du profil) : grille sur le site officiel. Délibération régionale non lue. Aucun montant calculé. Source : ECPL, site officiel de l'écocontribution poids lourds de la Région Grand Est, lue le 21/11/2026. La signalisation fait foi."
+  ]
+ },
+ "Belfort → Mulhouse": {
+  "passages": [],
+  "lines": []
+ },
+ "network": {
+  "r-pass": {
+   "lines": 4,
+   "km": {
+    "A35": {
+     "box": 91.1,
+     "kept": 85.6,
+     "toll": 0
+    },
+    "A36": {
+     "box": 2.2,
+     "kept": 2.2,
+     "toll": 5.6
+    },
+    "D83": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "N83": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "D1363": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "D502": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "D504": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    }
+   }
+  },
+  "ecpl": {
+   "lines": 1,
+   "km": {
+    "A30": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "A31": {
+     "box": 22,
+     "kept": 22,
+     "toll": 4
+    },
+    "A33": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "A313": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "N4": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "N44": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "N431": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    },
+    "N52": {
+     "box": 0,
+     "kept": 0,
+     "toll": 0
+    }
+   }
+  }
+ }
+}
