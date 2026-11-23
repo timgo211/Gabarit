@@ -139,11 +139,15 @@ navigation = createNavigation({
   onAreaOpen: (id) => areas.openSheet(id),
   areaFacts: (id) => areas.shortFacts(id),
   onView: () => areas.refreshDrive(),
+  // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
+  onAlternatives: (from) => openAlternatives(from),
+  onParkChange: (parked) => { if (!parked) closeAlternatives('moving'); },
   // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
   onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
   // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
   onDriving: (d) => saveDriving(storage, d),
   onEnd: (message) => {
+    closeAlternatives(); // v44
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
     if (message) showMessage(messageNode, message);
@@ -322,15 +326,15 @@ function rulesOf(route, vehicle, departure) {
 }
 
 /** Réglementation de chaque itinéraire proposé, d'après l'heure de départ (maintenant). */
-function choiceRules() {
-  if (!choice) return null;
+function choiceRules(c = choice) {
+  if (!c) return null;
   const departure = new Date();
-  const list = choice.options.map((o) => {
-    const r = { ...rulesOf(o.route, choice.vehicle, departure) };
+  const list = c.options.map((o) => {
+    const r = { ...rulesOf(o.route, c.vehicle, departure) };
     r.lines = [...r.lines];
     if (zfeFailed) r.lines.unshift({ level: 'info', text: 'Zones à faibles émissions indisponibles (fichier non chargé) : vérifie la signalisation.' });
     // Phase 12b : « Évite N restrictions saisies par toi », trajet trop long pour ORS, passage proche (à vérifier).
-    const rl = restrictionLines(o.route, choice.restr);
+    const rl = restrictionLines(o.route, c.restr);
     if (rl.length) {
       r.lines.unshift(...rl);
       r.short = [...r.short, ...rl.filter((l) => l.level === 'warn').map(() => 'Restriction saisie à vérifier').slice(0, 1)];
@@ -338,7 +342,7 @@ function choiceRules() {
     return r;
   });
   // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
-  const counts = choice.options.map((o, i) => ({ label: o.label, forbidden: list[i].forbiddenTunnels?.length ?? 0 }));
+  const counts = c.options.map((o, i) => ({ label: o.label, forbidden: list[i].forbiddenTunnels?.length ?? 0 }));
   list.forEach((r, i) => {
     const hint = avoidingOptionsText(counts, i);
     if (hint) {
@@ -553,6 +557,90 @@ function startGuidance(simulate = null) {
   return null;
 }
 navStartBtn.addEventListener('click', () => startGuidance(null));
+
+// ───────── v44 : « Autres itinéraires » depuis la vue d'ensemble du guidage, à l'arrêt seulement ─────────
+// Recalcul de la position reçue vers l'arrivée, profil actif, même budget (3 requêtes), mêmes règles et même fiche que
+// le calcul de départ ; l'utilisateur choisit, le guidage repart sur l'itinéraire choisi. Échec : diagnostics du
+// départ (2f), rien d'affiché ni de guidé. Aucune saisie en roulant : le panneau se ferme dès que le véhicule roule
+// et « Guider par cet itinéraire » est refusé hors de l'arrêt.
+const altUi = {
+  panel: $('#nav-alts'), status: $('#nav-alts-status'), summary: $('#nav-alts-summary'), notes: $('#nav-alts-notes'),
+  go: $('#btn-alts-go'),
+};
+let altChoice = null;
+let altTicket = 0;
+function renderAlternatives() {
+  if (!altChoice) return;
+  renderRouteChoice(altUi.summary, altUi.notes, {
+    choice: altChoice, dieselPrice: data.settings.dieselPrice, rules: choiceRules(altChoice),
+    onSelect: (i) => {
+      if (!altChoice?.options[i] || !navigation.parked) return;
+      altChoice = { ...altChoice, selected: i };
+      renderAlternatives();
+    },
+    rulesSource: rulesSourceText(zfeData, {
+      hazmat: !!altChoice.vehicle?.hazmat, tunnelsUpdated: tunnels.data?.updated ?? null, accessUpdated: access.state.updated,
+    }),
+    windCredit: weather.status === 'ok',
+  });
+  altUi.go.hidden = false;
+}
+function closeAlternatives(reason = '') {
+  altTicket += 1;
+  altChoice = null;
+  const wasOpen = !altUi.panel.hidden;
+  altUi.panel.hidden = true;
+  altUi.summary.hidden = true;
+  altUi.notes.hidden = true;
+  altUi.summary.replaceChildren();
+  altUi.notes.replaceChildren();
+  altUi.go.hidden = true;
+  altUi.status.textContent = '';
+  if (wasOpen && reason === 'moving') showMessage(messageNode, 'Autres itinéraires fermés : le véhicule roule. Disponible à l\'arrêt.', 'info');
+}
+async function openAlternatives(from) {
+  if (!choice || !navigation.active || !navigation.parked) return;
+  const my = ++altTicket;
+  altChoice = null;
+  altUi.panel.hidden = false;
+  altUi.summary.hidden = true;
+  altUi.notes.hidden = true;
+  altUi.summary.replaceChildren(); // fiches d'un calcul précédent : jamais montrées après un échec
+  altUi.notes.replaceChildren();
+  altUi.go.hidden = true;
+  altUi.status.textContent = 'Calcul des itinéraires depuis ta position…';
+  const vehicle = activeVehicle(data);
+  try {
+    await ensureTunnels(vehicle);
+    const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: from, end: choice.end });
+    const { options, failures } = await fetchRouteOptions({
+      apiKey: store.getApiKey(), vehicle, start: from, end: choice.end, avoidTolls: choice.avoidTolls,
+      avoidFerries: choice.avoidFerries, avoidPolygons: restr.geometry, isForbidden: tunnelBanCheck(vehicle),
+    });
+    if (my !== altTicket || !navigation.active) return;
+    altChoice = {
+      ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
+    };
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); winter.extend(o.route); }
+    altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
+    renderAlternatives();
+  } catch (err) {
+    if (my !== altTicket) return;
+    // Mêmes messages qu'au départ (diagnostic 2f compris, au conditionnel) ; aucun tracé affiché ni guidé.
+    altUi.status.textContent = errorText(err) || 'Erreur inattendue pendant le calcul.';
+  }
+}
+$('#btn-alts-close').addEventListener('click', () => closeAlternatives());
+altUi.go.addEventListener('click', () => {
+  if (!altChoice || !navigation.active) return;
+  if (!navigation.parked) { closeAlternatives('moving'); return; }
+  const sim = navigation.simulating ? { speedKmh: navigation.simSpeedKmh ?? data.settings.simSpeed } : null;
+  choice = altChoice;
+  closeAlternatives();
+  renderChoice();
+  areas.select(choice.options[choice.selected].route);
+  startGuidance(sim); // le guidage repart sur l'itinéraire choisi
+});
 
 // Écrans
 const settings = createSettings({
