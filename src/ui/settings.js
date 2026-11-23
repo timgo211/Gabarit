@@ -120,6 +120,7 @@ export function createSettings(ctx) {
     voiceVolume.value = String(settings.voiceVolume);
     showVoiceValues();
     for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) r.checked = r.value === settings.arrowColor;
+    for (const r of dlg.querySelectorAll('input[name="vehicle-icon"]')) r.checked = r.value === settings.vehicleIcon;
     dieselInput.value = formatPricePerLiter(settings.dieselPrice);
     syncAdr(settings.adr);
   }
@@ -248,6 +249,9 @@ export function createSettings(ctx) {
   }
   for (const r of dlg.querySelectorAll('input[name="arrow-color"]')) {
     r.addEventListener('change', () => { if (r.checked) ctx.onArrowColor(r.value); });
+  }
+  for (const r of dlg.querySelectorAll('input[name="vehicle-icon"]')) {
+    r.addEventListener('change', () => { if (r.checked) ctx.onVehicleIcon?.(r.value); });
   }
 
   $('#btn-diesel-save').addEventListener('click', () => {

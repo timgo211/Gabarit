@@ -106,6 +106,7 @@ const layerSwitch = createLayerSwitch({
 map = createMap($('#map'), $('#map-fallback'), theme.theme, {
   layer: data.settings.mapLayer,
   nightLevel: data.settings.nightMapLevel, // phase 2d : luminosité de la carte la nuit
+  vehicleIcon: data.settings.vehicleIcon, // v45 : flèche ou camion
   onLayerView: (view) => { layerSwitch.render(view); navigation?.setLayerView(view); },
 });
 window.addEventListener('resize', () => map.resize());
@@ -650,6 +651,7 @@ const settings = createSettings({
     update(() => d);
     theme.setMode(d.settings.theme);
     map.setNightLevel(d.settings.nightMapLevel);
+    map.setVehicleIcon(d.settings.vehicleIcon);
     voice.setEnabled(d.settings.voice);
     voice.setOptions({ name: d.settings.voiceName, rate: d.settings.voiceRate, volume: d.settings.voiceVolume });
     applyArrowColor();
@@ -674,6 +676,7 @@ const settings = createSettings({
     setSetting({ voiceName: o.name, voiceRate: o.rate, voiceVolume: o.volume });
   },
   onArrowColor: (c) => { setSetting({ arrowColor: c }); applyArrowColor(); },
+  onVehicleIcon: (k) => { setSetting({ vehicleIcon: k }); map.setVehicleIcon(k); },
   onAreaVoiceChange: (on) => setSetting({ areaVoice: on }),
   onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
   onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),

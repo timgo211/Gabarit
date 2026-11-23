@@ -7,7 +7,7 @@ import { THEME_MODES } from './theme.js';
 import { isSimSpeed, SIM_DEFAULT_SPEED } from './nav-sim.js';
 import { sanitizeMapLayer, DEFAULT_MAP_LAYER } from './map-layers.js';
 import {
-  sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
+  sanitizeArrowColor, sanitizeVehicleIcon, DEFAULT_VEHICLE_ICON, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
 import { sanitizeRestrictions } from './restrictions.js';
@@ -53,7 +53,7 @@ export function emptyData() {
     settings: {
       theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
-      arrowColor: DEFAULT_ARROW_COLOR, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
+      arrowColor: DEFAULT_ARROW_COLOR, vehicleIcon: DEFAULT_VEHICLE_ICON, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
       ruleVoice: true,
       driveVoice: true,
@@ -108,6 +108,7 @@ export function sanitizeData(raw) {
       dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut (vrais prix : phase 4)
       mapLayer: sanitizeMapLayer(s.mapLayer), // « plan » ou « satellite » (phase 7)
       arrowColor: sanitizeArrowColor(s.arrowColor), // phase 7c
+      vehicleIcon: sanitizeVehicleIcon(s.vehicleIcon), // v45 : camion par défaut, anciens réglages compris
       voiceName: sanitizeVoiceName(s.voiceName),
       voiceRate: sanitizeVoiceRate(s.voiceRate),
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
