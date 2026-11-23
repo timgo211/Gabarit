@@ -1,0 +1,36 @@
+name: Textes officiels (lecture, journal seulement)
+
+# Lit les textes officiels listés dans tools/textes-officiels.json (arrêtés, lois, grilles de tarifs) et imprime dans
+# le journal des extraits autour des mots-clés : beaucoup de sites officiels (Légifrance, RIS, gesetze-im-internet,
+# préfectures, IGN…) sont bloqués depuis le conteneur de développement. Aucune donnée n'est enregistrée, rien n'est
+# poussé. Séparée de « Données OSM » pour ne jamais relancer la copie OSM.
+# Lancée à chaque envoi qui modifie la liste ou l'outil (sur n'importe quelle branche) et à la main.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - tools/textes-officiels.json
+      - tools/textes-officiels.mjs
+      - .github/workflows/textes-officiels.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: textes-officiels-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Installer pdftotext et la reconnaissance de texte
+        run: sudo apt-get update -q && sudo apt-get install -y -q poppler-utils tesseract-ocr tesseract-ocr-fra tesseract-ocr-deu tesseract-ocr-ita
+      - name: Lire les textes
+        run: node tools/textes-officiels.mjs tools/textes-officiels.json
