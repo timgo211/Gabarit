@@ -106,6 +106,25 @@ export function confirmedTunnelBans(route, { vehicle, tunnels = null } = {}) {
 }
 
 /**
+ * v48 : tunnels que « Éviter le tunnel » contourne — interdits ADR au code du chargement (phase 5b) et tunnels dont la
+ * classe Euro du profil est interdite (phase 5g : verdict 'banned', texte officiel, ou 'operator', exploitant ; mêmes
+ * cas que confirmedTunnelBans). « À vérifier », classe non précisée : jamais. Un tunnel compté une fois.
+ * @returns {{ id:string, name:string, mid:number[], forbidden:true, why:('adr'|'euro')[] }[]}
+ */
+export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
+  const out = new Map();
+  const add = (p, why) => {
+    const key = p.id ?? tunnelName(p);
+    const cur = out.get(key);
+    if (cur) { if (!cur.why.includes(why)) cur.why.push(why); return; }
+    out.set(key, { ...p, forbidden: true, why: [why] });
+  };
+  for (const p of adrForbidden ?? []) add(p, 'adr');
+  for (const p of euroPassages ?? []) if (p.verdict === 'banned' || p.verdict === 'operator') add(p, 'euro');
+  return [...out.values()];
+}
+
+/**
  * @param {object} route itinéraire (parseDirections)
  * @param {{ vehicle:object, departure?:{ zones:object[], voies:object[] }|null, driving?:object|null,
  *   countries?:Map<string,{ status:string, data:object|null }>|null,
@@ -203,6 +222,7 @@ export function routeRules(route, {
   }
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
+    avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
     countries: ctry, weight, winter: win, euro, tolls: toll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
   };

@@ -5,7 +5,7 @@ import {
 } from '../lib/ors-request.js';
 import { parseDirections, NoRouteError } from '../lib/ors-response.js';
 import { classifyError, ERROR_KINDS, messageFor } from '../lib/ors-errors.js';
-import { computeRouteOptions, withBlockedHint } from '../lib/route-options.js';
+import { computeRouteOptions, computeAvoidRoute, withBlockedHint } from '../lib/route-options.js';
 
 /** Erreur portant un message déjà traduit pour l'utilisateur. */
 export class ApiError extends Error {
@@ -90,6 +90,24 @@ export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidToll
     });
   } catch (err) {
     // Phase 12b : restrictions saisies évitées → « Une restriction saisie bloque peut-être le seul passage. »
+    if (err instanceof NoRouteError) throw withBlockedHint(noRouteError(), avoidPolygons);
+    throw err;
+  }
+}
+
+/**
+ * v48 : contournement d'un tunnel interdit (« Éviter le tunnel ») : même budget et mêmes diagnostics d'échec que le
+ * calcul de départ (computeAvoidRoute, route-options.js).
+ * @returns route analysée (voir parseDirections).
+ */
+export async function fetchAvoidRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null }) {
+  requireKey(apiKey);
+  try {
+    const { route } = await computeAvoidRoute({
+      start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, send: (req) => postDirections(apiKey, req),
+    });
+    return route;
+  } catch (err) {
     if (err instanceof NoRouteError) throw withBlockedHint(noRouteError(), avoidPolygons);
     throw err;
   }

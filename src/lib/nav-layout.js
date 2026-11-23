@@ -4,7 +4,7 @@
 // Code de la route, art. R412-6-2 (legifrance.gouv.fr) : pendant la marche, l'écran ne sert qu'à la navigation ;
 // aucune saisie, et ce qui change l'itinéraire (autres itinéraires) n'est actif qu'à l'arrêt.
 
-import { pointAt, segmentAt } from './nav-geo.js';
+import { pointAt, segmentAt, haversine } from './nav-geo.js';
 import { roadLabel, keepRefsTogether } from './road-badge.js';
 import { isLongInstruction } from './format.js';
 
@@ -111,6 +111,23 @@ export function parkedState(prev, kmh, now) {
   if (!slow) return { since: null, parked: false };
   const since = prev?.since ?? now;
   return { since, parked: now - since >= PARK.MS };
+}
+
+/**
+ * v48 : vitesse d'un relevé GPS hors guidage (« Éviter le tunnel » à l'arrêt) : vitesse du GPS si elle est donnée,
+ * sinon déduite des deux derniers relevés s'ils ont entre 0,5 et 30 s d'écart et une précision ≤ 50 m ; sinon null
+ * (inconnue = en mouvement pour parkedState).
+ * @param {{ lonlat:number[], t:number, accuracy?:number }|null} prev
+ * @param {{ lonlat:number[], t:number, accuracy?:number, speed?:number|null }} cur speed en m/s
+ * @returns {number|null} km/h
+ */
+export function fixSpeedKmh(prev, cur) {
+  if (typeof cur?.speed === 'number' && Number.isFinite(cur.speed) && cur.speed >= 0) return cur.speed * 3.6;
+  if (!prev || !Array.isArray(prev.lonlat) || !Array.isArray(cur?.lonlat)) return null;
+  const dt = (cur.t - prev.t) / 1000;
+  const fine = (a) => typeof a !== 'number' || a <= 50;
+  if (!(dt >= 0.5 && dt <= 30) || !fine(prev.accuracy) || !fine(cur.accuracy)) return null;
+  return (haversine(prev.lonlat, cur.lonlat) / dt) * 3.6;
 }
 
 /** Liste des aires du guidage (phase 2d) : en portrait, 40 % de la hauteur de l'écran au plus. */

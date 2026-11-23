@@ -8,7 +8,8 @@ import { createRouteForm } from './ui/route-form.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
-import { fetchRouteOptions, fetchRoute } from './ui/api.js';
+import { fetchRouteOptions, fetchRoute, fetchAvoidRoute } from './ui/api.js';
+import { createPlanPark } from './ui/plan-park.js';
 import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption } from './lib/route-options.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
@@ -22,7 +23,9 @@ import { createWinter } from './ui/winter.js';
 import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
 import { TOLLS_GEO, parseTollNetwork } from './lib/hgv-tolls-geo.js';
 import { serviceDetailText } from './lib/ors-errors.js';
-import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
+import {
+  ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName, avoidTunnelAllowed, AVOID_PARKED_TEXT,
+} from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
 import { routeRules, rulesSourceText, confirmedTunnelBans } from './lib/route-rules.js';
 import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
@@ -424,20 +427,30 @@ async function avoidZfe() {
 }
 
 /**
- * « Éviter le tunnel » (à l'arrêt) : une requête ORS avec un petit carré sur chaque tunnel interdit au code du
- * véhicule (options.avoid_polygons, ajouté aux ZFE déjà évitées), mêmes réglages que l'itinéraire choisi.
+ * v48 : « à l'arrêt » hors guidage pour « Éviter le tunnel » (relevés GPS seulement tant que la fiche propose le
+ * bouton ; vitesse inconnue = en mouvement, bouton grisé).
+ */
+const planPark = createPlanPark({ onChange: () => renderChoice() });
+const tunnelAllowed = () => avoidTunnelAllowed({ guiding: navigation.active, parked: planPark.parked });
+
+/**
+ * « Éviter le tunnel » (à l'arrêt seulement) : une requête ORS avec un petit carré sur chaque tunnel interdit au code
+ * ADR du véhicule ou à sa classe Euro (v48, phase 5g : verdict confirmé ou exploitant), options.avoid_polygons ajouté
+ * aux ZFE déjà évitées, mêmes réglages que l'itinéraire choisi. Même budget et mêmes diagnostics d'échec que le départ
+ * (fetchAvoidRoute) ; échec : message, rien d'affiché ni de guidé. Jamais dit à voix haute.
  */
 async function avoidTunnel() {
   if (!choice || navigation.active || tunnelBusy) return;
+  if (!tunnelAllowed()) { showMessage(messageNode, AVOID_PARKED_TEXT, 'info'); return; }
   const option = choice.options[choice.selected];
-  const forbidden = rulesOf(option.route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
+  const forbidden = rulesOf(option.route, choice.vehicle, new Date()).avoidableTunnels ?? [];
   const plan = avoidTunnelsFor(forbidden, { start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   tunnelBusy = true;
   renderChoice();
   showMessage(messageNode, '');
   try {
-    const route = await fetchRoute({
+    const route = await fetchAvoidRoute({
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
       avoidPolygons: plan.geometry,
@@ -455,7 +468,7 @@ async function avoidTunnel() {
     speedLimits.extend(route);
     directions.extend(route);
     winter.extend(route);
-    const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
+    const still = rulesOf(route, choice.vehicle, new Date()).avoidableTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
   } catch (err) {
     showMessage(messageNode, `Éviter le tunnel : ${errorText(err) || 'calcul impossible.'}`);
@@ -515,9 +528,12 @@ function renderChoice() {
     rulesSource: rulesSourceText(zfeData, {
       hazmat: !!choice.vehicle?.hazmat, tunnelsUpdated: tunnels.data?.updated ?? null, accessUpdated: access.state.updated,
     }),
-    onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy, onAvoidLocal: avoidLocal, localBusy,
+    onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy, tunnelAllowed: tunnelAllowed(),
+    onAvoidLocal: avoidLocal, localBusy,
     windCredit: weather.status === 'ok',
   });
+  // v48 : relevés GPS seulement tant que l'itinéraire choisi a un tunnel à éviter, hors guidage.
+  planPark.watch(!navigation.active && (rules?.[choice.selected]?.avoidableTunnels?.length ?? 0) > 0);
   showZfeOnMap(rules);
   showBridgesOnMap(rules?.[choice.selected]);
 }
@@ -557,6 +573,7 @@ function startGuidance(simulate = null) {
   const option = choice.options[choice.selected];
   showMessage(messageNode, '');
   restrictionsUi.closeBridge(); // phase 12b : aucune saisie pendant le guidage
+  planPark.watch(false); // v48 : plus de relevés hors guidage
   navigation.start({
     route: option.route,
     vehicle: choice.vehicle,

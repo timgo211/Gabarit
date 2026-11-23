@@ -195,9 +195,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [x] Personnalisation : forme de la flèche, icône camion. (Reste de la phase 7c.) Fait en v45 : Réglages ›
     Affichage « Repère du véhicule » : Camion (par défaut, dessin maison vu de dessus, orienté au cap, couleurs de la
     flèche) ou Flèche.
-  - [ ] « Éviter le tunnel » pour une classe Euro interdite (Mont-Blanc, Fréjus, phase 5g) : à l'arrêt, une requête
-    ORS sur appui (comme le bouton ADR de la phase 5b : carré de 80 m, avoid_polygons, 150 km au plus). La phase 5g
-    n'affiche qu'une alerte.
+  - [x] « Éviter le tunnel » pour une classe Euro interdite (Mont-Blanc, Fréjus, phase 5g) : à l'arrêt, une requête
+    ORS sur appui (comme le bouton ADR de la phase 5b : carré de 80 m, avoid_polygons, 150 km au plus). Fait en v48 :
+    un seul bouton pour les tunnels interdits ADR et Euro (texte officiel ou exploitant ; « à vérifier » et classe non
+    précisée : non), actif seulement à l'arrêt confirmé (relevés GPS hors guidage, vitesse inconnue = grisé, ADR
+    compris), une requête dans le budget de 3 avec les diagnostics d'échec du départ (2f) ; au-delà de 150 km à vol
+    d'oiseau : rien envoyé, « à vérifier » ; jamais dit, rien dans le guidage.
   - [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
     Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
     via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
@@ -416,6 +419,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     (lu par reconnaissance de texte (OCR) dans l'Action « Sources Euro » le 21/11/2026) ne cite que 2919, 3291, 3331,
     3359 et 3373 : à vérifier dans les arrêtés des rampes (préfectoral n° DDT-2010-60 du 29/01/2010, décret n° 33 du
     26/01/2010 de la Vallée d'Aoste) avant de coder.
+    v48 (lu le 23/11/2026, Action « Textes officiels ») : décret VdA n° 33 du 26/01/2010 lu (Bulletin officiel n° 7
+    du 16/02/2010, p. 659, PDF texte) : ONU 2919, 3291, 3331, 3359 et 3373 seulement, « en application de » l'arrêté
+    DDT 2010-60 daté du 20 janvier 2010 (et non du 29). Arrêté DDT-2010-60 illisible (haute-savoie.gouv.fr refuse le
+    conteneur et l'Action). 3077 et 3082 : toujours à vérifier, rien ajouté à `KNOWN_TUNNELS`.
   - [x] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
     Fait : `data/taxes-pl.json` (dans `APP_FILES`) et `hgv-tolls.js`. R-Pass (Collectivité européenne d'Alsace,
     prévue au 1er janvier 2027, réseau et grille du site officiel r-pass.eu) et écocontribution PL du Grand Est
