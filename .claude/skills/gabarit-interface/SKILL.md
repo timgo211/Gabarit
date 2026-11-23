@@ -132,3 +132,6 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
   de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
   `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.
+- v51 : petit paysage (hauteur < 400 px, media query) : bouton « Pas une pause (travail) » sur deux lignes (7em) pour
+  que l'alerte de conduite tienne au-dessus du panneau du bas ; panneau de limitation : mention « règle » (`#nav-limit-src`,
+  `speedStatus(…).rule`) sous le panneau quand la limite vient d'une règle générale, couleur `--muted`, jamais dite.

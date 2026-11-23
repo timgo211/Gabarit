@@ -100,6 +100,7 @@ export function createNavigation(ctx) {
     speedo: $('#nav-speedo'),
     speed: $('#nav-speed'),
     limit: $('#nav-limit'),
+    limitSrc: $('#nav-limit-src'),
     screen: $('#nav-screen'),
     sim: $('#nav-sim'),
     simSpeed: $('#btn-sim-speed'),
@@ -461,9 +462,11 @@ export function createNavigation(ctx) {
     setStat(ui.remaining, formatDistance(view.remainingDistance));
     setStat(ui.time, formatDuration(view.remainingDuration));
     setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
-    const sp = speedStatus(view.speedKmh, view.speedLimit ?? null);
+    const sp = speedStatus(view.speedKmh, view.speedLimit ?? null, view.speedLimitSource ?? null);
     if (ui.speed.textContent !== sp.value) ui.speed.textContent = sp.value;
     ui.limit.hidden = sp.limit === null;
+    // v51 : limite d'une règle générale (pas écrite dans OSM) : mention « règle » sous le panneau, couleur neutre.
+    ui.limitSrc.hidden = !sp.rule;
     if (sp.limit !== null && ui.limit.textContent !== String(sp.limit)) ui.limit.textContent = String(sp.limit);
     ui.speedo.classList.toggle('over', sp.over);
     if (s.sim) ui.simOffroad.disabled = s.sim.mode !== 'route' || view.arrived;
@@ -905,6 +908,7 @@ export function createNavigation(ctx) {
     ui.reroute.hidden = true;
     ui.more.hidden = true;
     ui.limit.hidden = true;
+    ui.limitSrc.hidden = true;
     ui.speedo.classList.remove('over');
     setIcon({ kind: 'arrow', angle: 0 });
     ui.dist.textContent = '';

@@ -456,6 +456,11 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-drive-detail { font-size: .88rem; opacity: .9; }
 .nav-work { flex: 0 0 auto; min-height: 56px; padding: 0 12px; font-size: .95rem; white-space: normal; max-width: 11em; }
 .nav-drive-slot .nav-drive { box-shadow: none; }
+/* v51 : petit paysage (moins de 400 px de haut, ex. 760 × 360) : bouton « Pas une pause (travail) » sur deux lignes,
+   plus étroit, pour que le texte de l'alerte de conduite tienne en moins de lignes au-dessus du panneau du bas. */
+@media (orientation: landscape) and (max-height: 399px) {
+  .nav-work { max-width: 7em; padding: 0 8px; line-height: 1.15; }
+}
 .nav-more {
   flex: 0 0 auto; min-width: 56px; min-height: 56px; padding: 0 14px; border-radius: 28px; cursor: pointer;
   background: var(--card); color: var(--fg); border: 2px solid var(--border); font: inherit; font-weight: 800;
@@ -516,6 +521,13 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-limit {
   width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
   background: #FFFFFF; border: 7px solid #C8102E; color: #000000; font-weight: 800; font-size: 1.4rem;
+}
+/* v51 : limite venant d'une règle générale (pas d'une limite PL écrite dans OSM) : petite mention neutre sous le panneau,
+   jamais dans les couleurs du panneau. */
+.nav-limit-box { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.nav-limit-src {
+  font-size: .72rem; font-weight: 700; line-height: 1.2; padding: 0 6px; border-radius: 8px;
+  background: var(--card); color: var(--muted); border: 1px solid var(--border);
 }
 .nav-toast {
   position: absolute; left: 50%; bottom: 140px; transform: translateX(-50%); margin: 0; max-width: min(90%, 420px);

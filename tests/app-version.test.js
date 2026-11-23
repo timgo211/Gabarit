@@ -7,14 +7,18 @@ import { routeDiagnosticText } from '../src/lib/route-diagnostic.js';
 
 const swText = readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
-// Charge le vrai sw.js avec un faux `self` et renvoie ses écouteurs d'événements.
+// Charge le vrai sw.js avec un faux `self` et renvoie ses écouteurs d'événements. Adresse unique par chargement
+// (compteur, jamais l'horloge : deux chargements dans la même milliseconde recevaient le module déjà en cache, donc
+// sans écouteurs neufs). `self` reste défini : les écouteurs le lisent après le chargement.
+let loads = 0;
 async function loadServiceWorker() {
   const listeners = {};
   globalThis.self = {
     location: new URL('https://exemple.test/gabarit/sw.js'),
     addEventListener: (type, fn) => { listeners[type] = fn; },
   };
-  await import(`../sw.js?t=${Date.now()}`);
+  loads += 1;
+  await import(`../sw.js?chargement=${loads}`);
   return listeners;
 }
 

@@ -215,6 +215,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       Panneau seulement si la limite est connue, alerte visuelle, « Limite X » à voix haute en option (étiquette OSM
       seulement). Fiche « Limites de vitesse connues : N % du trajet ». Données : attente de la première copie
       (Geofabrik France en 404 le 23/11/2026).
+    - [x] v51 : limite venant d'une règle générale distinguée à l'écran (petite mention « règle » neutre sous le
+      panneau, couleurs du panneau inchangées) ; voix, fiche et diagnostic inchangés.
+  - [x] **Restes techniques (v51)** : test `app-version` (adresse unique par compteur, plus l'horloge ; 4 `node --test`
+    en parallèle × 3 verts) ; ✘ 760×360 du scénario `guidage` (alerte de conduite sous le panneau du bas, depuis v37)
+    corrigé : en petit paysage (hauteur < 400 px), bouton « Pas une pause (travail) » sur deux lignes.
     - [x] **Phase 11b — Directions des panneaux dans les consignes** (v47) : copie `data/directions-osm/` (bretelles
       `motorway_link` / `trunk_link` avec `destination` / `destination:ref`, mêmes Action, cases et plafonds) ;
       `directions.js` : « …, direction Metz » seulement si une seule bretelle à 60 m du point de manœuvre avec un cap
