@@ -44,6 +44,16 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     `route-options.js` (« Recommandé » / « Préférence ORS ») ; fixtures `ors-directions-an-alternatives.json`
     (Besançon → Belfort : D 683, A 36 + N 1019, N 57 + D 9) et `ors-directions-an-unnamed.json` (étapes sans nom),
     écrites d'après la doc ORS (extra-info waycategory.md, waytype.md)
+  - phase 12a : `bridges-convert.js` (Action : ponts bridge=yes|viaduct routes et rail, layer ≥ 1 ou absent, hors
+    piétons / cycles, ≥ 6 m ; tronçons maxheight ; cases de 1° `data/ponts-osm/`, limites 5 Mo / 60 Mo, France seule),
+    `bridge-check.js` (appli : cases lues, croisement en X avec le tracé, point de croisement exposé, hauteur connue
+    dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
+    `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
+    api.openstreetmap.org bloqué ; id 243477938 du constat)
+  - phase 12b : `restrictions.js` (Mes restrictions : modèle, validation, doublons à 5 m, `applies`, polygones de
+    30 m, zone du trajet, limite des 150 km, `mergeAvoid`, textes, `fromBridge` au point de croisement) ; UI
+    `src/ui/restrictions.js` (Réglages › Mes restrictions, panneau `#bridge-panel`) ; `withBlockedHint` dans
+    `route-options.js` (échec avec restrictions → phrase au conditionnel)
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)
@@ -98,7 +108,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `node tools/osm-update.mjs fichier.osm contour.poly` en local (osmium installé) ; téléchargements : délai par essai
   (60 s pour un `.poly`, 20 min pour un `.pbf`), 5 essais (attentes 30 s, 1 min, 2 min, 4 min) ; contours `.poly`
   gardés dans `data/osm-poly/` (hors `APP_FILES`, dates dans `dates.json`, écrits à chaque copie réussie) et utilisés
-  si leur téléchargement échoue (journal : « copie du dépôt utilisée », avec la date) ; attribution ODbL dans Réglages
+  si leur téléchargement échoue (journal : « copie du dépôt utilisée », avec la date) ; attribution ODbL dans Réglages ;
+  phase 12a : ponts de l'extrait France (filtrage osmium à part, `filterBridges`) dans `data/ponts-osm/`, écrits
+  seulement dans les limites de taille (sinon ancienne copie gardée, journal « ⚠ data/ponts-osm/ non modifié »)
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
   branche) de la liste Sécurité routière (xlsx du 22/10/2022) et des contours 2022 (2021 en secours) dans

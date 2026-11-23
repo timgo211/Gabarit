@@ -21,6 +21,7 @@ import { buildDirectionsRequest, buildRestrictions } from './ors-request.js';
 import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bboxOf } from './ors-response.js';
 import { ERROR_KINDS, failedSegment, NO_ROUTE_BASE_TEXT } from './ors-errors.js';
 import { pickRecommendedIndex, anShareText } from './road-class.js';
+import { BLOCKED_TEXT } from './restrictions.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
@@ -237,7 +238,7 @@ export const PRECISE_HINTS = Object.freeze(new Set(['start-no-exit', 'start-unre
  * Diagnostic en échec pour une autre raison (quota, réseau) : message d'origine, raison dans err.diagnosticNote.
  * @returns {Promise<number>} nombre de requêtes du calcul après le diagnostic
  */
-export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests }) {
+export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons = null }) {
   const hint = (kind, text) => {
     err.hint = kind;
     err.restrictionHint = kind === 'restrictions';
@@ -250,7 +251,9 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
   const probe = async (params) => {
     requests += 1;
     try {
-      parseAllDirections(await send(buildDirectionsRequest({ vehicle, avoidFerries, avoidTolls, ...params })));
+      // Phase 12b : mêmes zones évitées que le calcul (restrictions saisies) ; le sens inverse et le point de passage
+      // les gardent aussi, sinon une restriction en cause passerait pour un départ sans sortie.
+      parseAllDirections(await send(buildDirectionsRequest({ vehicle, avoidFerries, avoidTolls, avoidPolygons, ...params })));
       return { ok: true };
     } catch (e) {
       const noRoute = e?.code === 2009 || e instanceof NoRouteError;
@@ -302,12 +305,14 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
  *   request:{preference:string|null,avoidTolls:boolean}}[], failures:{key:string,label:string,kind:string}[], requests:number }>}
  *   options[0] est toujours le Recommandé. S'il échoue, l'erreur est relancée telle quelle (message existant).
  */
-export async function computeRouteOptions({ start, end, vehicle, avoidTolls = false, avoidFerries = false, send }) {
+export async function computeRouteOptions({ start, end, vehicle, avoidTolls = false, avoidFerries = false, send, avoidPolygons = null }) {
   let requests = 0;
   const ask = async (variant, alternatives = 0) => {
-    const request = requestFor(variant, avoidTolls);
+    // avoidPolygons (phase 12b) gardé dans la requête : le recalcul en guidage évite les mêmes restrictions.
+    const request = avoidPolygons ? { ...requestFor(variant, avoidTolls), avoidPolygons } : requestFor(variant, avoidTolls);
     const req = buildDirectionsRequest({
       start, end, vehicle, avoidFerries, avoidTolls: request.avoidTolls, preference: request.preference, alternatives,
+      avoidPolygons,
     });
     requests += 1;
     return { request, routes: parseAllDirections(await send(req)) };
@@ -325,9 +330,9 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     if (!main) main = await ask(VARIANTS.recommended);
   } catch (err) {
     if (err?.code === 2009) {
-      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests });
+      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons });
     }
-    throw err;
+    throw withBlockedHint(err, avoidPolygons);
   }
 
   let options = dedupeOptions(
@@ -346,6 +351,19 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     options = dedupeOptions(options);
   }
   return { options: promoteRecommended(nameAlternatives(options)), failures, requests };
+}
+
+/**
+ * Phase 12b : calcul en échec (2009 ou aucun itinéraire) alors que des restrictions saisies étaient évitées : phrase
+ * ajoutée au conditionnel, sans requête de plus. Renvoie l'erreur.
+ */
+export function withBlockedHint(err, avoidPolygons) {
+  const noRoute = err?.code === 2009 || errorKind(err) === ERROR_KINDS.NO_ROUTE;
+  if (noRoute && avoidPolygons?.coordinates?.length && !err.restrictionsBlocked) {
+    err.restrictionsBlocked = true;
+    err.message = `${err.message ? `${err.message} ` : ''}${BLOCKED_TEXT}`;
+  }
+  return err;
 }
 
 /** Ligne discrète pour une variante non calculée. */

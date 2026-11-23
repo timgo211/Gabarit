@@ -669,6 +669,17 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .avis-ok { color: var(--avis-ok); }
 .areas-credit { font-size: .8rem; }
 
+/* Mes restrictions (phase 12b) : liste dans Réglages, panneau du repère de pont. */
+.restr-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+.restr-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px; display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.restr-item .row { flex-wrap: wrap; }
+.bridge-panel { border: 2px solid var(--danger); border-radius: 12px; padding: 12px; margin: 8px 0; background: var(--bg); color: var(--text); overflow-wrap: anywhere; }
+/* Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement. */
+.bridge-marker {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+  font-size: 18px; line-height: 1; font-weight: 800; border: 3px solid var(--text); background: var(--bg); color: var(--danger);
+}
+.bridge-marker.medium { color: var(--warn); }
 .area-marker {
   width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
   display: grid; place-items: center; font: 800 18px/1 system-ui, sans-serif;

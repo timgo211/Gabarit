@@ -10,6 +10,7 @@ import {
   sanitizeArrowColor, sanitizeVoiceRate, sanitizeVoiceVolume, sanitizeVoiceName, DEFAULT_ARROW_COLOR, VOICE_RATE, VOICE_VOLUME,
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
+import { sanitizeRestrictions } from './restrictions.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -48,6 +49,7 @@ export function emptyData() {
     reports: [],
     trips: [],
     areaReports: [],
+    restrictions: [],
     settings: {
       theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
@@ -57,6 +59,7 @@ export function emptyData() {
       driveVoice: true,
       windVoice: true,
       windGust: WIND.GUST.default,
+      bridgeWarnings: true,
       adr: emptyAdrSettings(),
     },
   };
@@ -93,6 +96,7 @@ export function sanitizeData(raw) {
     reports: arr(raw.reports),
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
+    restrictions: sanitizeRestrictions(raw.restrictions).list, // Mes restrictions (phase 12b) : invalides et doublons écartés
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       nightMapLevel: sanitizeNightLevel(s.nightMapLevel), // luminosité de la carte la nuit (phase 2d), Normal par défaut
@@ -111,6 +115,7 @@ export function sanitizeData(raw) {
       driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
       windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 70 par défaut
+      bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
       // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
       adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },
