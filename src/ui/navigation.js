@@ -1069,6 +1069,10 @@ export function createNavigation(ctx) {
     get active() {
       return !!s;
     },
+    /** Message bref sur l'écran de guidage (v44 : choix d'itinéraire fermé en roulant), jamais dit à voix haute. */
+    notify(text) {
+      if (s && text) toast(text);
+    },
     /** Simulation en cours (v44 : le guidage choisi repart dans le même mode). */
     get simulating() {
       return !!s?.sim;

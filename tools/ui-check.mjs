@@ -2318,7 +2318,7 @@ async function otherRoutesCheck(browser, base) {
     await page.click('#btn-nav-alt');
     await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
     for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: chosen[i][0], lat: chosen[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
-    check(await page.isHidden('#nav-alts'), `${tag} : panneau fermé dès que le véhicule roule`);
+    check(await page.isHidden('#nav-alts') && /disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${tag} : panneau fermé dès que le véhicule roule, message`);
     // Échec : message du calcul de départ, rien d'affiché ni guidé.
     for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: chosen[3][0], lat: chosen[3][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
     mode = 'fail';
@@ -2877,11 +2877,14 @@ async function guidanceCheck(browser, base) {
     check(foot.out.length === 0, `${label} : à l'arrêt, rien ne se chevauche`, foot.out.join(' ; '));
     check((await overflowingNavText(page)).length === 0 && (await bannerOverBottom(page)).length === 0, `${label} : à l'arrêt, textes et bandeau à leur place`);
     await page.screenshot({ path: join(SHOTS, `2c-${mode}-${tag}-arret.png`) });
+    const altBefore = stats.directions;
     await page.click('#btn-nav-alt');
-    await page.waitForTimeout(700);
-    // v44 : vue d'ensemble et panneau « Autres itinéraires » (scénario « autres » pour le détail).
-    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && await page.isVisible('#nav-alts'),
-      `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble et le choix`);
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    // v44 : vue d'ensemble et panneau « Autres itinéraires » (scénario « autres » pour le détail) : 1 à 3 requêtes
+    // voulues par l'appui, hors du compte « aucun recalcul » de la liste des aires.
+    const altReq = stats.directions - altBefore;
+    check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && await page.isVisible('#nav-alts') && altReq >= 1 && altReq <= 3,
+      `${label} : à l'arrêt, « Autres itinéraires » ouvre la vue d'ensemble et le choix (1 à 3 requêtes)`, String(altReq));
     await page.click('#btn-alts-close');
     await page.click('#btn-nav-recenter');
 
@@ -2898,8 +2901,8 @@ async function guidanceCheck(browser, base) {
     await page.click('#btn-nav-area-go');
     await page.waitForTimeout(700);
     check(await page.getAttribute('#btn-nav-overview', 'aria-pressed') === 'true' && /bientôt/.test(await page.textContent('#nav-toast')),
-      `${label} : « Y aller » à l'arrêt → vue d'ensemble, « Autres itinéraires : bientôt »`);
-    check(stats.directions === reqBefore, `${label} : liste des aires, aucun recalcul`, `${stats.directions - reqBefore} requête(s)`);
+      `${label} : « Y aller » à l'arrêt → vue d'ensemble, « Y aller : bientôt »`);
+    check(stats.directions - altReq === reqBefore, `${label} : liste des aires, aucun recalcul`, `${stats.directions - altReq - reqBefore} requête(s)`);
     await page.click('#btn-nav-recenter');
     if (!(await page.isVisible('#nav-areas'))) await navAreas(page);
     await page.click('#btn-nav-areas-close');

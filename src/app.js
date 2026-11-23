@@ -596,7 +596,7 @@ function closeAlternatives(reason = '') {
   altUi.notes.replaceChildren();
   altUi.go.hidden = true;
   altUi.status.textContent = '';
-  if (wasOpen && reason === 'moving') showMessage(messageNode, 'Autres itinéraires fermés : le véhicule roule. Disponible à l\'arrêt.', 'info');
+  if (wasOpen && reason === 'moving') navigation.notify('Autres itinéraires : disponible à l\'arrêt');
 }
 async function openAlternatives(from) {
   if (!choice || !navigation.active || !navigation.parked) return;
