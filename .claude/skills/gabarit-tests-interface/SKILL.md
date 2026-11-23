@@ -105,3 +105,9 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   `.route-card-speed`, cases lues, ligne technique, Réglages (case décochée, texte fixe), GPS émulé à 40 km/h → panneau
   « 50 » aux couleurs réglementaires, 70 km/h → `over` (bord 4 px), rien dit par défaut, « Limite 50. » une fois avec
   le réglage ; copie absente → « inconnues » et aucun panneau.
+- `directions` (phase 11b) : itinéraire synthétique `ors-directions-sortie.json` (autoroute puis « Restez à droite »),
+  copie `data/directions-osm/` construite par les fonctions de l'Action (`directionsCopy` : 'fixture', 'proche' = avec
+  une bretelle au cap opposé, 'ambigu' = deux bretelles au même cap, null = 404). GPS émulé à 90 km/h depuis 1,1 km
+  de la sortie : bandeau « Restez à droite, direction Metz, Nancy (A 31) » entier, dit à voix haute ; 'proche' :
+  affiché, pas dit ; 'ambigu' et copie absente : consigne inchangée. 412×900 jour, 900×412 nuit, 360×760 nuit,
+  1280×800 jour.

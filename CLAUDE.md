@@ -68,6 +68,9 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   5 Mo / 40 Mo, copie réduite au-delà) : `maxspeed:hgv`, sinon `maxspeed` plafonné par la règle PL vérifiée
   (`speed-rules.js`), sinon inconnue (aucun panneau, rien d'inventé ; agglomération jamais déduite). Calculée une fois
   par itinéraire. Alerte visuelle ; « Limite X » dit seulement si `settings.speedVoice` (non par défaut) et étiquette OSM.
+- Directions (11b, `directions.js`, copie `data/directions-osm/` mêmes Action et cases, jamais précachée) : « direction X »
+  seulement si UNE bretelle à 60 m du point de manœuvre au cap cohérent ; dit seulement sans autre bretelle à 60 m ;
+  sinon consigne inchangée (jamais devinée). `maneuverText(m, { spoken })` : affiché ≠ dit.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - « Autres itinéraires » (v44, `openAlternatives` d'`app.js`, panneau `#nav-alts`) : seulement à l'arrêt (`parkedState`),
   depuis la dernière position reçue vers l'arrivée, profil actif, même calcul que le départ (`fetchRouteOptions`,

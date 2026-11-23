@@ -129,3 +129,6 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   (`settings.speedVoice`, désactivé par défaut : « Limite X » une fois par tronçon, étiquette OSM sans conditions,
   jamais une règle générale) et texte fixe `#speed-hint`. Fiche : `.route-card-speed` « Limites de vitesse connues :
   N % du trajet » (ou « inconnues ») ; note « conditions… à vérifier » ; diagnostic « Limites de vitesse : … ».
+- Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
+  de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
+  `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.
