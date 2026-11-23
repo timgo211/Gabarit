@@ -18,6 +18,7 @@ npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_mod
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
+                                   #   | carburant
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -93,6 +94,13 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   « Recommandé » en tête, notes, 2e fiche choisie → « Guider par cet itinéraire » → source `route` = 2e tracé ;
   panneau rouvert puis le véhicule roule → fermé ; 2009 → message du départ, aucune fiche ni bouton ; rien dit.
   412×900 jour, 900×412 nuit, 1280×800 jour. `guidage` : le bouton ouvre la vue d'ensemble et le panneau.
+- `carburant` (phase 4) : réponse de data.economie.gouv.fr simulée (option `fuel` d'`open`, forme de
+  `/exports/json`), stations placées près du tracé de `ors-directions-nav.json`. 412×900 jour, 900×412 nuit, 1280×800
+  jour : préparation en roulant → grisé, message, aucune requête ; à l'arrêt → une requête (`in_bbox`, rien d'autre),
+  4 stations triées par prix, « ancien » (72 h), « Piste PL », détour à vol d'oiseau, texte fixe ; filtre Piste PL ;
+  coût du trajet ; ★ gardée dans `gabarit.data` ; rouvert sans requête ; fermé en roulant ; guidage : puce grisée en
+  roulant, à l'arrêt stations devant seulement, fermé en roulant, rien dit ; réseau coupé → « Pas de connexion ».
+  Puis module `src/ui/fuel.js` refusé → message, nouvel essai chargé ; trajet en Suisse → « France seulement », 0 requête.
 - `recommande` (v43) : deux itinéraires (Mont-Blanc + contournement synthétique décalé de 0,2°) : Euro 3 → le
   contournement est « Recommandé » avec la phrase, Mont-Blanc en « Préférence ORS », une seule requête, rien dit ;
   Euro 6 → ordre d'ORS ; ADR code E → contournement ; Mont-Blanc seul en Euro 3 → « Tous les itinéraires… »

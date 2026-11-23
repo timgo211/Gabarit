@@ -126,6 +126,7 @@ export function createNavigation(ctx) {
     keep: $('#btn-nav-keep'),
     toast: $('#nav-toast'),
     areasBtn: $('#btn-nav-areas'),
+    fuel: $('#btn-nav-fuel'), // phase 4 : carburant sur le trajet, à l'arrêt seulement
     areas: $('#nav-areas'),
     areasList: $('#nav-areas-list'),
     areasEmpty: $('#nav-areas-empty'),
@@ -644,7 +645,7 @@ export function createNavigation(ctx) {
   /** « Y aller » et « Fiche complète » : actifs seulement à l'arrêt (moins de 5 km/h pendant 3 s). */
   function renderAreaButtons() {
     const off = String(!s?.park?.parked);
-    for (const b of [ui.areaGo, ui.areaSheet]) if (b.getAttribute('aria-disabled') !== off) b.setAttribute('aria-disabled', off);
+    for (const b of [ui.areaGo, ui.areaSheet, ui.fuel]) if (b.getAttribute('aria-disabled') !== off) b.setAttribute('aria-disabled', off);
   }
 
   /** Ouvre ou ferme la liste ; fermée seule au bout de 20 s sans toucher. */
@@ -1055,6 +1056,13 @@ export function createNavigation(ctx) {
     setSearch(false);
   });
   ui.areasClose.addEventListener('click', () => setAreasOpen(false));
+  // Phase 4 : « Carburant » (rangée de la loupe), à l'arrêt seulement ; stations devant la dernière position reçue.
+  ui.fuel.addEventListener('click', () => {
+    if (!s) return;
+    setSearch(false);
+    if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
+    ctx.onFuel?.(s.lastFix ?? s.view?.position ?? null);
+  });
   ui.areasList.addEventListener('click', (e) => {
     const b = e.target.closest('.nav-area');
     if (b?.dataset.id) pickArea(b.dataset.id);

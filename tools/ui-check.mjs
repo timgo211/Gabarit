@@ -141,7 +141,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null,
-  start = START,
+  start = START, fuel = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -160,7 +160,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [], satTiles: {} };
+  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [], satTiles: {}, fuel: [] };
   if (driving) await ctx.addInitScript((d) => { if (!sessionStorage.getItem('ui-check-init')) localStorage.setItem('gabarit.driving', d); }, JSON.stringify(driving));
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -236,6 +236,14 @@ async function open(browser, base, {
           hourly: { time, wind_speed_10m: gusts.map((g) => Math.round(g * 0.5)), wind_gusts_10m: gusts } };
       });
       return route.fulfill({ json: lats.length === 1 ? list[0] : list });
+    }
+    // Phase 4 : prix des carburants (data.economie.gouv.fr) ; fuel(url) → JSON, { __status } ou null (réseau coupé).
+    if (url.startsWith('https://data.economie.gouv.fr/')) {
+      stats.fuel.push(url);
+      const json = fuel ? fuel(url) : null;
+      if (!json) return route.abort('internetdisconnected');
+      if (json.__status) return route.fulfill({ status: json.__status, json: {}, headers: { 'access-control-allow-origin': '*' } });
+      return route.fulfill({ json, headers: { 'access-control-allow-origin': '*' } });
     }
     if (url.includes('/pelias/v1/autocomplete')) stats.pelias += 1;
     if (url.includes('/pelias/v1/autocomplete')) return route.fulfill({ json: fixture('pelias-autocomplete.json') });
@@ -3982,6 +3990,141 @@ async function bannerCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 4 : « Carburant sur le trajet ». Réponse de data.economie.gouv.fr simulée (forme de /exports/json lue par
+ * l'Action « Textes officiels » le 23/11/2026) avec des stations placées près du tracé de ors-directions-nav.json.
+ * À l'arrêt seulement (préparation : relevés GPS ; guidage : parkedState), une requête par itinéraire, tri par prix,
+ * « ancien », filtre « Piste PL », coût du trajet, ★ OK camion gardée, fermé en roulant, module refusé hors ligne →
+ * message, trajet hors de France → message sans requête, guidage : stations devant seulement, rien dit.
+ */
+async function fuelCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const now = Date.now();
+  const iso = (ms) => new Date(ms).toISOString().replace('.000Z', '+00:00');
+  const near = (i, dLat = 0.004) => ({ lon: line[i][0], lat: line[i][1] + dLat });
+  const stations = [
+    { id: 1001, adresse: '1 rue du Départ', ville: 'Essai', cp: '69100', geom: near(2), gazole_prix: 2.059, gazole_maj: iso(now - 3600e3), services_service: ['Toilettes publiques'] },
+    { id: 1002, adresse: '2 route Ancienne', ville: 'Essai', cp: '69100', geom: near(10), gazole_prix: 1.989, gazole_maj: iso(now - 72 * 3600e3), services_service: ['Piste poids lourds'] },
+    { id: 1003, adresse: '3 avenue des Poids Lourds', ville: 'Essai', cp: '69100', geom: near(20), gazole_prix: 2.019, gazole_maj: iso(now - 2 * 3600e3), services_service: ['Piste poids lourds', 'Douches'] },
+    { id: 1004, adresse: '4 quai de l\'Arrivée', ville: 'Essai', cp: '69100', geom: near(30), gazole_prix: 2.149, gazole_maj: iso(now - 600e3), services_service: null },
+    { id: 1005, adresse: 'Trop loin', ville: 'Ailleurs', cp: '69100', geom: near(15, 0.08), gazole_prix: 1.5, gazole_maj: iso(now), services_service: [] },
+  ];
+  const vehicle = { id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, consumption: 32 };
+  const prices = async (page) => page.locator('#fuel-list .fuel-price').allTextContents();
+  const park = async (page, p, speed, n = 4) => { for (let i = 0; i < n; i += 1) { await setGeo(page, { lon: p[0], lat: p[1], accuracy: 5, speed }); await page.waitForTimeout(1000); } };
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    let mode = 'ok';
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, vehicle, overpass: () => ({ elements: [] }), directions: () => nav,
+      fuel: () => (mode === 'ok' ? stations : mode === 'err' ? { __status: 503 } : null),
+    });
+    await computeRoute(page);
+    check(await page.isVisible('#btn-fuel'), `${tag} : bouton « Carburant sur le trajet » sous la fiche`);
+    // En roulant (préparation) : grisé, message, aucune requête.
+    await park(page, line[0], 14);
+    check(await page.getAttribute('#btn-fuel', 'aria-disabled') === 'true', `${tag} : grisé en roulant`);
+    await page.click('#btn-fuel', { force: true });
+    await page.waitForTimeout(400);
+    check(/disponible à l'arrêt/i.test(await page.textContent('#message')) && await page.isHidden('#fuel-panel') && stats.fuel.length === 0,
+      `${tag} : en roulant → « disponible à l'arrêt », aucune requête`);
+    // À l'arrêt : une requête, liste triée, ≤ 2 km.
+    await park(page, line[0], 0, 5);
+    check(await page.getAttribute('#btn-fuel', 'aria-disabled') === 'false', `${tag} : actif à l'arrêt`);
+    await page.click('#btn-fuel');
+    await page.waitForSelector('#fuel-list .fuel-row', { timeout: 10000 }).catch(() => {});
+    const q = stats.fuel[0] ? new URL(stats.fuel[0]) : null;
+    check(stats.fuel.length === 1 && /\/exports\/json$/.test(q?.pathname ?? '') && /in_bbox\(geom/.test(q?.searchParams.get('where') ?? '')
+      && !/key|token|v1|Semi/i.test(q?.search ?? 'x'), `${tag} : une requête, zones du trajet seulement`, stats.fuel.join(' '));
+    check(JSON.stringify(await prices(page)) === JSON.stringify(['1,989 €/L', '2,019 €/L', '2,059 €/L', '2,149 €/L']), `${tag} : 4 stations à moins de 2 km, triées par prix`, (await prices(page)).join(' '));
+    const first = await page.textContent('#fuel-list .fuel-row >> nth=0');
+    check(/ancien/.test(first) && /Piste PL/.test(first) && /(détour ≈ .* à vol d'oiseau|sur le trajet)/.test(first) && /mis à jour le/.test(first), `${tag} : prix de 72 h « ancien », Piste PL, détour ou « sur le trajet », date`, first);
+    const facts = await page.locator('#fuel-list .fuel-facts').allTextContents();
+    check(facts.some((t) => /détour ≈ \d.* à vol d'oiseau/.test(t)), `${tag} : détour estimé à vol d'oiseau`, facts.join(' | '));
+    check(/Prix indicatifs : vérifie à la pompe\./.test(await page.textContent('#fuel-note')), `${tag} : « Prix indicatifs : vérifie à la pompe. »`);
+    await noHorizontalScroll(page, `${tag} carburant`);
+    const box = await page.locator('#fuel-panel').boundingBox();
+    check(box && box.x >= 0 && box.x + box.width <= width + 1, `${tag} : fiche dans l'écran`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-carburant.png`) });
+    // Filtre Piste PL.
+    await page.click('#btn-fuel-hgv');
+    check((await prices(page)).length === 2, `${tag} : « Piste PL seulement » → 2 stations`, (await prices(page)).join(' '));
+    await page.click('#btn-fuel-hgv');
+    // Coût du trajet au prix d'une station : 6,012 km × 32 L/100 × 2,019.
+    await page.locator('#fuel-list .fuel-pick').nth(1).click();
+    const cost = await page.textContent('#fuel-cost');
+    check(/Coût du trajet à ce prix : ≈ 3,9 € \(≈ 2 L\)/.test(cost), `${tag} : coût du trajet`, cost);
+    // ★ OK camion : gardée dans gabarit.data, filtre proposé.
+    await page.locator('#fuel-list .fuel-star').nth(0).click();
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).fuelStations ?? []);
+    check(saved.length === 1 && saved[0].id === 1002 && await page.isVisible('#btn-fuel-ok'), `${tag} : ★ OK camion gardée, filtre proposé`, JSON.stringify(saved));
+    // Fermé puis rouvert : aucune nouvelle requête.
+    await page.click('#btn-fuel-close');
+    await page.click('#btn-fuel');
+    await page.waitForTimeout(500);
+    check(stats.fuel.length === 1 && (await prices(page)).length === 4, `${tag} : rouvert sans nouvelle requête`, String(stats.fuel.length));
+    // Le véhicule roule : fermé, message.
+    await park(page, line[0], 14);
+    check(await page.isHidden('#fuel-panel') && /disponible à l'arrêt/i.test(await page.textContent('#message')), `${tag} : fermé dès que le véhicule roule`);
+    // Guidage : en roulant grisé ; à l'arrêt, stations devant la position seulement.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    await page.click('#btn-nav-search');
+    check(await page.getAttribute('#btn-nav-fuel', 'aria-disabled') === 'true', `${tag} guidage : « Carburant » grisé en roulant`);
+    await page.click('#btn-nav-fuel', { force: true });
+    await page.waitForTimeout(400);
+    check(await page.isHidden('#fuel-panel') && /Disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${tag} guidage : en roulant → « Disponible à l'arrêt »`);
+    await park(page, line[12], 0, 5);
+    await page.click('#btn-nav-search');
+    await page.click('#btn-nav-fuel');
+    await page.waitForSelector('#fuel-list .fuel-row', { timeout: 10000 }).catch(() => {});
+    check(JSON.stringify(await prices(page)) === JSON.stringify(['2,019 €/L', '2,149 €/L']), `${tag} guidage : stations devant seulement`, (await prices(page)).join(' '));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-carburant-guidage.png`) });
+    for (let i = 13; i <= 15; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    check(await page.isHidden('#fuel-panel'), `${tag} guidage : fermé dès que le véhicule roule`);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /carburant|gazole|station|prix/i.test(t)), `${tag} : rien dit à voix haute`, spoken.join(' | '));
+    await stopGuidance(page);
+    // Hors ligne (module déjà chargé) puis réponse refusée.
+    await park(page, line[0], 0, 5);
+    mode = 'off';
+    await computeRoute(page); // nouvel itinéraire (nouvelle clé) : nouvelle requête
+    await park(page, line[0], 0, 5);
+    await page.click('#btn-fuel');
+    await page.waitForTimeout(1500);
+    check(/Pas de connexion : prix indisponibles\./.test(await page.textContent('#fuel-status')), `${tag} : réseau coupé → « Pas de connexion »`, await page.textContent('#fuel-status'));
+    await page.click('#btn-fuel-close');
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Module refusé (hors ligne, jamais en cache) → message, jamais un bouton muet ; trajet hors de France → message.
+  {
+    const ch = JSON.parse(JSON.stringify(nav));
+    ch.features[0].properties.extras = { ...(ch.features[0].properties.extras ?? {}), countryinfo: { values: [[0, line.length - 1, 193]], summary: [] } };
+    let blockModule = true;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width: 412, height: 900, vehicle, overpass: () => ({ elements: [] }), directions: () => ch, fuel: () => stations,
+    });
+    await ctx.route(/\/src\/ui\/fuel\.js$/, (route) => (blockModule ? route.abort('internetdisconnected') : route.continue()));
+    await computeRoute(page);
+    await park(page, line[0], 0, 5);
+    await page.click('#btn-fuel');
+    await page.waitForTimeout(800);
+    check(/Pas de connexion : prix indisponibles\./.test(await page.textContent('#message')) && await page.isHidden('#fuel-panel'),
+      'module carburant refusé (hors ligne) → « Pas de connexion : prix indisponibles. »', await page.textContent('#message'));
+    blockModule = false;
+    await page.click('#btn-fuel');
+    await page.waitForTimeout(800);
+    check(await page.isVisible('#fuel-panel') && /France seulement/.test(await page.textContent('#fuel-status')) && stats.fuel.length === 0,
+      'nouvel essai : module chargé ; trajet en Suisse → « France seulement », aucune requête', await page.textContent('#fuel-status'));
+    check(errors.filter((e) => !/fuel\.js|dynamically imported/i.test(e)).length === 0, 'hors France : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -3990,7 +4133,8 @@ try {
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
-    recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck };
+    recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
+    carburant: fuelCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

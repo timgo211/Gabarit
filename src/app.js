@@ -46,6 +46,7 @@ import { placeAlongRoute } from './lib/areas-route.js';
 import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
 import { buildSave, checkSave, restoredChoice, saveKey, shouldSave, RESUME_QUESTION } from './lib/route-save.js';
 import { createRouteStore } from './ui/route-save.js';
+import { FUEL, lazyLoader, toggleFuelStation } from './lib/fuel-stations.js';
 
 function pickStorage() {
   try {
@@ -65,6 +66,7 @@ const messageNode = $('#message');
 const summaryNode = $('#summary');
 const notesNode = $('#route-notes');
 const navStartBtn = $('#btn-nav-start');
+const fuelBtn = $('#btn-fuel'); // phase 4 : carburant sur le trajet
 /**
  * Itinéraires proposés au dernier calcul (sert au guidage et à la simulation) :
  * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, fromLabel, toLabel, startIsMyPosition }.
@@ -154,7 +156,8 @@ navigation = createNavigation({
   onQuit: () => forgetRoute(),
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
   onAlternatives: (from) => openAlternatives(from),
-  onParkChange: (parked) => { if (!parked) closeAlternatives('moving'); },
+  onParkChange: (parked) => { if (!parked) { closeAlternatives('moving'); closeFuel('moving'); } },
+  onFuel: (from) => openFuel(from), // phase 4 : à l'arrêt seulement
   // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
   onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
   // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
@@ -436,7 +439,12 @@ async function avoidZfe() {
  * v48 : « à l'arrêt » hors guidage pour « Éviter le tunnel » (relevés GPS seulement tant que la fiche propose le
  * bouton ; vitesse inconnue = en mouvement, bouton grisé).
  */
-const planPark = createPlanPark({ onChange: () => renderChoice() });
+const planPark = createPlanPark({
+  onChange: (parked) => {
+    if (!parked && !navigation.active) closeFuel('moving');
+    renderChoice();
+  },
+});
 const tunnelAllowed = () => avoidTunnelAllowed({ guiding: navigation.active, parked: planPark.parked });
 
 /**
@@ -538,8 +546,11 @@ function renderChoice() {
     onAvoidLocal: avoidLocal, localBusy,
     windCredit: weather.status === 'ok',
   });
-  // v48 : relevés GPS seulement tant que l'itinéraire choisi a un tunnel à éviter, hors guidage.
-  planPark.watch(!navigation.active && (rules?.[choice.selected]?.avoidableTunnels?.length ?? 0) > 0);
+  // v48 : relevés GPS hors guidage tant que la fiche propose un bouton réservé à l'arrêt : « Éviter le tunnel », et
+  // depuis la phase 4 « Carburant sur le trajet » (proposé pour tout itinéraire affiché).
+  planPark.watch(!navigation.active);
+  fuelBtn.hidden = navigation.active;
+  fuelBtn.setAttribute('aria-disabled', String(!planPark.parked));
   showZfeOnMap(rules);
   showBridgesOnMap(rules?.[choice.selected]);
 }
@@ -582,6 +593,8 @@ function startGuidance(simulate = null, resume = null) {
   showMessage(messageNode, '');
   restrictionsUi.closeBridge(); // phase 12b : aucune saisie pendant le guidage
   planPark.watch(false); // v48 : plus de relevés hors guidage
+  closeFuel();
+  fuelBtn.hidden = true;
   navigation.start({
     route: option.route,
     vehicle: choice.vehicle,
@@ -696,6 +709,39 @@ altUi.go.addEventListener('click', () => {
   startGuidance(sim); // le guidage repart sur l'itinéraire choisi
 });
 
+// ───────── Phase 4 : « Carburant sur le trajet », à l'arrêt seulement (préparation et guidage) ─────────
+// Module d'interface chargé à la demande (hors précache) : hors ligne, l'import échoue → message, jamais un bouton
+// muet. Une requête data.economie.gouv.fr par itinéraire (zones du trajet seulement), aucune requête ORS. Fermé dès
+// que le véhicule roule (R412-6-2) ; rien n'est dit à voix haute.
+const loadFuel = lazyLoader(() => import('./ui/fuel.js'));
+let fuelPanel = null;
+const fuelParked = () => (navigation.active ? navigation.parked : planPark.parked);
+function fuelMessage(text) {
+  if (navigation.active) navigation.notify(text);
+  else showMessage(messageNode, text, 'info');
+}
+async function openFuel(from = null) {
+  if (!choice) return;
+  if (!fuelParked()) { fuelMessage(FUEL.PARKED_TEXT); return; }
+  const loaded = await loadFuel();
+  if (!loaded.ok) { fuelMessage(loaded.text); return; }
+  if (!choice || !fuelParked()) return;
+  fuelPanel ??= loaded.mod.createFuelPanel({
+    root: $('#fuel-panel'),
+    getOk: () => data.fuelStations ?? [],
+    onToggleOk: (station) => update((d) => ({ ...d, fuelStations: toggleFuelStation(d.fuelStations, station) })),
+    isParked: fuelParked,
+  });
+  const route = choice.options[choice.selected].route;
+  fuelPanel.open({ key: route, route, vehicle: choice.vehicle, from: navigation.active ? from : null });
+}
+function closeFuel(reason = '') {
+  if (!fuelPanel?.isOpen) return;
+  fuelPanel.close();
+  if (reason === 'moving') fuelMessage(FUEL.PARKED_TEXT);
+}
+fuelBtn.addEventListener('click', () => openFuel(null));
+
 // Écrans
 const settings = createSettings({
   store,
@@ -793,6 +839,9 @@ const form = createRouteForm({
       summaryNode.hidden = true;
       notesNode.hidden = true;
       navStartBtn.hidden = true;
+      fuelBtn.hidden = true;
+      closeFuel();
+      planPark.watch(false); // plus de bouton réservé à l'arrêt
       choice = null;
       areas.clear();
       weather.clear();

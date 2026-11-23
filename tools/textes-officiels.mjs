@@ -7,6 +7,8 @@
 //
 // Entrée « tiles » (phase 7d) : tuiles réelles demandées avec l'en-tête Origin du site publié ; le journal donne statut
 // HTTP, type de contenu, taille et en-tête CORS access-control-allow-origin (MapLibre charge les tuiles raster par fetch).
+// Entrée « headers » (phase 4) : API JSON demandée avec l'en-tête Origin du site publié ; le journal donne tous les
+// en-têtes de réponse (CORS, quotas) et le début du corps.
 // Champ « run » du fichier : liste des entrées lues (toutes si absent).
 //
 // Usage : node tools/textes-officiels.mjs [fichier.json] [id…]
@@ -132,9 +134,33 @@ function checkTile(t) {
   }
 }
 
+// Entrée « headers » (phase 4) : API JSON appelée par fetch depuis le site publié. GET simple (aucun en-tête ajouté
+// par la page, donc pas de pré-vol) avec l'en-tête Origin du site ; le journal donne statut, type, taille, tous les
+// en-têtes de réponse (CORS, quotas X-RateLimit-*) et le début du corps.
+function checkHeaders(h) {
+  try {
+    const out = execFileSync('curl', [
+      '-sS', '-L', '-4', '--compressed', '--max-time', '90', '-A', UA, '-H', `Origin: ${ORIGIN}`,
+      '-H', `Referer: ${ORIGIN}/Gabarit/`, '-D', '-', '-o', `${WORK}/headers-body`,
+      '-w', '\n%{http_code} %{content_type} %{size_download}', h.url,
+    ], { maxBuffer: 1 << 22 }).toString();
+    const lines = out.trim().split('\n');
+    const [code, type, size] = lines.pop().split(' ');
+    const acao = lines.filter((l) => /^access-control-allow-origin:/i.test(l)).map((l) => l.split(':').slice(1).join(':').trim());
+    const ok = code === '200' && acao.some((v) => v === '*' || v === ORIGIN);
+    console.log(`\n── en-têtes ${h.label} : ${h.url}\n   HTTP ${code}, ${type}, ${size} o, access-control-allow-origin : ${acao.join(' | ') || 'absent'} → ${ok ? 'CORS OK' : 'CORS NON'}`);
+    for (const l of lines) if (l.trim()) console.log(`   | ${l.trim()}`);
+    const body = execFileSync('head', ['-c', String(h.head ?? 3000), `${WORK}/headers-body`]).toString();
+    console.log(`   corps : ${body}`);
+  } catch (err) {
+    console.log(`\n── en-têtes ${h.label} : ${h.url}\n   échec : ${String(err?.stderr || err?.message || err).trim().slice(0, 200)} → CORS NON`);
+  }
+}
+
 async function readEntry(entry) {
   console.log(`\n████ ${entry.id} — ${entry.title}`);
   for (const t of entry.tiles ?? []) checkTile(t);
+  for (const h of entry.headers ?? []) checkHeaders(h);
   const queue = [...(entry.urls ?? [])];
   const seen = new Set();
   let docs = 0;

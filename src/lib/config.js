@@ -10,6 +10,12 @@ export const PELIAS_BASE = 'https://api.heigit.org/pelias/v1';
 /** Prévisions météo Open-Meteo (vent fort, phase 5) : sans clé, usage non commercial (open-meteo.com/en/terms). */
 export const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1';
 
+/**
+ * Prix des carburants (phase 4) : jeu « flux instantané v2 » de data.economie.gouv.fr (Opendatasoft Explore v2.1),
+ * sans clé, CORS « * », 50 000 appels par jour (en-têtes lus par l'Action « Textes officiels » le 23/11/2026).
+ */
+export const FUEL_API = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2';
+
 /** ORS refuse maximum_speed < 80 km/h. */
 export const ORS_MIN_MAX_SPEED = 80;
 

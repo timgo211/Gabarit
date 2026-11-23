@@ -817,3 +817,42 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .resume-question { margin: 0 0 8px; font-weight: 800; font-size: 1.1rem; }
 .resume-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .resume-btns .btn { flex: 1 1 140px; min-height: 56px; }
+
+/* Phase 4 : « Carburant sur le trajet » (préparation et guidage, à l'arrêt seulement). Variables de la palette seulement. */
+.btn-fuel { margin-top: 10px; width: 100%; }
+.btn-fuel[aria-disabled="true"], #btn-nav-fuel[aria-disabled="true"] {
+  background: var(--nav-off-bg, var(--panel)); color: var(--nav-off-fg, var(--muted)); border-color: var(--nav-off-border, var(--border));
+}
+.fuel-panel {
+  position: fixed; inset: 12px; z-index: 45; overflow-y: auto; overscroll-behavior: contain; min-width: 0;
+  display: grid; align-content: start; gap: 10px; padding: 12px; border-radius: 20px;
+  background: var(--bg); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.fuel-panel[hidden] { display: none; }
+.fuel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.fuel-head h2 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; min-width: 0; }
+.fuel-head .btn, .fuel-filters .btn { min-height: var(--tap); }
+.fuel-note { margin: 0; color: var(--muted); font-size: .95rem; }
+.fuel-panel .status[hidden] { display: none; }
+.fuel-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.fuel-filters[hidden] { display: none; }
+.fuel-filters .btn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.fuel-cost { margin: 0; padding: 10px 12px; border-radius: var(--radius); background: var(--panel); font-weight: 700; }
+.fuel-cost[hidden] { display: none; }
+.fuel-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.fuel-row { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.fuel-pick {
+  flex: 1; min-width: 0; min-height: var(--tap); display: grid; gap: 2px; text-align: left; padding: 10px 12px;
+  border-radius: var(--radius); border: 2px solid var(--border); background: var(--card); color: var(--fg); font: inherit;
+}
+.fuel-row.selected .fuel-pick { border-color: var(--accent); border-width: 3px; }
+.fuel-top { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fuel-price { font-size: 1.35rem; font-weight: 800; }
+.fuel-row.old .fuel-price { color: var(--muted); }
+.fuel-badge { font-size: .85rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); }
+.fuel-badge.hgv, .fuel-badge.ok { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.fuel-badge.old { color: var(--muted); }
+.fuel-place { overflow-wrap: anywhere; }
+.fuel-facts, .fuel-updated { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+.fuel-star { min-width: var(--tap); min-height: var(--tap); font-size: 1.5rem; padding: 0 10px; }
+.fuel-star[aria-pressed="true"] { color: var(--warn); }

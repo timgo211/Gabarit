@@ -87,6 +87,14 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     30 m, zone du trajet, limite des 150 km, `mergeAvoid`, textes, `fromBridge` au point de croisement) ; UI
     `src/ui/restrictions.js` (Réglages › Mes restrictions, panneau `#bridge-panel`) ; `withBlockedHint` dans
     `route-options.js` (échec avec restrictions → phrase au conditionnel)
+  - phase 4 : `fuel-stations.js` (carburant : `routeBoxes` (tronçons de 20 km, 60 boîtes au plus, élargies de 2 km,
+    France seulement d'après `route.countries`), `fuelQueryUrl` (une requête `/exports/json`, `in_bbox`), `parseStations`,
+    `stationsAlongRoute` (≤ 2 km, devant la position en guidage), `describeStation` (« ancien » > 48 h, détour à vol
+    d'oiseau), `tripFuelCost`, `sanitizeFuelStations` / `toggleFuelStation` (champ `fuelStations` de `gabarit.data`),
+    `lazyLoader`) ; URL `FUEL_API` de `config.js` ; UI `src/ui/fuel.js` (panneau `#fuel-panel`, chargé par `import()`,
+    hors `APP_FILES` : `LAZY_APP_FILES` de `sw-routing.js`, bypass) ; boutons `#btn-fuel` (fiche) et `#btn-nav-fuel`
+    (rangée de la loupe) ; tests `tests/fuel-stations.test.js`, fixture `carburants-v2.json` (forme réelle de l'export
+    lue par l'Action « Textes officiels » le 23/11/2026, valeurs **synthétiques**) ; ui-check `carburant`
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

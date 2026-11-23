@@ -158,6 +158,16 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
     l'arrêt (`createPlanPark`) ; format différent, illisible, profil supprimé → effacé ; effacé à l'arrivée et par
     ✕ + « Quitter ». IndexedDB absent, refusé, bloqué (délai 2 s) ou plein : rien gardé, aucune erreur, guidage
     normal (`tests/route-store.test.js`, ui-check `reprise`). Navigation en arrière-plan (voix, GPS) : non faite (impossible en PWA, voir la PR v53).
+- Phase 4 (v54) : « Carburant sur le trajet » — bouton `#btn-fuel` sous « Démarrer » (préparation, `aria-disabled`
+  hors de l'arrêt : relevés `createPlanPark` dès qu'un itinéraire est affiché, vitesse inconnue = grisé) et puce
+  `#btn-nav-fuel` dans la rangée de la loupe (guidage, `parkedState`, stations devant la dernière position reçue).
+  Touché en roulant : « disponible à l'arrêt », aucune requête. Panneau `#fuel-panel` (fixe, z-index 45) : texte fixe
+  « Prix indicatifs : vérifie à la pompe. » + source, liste triée par prix (prix, badges « Piste PL » / « OK camion » /
+  « ancien », adresse, « à N km · détour ≈ X à vol d'oiseau », date), filtres « Piste PL seulement » (si une station en
+  a) et « OK camion seulement » (si la liste n'est pas vide), station touchée → `#fuel-cost`, ★ → `fuelStations`.
+  Fermé dès que le véhicule roule (`onParkChange`, `planPark.onChange`) et au démarrage du guidage. Module
+  `src/ui/fuel.js` chargé à la demande (`lazyLoader`) : import refusé → « Pas de connexion : prix indisponibles. »
+  (message de la fiche ou bref du guidage), jamais un bouton muet. Rien dans le bandeau ni à voix haute, rien sur la carte.
 - Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
   de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
   `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.

@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties.",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services).",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -418,16 +418,70 @@
         "deprecated|discouraged|obsolète"
       ],
       "head": 200
+    },
+    {
+      "id": "carburants",
+      "title": "Prix des carburants (data.economie.gouv.fr, jeu prix-des-carburants-en-france-flux-instantane-v2) : CORS, quotas, champs, services",
+      "headers": [
+        {
+          "label": "records limit=2",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=2",
+          "head": 6000
+        },
+        {
+          "label": "records limit=100",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=100&select=id",
+          "head": 300
+        },
+        {
+          "label": "records limit=101 (plafond ?)",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=101&select=id",
+          "head": 600
+        },
+        {
+          "label": "records offset=9990 (plafond ?)",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/records?limit=20&offset=9990&select=id",
+          "head": 600
+        },
+        {
+          "label": "facette services_service",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/facets?facet=services_service",
+          "head": 8000
+        },
+        {
+          "label": "export JSON bbox Lyon",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2/exports/json?select=id%2Cadresse%2Cville%2Ccp%2Cgeom%2Cgazole_prix%2Cgazole_maj%2Cservices_service&where=gazole_prix+is+not+null+and+%28in_bbox%28geom%2C+45.70%2C+4.80%2C+45.80%2C+4.90%29+or+in_bbox%28geom%2C+45.60%2C+4.70%2C+45.65%2C+4.75%29%29",
+          "head": 3000
+        },
+        {
+          "label": "jeu (métadonnées, licence)",
+          "url": "https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2",
+          "head": 8000
+        }
+      ],
+      "urls": [
+        "https://data.economie.gouv.fr/explore/dataset/prix-des-carburants-en-france-flux-instantane-v2/information/",
+        "https://help.opendatasoft.com/apis/ods-explore-v2/",
+        "https://userguide.opendatasoft.com/l/en/article/ux4fc3oa8t-api-quotas",
+        "https://help.opendatasoft.com/apis/ods-explore-v2/explore_v2.1.html"
+      ],
+      "keywords": [
+        "[Ll]icence",
+        "in_bbox",
+        "limit",
+        "offset",
+        "10 ?000",
+        "quota",
+        "X-RateLimit",
+        "CORS|Access-Control",
+        "services_service",
+        "gazole_maj",
+        "fuseau|timezone|UTC"
+      ],
+      "head": 300
     }
   ],
   "run": [
-    "sat-lu",
-    "sat-be-vl",
-    "sat-be-wa",
-    "sat-be-bru",
-    "sat-ch",
-    "sat-es",
-    "sat-de",
-    "osm-sorties"
+    "carburants"
   ]
 }

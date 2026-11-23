@@ -542,7 +542,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     lisible), NGI (service national à essayer), Bade-Wurtemberg (DOP20 accordé à OSM seulement), Bavière, Sarre
     (conditions non lues), Hesse (service sans réponse) : relire par l'Action avant de coder.
 
-- [ ] **Phase 4 — Carburant**
+- [x] **Phase 4 — Carburant** (v54 : fiche « Carburant sur le trajet » à l'arrêt, stations à ≤ 2 km, tri par prix du
+  gazole, « ancien » > 48 h, filtre « Piste PL » (valeur lue dans la facette du jeu), détour à vol d'oiseau, mes
+  stations « OK camion » exportées, coût du trajet au prix d'une station ; France seulement ; rien en guidage roulant ni
+  à voix haute)
   Stations le long du trajet via l'API ouverte prix-carburants (data.economie.gouv.fr, jeu
   `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
   tri par prix du gazole, détour estimé, mes stations « OK camion », coût carburant du trajet.

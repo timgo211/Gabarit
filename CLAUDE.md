@@ -108,7 +108,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   « Essieux » `axles`, non précisé = les deux cas) et estimation « à vérifier, pas une facture », ligne grise, jamais dite.
 - Contours des taxes PL (`data/taxes-pl.json`, v50) : Admin Express COG 2026 (Action « Contours IGN ») ; tout changement
   de contours doit laisser vert `tests/taxes-contours.test.js` (résultats 5h ter figés), sinon contours non remplacés.
-- Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
+- Carburant (phase 4, `fuel-stations.js`, `src/ui/fuel.js` chargé à la demande, jamais en cache) : data.economie.gouv.fr
+  sans clé (CORS *, 50 000/jour), une requête par itinéraire (boîtes du trajet seulement), à l'arrêt seulement, jamais dit ;
+  `settings.dieselPrice` (Réglages) reste le prix des fiches. Détail : skill `gabarit-interface`.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour
   les paramètres et limites exacts), MDN sur raw.githubusercontent.com/mdn/content, MapLibre dans le paquet npm
