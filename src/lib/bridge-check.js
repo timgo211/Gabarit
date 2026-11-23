@@ -7,7 +7,8 @@
 // Méthode : croisement en X d'un segment du tracé avec un segment du pont (intersection franche, angle d'au moins
 // BRIDGE.MIN_ANGLE_DEG) ; jamais quand le tracé roule sur le pont (tracé à moins de BRIDGE.ON_BRIDGE_M du pont 15 m
 // avant ou après le croisement : sur le pont, en montant ou en descendant). Ignoré si une hauteur est connue sous le pont (tronçon maxheight à moins de
-// BRIDGE.KNOWN_NEAR_M du croisement). Classe de la route dessous (road-class.js, phase 2g) : autre = priorité haute,
+// BRIDGE.KNOWN_NEAR_M du croisement) plus haute que le véhicule ; au plus celle du véhicule : signalé (graphe d'ORS
+// plus ancien que l'étiquette). Classe de la route dessous (road-class.js, phase 2g) : autre = priorité haute,
 // nationale = moyenne, autoroute = jamais signalée (comptée dans la ligne technique). Pont portant lui-même une hauteur
 // lisible inférieure ou égale à celle du véhicule : signalé en priorité haute (ORS ne la lit pas sur la route dessous).
 
@@ -201,12 +202,21 @@ export function bridgesAlongRoute(route, data, { vehicleHeight = null } = {}) {
         const at = along + x.t * segLen;
         if (seen.some((s) => s.id === br.id && Math.abs(s.at - at) < 50)) continue;
         seen.push({ id: br.id, at });
-        const own = parseHeight(br.height);
+        let own = parseHeight(br.height);
         if (own !== null && isNum(vehicleHeight) && vehicleHeight < own) { counts.knownOk += 1; continue; }
+        // Hauteur connue dessous (tronçon maxheight à moins de 40 m). Elle n'écarte le pont que si elle dépasse celle du
+        // véhicule : ORS a calculé un passage qu'elle interdirait, son graphe est donc plus ancien que l'étiquette
+        // (constat 23/11/2026 : chemin 531802661 à 3,8 m sous le pont 243477938 dans l'extrait du 21/11/2026, alors
+        // qu'ORS y fait passer un camion de 4 m) → signalé en priorité haute avec cette hauteur, « à vérifier ».
         const dLat = BRIDGE.KNOWN_NEAR_M / KY; const dLon = BRIDGE.KNOWN_NEAR_M / kx;
         const below = [...near(clearGrid, p[0] - dLon, p[1] - dLat, p[0] + dLon, p[1] + dLat)]
-          .some((c) => distToLine(p, c.coords) <= BRIDGE.KNOWN_NEAR_M);
-        if (below && own === null) { counts.knownBelow += 1; continue; }
+          .filter((c) => distToLine(p, c.coords) <= BRIDGE.KNOWN_NEAR_M);
+        if (below.length && own === null) {
+          const hs = below.map((c) => parseHeight(c.height));
+          const low = hs.filter((h) => h !== null && !(isNum(vehicleHeight) && vehicleHeight < h));
+          if (!low.length) { counts.knownBelow += 1; continue; }
+          own = Math.min(...low);
+        }
         const roadClass = seg ? seg.classes[i] : null;
         let level;
         if (own !== null) level = 'high'; // hauteur du pont lisible, au plus celle du véhicule (ou véhicule sans hauteur)

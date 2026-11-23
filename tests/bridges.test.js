@@ -167,3 +167,22 @@ test('guidage : le moteur et l\'écran de guidage n\'importent jamais les ponts'
     assert.ok(!/bridge-check|bridges/.test(text), `${f} ne doit rien savoir des ponts`);
   }
 });
+
+// Données RÉELLES (extrait de la copie de l'Action du 21/11/2026) : pont 243477938 et tronçon 531802661 à 3,8 m dessous.
+test('acceptation (données réelles) : sous le pont 243477938 → « haute » à 3,8 m ; sur la voie ferrée → aucun ; 3,5 m de haut → rien', () => {
+  const real = mergeBridgeTiles([parseBridgeTile(JSON.parse(readFileSync(new URL('./fixtures/osm-ponts-colombier-reel.json', import.meta.url), 'utf8')))]);
+  const v = real.bridges.find((b) => b.id === 243477938);
+  assert.deepEqual(v.coords, [[6.21211, 47.65992], [6.21225, 47.65997]]);
+  const mid = [(v.coords[0][0] + v.coords[1][0]) / 2, (v.coords[0][1] + v.coords[1][1]) / 2];
+  const under = { coordinates: [[mid[0], 47.6590], [mid[0], 47.6610]], steps: [{ name: 'Rue de Colombier', wayPoints: [0, 1] }], roadExtras: null };
+  const r = bridgesAlongRoute(under, real, { vehicleHeight: 4 });
+  const it = r.items.find((x) => x.id === 243477938);
+  assert.equal(it.level, 'high');
+  assert.equal(it.text, lowBridgeText(3.8), 'hauteur 3,8 m dessous (531802661) au plus celle du camion de 4 m');
+  assert.ok(Math.abs(it.point[0] - mid[0]) < 1e-6 && Math.abs(it.point[1] - 47.659945) < 0.00005, 'point de croisement');
+  const onTrack = { coordinates: [[6.2115, 47.6597], ...v.coords, [6.2130, 47.6602]], steps: [], roadExtras: null };
+  assert.equal(bridgesAlongRoute(onTrack, real, { vehicleHeight: 4 }).items.filter((x) => x.id === 243477938).length, 0);
+  const low = bridgesAlongRoute(under, real, { vehicleHeight: 3.5 });
+  assert.ok(!low.items.some((x) => x.id === 243477938), 'véhicule de 3,5 m : hauteur connue dessous suffisante');
+  assert.ok(low.counts.knownBelow >= 1);
+});
