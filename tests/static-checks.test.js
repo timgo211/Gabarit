@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, relative, extname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { LAZY_APP_FILES } from '../src/lib/sw-routing.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const SKIP = new Set(['.git', 'node_modules']);
@@ -108,7 +109,14 @@ test('service worker : ne met pas en cache les API, liste complète et relative'
     assert.ok(existsSync(join(ROOT, p)), `sw.js liste un fichier absent : ${p}`);
   }
   const appFiles = files.map(rel).filter((p) => p.startsWith('src/') || p.startsWith('icons/'));
-  for (const p of appFiles) assert.ok(listed.includes(p), `sw.js ne met pas en cache ${p} (hors ligne cassé)`);
+  for (const p of appFiles) {
+    if (LAZY_APP_FILES.includes(p)) {
+      // Phase 4 : module chargé à la demande, jamais précaché (l'appli affiche un message hors ligne).
+      assert.ok(!listed.includes(p), `${p} est chargé à la demande : hors APP_FILES`);
+      continue;
+    }
+    assert.ok(listed.includes(p), `sw.js ne met pas en cache ${p} (hors ligne cassé)`);
+  }
   for (const p of ['index.html', 'manifest.webmanifest']) assert.ok(listed.includes(p));
 });
 

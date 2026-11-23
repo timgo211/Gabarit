@@ -82,6 +82,8 @@
         <div id="nav-search" class="nav-search" role="group" aria-label="Le long du trajet" hidden>
           <button type="button" id="btn-nav-areas" class="nav-chip" aria-pressed="false" aria-controls="nav-areas"></button>
           <button type="button" id="btn-nav-layer" class="nav-chip" aria-label="Passer en vue satellite"></button>
+          <!-- Phase 4 : prix du gazole sur le trajet, à l'arrêt seulement. -->
+          <button type="button" id="btn-nav-fuel" class="nav-chip" aria-disabled="true" aria-label="Carburant sur le trajet (à l'arrêt)">Carburant</button>
         </div>
         <!-- Liste défilante des aires et parkings PL (phase 2d) : un doigt pour défiler, aucune saisie (R412-6-2). -->
         <section id="nav-areas" class="nav-areas" aria-label="Aires et parkings PL" hidden>
@@ -155,6 +157,22 @@
           </div>
         </div>
       </div>
+      <!-- Phase 4 : « Carburant sur le trajet » (préparation et guidage), à l'arrêt seulement ; fermé dès que le véhicule
+           roule (R412-6-2). Module src/ui/fuel.js chargé à la demande. -->
+      <section id="fuel-panel" class="fuel-panel" role="dialog" aria-labelledby="fuel-title" hidden>
+        <div class="fuel-head">
+          <h2 id="fuel-title">Carburant sur le trajet</h2>
+          <button type="button" id="btn-fuel-close" class="btn">Fermer</button>
+        </div>
+        <p id="fuel-note" class="fuel-note"></p>
+        <p id="fuel-status" class="status" role="status" hidden></p>
+        <div id="fuel-filters" class="fuel-filters" role="group" aria-label="Filtres" hidden>
+          <button type="button" id="btn-fuel-hgv" class="btn" aria-pressed="false" hidden>Piste PL seulement</button>
+          <button type="button" id="btn-fuel-ok" class="btn" aria-pressed="false" hidden>OK camion seulement</button>
+        </div>
+        <p id="fuel-cost" class="fuel-cost" role="status" hidden></p>
+        <ol id="fuel-list" class="fuel-list" aria-label="Stations, de la moins chère à la plus chère"></ol>
+      </section>
     </main>
 
     <section class="panel" aria-label="Itinéraire">
@@ -203,6 +221,8 @@
       </div>
       <div id="summary" class="summary" aria-live="polite" hidden></div>
       <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
+      <!-- Phase 4 : stations à moins de 2 km du tracé, prix du gazole (à l'arrêt seulement). -->
+      <button type="button" id="btn-fuel" class="btn btn-big btn-fuel" aria-disabled="true" hidden>⛽ Carburant sur le trajet</button>
       <div id="route-notes" class="route-notes" hidden></div>
       <section id="areas" class="areas" aria-label="Aires du trajet" hidden>
         <h2 class="areas-title">Aires du trajet <span id="areas-count" class="areas-count"></span></h2>

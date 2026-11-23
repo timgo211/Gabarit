@@ -11,6 +11,7 @@ import {
 } from './prefs.js';
 import { sanitizeAreaReports } from './areas-avis.js';
 import { sanitizeRestrictions } from './restrictions.js';
+import { sanitizeFuelStations } from './fuel-stations.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -50,6 +51,7 @@ export function emptyData() {
     trips: [],
     areaReports: [],
     restrictions: [],
+    fuelStations: [],
     settings: {
       theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
@@ -99,6 +101,7 @@ export function sanitizeData(raw) {
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
     restrictions: sanitizeRestrictions(raw.restrictions).list, // Mes restrictions (phase 12b) : invalides et doublons écartés
+    fuelStations: sanitizeFuelStations(raw.fuelStations), // Mes stations « OK camion » (phase 4)
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       nightMapLevel: sanitizeNightLevel(s.nightMapLevel), // luminosité de la carte la nuit (phase 2d), Normal par défaut
@@ -106,7 +109,7 @@ export function sanitizeData(raw) {
       avoidFerries: s.avoidFerries === true,
       voice: s.voice !== false, // guidage vocal activé par défaut
       simSpeed: isSimSpeed(s.simSpeed) ? s.simSpeed : SIM_DEFAULT_SPEED,
-      dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut (vrais prix : phase 4)
+      dieselPrice: isDieselPrice(s.dieselPrice) ? s.dieselPrice : null, // vide par défaut ; prix des stations : fiche « Carburant » (phase 4)
       mapLayer: sanitizeMapLayer(s.mapLayer), // « plan » ou « satellite » (phase 7)
       arrowColor: sanitizeArrowColor(s.arrowColor), // phase 7c
       vehicleIcon: sanitizeVehicleIcon(s.vehicleIcon), // v45 : camion par défaut, anciens réglages compris

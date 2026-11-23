@@ -9,6 +9,12 @@ export const MAPLIBRE_ASSETS = [
 ];
 
 /**
+ * Modules chargés à la demande (import()), hors APP_FILES et jamais mis en cache : hors ligne, l'import échoue et
+ * l'appli affiche un message (phase 4 : « Pas de connexion : prix indisponibles. »).
+ */
+export const LAZY_APP_FILES = ['src/ui/fuel.js'];
+
+/**
  * @param {string} method  méthode HTTP
  * @param {string} url     URL absolue de la requête
  * @param {string} appOrigin  origine du service worker (self.location.origin)
@@ -24,6 +30,7 @@ export function cacheStrategy(method, url, appOrigin) {
   }
   if (MAPLIBRE_ASSETS.includes(u.href)) return 'cache-first';
   if (u.origin !== appOrigin) return 'bypass';
+  if (LAZY_APP_FILES.some((f) => u.pathname.endsWith(`/${f}`))) return 'bypass';
   // Données servies par l'appli (data/aires-pl.json, phase 9 ; ZFE, phase 5) : réseau d'abord, copie hors ligne.
   return 'network-first';
 }

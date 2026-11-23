@@ -1,0 +1,10 @@
+[
+  {"id": 69100001, "adresse": "1 rue de l'Essai", "ville": "Villebrune", "cp": "69100", "geom": {"lon": 4.8800, "lat": 45.7605}, "gazole_prix": 2.026, "gazole_maj": "2026-11-23T10:52:00+00:00", "services_service": ["DAB (Distributeur automatique de billets)", "Toilettes publiques"]},
+  {"id": 69009003, "adresse": "2 avenue du Test", "ville": "Lyonnet", "cp": "69009", "geom": {"lon": 4.9500, "lat": 45.7650}, "gazole_prix": 1.991, "gazole_maj": "2026-11-20T07:31:00+00:00", "services_service": null},
+  {"id": 69110006, "adresse": "Boulevard Fictif", "ville": "Sainte-Essai", "cp": "69110", "geom": {"lon": 5.0200, "lat": 45.7450}, "gazole_prix": 2.190, "gazole_maj": "2026-11-23T08:29:00+00:00", "services_service": ["Piste poids lourds", "Automate CB 24/24"]},
+  {"id": 69007012, "adresse": "44 avenue Exemple", "ville": "Lyonnet", "cp": "69007", "geom": {"lon": 5.1000, "lat": 45.7598}, "gazole_prix": 2.099, "gazole_maj": "2026-11-23T06:00:00+00:00", "services_service": "Location de véhicule//Piste poids lourds//Boutique alimentaire"},
+  {"id": 69002006, "adresse": "Loin du trajet", "ville": "Ailleurs", "cp": "69002", "geom": {"lon": 4.9000, "lat": 45.9000}, "gazole_prix": 1.500, "gazole_maj": "2026-11-23T11:20:54+00:00", "services_service": []},
+  {"id": 69002007, "adresse": "Prix aberrant", "ville": "Ailleurs", "cp": "69002", "geom": {"lon": 4.9000, "lat": 45.7600}, "gazole_prix": 0.001, "gazole_maj": "2026-11-23T11:20:54+00:00", "services_service": []},
+  {"id": 69002008, "adresse": "Sans position", "ville": "Ailleurs", "cp": "69002", "geom": null, "gazole_prix": 2.0, "gazole_maj": null, "services_service": []},
+  {"id": 69100001, "adresse": "Doublon", "ville": "Villebrune", "cp": "69100", "geom": {"lon": 4.8800, "lat": 45.7605}, "gazole_prix": 2.5, "gazole_maj": null, "services_service": []}
+]
