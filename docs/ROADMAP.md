@@ -452,7 +452,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
     pollution, fermetures de tunnels et de cols.
 
-## Bloc 5 — Ponts et restrictions (après l'écart de TomTom et HERE)
+## Bloc 5 — Ponts et restrictions (après l'écart des services de routage commerciaux)
 
 - [x] **Phase 12a — Ponts sans hauteur connue d'après OSM** (v40)
   Constat : Besançon → Luxeuil (Semi 44 t, H 4 m) passe sous le pont ferroviaire de Colombier (3,8 m, chemin OSM
@@ -494,9 +494,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   option n'en traverse pas ; « à vérifier », « annoncée » et classe non précisée ne comptent pas. Toutes par un tunnel
   interdit : choix gardé, la fiche le dit. Aucune requête de plus (budget de 3) ; ligne sur la fiche, jamais dite.
 
-- [ ] **Phase 12 TomTom / HERE : abandonnée (conditions d'usage)** — TomTom §11.6.10 et HERE Platform Terms art. 3.c
-  interdisent de comparer leur service à ORS et de guider avec leur tracé. Ticket TomTom CS0017293 ouvert pour un accord
-  écrit ; sans réponse positive, rien n'est branché (branche claude/kind-newton-a6agfs laissée telle quelle).
+- [ ] **Phase 12 routage commercial : abandonnée (conditions d'usage)** — HERE Platform Terms art. 3.c interdisent de
+  comparer leur service à ORS et de guider avec leur tracé. ORS reste le seul moteur.
 - [ ] **Mapillary (panneaux)** : à étudier après lecture des conditions.
 - [ ] **Contribuer à OSM** : maxheight sur le pont de Colombier (chemin 243477938) et maxweight de la Rue du Viaduc
   (chemin 190520091), relevés sur place.
@@ -521,8 +520,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 - [ ] **Phase 10 — Trafic en temps réel (à étudier)**
   ORS ne tient pas compte du trafic. D'abord étudier les sources gratuites : données ouvertes du réseau routier
-  national (Bison Futé / DIR, événements DATEX II sur transport.data.gouv.fr), offres gratuites avec clé (TomTom,
-  HERE…) et leurs quotas. Commencer par afficher bouchons et événements sur le trajet ; recalcul selon le trafic
+  national (Bison Futé / DIR, événements DATEX II sur transport.data.gouv.fr), offres gratuites avec clé (HERE…)
+  et leurs quotas. Commencer par afficher bouchons et événements sur le trajet ; recalcul selon le trafic
   seulement si une source le permet. Présenter les options avant de coder.
 
 ## Tout à la fin
