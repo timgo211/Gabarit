@@ -57,6 +57,12 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   dans les notes (« Hauteur max Pays »). Sites officiels à ajouter à l'environnement cloud « Gabarit ».
 - Limites de poids d'OSM sur le trajet (phase 12a bis, `weight-check.js`, panneau B13 comparé au PTAC du profil) :
   règles dans `gabarit-interface` (affichage) et `gabarit-structure` (copie `data/poids-osm/`).
+- « Recommandé » et tunnels (v43) : `confirmedTunnelBans` (`route-rules.js`) = tunnels ADR interdits au code (avec la
+  case ADR) + tunnels Euro au verdict 'banned' ou 'operator' ; `computeRouteOptions({ isForbidden })` →
+  `promoteRecommended(options, { forbidden })` (`pickRecommendedIndex(options, { excluded })`) ; notes
+  `TUNNEL_AVOIDED_NOTE` / `ALL_TUNNELS_NOTE` sur la fiche. `app.js` attend la lecture de `data/tunnels-adr.json`
+  (`ensureTunnels` renvoie une promesse) avant le classement. Statut 'check' (« à vérifier ») et taxes « annoncées » :
+  jamais comptés.
 - Normes Euro (phase 5g, `euro.js`) : profil `euroClass` ('' non précisé par défaut, '0'–'6', 'EEV' ; anciens profils
   → ''), servira à la 5h. Tunnels : seulement au-delà de 3,5 t de PTAC, tubes en dur de `KNOWN_TUNNELS` (pas de
   fichier ni d'Overpass) ; règles `TUNNEL_RULES` avec `status` 'confirmed' (texte officiel lu), 'operator'

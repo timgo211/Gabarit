@@ -76,6 +76,15 @@ export const VARIANTS = Object.freeze({
 });
 
 /** Note du « Recommandé » choisi pour sa part A/N (phase 2g) : jamais une garantie. */
+/**
+ * v43 : « Recommandé » n'est jamais un itinéraire qui traverse un tunnel dont l'interdiction est confirmée pour le
+ * profil (classe Euro : texte officiel ou exploitant, euro.js ; ADR : catégorie du tunnel et code du chargement,
+ * adr.js), si un autre itinéraire calculé n'en traverse pas. Aucune requête de plus. Statuts « à vérifier » et
+ * « annoncée » : ne comptent pas. Ligne sur la fiche, jamais dite à voix haute.
+ */
+export const TUNNEL_AVOIDED_NOTE = "Recommandé parce qu'il ne traverse pas de tunnel interdit à ton profil, contrairement à un autre itinéraire calculé. La signalisation fait foi.";
+export const ALL_TUNNELS_NOTE = "Tous les itinéraires calculés traversent un tunnel interdit à ton profil : choix habituel gardé, à vérifier avant le départ. La signalisation fait foi.";
+
 export const AN_PREFERRED_NOTE = "Préféré pour sa part d'autoroute et de nationale. Une autoroute ou une nationale peut aussi avoir une limite : la signalisation fait foi.";
 
 /**
@@ -84,15 +93,25 @@ export const AN_PREFERRED_NOTE = "Préféré pour sa part d'autoroute et de nati
  * nom en « aussi », sauf une simple alternative) ; la préférence d'ORS devient « Préférence ORS ». Clés et réglages de
  * requête inchangés (recalcul en guidage, partage). Sinon, liste inchangée.
  */
-export function promoteRecommended(options) {
-  const i = pickRecommendedIndex(options);
+export function promoteRecommended(options, { forbidden = null } = {}) {
+  const flags = Array.isArray(forbidden) && Array.isArray(options) ? options.map((_, k) => !!forbidden[k]) : null;
+  const some = !!flags?.some(Boolean);
+  const all = some && flags.every(Boolean);
+  if (all) {
+    // Tous traversent un tunnel interdit : choix actuel gardé, la fiche le dit en clair.
+    const out = promoteRecommended(options);
+    const [head, ...rest] = out;
+    return [{ ...head, tunnelPick: 'all', note: [head.note, ALL_TUNNELS_NOTE].filter(Boolean).join(' ') }, ...rest];
+  }
+  const i = pickRecommendedIndex(options, { excluded: some ? flags : null });
   if (i <= 0) return options;
   const best = options[i];
   const ors = options[0];
   const also = best.key === VARIANTS.alternative.key ? best.also : [best.label, ...best.also];
+  const byTunnel = some && flags[0];
   const promoted = {
-    ...best, label: VARIANTS.recommended.label, also, promoted: true,
-    note: [best.note, AN_PREFERRED_NOTE].filter(Boolean).join(' '),
+    ...best, label: VARIANTS.recommended.label, also, promoted: true, ...(byTunnel ? { tunnelPick: 'avoided' } : {}),
+    note: [best.note, byTunnel ? TUNNEL_AVOIDED_NOTE : AN_PREFERRED_NOTE].filter(Boolean).join(' '),
   };
   const demoted = { ...ors, key: VARIANTS.orsDefault.key, label: VARIANTS.orsDefault.label };
   return [promoted, demoted, ...options.filter((_, k) => k !== 0 && k !== i)];
@@ -305,7 +324,9 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
  *   request:{preference:string|null,avoidTolls:boolean}}[], failures:{key:string,label:string,kind:string}[], requests:number }>}
  *   options[0] est toujours le Recommandé. S'il échoue, l'erreur est relancée telle quelle (message existant).
  */
-export async function computeRouteOptions({ start, end, vehicle, avoidTolls = false, avoidFerries = false, send, avoidPolygons = null }) {
+export async function computeRouteOptions({
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, send, avoidPolygons = null, isForbidden = null,
+}) {
   let requests = 0;
   const ask = async (variant, alternatives = 0) => {
     // avoidPolygons (phase 12b) gardé dans la requête : le recalcul en guidage évite les mêmes restrictions.
@@ -350,7 +371,10 @@ export async function computeRouteOptions({ start, end, vehicle, avoidTolls = fa
     });
     options = dedupeOptions(options);
   }
-  return { options: promoteRecommended(nameAlternatives(options)), failures, requests };
+  // v43 : tunnel interdit confirmé pour le profil (isForbidden : route → booléen, calculé sans requête).
+  const named = nameAlternatives(options);
+  const forbidden = typeof isForbidden === 'function' ? named.map((o) => !!isForbidden(o.route)) : null;
+  return { options: promoteRecommended(named, { forbidden }), failures, requests };
 }
 
 /**

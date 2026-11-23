@@ -22,7 +22,7 @@ import { TOLLS_GEO, parseTollNetwork } from './lib/hgv-tolls-geo.js';
 import { serviceDetailText } from './lib/ors-errors.js';
 import { ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
-import { routeRules, rulesSourceText } from './lib/route-rules.js';
+import { routeRules, rulesSourceText, confirmedTunnelBans } from './lib/route-rules.js';
 import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
@@ -192,10 +192,12 @@ fetch(ZFE.DATA_PATH, { cache: 'no-cache' })
 /** { status:'idle'|'loading'|'ok'|'failed', data } ; absent, illisible ou vide → 'failed' (alerte indisponible). */
 let tunnels = { status: 'idle', data: null };
 let tunnelBusy = false;
+let tunnelsPromise = Promise.resolve();
+/** Lecture du fichier des tunnels ; la promesse se résout quand il est lu (ou en échec), jamais en erreur. */
 function ensureTunnels(vehicle) {
-  if (!effectiveCode(vehicle) || tunnels.status === 'loading' || tunnels.status === 'ok') return;
+  if (!effectiveCode(vehicle) || tunnels.status === 'loading' || tunnels.status === 'ok') return tunnelsPromise;
   tunnels = { status: 'loading', data: null };
-  fetch(ADR.DATA_PATH, { cache: 'no-cache' })
+  tunnelsPromise = fetch(ADR.DATA_PATH, { cache: 'no-cache' })
     .then((r) => (r.ok ? r.json() : null))
     .then((j) => {
       const data = j ? parseTunnelData(j) : null;
@@ -206,7 +208,14 @@ function ensureTunnels(vehicle) {
       navigation.setTunnels(tunnels.status === 'ok' ? tunnels.data : null);
       renderChoice();
     });
+  return tunnelsPromise;
 }
+
+/**
+ * v43 : « Recommandé » jamais par un tunnel interdit confirmé pour le profil (ADR, classe Euro) si un autre itinéraire
+ * calculé l'évite. Fichier des tunnels ADR lu avant le classement (fichier local) ; calcul sans requête.
+ */
+const tunnelBanCheck = (vehicle) => (route) => confirmedTunnelBans(route, { vehicle, tunnels }).length > 0;
 
 // ───────── Accès (phase 5d) : data/acces-osm/, cases touchées par les itinéraires proposés ─────────
 let localBusy = false;
@@ -603,12 +612,15 @@ const form = createRouteForm({
     const vehicle = activeVehicle(data);
     showMessage(messageNode, '');
     form.setBusy(true);
-    ensureTunnels(vehicle); // phase 5b : fichier des tunnels lu seulement pour un véhicule ADR avec code tunnel
+    const tunnelsRead = ensureTunnels(vehicle); // phase 5b : fichier des tunnels lu seulement pour un véhicule ADR avec code tunnel
     try {
       // Phase 12b : restrictions saisies proches du trajet évitées (avoid_polygons), 150 km au plus à vol d'oiseau.
       const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: p.start, end: p.end });
       restrictionsUi.closeBridge();
-      const { options, failures } = await fetchRouteOptions({ apiKey: store.getApiKey(), vehicle, ...p, avoidPolygons: restr.geometry });
+      await tunnelsRead; // v43 : tunnels ADR connus avant de choisir le « Recommandé »
+      const { options, failures } = await fetchRouteOptions({
+        apiKey: store.getApiKey(), vehicle, ...p, avoidPolygons: restr.geometry, isForbidden: tunnelBanCheck(vehicle),
+      });
       // Lien partagé : la variante choisie par l'expéditeur est présélectionnée (choix modifiable à l'arrêt).
       let selected = 0;
       const shared = pendingShared;

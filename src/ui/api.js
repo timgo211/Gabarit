@@ -82,11 +82,11 @@ export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoi
  * Itinéraires proposés au calcul (Recommandé + alternatives ou variantes, 3 requêtes au plus) : voir route-options.js.
  * @returns {{ options:object[], failures:object[], requests:number }}
  */
-export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons = null }) {
+export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons = null, isForbidden = null }) {
   requireKey(apiKey);
   try {
     return await computeRouteOptions({
-      start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons, send: (req) => postDirections(apiKey, req),
+      start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons, isForbidden, send: (req) => postDirections(apiKey, req),
     });
   } catch (err) {
     // Phase 12b : restrictions saisies évitées → « Une restriction saisie bloque peut-être le seul passage. »

@@ -2251,6 +2251,60 @@ async function bridgesCheck(browser, base) {
 }
 
 /**
+ * v43 : « Recommandé » jamais par un tunnel interdit confirmé. Deux itinéraires (Mont-Blanc, préférence d'ORS ;
+ * contournement SYNTHÉTIQUE décalé de 0,2° vers l'ouest, deux fois plus long) : Euro 3 → contournement en tête avec la
+ * ligne, Mont-Blanc en « Préférence ORS » ; Euro 6 → ordre d'ORS ; ADR code E → contournement ; un seul itinéraire
+ * (Mont-Blanc) en Euro 3 → « Tous les itinéraires… ». Aucune requête de plus. 412×900 jour, 900×412 nuit.
+ */
+async function recommendedTunnelCheck(browser, base) {
+  const mb = fixture('ors-directions-mont-blanc.json');
+  const detour = JSON.parse(JSON.stringify(mb.features[0]));
+  detour.geometry.coordinates = detour.geometry.coordinates.map(([x, y]) => [x - 0.2, y]);
+  detour.properties.summary = { distance: 60000, duration: 3000 };
+  Object.assign(detour.properties.segments[0], { distance: 60000, duration: 3000 });
+  const two = { ...mb, features: [mb.features[0], detour] };
+  const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
+  const AVOIDED = /Recommandé parce qu'il ne traverse pas de tunnel interdit à ton profil, contrairement à un autre itinéraire calculé\. La signalisation fait foi\./;
+  const cards = (page) => page.$$eval('.route-card', (n) => n.map((c) => c.textContent));
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    let calls = 0;
+    const run = async (opts) => {
+      calls = 0;
+      const o = await open(browser, base, { width, height, theme, voice: true, overpass: () => ({ elements: [] }), ...opts, directions: () => { calls += 1; return opts.directions(); } });
+      await computeRoute(o.page);
+      return o;
+    };
+    let o = await run({ vehicle: veh('3'), directions: () => two });
+    let c = await cards(o.page);
+    check(c.length === 2 && AVOIDED.test(c[0]) && /^Recommandé/.test(c[0].trim()) && /Préférence ORS/.test(c[1]) && /Mont-Blanc interdit/.test(c[1]),
+      `${tag} : Euro 3 → contournement recommandé, Mont-Blanc en « Préférence ORS »`, c.join(' || '));
+    check(calls === 1, `${tag} : aucune requête de plus`, String(calls));
+    const spoken = await o.page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /tunnel/i.test(t)), `${tag} : rien dit à voix haute`);
+    await noHorizontalScroll(o.page, `${tag} recommandé`);
+    await o.page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-recommande-tunnel.png`) });
+    check(o.errors.length === 0, `${tag} : aucune erreur JavaScript`, o.errors.join(' | '));
+    await o.ctx.close();
+    if (theme !== 'day') continue;
+    o = await run({ vehicle: veh('6'), directions: () => two });
+    c = await cards(o.page);
+    check(!AVOIDED.test(c.join(' ')) && /Tunnel|Mont-Blanc|admise/.test(await o.page.textContent('#route-notes')) && !/Préférence ORS/.test(c.join(' ')),
+      `${tag} : Euro 6 → ordre d'ORS`, c.join(' || '));
+    await o.ctx.close();
+    o = await run({ vehicle: veh('6'), settings: { adr: { enabled: true, adrClass: '', unNumber: '', tunnelCode: 'E' } }, directions: () => two });
+    c = await cards(o.page);
+    check(AVOIDED.test(c[0] ?? ''), `${tag} : ADR code E → contournement recommandé`, c.join(' || '));
+    await o.ctx.close();
+    o = await run({ vehicle: veh('3'), directions: () => mb });
+    c = await cards(o.page);
+    check(/Tous les itinéraires calculés traversent un tunnel interdit à ton profil : choix habituel gardé, à vérifier avant le départ\. La signalisation fait foi\./.test(c[0] ?? ''),
+      `${tag} : tous par le tunnel → la fiche le dit`, c.join(' || '));
+    await o.ctx.close();
+  }
+}
+
+/**
  * Phase 12a bis : limites de poids d'OSM sur l'itinéraire synthétique de Colombier (fixture osm-poids-colombier,
  * SYNTHÉTIQUE). Fiche (3 lignes « à vérifier », desserte possible), résumé, repères « 3,5 t », ligne technique,
  * repère touché → panneau et « Éviter ce passage » (restriction de poids), guidage : aucun repère, rien à l'écran ni à
@@ -3279,7 +3333,8 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck };
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck,
+    recommande: recommendedTunnelCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

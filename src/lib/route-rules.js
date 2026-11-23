@@ -93,8 +93,20 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
 }
 
 /**
+ * v43 : tunnels traversés dont l'interdiction est confirmée pour le profil — ADR (catégorie du tunnel et code tunnel
+ * du chargement, seulement avec des matières dangereuses) et classe Euro (verdict 'banned' : texte officiel ;
+ * 'operator' : confirmé par l'exploitant). « À vérifier », classe non précisée : ne comptent pas. Sans requête.
+ * @returns {string[]} noms des tunnels
+ */
+export function confirmedTunnelBans(route, { vehicle, tunnels = null } = {}) {
+  const adr = vehicle?.hazmat ? tunnelRules(route, { vehicle, tunnels }).forbidden.map(tunnelName) : [];
+  const euro = euroRules(route, { vehicle }).passages.filter((p) => p.verdict === 'banned' || p.verdict === 'operator').map((p) => p.name);
+  return [...new Set([...adr, ...euro])];
+}
+
+/**
  * @param {object} route itinéraire (parseDirections)
- * @param {{ vehicle:object, departure?:Date, zfe?:{ zones:object[], voies:object[] }|null, driving?:object|null,
+ * @param {{ vehicle:object, departure?:{ zones:object[], voies:object[] }|null, driving?:object|null,
  *   countries?:Map<string,{ status:string, data:object|null }>|null,
  *   wind?:{ status:string, forecast:object|null, threshold:number }|null }} ctx
  *   driving : décompte du temps de conduite (driving-time.js) ; wind : prévisions Open-Meteo et seuil de rafales ;

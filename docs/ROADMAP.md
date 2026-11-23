@@ -472,6 +472,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   temps d'horloge → bornée en travail) ; ✘ « nav-toast » du scénario `guidage` à 412×900 dû à l'environnement
   (wake lock refusée par Chromium sans écran).
 
+- [x] **v43 — Ne jamais recommander un itinéraire par un tunnel interdit**
+  « Recommandé » (2g) écarte tout itinéraire calculé qui traverse un tunnel dont l'interdiction est confirmée pour le
+  profil (classe Euro : texte officiel ou exploitant ; ADR quand le profil a des matières dangereuses), si une autre
+  option n'en traverse pas ; « à vérifier », « annoncée » et classe non précisée ne comptent pas. Toutes par un tunnel
+  interdit : choix gardé, la fiche le dit. Aucune requête de plus (budget de 3) ; ligne sur la fiche, jamais dite.
+
 - [ ] **Phase 12 TomTom / HERE : abandonnée (conditions d'usage)** — TomTom §11.6.10 et HERE Platform Terms art. 3.c
   interdisent de comparer leur service à ORS et de guider avec leur tracé. Ticket TomTom CS0017293 ouvert pour un accord
   écrit ; sans réponse positive, rien n'est branché (branche claude/kind-newton-a6agfs laissée telle quelle).
