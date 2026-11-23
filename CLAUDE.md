@@ -77,6 +77,9 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   (waycategory bit 1 = A ; N = waytype 1 + référence N de l'étape ; inconnu jamais N) à ≤ 15 % de durée du plus rapide
   (`ROUTE_PREF`), égalité → le plus rapide ; > 30 % de km sans nom ni référence → part inconnue, ordre d'ORS gardé.
   Péages hors calcul. Jamais une garantie : « la signalisation fait foi ».
+  v43 : jamais un itinéraire par un tunnel interdit confirmé pour le profil (`confirmedTunnelBans` : Euro texte
+  officiel ou exploitant, ADR avec matières dangereuses ; « à vérifier », « annoncée », classe vide : non) si une autre
+  option calculée l'évite ; toutes → choix gardé + `ALL_TUNNELS_NOTE`. Sans requête de plus ; fiche, jamais la voix.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

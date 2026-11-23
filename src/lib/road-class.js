@@ -141,21 +141,28 @@ export function anShareText(route) {
  * Péages hors calcul. Part inconnue du premier (préférence d'ORS) → 0 (ordre gardé) ; autres parts inconnues : écartées.
  * @param {{ route:{ duration:number } }[]} options
  */
-export function pickRecommendedIndex(options) {
-  if (!Array.isArray(options) || options.length < 2) return 0;
+export function pickRecommendedIndex(options, { excluded = null } = {}) {
+  if (!Array.isArray(options) || !options.length) return 0;
+  // Phase v43 : itinéraires écartés (tunnel interdit confirmé pour le profil) ; le choix se fait parmi les autres,
+  // dans l'ordre d'ORS, avec les mêmes règles (15 % du plus rapide d'entre eux, part A/N). Tous écartés : 0.
+  const allowed = options.map((_, i) => i).filter((i) => !excluded?.[i]);
+  if (!allowed.length) return 0;
+  const first = allowed[0];
+  if (allowed.length < 2) return first;
   const shares = options.map((o) => anShare(o.route));
-  if (shares[0] === null) return 0;
-  const fastest = Math.min(...options.map((o) => o.route.duration));
+  if (shares[first] === null) return first;
+  const fastest = Math.min(...allowed.map((i) => options[i].route.duration));
   const limit = fastest * (1 + ROUTE_PREF.MAX_SLOWER_SHARE);
   let best = -1;
-  options.forEach((o, i) => {
-    if (shares[i] === null || o.route.duration > limit) return;
-    if (best < 0) { best = i; return; }
+  for (const i of allowed) {
+    const o = options[i];
+    if (shares[i] === null || o.route.duration > limit) continue;
+    if (best < 0) { best = i; continue; }
     const a = sharePercent(shares[i]);
     const b = sharePercent(shares[best]);
     if (a > b || (a === b && o.route.duration < options[best].route.duration)) best = i;
-  });
-  return best < 0 ? 0 : best;
+  }
+  return best < 0 ? first : best;
 }
 
 /** Ligne du diagnostic du trajet : « Classes de route : A 52,1 km, N 10,0 km, autre 8,3 km, inconnus 0,0 km ; part A/N 88 % ». */
