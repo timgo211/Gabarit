@@ -15,6 +15,7 @@ import { createAccess } from './ui/access.js';
 import { createBridges } from './ui/bridges.js';
 import { createWeightLimits } from './ui/weight-limits.js';
 import { createSpeedLimits } from './ui/speed-limits.js';
+import { createDirections } from './ui/directions.js';
 import { createRestrictions } from './ui/restrictions.js';
 import { restrictionsForTrip, restrictionLines, mergeAvoid } from './lib/restrictions.js';
 import { createWinter } from './ui/winter.js';
@@ -137,6 +138,7 @@ navigation = createNavigation({
     bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
     weightLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
     speedLimits.extend(route); // phase 11a : cases de data/vitesses-osm/ manquantes
+    directions.extend(route); // phase 11b : cases de data/directions-osm/ manquantes
     winter.extend(route); // phase 5f : cases de data/hiver/ manquantes
   },
   onAreaOpen: (id) => areas.openSheet(id),
@@ -243,6 +245,10 @@ const speedLimits = createSpeedLimits({
     renderChoice();
     if (navigation?.active) navigation.setSpeeds(st.status === 'ok' ? st.data : null);
   },
+});
+// Directions des panneaux (phase 11b) : consignes du guidage seulement (cases arrivées après « Démarrer » ou au recalcul).
+const directions = createDirections({
+  onChange: (st) => { if (navigation?.active) navigation.setDirections(st.status === 'ok' ? st.data : null); },
 });
 // Repère touché (à l'arrêt) : texte du pont ou de la limite de poids, jamais dit à voix haute.
 map.onBridgePick((key) => {
@@ -405,6 +411,7 @@ async function avoidZfe() {
     bridges.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
+    directions.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).banned;
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
@@ -446,6 +453,7 @@ async function avoidTunnel() {
     bridges.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
+    directions.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
@@ -486,6 +494,7 @@ async function avoidLocal() {
     bridges.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
+    directions.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).localTransit ?? [];
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans desserte » traverse encore une route réservée à la desserte locale (km ${still.map((p) => Math.round(p.enter / 1000)).join(', ')}). La signalisation fait foi.`, 'info');
@@ -569,6 +578,8 @@ function startGuidance(simulate = null) {
     windVoice: data.settings.windVoice,
     // Phase 11a : limitations de vitesse (copie des cases du trajet) ; « Limite X » dit seulement si le réglage est activé.
     speeds: { data: speedLimits.state.status === 'ok' ? speedLimits.state.data : null, voice: data.settings.speedVoice === true },
+    // Phase 11b : directions des panneaux dans les consignes (copie des cases du trajet).
+    directions: directions.state.status === 'ok' ? directions.state.data : null,
   });
   return null;
 }
@@ -637,7 +648,7 @@ async function openAlternatives(from) {
     altChoice = {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
     };
-    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); winter.extend(o.route); }
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
   } catch (err) {
@@ -752,6 +763,7 @@ const form = createRouteForm({
       bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
       weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
       speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
+      directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/
       winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
       const route = options[0].route;
       update((d) => addTrip(d, {
@@ -769,6 +781,7 @@ const form = createRouteForm({
       bridges.clear();
       weightLimits.clear();
       speedLimits.clear();
+      directions.clear();
       map.showBridges([]);
       winter.clear();
       map.showZfe([]);

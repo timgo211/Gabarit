@@ -7,7 +7,8 @@ name: Données OSM (tunnels ADR, aires PL, accès)
 # phase 12a : extrait France, filtrage à part, 5 Mo par fichier et 60 Mo en tout au plus) avec les limites de poids
 # (data/poids-osm/, phase 12a bis : même filtrage et mêmes cases que les ponts, 5 Mo par fichier et 30 Mo en tout) et les
 # limitations de vitesse (data/vitesses-osm/, phase 11a : même filtrage et mêmes cases, 5 Mo par fichier et 40 Mo en
-# tout, copie réduite au-delà). Un seul téléchargement des extraits par pays de Geofabrik
+# tout, copie réduite au-delà) et les directions des bretelles (data/directions-osm/, phase 11b : mêmes filtrage et cases,
+# 5 Mo / 40 Mo). Un seul téléchargement des extraits par pays de Geofabrik
 # et un seul filtrage osmium pour les trois premiers (voir tools/osm-update.mjs). Échec : rien n'est enregistré,
 # l'ancienne copie reste.
 # Lancement à la main avec « r411 » coché : lecture seule du Code de la route, art. R411-8 (pouvoir de police), texte
@@ -41,6 +42,7 @@ on:
       - src/lib/weight-convert.js
       - src/lib/speed-convert.js
       - src/lib/speed-rules.js
+      - src/lib/directions-convert.js
       - data/taxes-pl.json
       - .github/workflows/osm-data.yml
 
@@ -175,7 +177,7 @@ jobs:
           # Chemins existants seulement : une copie non écrite (data/poids-osm/ trop gros à la première copie) ne
           # bloque pas l'enregistrement des autres (git add échoue sur un chemin absent).
           P=""
-          for p in data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm data/poids-osm data/vitesses-osm; do
+          for p in data/tunnels-adr.json data/aires-osm data/acces-osm data/osm-poly data/taxes-pl-osm.json data/ponts-osm data/poids-osm data/vitesses-osm data/directions-osm; do
             if [ -e "$p" ]; then P="$P $p"; fi
           done
           git add -A -N $P
@@ -186,6 +188,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A $P
-          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL, ponts, limites de poids et de vitesse OpenStreetMap (mise à jour automatique)"
+          git commit -m "Données : tunnels ADR, aires PL, accès conditionnels, réseau des taxes PL, ponts, limites de poids et de vitesse, directions OpenStreetMap (mise à jour automatique)"
           git pull --rebase
           git push

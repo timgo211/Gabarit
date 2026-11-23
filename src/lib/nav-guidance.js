@@ -154,15 +154,22 @@ export function arrivalSide(instruction) {
   return m ? m[1].toLowerCase() : '';
 }
 
-/** Texte d'une manœuvre à l'impératif, tel qu'affiché et prononcé. */
-export function maneuverText(m, { uturnSafe = false } = {}) {
+/**
+ * Texte d'une manœuvre à l'impératif, tel qu'affiché (spoken false) ou prononcé (spoken true). Phase 11b : complément
+ * « direction Metz » (m.direction, directions.js) affiché dès qu'une seule bretelle correspond, dit seulement si la
+ * correspondance est sans ambiguïté (m.direction.speak) ; jamais si la consigne donne déjà une direction.
+ */
+export function maneuverText(m, { uturnSafe = false, spoken = false } = {}) {
   if (!m) return '';
   if (uturnSafe && m.type === STEP_TYPES.UTURN) return UTURN_SAFE_TEXT;
   if (m.type === STEP_TYPES.GOAL) {
     const side = arrivalSide(m.instruction);
     return side ? `Vous arrivez à destination, ${side}` : 'Vous arrivez à destination';
   }
-  return (m.instruction || '').trim() || 'Continuez';
+  const base = (m.instruction || '').trim() || 'Continuez';
+  const d = m.direction;
+  if (d?.text && (!spoken || d.speak === true) && !/\bdirection\b/i.test(base)) return `${base}, direction ${d.text}`;
+  return base;
 }
 
 /** Phrase « Destination atteinte » (avec le côté si ORS le donne). */
@@ -176,10 +183,10 @@ export function arrivedText(goal) {
  * @param {{ maneuver:object, stage:'far'|'near'|'now', distance:number, then?:object|null, thenGap?:number|null, uturnSafe?:boolean }} p
  */
 export function announcementText({ maneuver, stage, distance, then = null, thenGap = null, uturnSafe = false }) {
-  const main = maneuverText(maneuver, { uturnSafe });
+  const main = maneuverText(maneuver, { uturnSafe, spoken: true });
   let text = stage === 'now' ? main : `Dans ${spokenDistance(distance)}, ${lcFirst(main)}`;
   if (then && stage !== 'far' && typeof thenGap === 'number' && thenGap <= THEN_MAX_GAP_M) {
-    text += `, puis ${lcFirst(maneuverText(then))}`;
+    text += `, puis ${lcFirst(maneuverText(then, { spoken: true }))}`;
   }
   return `${text}.`;
 }

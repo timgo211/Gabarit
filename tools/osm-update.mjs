@@ -6,7 +6,8 @@
 // dans le filtrage commun) et ponts sans hauteur connue (phase 12a, data/ponts-osm/ : extrait France, filtrage à part,
 // voir src/lib/bridges-convert.js), plus les limites de poids (phase 12a bis, data/poids-osm/ : mêmes extrait, filtrage
 // et cases que les ponts, voir src/lib/weight-convert.js) et les limitations de vitesse (phase 11a, data/vitesses-osm/ :
-// mêmes extrait, filtrage et cases, voir src/lib/speed-convert.js). Lancé par
+// mêmes extrait, filtrage et cases, voir src/lib/speed-convert.js) et les directions des bretelles (phase 11b,
+// data/directions-osm/ : mêmes extrait, filtrage et cases, voir src/lib/directions-convert.js). Lancé par
 // .github/workflows/osm-data.yml (le 1er du mois, à la main, ou quand ce fichier change) ; Node 22, sans dépendance
 // npm ; osmium-tool installé par l'Action (apt).
 //
@@ -46,6 +47,7 @@ import {
 } from '../src/lib/bridges-convert.js';
 import { WEIGHTS, convertWeights, osmiumWeightsFilter, probeLog, weightFromFeature } from '../src/lib/weight-convert.js';
 import { SPEEDS, convertSpeeds, osmiumSpeedsFilter, speedFromFeature } from '../src/lib/speed-convert.js';
+import { DIRECTIONS, convertDirections, directionFromFeature, osmiumDirectionsFilter } from '../src/lib/directions-convert.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const OUT = join(ROOT, 'data', 'tunnels-adr.json');
@@ -55,6 +57,7 @@ const TOLLS_OUT = join(ROOT, 'data', 'taxes-pl-osm.json');
 const BRIDGES_DIR = join(ROOT, 'data', 'ponts-osm');
 const WEIGHTS_DIR = join(ROOT, 'data', 'poids-osm');
 const SPEEDS_DIR = join(ROOT, 'data', 'vitesses-osm');
+const DIRECTIONS_DIR = join(ROOT, 'data', 'directions-osm');
 // Réseau des taxes PL : périmètre (cadres, contours IGN, zones exclues) lu dans data/taxes-pl.json.
 const TOLL_DATA = parseTollData(JSON.parse(readFileSync(join(ROOT, 'data', 'taxes-pl.json'), 'utf8')));
 const TOLL_BBOX = tollsBbox(TOLL_DATA);
@@ -129,14 +132,15 @@ async function filterTolls(file, dir, tollWays) {
  * tiennent pas dans les limites de taille), export GeoJSON lu ligne à ligne. Pays de BRIDGES.REGIONS seulement (et
  * chaque fichier local en essai). Phase 12a bis : limites de poids (maxweight, maxweight:hgv) dans le même filtrage et
  * le même export ; étiquettes du chemin du constat (WEIGHTS.PROBE_WAY) écrites dans le journal. Phase 11a : limites
- * de vitesse (maxspeed, maxspeed:hgv) dans le même filtrage et le même export.
+ * de vitesse (maxspeed, maxspeed:hgv) dans le même filtrage et le même export ; phase 11b : directions des bretelles
+ * (destination, destination:ref).
  */
-async function filterBridges(file, dir, bridges, clearances, weights, speeds) {
+async function filterBridges(file, dir, bridges, clearances, weights, speeds, dirs) {
   const kept = join(dir, 'ponts.osm.pbf');
   const seq = join(dir, 'ponts.geojsonseq');
-  execFileSync('osmium', ['tags-filter', '--overwrite', '-o', kept, file, ...osmiumBridgesFilter(), ...osmiumWeightsFilter(), ...osmiumSpeedsFilter()], { stdio: 'inherit' });
+  execFileSync('osmium', ['tags-filter', '--overwrite', '-o', kept, file, ...osmiumBridgesFilter(), ...osmiumWeightsFilter(), ...osmiumSpeedsFilter(), ...osmiumDirectionsFilter()], { stdio: 'inherit' });
   execFileSync('osmium', ['export', '--overwrite', '-f', 'geojsonseq', '--add-unique-id=type_id', '-o', seq, kept], { stdio: 'inherit' });
-  let nb = 0; let nh = 0; let nw = 0; let ns = 0; let lines = 0;
+  let nb = 0; let nh = 0; let nw = 0; let ns = 0; let nd = 0; let lines = 0;
   let probe = null;
   const rl = createInterface({ input: createReadStream(seq, { encoding: 'utf8' }), crlfDelay: Infinity });
   for await (const line of rl) {
@@ -152,10 +156,12 @@ async function filterBridges(file, dir, bridges, clearances, weights, speeds) {
     if (w) { weights.set(w.id, w); nw += 1; }
     const sp = speedFromFeature(f);
     if (sp) { speeds.set(f.id, sp); ns += 1; }
+    const dr = directionFromFeature(f);
+    if (dr) { dirs.set(f.id, dr); nd += 1; }
   }
   const size = statSync(seq).size;
   for (const f of [kept, seq]) rmSync(f, { force: true });
-  return { nb, nh, nw, ns, lines, size, probe: probeLog(probe) };
+  return { nb, nh, nw, ns, nd, lines, size, probe: probeLog(probe) };
 }
 
 /** Date de l'extrait (en-tête osmosis_replication_timestamp du fichier .pbf), ou null. */
@@ -304,6 +310,7 @@ async function main() {
   const clearances = new Map();
   const weights = new Map();
   const speeds = new Map();
+  const dirs = new Map();
   const bridgePolys = [];
   const polys = [];
   const freshPolys = new Map();
@@ -314,8 +321,8 @@ async function main() {
         if (f.endsWith('.poly')) { const p = parsePoly(readFileSync(f, 'utf8')); polys.push(p); bridgePolys.push(p); continue; }
         const r = await filterFile(f, dir, tunnels, areas, ways);
         const t = await filterTolls(f, dir, tollWays);
-        const b = await filterBridges(f, dir, bridges, clearances, weights, speeds);
-        console.log(`${f} : ${b.nb} ponts, ${b.nh} tronçons à hauteur connue, ${b.nw} tronçons à limite de poids, ${b.ns} voies à limite de vitesse (${b.lines} objets exportés).`);
+        const b = await filterBridges(f, dir, bridges, clearances, weights, speeds, dirs);
+        console.log(`${f} : ${b.nb} ponts, ${b.nh} tronçons à hauteur connue, ${b.nw} tronçons à limite de poids, ${b.ns} voies à limite de vitesse, ${b.nd} bretelles à direction (${b.lines} objets exportés).`);
         console.log(b.probe);
         console.log(`${f} : ${r.nt} voies en tunnel portant hazmat, ${r.na} aires, ${r.nw} voies à accès conditionnel, ${t.n} routes à référence dans le cadre des taxes PL.`);
       }
@@ -336,7 +343,7 @@ async function main() {
         const r = await filterFile(file, dir, tunnels, areas, ways);
         if (BRIDGES.REGIONS.includes(region)) {
           const t4 = Date.now();
-          const b = await filterBridges(file, dir, bridges, clearances, weights, speeds);
+          const b = await filterBridges(file, dir, bridges, clearances, weights, speeds, dirs);
           bridgePolys.push(poly);
           console.log(`${region} : ${b.nb} ponts, ${b.nh} tronçons à hauteur connue, ${b.nw} tronçons à limite de poids, ${b.ns} voies à limite de vitesse (${b.lines} objets exportés, `
             + `${(b.size / 1024 / 1024).toFixed(0)} Mo de GeoJSON, ${Math.round((Date.now() - t4) / 1000)} s).`);
@@ -426,6 +433,16 @@ async function main() {
     if (sconv.problem) console.log(`⚠ data/vitesses-osm/ non modifié : ${sconv.problem}.`);
     else writeTiles(SPEEDS_DIR, sconv.index, sconv.tiles, `voies à limite de vitesse (copie ${sconv.index.mode})`);
   } else console.log('⚠ data/vitesses-osm/ non modifié : aucune limite de vitesse lue.');
+  // Directions des bretelles (phase 11b) : mêmes cases ; écrites seulement dans les limites de taille (5 Mo par
+  // fichier, 40 Mo en tout) ; sinon ancienne copie gardée.
+  if (dirs.size) {
+    const dconv = convertDirections([...dirs.values()], {
+      updated: day, grid: buildCoverage(bridgePolys), countries: DIRECTIONS.REGIONS.map((c) => c.split('/').pop()),
+    });
+    for (const line of dconv.log) console.log(line);
+    if (dconv.problem) console.log(`⚠ data/directions-osm/ non modifié : ${dconv.problem}.`);
+    else writeTiles(DIRECTIONS_DIR, dconv.index, dconv.tiles, 'bretelles à direction');
+  } else console.log('⚠ data/directions-osm/ non modifié : aucune direction lue.');
   if (freshPolys.size) {
     mkdirSync(POLY_DIR, { recursive: true });
     const dates = existsSync(POLY_DATES) ? JSON.parse(readFileSync(POLY_DATES, 'utf8')) : {};
