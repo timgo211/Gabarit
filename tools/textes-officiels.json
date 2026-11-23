@@ -1028,12 +1028,63 @@
       "maxDocs": 2,
       "head": 0,
       "ocr": "deu"
+    },
+    {
+      "id": "sat7d-lic2-vl",
+      "title": "7d restes (v58), 5e tour — Flandre : texte du « Gebruiksrecht » des webdiensten",
+      "urls": [
+        "https://www.vlaanderen.be/digitaal-vlaanderen/onze-oplossingen/geografische-webdiensten/gebruiksrecht-en-privacyverklaring-geografische-webdiensten"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kosteloos|gratuit|gratis|kostenfrei|bronvermelding|Quellenvermerk|mention|attribution"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 3,
+      "head": 0,
+      "ocr": "deu",
+      "follow": "(gebruiksrecht|licentie)"
+    },
+    {
+      "id": "sat7d-lic2-wa",
+      "title": "7d restes (v58), 5e tour — Wallonie : conditions d'accès et de réutilisation",
+      "urls": [
+        "https://geoportail.wallonie.be/home/a-propos/conditions-d-utilisation.html",
+        "https://geoportail.wallonie.be/acces-donnees.html",
+        "https://geoservices.wallonie.be/arcgis/rest/services/IMAGERIE/ORTHO_LAST/MapServer?f=pjson"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kosteloos|gratuit|gratis|kostenfrei|bronvermelding|Quellenvermerk|mention|attribution"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 5,
+      "head": 0,
+      "ocr": "deu",
+      "follow": "(conditions|licence|cgu|CGU|acces-donnees)"
+    },
+    {
+      "id": "sat7d-lic2-sl",
+      "title": "7d restes (v58), 5e tour — Sarre : licence des Geobasisdaten",
+      "urls": [
+        "https://geoportal.saarland.de/article/Lizenzen/",
+        "https://www.saarland.de/lvgl/DE/portale/geobasisdaten/opendata/opendata_node.html",
+        "https://www.saarland.de/lvgl/DE/service/rechtliches/nutzungsbedingungen"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|Nutzungsbedingung|gebruiksrecht|gebruiksvoorwaarden|conditions|CC[ -]?BY|CC0|dl-de|Datenlizenz|Modellicentie|Licence Ouverte|kosteloos|gratuit|gratis|kostenfrei|bronvermelding|Quellenvermerk|mention|attribution"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 5,
+      "head": 0,
+      "ocr": "deu",
+      "follow": "(lizenz|nutzungsbedingung|opendata|open-data|dl-de)"
     }
   ],
   "run": [
-    "sat7d-lic-vl",
-    "sat7d-lic-wa",
-    "sat7d-lic-sl",
-    "sat7d-lic-bw"
+    "sat7d-lic2-vl",
+    "sat7d-lic2-wa",
+    "sat7d-lic2-sl"
   ]
 }
