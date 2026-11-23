@@ -41,7 +41,9 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` la nuit selon le niveau (0,6 / 0,8 / 0,9, phase 2d)
   et libellés clairs (`photoLabelPatches`). Réglages du style appliqués par `applyGuidanceStyle` (chargement de
   style, thème, entrée / sortie du guidage), jamais à chaque position. Repère : `src/ui/vehicle-icon.js` (registre
-  d'icônes, flèche seule pour l'instant). Pictogrammes des boutons : `src/ui/nav-symbols.js` (Material Symbols,
+  d'icônes : flèche, camion vu de dessus — dessin maison, formes simples, jamais un logo ni une icône copiée ; v45),
+  `settings.vehicleIcon` (`truck` par défaut, `sanitizeVehicleIcon` de `prefs.js`), Réglages › Affichage « Repère du
+  véhicule » ; `map.setVehicleIcon` recrée le repère à la même place et au même cap. 60 px, couleurs `--arrow-*`. Pictogrammes des boutons : `src/ui/nav-symbols.js` (Material Symbols,
   Apache 2.0, recopiés ; crédit dans Réglages).
 - Thème auto (phase 2c) : nuit entre coucher et lever du soleil à la dernière position (`src/lib/sun.js`, NOAA) ;
   sans position, 20 h – 7 h ; position du guidage reprise au plus toutes les 5 min (`THEME_RECHECK_NAV_MS`) ; choix

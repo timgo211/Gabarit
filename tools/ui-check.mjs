@@ -2251,6 +2251,65 @@ async function bridgesCheck(browser, base) {
 }
 
 /**
+ * v45 : repère camion (vu de dessus, dessin maison), camion par défaut. Guidage avec le GPS émulé, portrait et
+ * paysage, jour, nuit et satellite : repère `data-icon="truck"`, 60 px comme la flèche, tourné au cap, centré au
+ * même point que la flèche ; Réglages › Affichage « Flèche » → flèche à la même place, sans rechargement ; réglage
+ * gardé au rechargement.
+ */
+async function truckIconCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height] of [[412, 900], [900, 412]]) {
+    for (const mode of ['jour', 'nuit', 'satellite']) {
+      const tag = `${width}×${height} ${mode}`;
+      const { page, ctx, errors } = await open(browser, base, {
+        width, height, theme: mode === 'jour' ? 'day' : 'night',
+        directions: () => nav, overpass: () => ({ elements: [] }),
+      });
+      await computeRoute(page);
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      for (let i = 1; i <= 4; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+      if (mode === 'satellite') {
+        await navLayer(page); // guidage démarré en plan : un toucher passe en satellite
+        await page.waitForTimeout(800);
+      }
+      await page.waitForTimeout(1500);
+      const info = () => page.evaluate(() => {
+        const m = document.querySelector('.me-marker');
+        if (!m) return null;
+        const r = m.getBoundingClientRect();
+        const icon = m.querySelector('.me-icon')?.getBoundingClientRect();
+        return {
+          icon: m.dataset.icon, w: Math.round(m.offsetWidth), h: Math.round(m.offsetHeight), cx: r.left + r.width / 2, cy: r.top + r.height / 2,
+          rot: /rotate[XYZ]?\((-?[\d.]+)deg\)/.exec(m.style.transform)?.[1] ?? null, noHeading: m.classList.contains('no-heading'),
+          iconW: icon ? Math.round(icon.width) : 0, glass: !!m.querySelector('.me-glass'),
+        };
+      });
+      const t = await info();
+      check(t?.icon === 'truck' && t.glass && !t.noHeading && t.iconW > 0, `${tag} : repère camion au cap`, JSON.stringify(t));
+      check(t?.w === 60 && t?.h === 60, `${tag} : 60 px comme la flèche`, `${t?.w}×${t?.h}`);
+      check(t?.rot !== null && Math.abs(Number(t.rot)) > 1, `${tag} : tourné au cap de la route`, String(t?.rot));
+      await page.screenshot({ path: join(SHOTS, `v45-camion-${mode}-${width}x${height}.png`) });
+      if (mode === 'jour') {
+        // Réglages › Affichage : « Flèche », appliqué sans rechargement, à la même place.
+        await page.evaluate(() => { const r = document.querySelector('input[name="vehicle-icon"][value="arrow"]'); r.checked = true; r.dispatchEvent(new Event('change', { bubbles: true })); });
+        await page.waitForTimeout(400);
+        const a = await info();
+        check(a?.icon === 'arrow' && Math.abs(a.cx - t.cx) < 40 && Math.abs(a.cy - t.cy) < 40 && a.w === 60, `${tag} : « Flèche » → flèche à la même place`, JSON.stringify(a));
+        const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).settings.vehicleIcon);
+        check(saved === 'arrow', `${tag} : réglage mémorisé`, String(saved));
+        await page.screenshot({ path: join(SHOTS, `v45-fleche-${mode}-${width}x${height}.png`) });
+      }
+      await stopGuidance(page);
+      check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+  }
+}
+
+/**
  * v44 : « Autres itinéraires » depuis la vue d'ensemble, à l'arrêt seulement. GPS émulé : en roulant, bouton grisé et
  * « Disponible à l'arrêt », aucun calcul ; à l'arrêt (3 s), vue d'ensemble + panneau, calcul depuis la position reçue
  * vers la même arrivée (3 requêtes au plus), fiches comme au départ, choix d'une autre fiche, « Guider par cet
@@ -3425,7 +3484,7 @@ try {
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck,
-    recommande: recommendedTunnelCheck, autres: otherRoutesCheck };
+    recommande: recommendedTunnelCheck, autres: otherRoutesCheck, camion: truckIconCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

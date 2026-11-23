@@ -21,6 +21,7 @@ import {
   STREET_BUBBLE, bubbleColors, sanitizeNightLevel,
 } from '../lib/map-palette.js';
 import { vehicleElement } from './vehicle-icon.js';
+import { sanitizeVehicleIcon } from '../lib/prefs.js';
 
 const FRANCE_CENTER = [2.35, 46.6];
 const ROUTE_LAYERS = [
@@ -95,6 +96,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let theme = initialTheme;
   /** Luminosité de la carte la nuit (phase 2d) : 'dark' | 'normal' | 'light'. */
   let nightLevel = sanitizeNightLevel(opts.nightLevel);
+  let vehicleIcon = sanitizeVehicleIcon(opts.vehicleIcon); // v45 : « Flèche » ou « Camion » (Réglages › Affichage)
   /** Aire mise en évidence (liste du guidage, phase 2d). */
   let highlighted = null;
   let navigating = false;
@@ -674,7 +676,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (lonlat) { marks.me = lonlat; marks.meBearing = bearing; }
     if (!map || !lonlat) return;
     if (!markers.me) {
-      markers.me = new lib.Marker({ element: vehicleElement(), rotationAlignment: 'map', pitchAlignment: 'map' })
+      markers.me = new lib.Marker({ element: vehicleElement(vehicleIcon), rotationAlignment: 'map', pitchAlignment: 'map' })
         .setLngLat(lonlat).addTo(map);
     } else {
       markers.me.setLngLat(lonlat);
@@ -719,6 +721,20 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (lib) loadStyle();
     },
     /** Luminosité de la carte la nuit (phase 2d) : appliquée tout de suite la nuit, sans rechargement. */
+    /** Repère du véhicule (v45) : « arrow » ou « truck » ; même place, même cap, recréé tout de suite. */
+    setVehicleIcon(kind) {
+      const k = sanitizeVehicleIcon(kind);
+      if (k === vehicleIcon) return;
+      vehicleIcon = k;
+      if (!markers.me) return;
+      const at = markers.me.getLngLat().toArray();
+      const rot = markers.me.getRotation();
+      const noHeading = markers.me.getElement().classList.contains('no-heading');
+      markers.me.remove();
+      markers.me = new lib.Marker({ element: vehicleElement(vehicleIcon), rotationAlignment: 'map', pitchAlignment: 'map' })
+        .setLngLat(at).setRotation(rot).addTo(map);
+      markers.me.getElement().classList.toggle('no-heading', noHeading);
+    },
     setNightLevel(level) {
       const l = sanitizeNightLevel(level);
       if (l === nightLevel) return;

@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres
+                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
@@ -83,6 +83,8 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   dans le panneau du bas, plus haut que sur la tablette ; à 412×900 (`guidage`) le message bref passe alors sur les
   alertes (✘ « nav-toast », vert avec une wake lock simulée). 760×360 à l'arrêt (alerte de conduite avec « Pas une
   pause (travail) » sous le panneau du bas) : ✘ aussi en v37 et v38, même avec la wake lock simulée, non traité.
+- `camion` (v45) : guidage avec le GPS émulé à 412×900 et 900×412, jour, nuit, satellite : repère `data-icon="truck"`
+  (pare-brise), 60 px, tourné au cap ; Réglages › Affichage « Flèche » → flèche au même point, réglage mémorisé.
 - `autres` (v44) : GPS émulé ; en roulant, bouton grisé, « Disponible à l'arrêt », aucune requête ; à l'arrêt 3 s :
   vue d'ensemble, panneau, 1 à 3 requêtes de la position reçue vers la même arrivée (`vehicle_type` hgv), 3 fiches
   « Recommandé » en tête, notes, 2e fiche choisie → « Guider par cet itinéraire » → source `route` = 2e tracé ;

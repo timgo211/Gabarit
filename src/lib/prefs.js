@@ -29,6 +29,13 @@ export function arrowColors(choice, theme) {
   return ARROW_COLORS[c];
 }
 
+/** Repère du véhicule sur la carte (v45, Réglages › Affichage) : flèche ou camion vu de dessus (par défaut). */
+export const VEHICLE_ICON_CHOICES = Object.freeze(['arrow', 'truck']);
+export const DEFAULT_VEHICLE_ICON = 'truck';
+export function sanitizeVehicleIcon(x) {
+  return VEHICLE_ICON_CHOICES.includes(x) ? x : DEFAULT_VEHICLE_ICON;
+}
+
 /** Vitesse de la voix (SpeechSynthesisUtterance.rate : 0,1 à 10, 1 = normale) ; plage utile en cabine. */
 export const VOICE_RATE = Object.freeze({ min: 0.7, max: 1.5, step: 0.1, default: 1 });
 /** Volume de la voix (SpeechSynthesisUtterance.volume : 0 à 1) ; jamais muet ici (bouton Voix pour couper). */
