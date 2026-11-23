@@ -1497,6 +1497,9 @@ async function adrCheck(browser, base) {
     check(summary.some((t) => /matières dangereuses, code C, classe 3, UN 1202/.test(t)), `${width} px : profil ADR dans les notes`);
     check(/OpenStreetMap \(ODbL\).*Copie OSM du 17\/11\/2026/.test(await page.textContent('.rules-source')), `${width} px : source des tunnels`);
     check(await page.isVisible('.btn-avoid-tunnel'), `${width} px : bouton « Éviter le tunnel » à l'arrêt`);
+    // v48 : bouton actif seulement à l'arrêt confirmé (GPS émulé à 0 km/h ; vitesse inconnue = en mouvement).
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.waitForSelector('.btn-avoid-tunnel:not([disabled])', { timeout: 20000 });
     await noHorizontalScroll(page, `${width} px fiches ADR`);
     await page.locator('#route-notes').scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-adr.png`) });
@@ -1837,8 +1840,10 @@ async function euroCheck(browser, base) {
   const veh = (euroClass) => ({ id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90, critair: '2', euroClass });
   const notesOf = (page) => page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
   for (const [width, height] of [[360, 760], [412, 900], [800, 1280], [1280, 800]]) {
+    const avoid = [];
     const { page, ctx, errors } = await open(browser, base, {
-      width, height, now, voice: true, vehicle: veh('3'), directions: () => mb, overpass: () => ({ elements: [] }),
+      width, height, now, voice: true, vehicle: veh('3'), overpass: () => ({ elements: [] }),
+      directions: (body) => { if (body.options?.avoid_polygons) avoid.push(body.options.avoid_polygons); return mb; },
     });
     await computeRoute(page);
     await page.waitForSelector('.rules-notes', { timeout: 10000 });
@@ -1849,6 +1854,23 @@ async function euroCheck(browser, base) {
     await noHorizontalScroll(page, `${width} px notes Euro`);
     await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-euro.png`) });
+    // v48 : « Éviter le tunnel » (classe Euro interdite) : à l'arrêt seulement (grisé en roulant ou vitesse inconnue),
+    // une requête ORS, un carré de 80 m ; jamais dit à voix haute.
+    check(await page.isVisible('.btn-avoid-tunnel'), `${width} px : bouton « Éviter le tunnel » pour Euro 3`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 15 });
+    await page.waitForSelector('.btn-avoid-tunnel[disabled]', { timeout: 15000 });
+    check(/à l'arrêt/.test(await page.textContent('.btn-avoid-tunnel')), `${width} px : en roulant, bouton grisé « (à l'arrêt) »`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.waitForSelector('.btn-avoid-tunnel:not([disabled])', { timeout: 20000 });
+    await noHorizontalScroll(page, `${width} px bouton Euro`);
+    await page.click('.btn-avoid-tunnel');
+    await page.waitForSelector('.route-card:has-text("Contournement")', { timeout: 10000 });
+    check(avoid.length === 1 && avoid[0].type === 'MultiPolygon' && avoid[0].coordinates.length === 1
+      && avoid[0].coordinates[0][0].length === 5, `${width} px : Euro, une requête ORS, un carré`, JSON.stringify(avoid[0] ?? null).slice(0, 90));
+    check(/Le contournement passe encore par : Tunnel du Mont-Blanc\. La signalisation fait foi\./.test(await page.textContent('#message')),
+      `${width} px : Euro, prévient si le contournement y passe encore (fixture identique)`);
+    const said = await page.evaluate(() => window.__spoken ?? []);
+    check(!said.some((x) => /tunnel|contourn/i.test(x)), `${width} px : « Éviter le tunnel » jamais dit`, said.join(' | '));
     if (width === 360) {
       await page.click('#btn-vehicles');
       await page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');

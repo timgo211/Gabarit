@@ -86,6 +86,13 @@ export const KNOWN_TUNNELS = Object.freeze([
   }),
   Object.freeze({
     // Bison Futé : catégorie E, et les nos ONU 2919, 3291, 3331, 3359, 3373 (sans code) sont aussi interdits d'accès.
+    // Phase 5b bis (lu le 23/11/2026, Action « Textes officiels », PDF texte sans OCR) : Bison Futé ajoute 3077 et 3082
+    // (« interdiction de transit de ces marchandises sur les rampes d'accès au tunnel, interdiction établie par les
+    // Préfecture française et italienne »), mais le décret du Président de la Région Vallée d'Aoste n° 33 du
+    // 26 janvier 2010 (Bulletin officiel n° 7 du 16/02/2010, p. 659, regione.vda.it) ne cite que « les numéros ONU 2919,
+    // 3291, 3331, 3359 et 3373 », « en application de l'interdiction établie par l'arrêté du préfet de la Haute-Savoie
+    // n° DDT 2010-60 du 20 janvier 2010 » ; cet arrêté n'a pas pu être lu (haute-savoie.gouv.fr refuse le conteneur et
+    // l'Action). 3077 et 3082 : à vérifier, non ajoutés.
     id: 'known:montblanc', name: 'Tunnel du Mont-Blanc', cat: 'E', known: true, noCodeBanned: true,
     note: 'PL de plus de 3,5 t : accréditation obligatoire avant le tunnel (Passy-Le Fayet ou Aoste).',
     // OSM (API, 20/11/2026) : w1212015047 + w4525912 « Tunnel du Mont Blanc » (côté français, hazmat=E) +
@@ -395,7 +402,7 @@ export function squareAround(p, size = ADR.AVOID_SQUARE_M) {
 }
 
 /**
- * Zones à éviter pour les tunnels interdits, ajoutées à celles déjà évitées (ZFE). Mêmes limites de l'API publique
+ * Zones à éviter pour les tunnels interdits (ADR, et v48 classe Euro : avoidableTunnels de route-rules.js), ajoutées à celles déjà évitées (ZFE). Mêmes limites de l'API publique
  * d'ORS que pour les ZFE (150 km à vol d'oiseau avec zones à éviter).
  * @returns {{ ok:true, geometry:object }|{ ok:false, text:string }}
  */
@@ -405,7 +412,7 @@ export function avoidTunnelsFor(passages, { start, end, existing = null, maxDist
   if (!isPoint(start) || !isPoint(end) || haversine(start, end) > maxDistance) {
     return {
       ok: false,
-      text: 'Éviter le tunnel : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le départ et l\'arrivée sont à 150 km au plus à vol d\'oiseau. Choisis un autre itinéraire proposé ou ajoute une étape ; la signalisation fait foi.',
+      text: 'Éviter le tunnel : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le départ et l\'arrivée sont à 150 km au plus à vol d\'oiseau. Tunnel non évité, rien n\'a été envoyé : à vérifier. Choisis un autre itinéraire proposé ou ajoute une étape ; la signalisation fait foi.',
     };
   }
   const polygons = [];
@@ -413,4 +420,17 @@ export function avoidTunnelsFor(passages, { start, end, existing = null, maxDist
   else if (existing?.type === 'Polygon' && Array.isArray(existing.coordinates)) polygons.push(existing.coordinates);
   for (const p of list) polygons.push([squareAround(p.mid)]);
   return { ok: true, geometry: { type: 'MultiPolygon', coordinates: polygons } };
+}
+
+/** v48 : texte du bouton grisé quand le véhicule n'est pas à l'arrêt (vitesse inconnue = en mouvement). */
+export const AVOID_PARKED_TEXT = 'Éviter le tunnel : disponible à l\'arrêt seulement (vitesse inconnue ou en mouvement).';
+
+/**
+ * v48 : « Éviter le tunnel » permis ? Jamais en guidage (le recalcul garde ses réglages), et seulement à l'arrêt
+ * confirmé (parkedState de nav-layout.js : < 5 km/h pendant 3 s ; vitesse inconnue = en mouvement). R412-6-2 :
+ * aucune saisie en roulant.
+ * @param {{ guiding:boolean, parked:boolean }} p
+ */
+export function avoidTunnelAllowed({ guiding = false, parked = false } = {}) {
+  return !guiding && parked === true;
 }

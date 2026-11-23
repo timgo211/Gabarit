@@ -87,7 +87,9 @@ function card(d, { checked, onSelect, rules }) {
  * Réglementation de l'itinéraire choisi (phase 5) : une ligne par ZFE et par interdiction, lien vers l'arrêté (texte
  * et adresse venant de data/zfe.json : textContent, adresse http(s) vérifiée par safeUrl), bouton « Éviter la ZFE ».
  */
-function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, onAvoidLocal, localBusy }) {
+function rulesBlock(rules, {
+  source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed = false, onAvoidLocal, localBusy,
+}) {
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
@@ -100,9 +102,11 @@ function rulesBlock(rules, { source, onAvoidZfe, avoidBusy, canAvoid, windCredit
       type: 'button', class: 'btn btn-avoid-zfe', disabled: !!avoidBusy, onclick: onAvoidZfe,
       text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',
     }) : null,
-    onAvoidTunnel && rules.forbiddenTunnels?.length ? el('button', {
-      type: 'button', class: 'btn btn-avoid-tunnel', disabled: !!tunnelBusy, onclick: onAvoidTunnel,
-      text: tunnelBusy ? 'Calcul du contournement…' : '⛔ Éviter le tunnel',
+    // Tunnels interdits (ADR, phase 5b ; classe Euro, v48) : à l'arrêt seulement, grisé sinon (vitesse inconnue).
+    onAvoidTunnel && rules.avoidableTunnels?.length ? el('button', {
+      type: 'button', class: 'btn btn-avoid-tunnel', disabled: !!tunnelBusy || !tunnelAllowed, onclick: onAvoidTunnel,
+      'aria-disabled': String(!!tunnelBusy || !tunnelAllowed),
+      text: tunnelBusy ? 'Calcul du contournement…' : tunnelAllowed ? '⛔ Éviter le tunnel' : '⛔ Éviter le tunnel (à l\'arrêt)',
     }) : null,
     // Phase 5d : route réservée à la desserte locale traversée en transit (une requête ORS sur appui, à l'arrêt).
     onAvoidLocal && rules.localTransit?.length ? el('button', {
@@ -182,7 +186,7 @@ function diagnosticBlock(route, rules, label) {
  */
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
-  windCredit = false, onAvoidTunnel = null, tunnelBusy = false, onAvoidLocal = null, localBusy = false,
+  windCredit = false, onAvoidTunnel = null, tunnelBusy = false, tunnelAllowed = false, onAvoidLocal = null, localBusy = false,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -215,7 +219,7 @@ export function renderRouteChoice(node, notesNode, {
   node.hidden = false;
   notesNode.replaceChildren(
     ...rulesBlock(rules?.[selected], {
-      source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy,
+      source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed,
       onAvoidLocal, localBusy,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),

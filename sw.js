@@ -111,6 +111,7 @@ const APP_FILES = [
   './src/ui/nav-symbols.js',
   './src/ui/vehicle-icon.js',
   './src/ui/navigation.js',
+  './src/ui/plan-park.js',
   './src/ui/route-form.js',
   './src/ui/settings.js',
   './src/ui/share.js',

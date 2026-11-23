@@ -458,6 +458,28 @@ export function noZfeOption(option, route, avoidPolygons, names) {
 }
 
 /**
+ * v48 : itinéraire de contournement (« Éviter le tunnel ») : une requête, comptée dans le budget de 3 requêtes du
+ * calcul de départ ; code 2009 → mêmes diagnostics (diagnose2009, phases 2f / 5h ter, au conditionnel) avec le reste
+ * du budget, et même précision « zone évitée » (withBlockedHint). Échec : erreur relancée, rien d'affiché ni de guidé.
+ * @returns {Promise<{ route:object, requests:number }>}
+ */
+export async function computeAvoidRoute({
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, avoidPolygons = null, send,
+}) {
+  let requests = 1;
+  try {
+    const req = buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, preference, avoidPolygons });
+    const routes = parseAllDirections(await send(req));
+    return { route: routes[0], requests };
+  } catch (err) {
+    if (err?.code === 2009) {
+      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons });
+    }
+    throw withBlockedHint(err, avoidPolygons);
+  }
+}
+
+/**
  * Itinéraire « Contournement » (phase 5b) : mêmes réglages que l'itinéraire choisi, tunnels interdits au code du
  * véhicule évités (petits carrés options.avoid_polygons, ajoutés aux ZFE déjà évitées).
  */

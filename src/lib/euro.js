@@ -35,7 +35,7 @@
 // (gesetze-im-internet.de) ; 35. BImSchV annexe 2, groupe 4 « C (EEV) » (gesetze-im-internet.de) ; arrêtés du
 // Mont-Blanc et du Fréjus : EEV absent des classes interdites.
 
-import { prepareLine } from './nav-geo.js';
+import { prepareLine, pointAt } from './nav-geo.js';
 import { KNOWN_TUNNELS, indexLine, tubePassage } from './adr.js';
 
 export const EURO = Object.freeze({
@@ -132,7 +132,8 @@ function sourceText(rule) {
 
 /**
  * Tunnels à règle Euro traversés par l'itinéraire (tubes en dur de KNOWN_TUNNELS, adr.js), triés depuis le départ.
- * @returns {{ id:string, name:string, enter:number, exit:number }[]}
+ * mid : milieu du passage sur le tracé (v48 : carré évité par « Éviter le tunnel », comme les tunnels ADR).
+ * @returns {{ id:string, name:string, enter:number, exit:number, mid:number[] }[]}
  */
 export function euroTunnelsAlongRoute(route, rules = TUNNEL_RULES) {
   if (!Array.isArray(route?.coordinates) || route.coordinates.length < 2) return [];
@@ -144,7 +145,10 @@ export function euroTunnelsAlongRoute(route, rules = TUNNEL_RULES) {
     if (!ids.has(t.id)) continue;
     for (const g of t.tubes) {
       const pass = tubePassage(line, grid, g);
-      if (pass) { out.push({ id: t.id, name: t.name, enter: pass.enter, exit: pass.exit }); break; }
+      if (pass) {
+        out.push({ id: t.id, name: t.name, enter: pass.enter, exit: pass.exit, mid: pointAt(line, (pass.enter + pass.exit) / 2).point });
+        break;
+      }
     }
   }
   return out.sort((a, b) => a.enter - b.enter);

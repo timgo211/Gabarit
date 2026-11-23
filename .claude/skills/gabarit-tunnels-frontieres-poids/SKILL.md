@@ -22,9 +22,15 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   pour un chargement ADR avec code ; absent / vide → « Alerte tunnels indisponible (données non chargées) », jamais un
   silence ; jamais « sans tunnel interdit » mais « Aucun tunnel signalé dans les données (copie du JJ/MM), la
   signalisation fait foi » ; chaque alerte tunnel finit par « la signalisation fait foi ». `KNOWN_TUNNELS` : Fourvière
-  E, Fréjus C, Mont-Blanc E (Bison Futé), catégorie gardée face à OSM, vérifiés sans données. Tube sur le tracé : 5
+  E, Fréjus C, Mont-Blanc E (Bison Futé), catégorie gardée face à OSM, vérifiés sans données. Mont-Blanc, ONU 3077 et
+  3082 (5b bis) : cités par Bison Futé seulement ; décret VdA n° 33/2010 lu (2919, 3291, 3331, 3359, 3373), arrêté
+  DDT-2010-60 illisible → non ajoutés tant qu'un texte officiel lisible ne les cite pas. Tube sur le tracé : 5
   points à 35 m au plus, dans l'ordre ; tubes qui se chevauchent réunis. « Éviter le tunnel » : carré de 80 m au milieu
-  (avoid_polygons ajouté aux ZFE évitées, 150 km), option « Contournement ». Guidage : `view.rules.tunnel`, bandeau
+  (avoid_polygons ajouté aux ZFE évitées, 150 km ; au-delà rien envoyé, « à vérifier »), option « Contournement ».
+  v48 : un seul bouton pour `avoidableTunnels` (route-rules.js) = ADR interdits + Euro 'banned'/'operator' (un tunnel
+  une fois) ; à l'arrêt seulement (`avoidTunnelAllowed`, relevés GPS toutes les 2 s hors guidage `src/ui/plan-park.js`,
+  `fixSpeedKmh` + `parkedState`, vitesse inconnue = en mouvement → grisé « (à l'arrêt) ») ; requête `fetchAvoidRoute`
+  = `computeAvoidRoute` (1 requête du budget de 3, code 2009 → `diagnose2009`, `withBlockedHint`) ; jamais dit. Guidage : `view.rules.tunnel`, bandeau
   sous 20 km, voix vers 5 km (`settings.ruleVoice`). Nom affiché : `tunnel:name` d'abord (Fourvière : name =
   « Autoroute du Soleil ») ; `hazmat=E` (lettre en valeur) = catégorie E. Overpass, Geofabrik, api.openstreetmap.org
   et unece.org refusent le conteneur (Action GitHub pour mesurer / copier).
@@ -74,7 +80,7 @@ description: Règles ADR et tunnels (5b), frontières et fiches pays (5c), poids
   n'a pas de type de véhicule (autocar, camping-car non distingués). Chaque alerte finit par « La signalisation fait
   foi. » ; jamais de voix, de bandeau ni d'annonce. Fiches pays : bloc `euro` (règle + `mine` : texte par classe ;
   classe absente de `mine` → « à vérifier ») ; CH (ORPL), DE (BFStrMG annexe 1, 35. BImSchV) ; AT et IT « à
-  vérifier ». « Éviter le tunnel » pour une classe Euro : Bloc 2 Guidage. sftrf.fr, sitaf.it, atmb.com,
+  vérifier ». « Éviter le tunnel » pour une classe Euro : fait en v48 (voir 5b ; passages Euro avec `mid`). sftrf.fr, sitaf.it, atmb.com,
   tunnelmb.net et ris.bka.gv.at refusent le conteneur (RIS répond aussi 503 à l'Action).
 - Vitesses PL par type de route (phase 11a, `speed-rules.js`) : servent seulement à plafonner une étiquette `maxspeed`
   d'OSM, jamais affichées seules. France : `FR_SPEED_RULES` (Code de la route, art. R413-8 et suivants, lus par la case
