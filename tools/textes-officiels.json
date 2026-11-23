@@ -865,9 +865,107 @@
           "head": 2500
         }
       ]
+    },
+    {
+      "id": "sat7d-tuiles-seules",
+      "title": "7d restes (v58), 3e tour — tuiles seules (statut, type, CORS)",
+      "keywords": [],
+      "tiles": [
+        {
+          "label": "BE-VL OMWRGBMRVL WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-VL OMW WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMW/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-VL OMWRGBMRVL WMTS GoogleMapsVL (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=omwrgbmrvl&STYLE=&FORMAT=image/png&TILEMATRIXSET=GoogleMapsVL&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        },
+        {
+          "label": "BE-WA ORTHO_LAST WMS 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        },
+        {
+          "label": "BE-WA ORTHO_LAST REST export 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/rest/services/IMAGERIE/ORTHO_LAST/MapServer/export?bbox={bbox-epsg-3857}&bboxSR=3857&imageSR=3857&size=256,256&format=jpg&f=image",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        },
+        {
+          "label": "DE-BW DOP20 WMS 3857 (Freiburg)",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/wms/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=IMAGES_DOP_20_RGB&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 7.85,
+          "lat": 47.995,
+          "z": 17
+        },
+        {
+          "label": "DE-BW DOP20 WMS 1.1.1 (Freiburg)",
+          "url": "https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=IMAGES_DOP_20_RGB&STYLES=&FORMAT=image/jpeg&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 7.85,
+          "lat": 47.995,
+          "z": 17
+        },
+        {
+          "label": "DE-BY DOP40 WMS 3857 (München)",
+          "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop40?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=by_dop40c&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 11.575,
+          "lat": 48.137,
+          "z": 17
+        },
+        {
+          "label": "DE-SL truedop WMS 3857 (Saarbrücken)",
+          "url": "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=sl_dop20_rgb&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.996,
+          "lat": 49.234,
+          "z": 17
+        },
+        {
+          "label": "DE-HE DOP20 WMS 3857 (Frankfurt)",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=he_dop20_rgb&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 8.682,
+          "lat": 50.11,
+          "z": 17
+        },
+        {
+          "label": "DE-HE DOP WMS 1.1.1 (Frankfurt)",
+          "url": "https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=he_dop_rgb&STYLES=&FORMAT=image/jpeg&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 8.682,
+          "lat": 50.11,
+          "z": 17
+        },
+        {
+          "label": "DE-BY DOP20 WMS 3857 (München)",
+          "url": "https://geoservices.bayern.de/od/wms/dop/v1/dop20?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=by_dop20c&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 11.575,
+          "lat": 48.137,
+          "z": 17
+        },
+        {
+          "label": "BE-VL omw WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/omw/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        }
+      ]
     }
   ],
   "run": [
-    "sat7d-tuiles"
+    "sat7d-tuiles-seules"
   ]
 }
