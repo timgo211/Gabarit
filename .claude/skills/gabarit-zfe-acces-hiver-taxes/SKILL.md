@@ -66,7 +66,7 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   securite-routiere.gouv.fr, contours-administratifs.s3.rbx.io.cloud.ovh.net (bloqué au conteneur), ris.bka.gv.at.
 - Taxes PL régionales (phase 5h, `hgv-tolls.js`) : `data/taxes-pl.json` dans `APP_FILES` ; chaque taxe a `start`,
   `status`, `url` officielle, `bbox`, `roads` (références `roadRefs` des étapes ORS), `area` (contour de la collectivité : Bas-Rhin et Haut-Rhin, IGN Admin
-  Express COG 2018, Licence Ouverte, via gregoiredavid/france-geojson, simplifié à 150 m ; toute route de la taxe doit
+  Express COG 2026 (v50, WFS Géoplateforme, Licence Ouverte), simplifié à 150 m ; toute route de la taxe doit
   y être : plus de D 83 de Belfort, v28), `roadBoxes` (cadre propre à une route : D83 et N83 entre Colmar et Sélestat
   seulement, la D 83 d'OSM allant de Cernay à Erstein ; limite de la concession de l'A36 à vérifier), `scope` (réseau
   officiel),
@@ -99,9 +99,11 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   dans `roads`, hors `*_link`, hors péage PL (`isHgvToll` : `toll:hgv=yes`, ou `toll=yes` sans `toll:hgv=no` ;
   sections concédées exclues sans liste à la main : A355, A36 vers Belfort, A31 au sud de Toul) ; cadre ECPL = Grand
   Est entier (3,38–8,24° E, 47,42–50,17° N : RN44 et RN4 dans la Marne) ; segments gardés si leur milieu est dans le périmètre (`pointInTax` : `bbox`, `area`,
-  `exclude` — Eurométropole de Strasbourg, 33 communes ; Alsace pour l'ECPL —, `roadBoxes`, `roadAreas` — RN52 en
-  Meurthe-et-Moselle) ; contours IGN Admin Express COG 2018 (Licence Ouverte, gregoiredavid/france-geojson) dans
-  `data/taxes-pl.json`. Journal : par référence, km avant découpage (cadre seul) puis gardés après découpage (comptés par
+  `exclude` — Eurométropole de Strasbourg (contour de l'EPCI 246700488, 50 m) ; Alsace pour l'ECPL —, `roadBoxes`,
+  `roadAreas` — RN52 en Meurthe-et-Moselle) ; contours IGN Admin Express COG 2026 (v50 ; Action « Contours IGN » :
+  `tools/contours-ign.mjs` → `data/contours-ign.json`, puis `tools/taxes-contours.mjs` en local) dans
+  `data/taxes-pl.json`. Non-régression obligatoire avant tout changement de contours : `tests/taxes-contours.test.js`
+  (résultats figés `tests/fixtures/taxes-5hter-attendu.json`) ; un résultat qui change → contours non remplacés. Journal : par référence, km avant découpage (cadre seul) puis gardés après découpage (comptés par
   l'appli) et exclus pour péage (sens unique compté pour moitié), répartition `toll` / `toll:hgv` de l'A31 au sud de
   48,65° N (`TOLL_BREAKDOWN`), total
   ECPL comparé aux 525 km annoncés. Appli : point du tracé tous les 50 m, ≤ 15 m d'un segment (graphe ORS = nœuds OSM ;

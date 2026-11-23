@@ -72,7 +72,7 @@ export function convertTollNetwork(ways, data, { updated = null } = {}) {
   const out = {
     source: 'OpenStreetMap (extrait Geofabrik France) : routes portant une référence du réseau des taxes PL régionales, hors bretelles et hors péage poids lourd (toll:hgv=yes, ou toll=yes sans toll:hgv=no)',
     license: 'ODbL, © contributeurs OpenStreetMap',
-    contours: 'IGN Admin Express COG 2018, Licence Ouverte (data/taxes-pl.json)',
+    contours: 'IGN Admin Express COG 2026, Licence Ouverte (data/taxes-pl.json)',
     updated,
     taxes: {},
   };

@@ -445,8 +445,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     tracé et repères effacés. Code 2009 : une requête de diagnostic sans les restrictions du profil (budget de 3),
     message « peut-être joignable seulement en franchissant une limite… », jamais affichée ni guidée ; échec aussi sans
     restrictions → « rue sans sortie possible pour le camion ». Diagnostic : version demandée au service worker.
-  - [ ] **Contours Admin Express à jour** (millésime récent, site IGN) : remplacer les contours COG 2018 de
-    `data/taxes-pl.json` (Alsace, Eurométropole, Grand Est, Meurthe-et-Moselle).
+  - [x] **Contours Admin Express à jour** (millésime récent, site IGN) : remplacer les contours COG 2018 de
+    `data/taxes-pl.json` (Alsace, Eurométropole, Grand Est, Meurthe-et-Moselle). Fait en v50 : Admin Express COG 2026
+    (édition du 1/01/2026, WFS de la Géoplateforme, lu par l'Action « Contours IGN » le 23/11/2026), simplifiés à
+    150 m (50 m pour l'Eurométropole, contour de l'EPCI) ; `data/taxes-pl.json` 186 672 → 153 108 octets ; résultats
+    de la 5h ter identiques (test de non-régression figé avant le remplacement) ; statut « annoncée » inchangé.
   - [x] **Taxes PL : péage autrichien** (fait en v49) : champ « Essieux » du profil (non précisé par défaut : les deux
     cas ; 2, 3, 4, 5 et plus), montré tant qu'un montant en dépend ; GO-Maut ASFINAG 2026 (PDF texte et page HTML lus
     le 23/11/2026, sommes des composantes vérifiées) : taux du profil et estimation sur les km à péage, « à vérifier »,
