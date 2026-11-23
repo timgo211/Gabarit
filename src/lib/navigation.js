@@ -22,6 +22,7 @@ import { prepareGuidanceBorders, guidanceBorder } from './country-rules.js';
 import { localAlongRoute, guidanceLocal } from './access-local.js';
 import { conditionalAlongRoute, guidanceConditional } from './access-conditional.js';
 import { countriesAlongRoute } from './countries.js';
+import { speedLimitsAlongRoute, limitAt } from './speed-limit.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -181,6 +182,15 @@ function placeAccess(rules, route, now) {
 }
 
 /**
+ * Limitations de vitesse du tracé (phase 11a, copie data/vitesses-osm/ des cases du trajet) : calculées une fois par
+ * itinéraire (au départ, au recalcul, à l'arrivée d'une case), jamais à chaque position.
+ */
+function placeSpeeds(ctx, rules, route) {
+  if (!ctx?.data?.ways?.length || !rules?.vehicle) return null;
+  return speedLimitsAlongRoute(route, ctx.data, { vehicle: rules.vehicle, countries: rules.countries ?? null });
+}
+
+/**
  * Démarre le guidage.
  * @param {object} route itinéraire lu par parseDirections
  * @param {{ destination?:number[]|null, now?:number, areas?:object[]|null, announceAreas?:boolean,
@@ -190,13 +200,21 @@ function placeAccess(rules, route, now) {
  *   rules (phase 5) : profil véhicule et ZFE (parseZfeData) pour les alertes ZFE et interdictions PL, voice :
  *   alertes dites à voix haute (réglage, activé par défaut) ;
  *   driving (phase 5, PR B) : décompte du temps de conduite lu sur l'appareil (driving-time.js), driveVoice : annonces
- *   des pauses ; wind : prévisions Open-Meteo (parseWind) ou null, windGust : seuil de rafales (km/h), windVoice
+ *   des pauses ; wind : prévisions Open-Meteo (parseWind) ou null, windGust : seuil de rafales (km/h), windVoice ;
+ *   speeds (phase 11a) : { data:mergeSpeedTiles|null, voice:boolean } — limitations de vitesse, voice : « Limite X »
+ *   dit au dépassement (réglage, désactivé par défaut ; étiquette OSM de la voie sans conditions seulement)
  */
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
-  driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true,
+  driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null,
 } = {}) {
+  const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
   return {
+    speedCtx,
+    speedLimits: placeSpeeds(speedCtx, rules, route),
+    speedCursor: 0,
+    speedOver: false,
+    speedAnnounced: -1,
     driving: driving ?? emptyDriving(),
     driveVoice: driveVoice !== false,
     wind: prepareGuidanceWind(wind, route, windGust),
@@ -406,6 +424,23 @@ export function updateNavigation(state, fix) {
     }
   }
 
+  // Limitation de vitesse (phase 11a) : limite connue du tronçon (affichage), dépassement visuel ; « Limite X » dit
+  // seulement si le réglage est activé, au passage en dépassement, une fois par tronçon, pour une étiquette OSM de la
+  // voie sans conditions (jamais une règle générale). Hors du tracé ou arrivé : inconnue.
+  let speedLimit = null;
+  if (s.speedLimits && onRoute && !s.arrived) {
+    const sl = limitAt(s.speedLimits, loc.along, s.speedCursor);
+    s.speedCursor = sl.cursor;
+    speedLimit = sl.limit;
+  }
+  const over = speedLimit !== null && Math.round(speed * 3.6) > speedLimit.kmh;
+  if (over && !s.speedOver && s.speedCtx?.voice && speedLimit.source === 'osm' && !speedLimit.cond
+    && s.speedAnnounced !== s.speedCursor && !s.rerouting) {
+    s.speedAnnounced = s.speedCursor;
+    events.push({ type: 'speak', text: `Limite ${speedLimit.kmh}.` });
+  }
+  s.speedOver = over;
+
   // Vent fort (phase 5, PR B) : rafales au-dessus du seuil devant, à l'heure où on y sera. Affichage et voix.
   const w = guidanceWind(s.wind, {
     along: loc.along, now: t, timeTo: (al) => remainingDuration(s.route, loc.along) - remainingDuration(s.route, al),
@@ -430,6 +465,9 @@ export function updateNavigation(state, fix) {
     zoom: zoomForSpeed(speed * 3.6),
     pitch: NAV.PITCH,
     speedKmh: speed * 3.6,
+    /** Limitation de vitesse PL connue du tronçon (km/h) ou null (phase 11a) ; source 'osm' | 'rule'. */
+    speedLimit: speedLimit?.kmh ?? null,
+    speedLimitSource: speedLimit?.source ?? null,
     /**
      * Vitesse pour les boutons réservés à l'arrêt (km/h) : vitesse du GPS, sinon déduite des deux dernières
      * positions (dérive sous max(précision, 5 m) = 0) ; null si inconnue (= en mouvement).
@@ -589,6 +627,13 @@ export function setNavigationCountries(state, countries) {
   return { ...state, rules, borders: placeBorders(rules, state.source) };
 }
 
+/** Cases de data/vitesses-osm/ arrivées ou complétées après « Démarrer » (phase 11a) : limites recalculées sur le tracé. */
+export function setNavigationSpeeds(state, data) {
+  if (!state) return state;
+  const speedCtx = { ...(state.speedCtx ?? { voice: false }), data: data ?? null };
+  return { ...state, speedCtx, speedLimits: placeSpeeds(speedCtx, state.rules, state.source), speedCursor: 0 };
+}
+
 /** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
 export function setNavigationWind(state, forecast) {
   if (!state) return state;
@@ -620,6 +665,10 @@ export function rerouteDone(state, route) {
     local: placeLocal(state.rules, route),
     access: placeAccess(state.rules, route, state.lastFixAt ?? state.startedAt),
     wind: state.wind ? { ...state.wind, placed: placeWind(state.wind.forecast, route) } : state.wind,
+    speedLimits: placeSpeeds(state.speedCtx, state.rules, route),
+    speedCursor: 0,
+    speedOver: false,
+    speedAnnounced: -1,
     segIndex: null,
     along: 0,
     announced: {},

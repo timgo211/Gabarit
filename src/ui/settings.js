@@ -52,6 +52,7 @@ export function createSettings(ctx) {
   const bridgeWarnings = $('#bridge-warnings');
   const weightWarnings = $('#weight-warnings');
   const windVoice = $('#wind-voice');
+  const speedVoice = $('#speed-voice');
   const windGust = $('#wind-gust');
   const windStatus = $('#wind-status');
   const drivingStatus = $('#driving-status');
@@ -114,6 +115,7 @@ export function createSettings(ctx) {
     bridgeWarnings.checked = settings.bridgeWarnings !== false;
     weightWarnings.checked = settings.weightWarnings !== false;
     windVoice.checked = settings.windVoice;
+    speedVoice.checked = settings.speedVoice === true;
     windGust.value = String(settings.windGust);
     fillVoices(settings.voiceName);
     voiceRate.value = String(settings.voiceRate);
@@ -230,6 +232,7 @@ export function createSettings(ctx) {
   bridgeWarnings.addEventListener('change', () => ctx.onBridgeWarningsChange?.(bridgeWarnings.checked));
   weightWarnings.addEventListener('change', () => ctx.onWeightWarningsChange?.(weightWarnings.checked));
   windVoice.addEventListener('change', () => ctx.onWindVoiceChange?.(windVoice.checked));
+  speedVoice.addEventListener('change', () => ctx.onSpeedVoiceChange?.(speedVoice.checked));
   $('#btn-wind-save').addEventListener('click', () => {
     const g = sanitizeWindGust(windGust.value);
     windGust.value = String(g);

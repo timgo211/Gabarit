@@ -198,7 +198,7 @@ export function buttonColumn({ height, minTop = 0, maxBottom = null, count }) {
 /**
  * Compteur de vitesse : chiffre, panneau seulement si la limite PL de la route est connue, dépassement.
  * @param {number|null} kmh
- * @param {number|null} limitKmh limite PL connue (aucune source avant la phase 11 : null)
+ * @param {number|null} limitKmh limite PL connue du tronçon (phase 11a, speed-limit.js) ou null (aucun panneau)
  */
 export function speedStatus(kmh, limitKmh = null) {
   const v = Number.isFinite(kmh) && kmh >= 0 ? Math.round(kmh) : null;
