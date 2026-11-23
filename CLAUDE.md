@@ -71,6 +71,8 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
 - ORS : `bearings` n'est accepté que pour les profils vélo (pas de cap imposé au recalcul camion).
   Quota gratuit : 2 000 itinéraires/jour (dépassé → HTTP 403), 40/min (→ 429) ; recalcul au plus toutes les 30 s.
 - Chrome n'autorise la voix qu'après une action de l'utilisateur : première phrase dans le geste « Démarrer ».
+- Repère du véhicule (v45, `src/ui/vehicle-icon.js`) : camion vu de dessus par défaut (dessin maison, jamais un logo ni
+  une icône copiée) ou flèche (`settings.vehicleIcon`) ; même taille, même centre, couleurs `--arrow-*`.
 - Itinéraires alternatifs (`route-options.js`) : 3 requêtes ORS au plus par calcul. Le Recommandé est toujours la
   première fiche et la référence des écarts (préférence d'ORS, sauf choix A/N ci-dessous → « Préférence ORS »). `alternative_routes` (`target_count` ≤ 3,
   2 points seulement) uniquement si départ–arrivée ≤ 100 km **à vol d'oiseau** (ORS mesure ainsi, sinon erreur 2004) ;
