@@ -50,6 +50,15 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
     `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
     api.openstreetmap.org bloqué ; id 243477938 du constat)
+  - phase 11a : `speed-convert.js` (Action : voies motorway à tertiary et bretelles avec `maxspeed:hgv` / `maxspeed`
+    en km/h, sens → la plus basse, drapeau conditions, voies mises bout à bout, `data/vitesses-osm/` mêmes cases que
+    les ponts, 5 Mo / 40 Mo, 3 → 8 → 20 m, puis copie réduite, sinon rien), `speed-rules.js` (règles générales PL :
+    `FR_SPEED_RULES` vérifiées sur le Code de la route ou vides ; autres pays : `speeds.bands` des fiches ; voie rapide
+    = la plus basse), `speed-limit.js` (appli : intervalles le long du tracé, 5 m, 15 m, cap modulo 180°, voie la plus
+    proche puis la plus basse, `limitAt` à curseur, couverture, `speedRules` : ligne de fiche et ligne technique) ; UI
+    `src/ui/speed-limits.js` (`createTileCopy`) ; moteur : `startNavigation({ speeds })`, `setNavigationSpeeds`,
+    `view.speedLimit` / `speedLimitSource` ; fixture **synthétique** `osm-vitesses-colombier.geojsonseq` ; tests
+    `tests/speed.test.js`
   - phase 12a bis : `weight-convert.js` (Action : voies maxweight / maxweight:hgv en tonnes, drapeau desserte
     hgv=destination|delivery ou maxweight:conditional, mêmes filtrage osmium et cases de 1° que les ponts,
     `data/poids-osm/`, 5 Mo / 30 Mo, simplification 3 → 8 → 20 m si trop gros, chemin 190520091 écrit dans le journal),
@@ -121,7 +130,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   phase 12a : ponts de l'extrait France (filtrage osmium à part, `filterBridges`) dans `data/ponts-osm/`, écrits
   seulement dans les limites de taille (sinon ancienne copie gardée, journal « ⚠ data/ponts-osm/ non modifié ») ;
   phase 12a bis : limites de poids dans le même filtrage (`data/poids-osm/`, « ⚠ data/poids-osm/ non modifié » si trop
-  gros) ; l'étape « Enregistrer » n'ajoute que les chemins qui existent (une copie absente ne bloque pas les autres)
+  gros) ; phase 11a : limitations de vitesse dans le même filtrage (`data/vitesses-osm/`, copie complète puis réduite,
+  « ⚠ data/vitesses-osm/ non modifié » si trop gros) ; case manuelle « r413 » : lecture du Code de la route,
+  art. R413-1 à R413-10, dans le journal (pour `speed-rules.js`) ; l'étape « Enregistrer » n'ajoute que les chemins qui existent (une copie absente ne bloque pas les autres)
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
   branche) de la liste Sécurité routière (xlsx du 22/10/2022) et des contours 2022 (2021 en secours) dans

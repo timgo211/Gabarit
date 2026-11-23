@@ -27,6 +27,7 @@ import { parseTollData } from '../src/lib/hgv-tolls.js';
 import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/lib/bridges-convert.js';
 import { BRIDGE } from '../src/lib/bridge-check.js';
 import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
+import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
 import { sunTimes } from '../src/lib/sun.js';
 import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
@@ -131,7 +132,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -301,6 +302,15 @@ async function open(browser, base, {
     const name = new URL(route.request().url()).pathname.split('/').pop();
     stats.weights = [...(stats.weights ?? []), name];
     const json = weightFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
+  // Phase 11a : copie data/vitesses-osm/ (null, par défaut : absente, 404 ; 'fixture' : voies de
+  // tests/fixtures/osm-vitesses-colombier.geojsonseq passées par les fonctions de l'Action).
+  const speedFiles = speedsCopyFiles(speedsCopy);
+  await ctx.route(/\/data\/vitesses-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.speeds = [...(stats.speeds ?? []), name];
+    const json = speedFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
   const page = await ctx.newPage();
@@ -2525,6 +2535,86 @@ async function weightsCheck(browser, base) {
   await none.ctx.close();
 }
 
+/** Fichiers de la copie des limitations de vitesse simulée (nom → JSON), d'après les fonctions de l'Action (phase 11a). */
+function speedsCopyFiles(kind) {
+  if (!kind) return null;
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-vitesses-colombier.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).filter(Boolean);
+  const { index, tiles } = convertSpeeds(feats.map(speedFromFeature).filter(Boolean),
+    { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * Phase 11a : limitations de vitesse. Itinéraire synthétique de Colombier, copie data/vitesses-osm/ construite par les
+ * fonctions de l'Action (Rue du Viaduc à 50, puis 90, voie rapide maxspeed:hgv 70 avec condition, A 36 à 130).
+ * Fourgon de 3,5 t (étiquettes maxspeed sans plafond, indépendant des règles françaises) : fiche « Limites de vitesse
+ * connues », réglage et texte fixe, guidage avec le GPS émulé à 40 km/h (panneau 50) puis 70 km/h (dépassement :
+ * compteur en alerte, rien dit par défaut), réglage activé → « Limite 50 » une fois. Sans copie : aucun panneau,
+ * « inconnues ». 412×900 jour, 900×412 nuit, 360×760 nuit, 1280×800 jour.
+ */
+async function speedsCheck(browser, base) {
+  const col = fixture('ors-directions-colombier.json');
+  const line = col.features[0].geometry.coordinates;
+  const van = { id: 'v1', name: 'Fourgon 3,5 t', height: 2.8, width: 2.1, length: 6, weight: 3.5, axleload: 2, maxSpeed: 110 };
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [360, 760, 'night'], [1280, 800, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    for (const voiceOn of width === 412 ? [false, true] : [false]) {
+      const { page, ctx, errors, stats } = await open(browser, base, {
+        width, height, theme, voice: true, vehicle: van, directions: () => col, overpass: () => ({ elements: [] }),
+        speedsCopy: 'fixture', settings: voiceOn ? { speedVoice: true } : null,
+      });
+      await computeRoute(page);
+      await page.waitForFunction(() => /Limites de vitesse connues : \d+ %/.test(document.querySelector('.route-card[aria-checked="true"]')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+      const cardText = (await page.textContent('.route-card[aria-checked="true"] .route-card-speed').catch(() => '')) ?? '';
+      check(/^Limites de vitesse connues : \d+ % du trajet$/.test(cardText.trim()), `${tag} : ligne « Limites de vitesse connues » sur la fiche`, cardText);
+      check((stats.speeds ?? []).includes('index.json') && (stats.speeds ?? []).includes('6_47.json'), `${tag} : copie data/vitesses-osm/ lue`, (stats.speeds ?? []).join(','));
+      await page.locator('.route-diag summary').click();
+      await page.waitForFunction(() => /Limites de vitesse : \d+ %/.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+      check(/Limites de vitesse : \d+ % \(OSM \d+ %/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique des limites de vitesse`);
+      await noHorizontalScroll(page, `${tag} limites de vitesse`);
+      if (!voiceOn) {
+        await page.click('#btn-settings');
+        await page.waitForSelector('#speed-voice');
+        check(!(await page.isChecked('#speed-voice')), `${tag} : « Annoncer les dépassements de limite » désactivé par défaut`);
+        check((await page.textContent('#speed-hint')).trim() === "Limites d'après OpenStreetMap et règles générales : la signalisation fait foi.", `${tag} : texte fixe dans Réglages`);
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(300);
+      }
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await page.waitForTimeout(800);
+      await drive(ctx, page, line, 40, 4);
+      const lim = await page.evaluate(() => ({ hidden: document.querySelector('#nav-limit').hidden, text: document.querySelector('#nav-limit').textContent, over: document.querySelector('#nav-speedo').classList.contains('over') }));
+      check(!lim.hidden && lim.text === '50' && !lim.over, `${tag} : panneau 50 à 40 km/h, pas de dépassement`, JSON.stringify(lim));
+      const colors = await page.evaluate(() => { const cs = getComputedStyle(document.querySelector('#nav-limit')); return [cs.backgroundColor, cs.borderTopColor, cs.color]; });
+      check(colors.join() === 'rgb(255, 255, 255),rgb(200, 16, 46),rgb(0, 0, 0)', `${tag} : couleurs réglementaires du panneau`, colors.join(' '));
+      await drive(ctx, page, line.slice(2), 70, 4);
+      const ov = await page.evaluate(() => ({ text: document.querySelector('#nav-limit').textContent, over: document.querySelector('#nav-speedo').classList.contains('over'), border: getComputedStyle(document.querySelector('.nav-speed-pill')).borderTopWidth }));
+      check(ov.text === '50' && ov.over && ov.border === '4px', `${tag} : dépassement à 70 km/h (compteur en alerte)`, JSON.stringify(ov));
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-vitesse${voiceOn ? '-voix' : ''}.png`) });
+      const spoken = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /^Limite/.test(t));
+      if (voiceOn) check(spoken.length === 1 && spoken[0] === 'Limite 50.', `${tag} : réglage activé → « Limite 50 » dit une fois`, spoken.join(' | '));
+      else check(spoken.length === 0, `${tag} : rien dit par défaut`, spoken.join(' | '));
+      check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+  }
+  // Sans copie : fiche « inconnues », aucun panneau en guidage.
+  const none = await open(browser, base, { width: 412, height: 900, vehicle: van, directions: () => col, overpass: () => ({ elements: [] }) });
+  await computeRoute(none.page);
+  await none.page.waitForTimeout(800);
+  check(/inconnues \(copie OpenStreetMap absente\)/.test(await none.page.textContent('.route-card[aria-checked="true"]')), 'copie absente → « inconnues » sur la fiche');
+  await setGeo(none.page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+  await none.page.click('#btn-nav-start');
+  await none.page.waitForSelector('#nav:not([hidden])');
+  await drive(none.ctx, none.page, line, 70, 3);
+  check(await none.page.evaluate(() => document.querySelector('#nav-limit').hidden), 'copie absente → aucun panneau de limitation');
+  await none.ctx.close();
+}
+
 /**
  * Phase 12b : Mes restrictions. « Éviter ce passage » depuis le repère du viaduc de Colombier (point de croisement),
  * liste dans Réglages, recalcul avec avoid_polygons et « Évite 1 restriction saisie par toi », échec 2009 avec la
@@ -3483,7 +3573,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck,
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, camion: truckIconCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;

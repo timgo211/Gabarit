@@ -64,6 +64,10 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
 - Limites de poids (12a bis, `weight-check.js`, copie `data/poids-osm/` des mêmes Action et cases que les ponts, jamais
   précachée, 5 Mo par fichier / 30 Mo en tout) : tronçon suivi (15 m, cap modulo 180°, jamais un croisement) dont la
   limite est < PTAC ; fiche et carte à l'arrêt seulement, jamais dit ni dans le guidage ; « à vérifier ».
+- Limitation de vitesse (11a, `speed-limit.js`, copie `data/vitesses-osm/` mêmes Action et cases, jamais précachée,
+  5 Mo / 40 Mo, copie réduite au-delà) : `maxspeed:hgv`, sinon `maxspeed` plafonné par la règle PL vérifiée
+  (`speed-rules.js`), sinon inconnue (aucun panneau, rien d'inventé ; agglomération jamais déduite). Calculée une fois
+  par itinéraire. Alerte visuelle ; « Limite X » dit seulement si `settings.speedVoice` (non par défaut) et étiquette OSM.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation).
 - « Autres itinéraires » (v44, `openAlternatives` d'`app.js`, panneau `#nav-alts`) : seulement à l'arrêt (`parkedState`),
   depuis la dernière position reçue vers l'arrivée, profil actif, même calcul que le départ (`fetchRouteOptions`,
