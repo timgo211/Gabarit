@@ -457,6 +457,21 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   et la fiche le dit, « à vérifier ». Fiche : « Évite N restrictions saisies par toi » ; échec : « Une restriction saisie
   bloque peut-être le seul passage. » Rien dans le guidage ni dans la voix.
 
+- [x] **Phase 12a bis — Limites de poids d'après OSM** (v42)
+  L'Action « Données OSM » copie aussi, pour la France, les tronçons routiers portant maxweight ou maxweight:hgv en
+  tonnes (valeurs illisibles ignorées ; drapeau « desserte possible » si hgv=destination|delivery ou
+  maxweight:conditional), dans le même filtrage et les mêmes cases que les ponts (`data/poids-osm/`, 5 Mo par fichier
+  et 30 Mo en tout au plus, simplification 3 m puis 8 m puis 20 m si trop gros ; lus par cases du trajet, jamais
+  précachés). Tronçon suivi par le tracé (15 m, cap modulo 180°, jamais un croisement) dont la limite est inférieure
+  au PTAC du profil (panneau B13) : fiche (5 au plus + « +N ») et repère « 3,5 t » à l'arrêt seulement, jamais dit ni
+  dans le guidage : « Limite de poids de X t d'après OpenStreetMap, que le calcul n'a peut-être pas prise en compte :
+  à vérifier. La signalisation fait foi. » (variante « desserte locale possible »). Réglage « Signaler les limites de
+  poids » (activé). « Éviter ce passage » : restriction de poids au point du tracé (comme la 12b). Ligne technique
+  « Limites de poids : N ». Rue du Viaduc (chemin 190520091) : étiquettes non lisibles depuis le conteneur, fixture
+  synthétique ; le journal de l'Action les écrit. En plus : test instable corrigé (simplification des aires bornée en
+  temps d'horloge → bornée en travail) ; ✘ « nav-toast » du scénario `guidage` à 412×900 dû à l'environnement
+  (wake lock refusée par Chromium sans écran).
+
 - [ ] **Phase 12 TomTom / HERE : abandonnée (conditions d'usage)** — TomTom §11.6.10 et HERE Platform Terms art. 3.c
   interdisent de comparer leur service à ORS et de guider avec leur tracé. Ticket TomTom CS0017293 ouvert pour un accord
   écrit ; sans réponse positive, rien n'est branché (branche claude/kind-newton-a6agfs laissée telle quelle).

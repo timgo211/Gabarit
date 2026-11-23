@@ -55,14 +55,17 @@ test('simplification : extrémités gardées, ligne droite réduite à 2 points,
   assert.deepEqual(simplifyLine(straight, 20), [straight[0], straight[49]]);
   // ≈ 900 km de route sinueuse, un point tous les 30 m (tracé ORS dense).
   const zigzag = Array.from({ length: 30000 }, (_, i) => [-1 + i * 0.0004, 46 + 0.05 * Math.sin(i / 40)]);
-  const t0 = Date.now();
-  const { line, tolerance } = queryLine(zigzag);
+  // Travail mesuré en distances calculées, pas en temps d'horloge : la limite de 3 s échouait sous charge (3,3 s
+  // quand node --test tourne en parallèle avec d'autres processus, 1 échec sur 12 exécutions), pour ≈ 0,4 s au calme.
+  const stats = {};
+  const { line, tolerance } = queryLine(zigzag, { stats });
   assert.ok(line.length <= AREAS_OSM.MAX_POINTS);
   assert.deepEqual(line[0], zigzag[0]);
   assert.deepEqual(line.at(-1), zigzag.at(-1));
   assert.ok(tolerance > 0);
   assert.ok(buildOverpassQuery(zigzag).length < 30000);
-  assert.ok(Date.now() - t0 < 3000, `simplification trop lente : ${Date.now() - t0} ms`);
+  // 11,9 millions de distances pour les 5 tolérances (≈ 0,4 s au calme) : borne à 15 millions.
+  assert.ok(stats.steps > 0 && stats.steps <= 15e6, `simplification trop coûteuse : ${stats.steps} distances`);
 });
 
 test('plusieurs itinéraires en une seule ligne, sans segment inventé (B parcouru à l\'envers)', () => {

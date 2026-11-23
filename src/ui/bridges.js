@@ -14,13 +14,23 @@ const EMPTY = Object.freeze({ bridges: [], clearances: [] });
  *   uncovered:boolean })=>void }} p
  */
 export function createBridges({ onChange }) {
+  return createTileCopy({
+    indexPath: BRIDGES.INDEX_PATH, dir: BRIDGES.DIR, parse: parseBridgeTile, merge: mergeBridgeTiles, empty: EMPTY, onChange,
+  });
+}
+
+/**
+ * Copie OSM lue par cases de 1° (data/ponts-osm/, data/poids-osm/ de la phase 12a bis) : index.json puis les cases
+ * touchées par les itinéraires, une seule lecture par case, jamais dans le précache.
+ */
+export function createTileCopy({ indexPath, dir, parse, merge, empty, onChange }) {
   let indexPromise = null;
   const tilePromises = new Map();
-  let state = { status: 'idle', data: EMPTY, updated: null, uncovered: false };
+  let state = { status: 'idle', data: empty, updated: null, uncovered: false };
   let ticket = 0;
 
   const getIndex = () => {
-    indexPromise ??= fetch(BRIDGES.INDEX_PATH, { cache: 'no-cache' })
+    indexPromise ??= fetch(indexPath, { cache: 'no-cache' })
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => parseIndex(j))
       .catch(() => null);
@@ -28,9 +38,9 @@ export function createBridges({ onChange }) {
   };
   const getTile = (key) => {
     if (!tilePromises.has(key)) {
-      tilePromises.set(key, fetch(`${BRIDGES.DIR}${key}.json`, { cache: 'no-cache' })
+      tilePromises.set(key, fetch(`${dir}${key}.json`, { cache: 'no-cache' })
         .then((r) => (r.ok ? r.json() : null))
-        .then((j) => parseBridgeTile(j))
+        .then((j) => parse(j))
         .catch(() => null));
     }
     return tilePromises.get(key);
@@ -51,20 +61,20 @@ export function createBridges({ onChange }) {
     /** Cases touchées par tous les itinéraires proposés (un seul chargement par case). */
     async load(routes) {
       const my = ++ticket;
-      set({ status: 'loading', data: EMPTY, updated: null, uncovered: false });
+      set({ status: 'loading', data: empty, updated: null, uncovered: false });
       const r = await read(routes);
       if (my !== ticket) return;
-      if (!r || r.failed) { set({ status: 'failed', data: EMPTY, updated: r?.updated ?? null, uncovered: false }); return; }
-      set({ status: 'ok', data: mergeBridgeTiles(r.tiles), updated: r.updated, uncovered: r.uncovered });
+      if (!r || r.failed) { set({ status: 'failed', data: empty, updated: r?.updated ?? null, uncovered: false }); return; }
+      set({ status: 'ok', data: merge(r.tiles), updated: r.updated, uncovered: r.uncovered });
     },
     /** Itinéraire ajouté (« Éviter », recalcul) : cases manquantes ajoutées. */
     async extend(route) {
       if (state.status !== 'ok') return;
       const r = await read([route]);
       if (!r || r.failed || state.status !== 'ok') return;
-      const merged = mergeBridgeTiles([state.data, ...r.tiles]);
+      const merged = merge([state.data, ...r.tiles]);
       set({ ...state, data: merged, uncovered: state.uncovered || r.uncovered });
     },
-    clear() { ticket += 1; state = { status: 'idle', data: EMPTY, updated: null, uncovered: false }; },
+    clear() { ticket += 1; state = { status: 'idle', data: empty, updated: null, uncovered: false }; },
   };
 }

@@ -26,6 +26,7 @@ import { convertTollNetwork } from '../src/lib/hgv-tolls-convert.js';
 import { parseTollData } from '../src/lib/hgv-tolls.js';
 import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/lib/bridges-convert.js';
 import { BRIDGE } from '../src/lib/bridge-check.js';
+import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
 import { sunTimes } from '../src/lib/sun.js';
 import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
@@ -130,7 +131,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null, restrictions = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -292,6 +293,16 @@ async function open(browser, base, {
     const json = bridgeFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 12a bis : copie data/poids-osm/ (null, par défaut : absente, 404, même quand l'Action a écrit la vraie copie
+  // dans le dépôt ; 'fixture' : tronçons de tests/fixtures/osm-poids-colombier.geojsonseq passés par les fonctions de
+  // l'Action).
+  const weightFiles = weightsCopyFiles(weightsCopy);
+  await ctx.route(/\/data\/poids-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.weights = [...(stats.weights ?? []), name];
+    const json = weightFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -335,6 +346,17 @@ function bridgesCopyFiles(kind) {
   const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-ponts-colombier.geojsonseq'), 'utf8').split('\n')
     .map(parseGeojsonLine).filter(Boolean);
   const { index, tiles } = convertBridges(feats.map(bridgeFromFeature).filter(Boolean), feats.map(clearanceFromFeature).filter(Boolean),
+    { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/** Fichiers de la copie des limites de poids simulée (nom → JSON), d'après les fonctions de l'Action (phase 12a bis). */
+function weightsCopyFiles(kind) {
+  if (!kind) return null;
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-poids-colombier.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).filter(Boolean);
+  const { index, tiles } = convertWeights(feats.map(weightFromFeature).filter(Boolean),
     { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
 }
@@ -2229,6 +2251,82 @@ async function bridgesCheck(browser, base) {
 }
 
 /**
+ * Phase 12a bis : limites de poids d'OSM sur l'itinéraire synthétique de Colombier (fixture osm-poids-colombier,
+ * SYNTHÉTIQUE). Fiche (3 lignes « à vérifier », desserte possible), résumé, repères « 3,5 t », ligne technique,
+ * repère touché → panneau et « Éviter ce passage » (restriction de poids), guidage : aucun repère, rien à l'écran ni à
+ * voix haute ; réglage désactivé ; copie absente. 412×900 jour, 900×412 nuit, 360×760 nuit.
+ */
+async function weightsCheck(browser, base) {
+  const col = fixture('ors-directions-colombier.json');
+  const line = col.features[0].geometry.coordinates;
+  const T35 = "Limite de poids de 3,5 t d'après OpenStreetMap, que le calcul n'a peut-être pas prise en compte : à vérifier. La signalisation fait foi.";
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [360, 760, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => col, overpass: () => ({ elements: [] }), weightsCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForFunction((t) => (document.querySelector('#route-notes')?.textContent ?? '').includes(t), T35, { timeout: 10000 }).catch(() => {});
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    const lines = notes.filter((n) => n.text.startsWith('Limite de poids de '));
+    check(lines.length === 3 && lines.every((l) => l.cls === 'warn'), `${tag} : 3 limites de poids sur la fiche`, lines.map((l) => l.text).join(' | '));
+    check(lines[0]?.text === `${T35} (km 1)`, `${tag} : Rue du Viaduc 3,5 t, texte exact`, lines[0]?.text);
+    check(/12 t d'après OpenStreetMap \(desserte locale possible\)/.test(lines[1]?.text ?? ''), `${tag} : variante « desserte locale possible »`);
+    check(!notes.some((n) => /7,5 t|50 t/.test(n.text)), `${tag} : route qui croise et limite au-dessus du PTAC ignorées`);
+    check(/3 limites de poids à vérifier/.test(await page.textContent('.route-card[aria-checked="true"]')), `${tag} : résumé de la fiche`);
+    const markers = await page.locator('.bridge-marker.weight-marker').count();
+    check(markers === 3, `${tag} : 3 repères de limite de poids à l'arrêt`, String(markers));
+    check(/^3,5 t$/.test((await page.locator('.weight-marker').first().textContent()).trim()), `${tag} : repère « 3,5 t »`);
+    check((stats.weights ?? []).includes('index.json') && (stats.weights ?? []).includes('6_47.json'), `${tag} : copie data/poids-osm/ lue`, (stats.weights ?? []).join(','));
+    await page.locator('.route-diag summary').click();
+    await page.waitForFunction(() => /Limites de poids : /.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check(/Limites de poids : 3/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique « Limites de poids : 3 »`);
+    // Repère touché : panneau (texte, aide), « Éviter ce passage » → restriction de poids au point du tracé.
+    await page.locator('.weight-marker').first().click({ force: true });
+    await page.waitForSelector('#bridge-panel:not([hidden])', { timeout: 5000 }).catch(() => {});
+    check(/^Limite de poids de 3,5 t .*La signalisation fait foi\. \(km 1\)$/.test(await page.textContent('#bridge-panel-text')), `${tag} : repère touché → texte de la limite`);
+    check(/restriction de poids/.test(await page.textContent('#bridge-panel-help')), `${tag} : aide « Éviter ce passage » (poids)`);
+    await page.click('#btn-bridge-avoid');
+    await page.waitForTimeout(200);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).restrictions);
+    check(stored.length === 1 && stored[0].type === 'weight' && stored[0].value === 3.5 && stored[0].origin === 'osm-weight'
+      && stored[0].osmId === 190520091 && Math.abs(stored[0].lon - line[0][0]) < 1e-6,
+    `${tag} : restriction de poids enregistrée au point du tracé`, JSON.stringify(stored));
+    await noHorizontalScroll(page, `${tag} limites de poids`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-poids.png`) });
+    await page.click('#btn-bridge-close');
+    if (width === 412) {
+      await page.click('#btn-settings');
+      await page.waitForSelector('#weight-warnings');
+      check(await page.isChecked('#weight-warnings'), `${tag} : case « Signaler les limites de poids » cochée par défaut`);
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await page.waitForTimeout(1200);
+      check(await page.locator('.bridge-marker').count() === 0, `${tag} : aucun repère pendant le guidage`);
+      check(!/poids|\d t\b/i.test(await page.textContent('#nav')), `${tag} : rien sur les limites de poids dans l'écran de guidage`);
+      await drive(ctx, page, line, 50, 85);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((t) => /poids|tonne/i.test(t)), `${tag} : aucune limite de poids dite à voix haute`, spoken.join(' | '));
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  const off = await open(browser, base, { width: 412, height: 900, directions: () => col, overpass: () => ({ elements: [] }), weightsCopy: 'fixture', settings: { weightWarnings: false } });
+  await computeRoute(off.page);
+  await off.page.waitForTimeout(800);
+  check(!/Limite de poids de/.test(await off.page.textContent('#route-notes')) && await off.page.locator('.weight-marker').count() === 0, 'réglage désactivé : aucune limite de poids signalée');
+  await off.ctx.close();
+  const none = await open(browser, base, { width: 412, height: 900, directions: () => col, overpass: () => ({ elements: [] }) });
+  await computeRoute(none.page);
+  await none.page.waitForTimeout(800);
+  check(/Limites de poids : données non chargées/.test(await none.page.textContent('#route-notes')), 'copie absente → « données non chargées »');
+  await none.ctx.close();
+}
+
+/**
  * Phase 12b : Mes restrictions. « Éviter ce passage » depuis le repère du viaduc de Colombier (point de croisement),
  * liste dans Réglages, recalcul avec avoid_polygons et « Évite 1 restriction saisie par toi », échec 2009 avec la
  * phrase au conditionnel, rien en guidage, boutons refusés en roulant ; jour / nuit, portrait / paysage.
@@ -3181,7 +3279,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck };
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

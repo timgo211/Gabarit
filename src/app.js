@@ -13,6 +13,7 @@ import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOpt
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
 import { createBridges } from './ui/bridges.js';
+import { createWeightLimits } from './ui/weight-limits.js';
 import { createRestrictions } from './ui/restrictions.js';
 import { restrictionsForTrip, restrictionLines, mergeAvoid } from './lib/restrictions.js';
 import { createWinter } from './ui/winter.js';
@@ -132,6 +133,7 @@ navigation = createNavigation({
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
     access.extend(route); // phase 5d : cases de data/acces-osm/ manquantes pour le nouveau tracé
     bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
+    weightLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
     winter.extend(route); // phase 5f : cases de data/hiver/ manquantes
   },
   onAreaOpen: (id) => areas.openSheet(id),
@@ -217,12 +219,16 @@ const access = createAccess({
 
 // ───────── Ponts sans hauteur connue (phase 12a) : data/ponts-osm/, cases touchées par les itinéraires proposés ─────────
 const bridges = createBridges({ onChange: () => renderChoice() });
-// Repère touché (à l'arrêt) : texte du pont en message, jamais dit à voix haute.
+// Limites de poids d'OSM (phase 12a bis) : data/poids-osm/, mêmes cases que les ponts.
+const weightLimits = createWeightLimits({ onChange: () => renderChoice() });
+// Repère touché (à l'arrêt) : texte du pont ou de la limite de poids, jamais dit à voix haute.
 map.onBridgePick((key) => {
   if (!choice || navigation.active) return;
-  const items = rulesOf(choice.options[choice.selected].route, choice.vehicle, new Date()).bridges?.items ?? [];
-  const it = items.find((x) => bridgeKey(x) === key);
-  if (it) restrictionsUi.openBridge(it); // phase 12b : texte, aide et « Éviter ce passage »
+  const rules = rulesOf(choice.options[choice.selected].route, choice.vehicle, new Date());
+  const it = (rules.bridges?.items ?? []).find((x) => bridgeKey(x) === key);
+  if (it) { restrictionsUi.openBridge(it); return; } // phase 12b : texte, aide et « Éviter ce passage »
+  const w = (rules.weightLimits?.items ?? []).find((x) => weightKey(x) === key);
+  if (w) restrictionsUi.openWeight(w); // phase 12a bis : restriction de poids au point du tracé
 });
 // Mes restrictions (phase 12b) : Réglages et panneau du repère de pont ; ajout à l'arrêt seulement.
 const restrictionsUi = createRestrictions({
@@ -232,6 +238,7 @@ const restrictionsUi = createRestrictions({
   getDrive: () => ({ navigating: navigation.active, parked: navigation.parked }),
 });
 const bridgeKey = (it) => `${it.id}@${Math.round(it.along)}`;
+const weightKey = (it) => `w${it.id}@${Math.round(it.along)}`;
 
 // ───────── Équipements d'hiver (phase 5f) : data/hiver/, cases traversées par les itinéraires proposés ─────────
 const winter = createWinter({ onChange: () => renderChoice() });
@@ -291,15 +298,17 @@ function rulesOf(route, vehicle, departure) {
   const tol = tolls;
   const brg = bridges.state;
   const bw = data.settings.bridgeWarnings !== false;
-  if (hit && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  const wl = weightLimits.state;
+  const ww = data.settings.weightWarnings !== false;
+  if (hit && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
-    bridges: brg, bridgeWarnings: bw,
+    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww,
   });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, rules });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
   return rules;
 }
 
@@ -370,6 +379,7 @@ async function avoidZfe() {
     areas.select(route); // aires déjà trouvées replacées (la requête Overpass couvrait les premiers itinéraires)
     access.extend(route);
     bridges.extend(route);
+    weightLimits.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).banned;
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
@@ -409,6 +419,7 @@ async function avoidTunnel() {
     areas.select(route);
     access.extend(route);
     bridges.extend(route);
+    weightLimits.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
@@ -447,6 +458,7 @@ async function avoidLocal() {
     areas.select(route);
     access.extend(route);
     bridges.extend(route);
+    weightLimits.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).localTransit ?? [];
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans desserte » traverse encore une route réservée à la desserte locale (km ${still.map((p) => Math.round(p.enter / 1000)).join(', ')}). La signalisation fait foi.`, 'info');
@@ -474,13 +486,23 @@ function renderChoice() {
   showBridgesOnMap(rules?.[choice.selected]);
 }
 
-/** Repères des ponts à vérifier de l'itinéraire choisi (phase 12a), à l'arrêt seulement (retirés en guidage). */
+/**
+ * Repères des ponts (phase 12a) et des limites de poids (phase 12a bis) à vérifier de l'itinéraire choisi, à l'arrêt
+ * seulement (retirés en guidage).
+ */
 function showBridgesOnMap(r) {
   const items = r?.bridges?.items ?? [];
-  map.showBridges(items.map((it) => ({
-    key: bridgeKey(it), lonlat: it.point, level: it.level,
-    label: `Pont à vérifier, priorité ${it.level === 'high' ? 'haute' : 'moyenne'}${it.name ? ` : ${it.name}` : ''}`,
-  })));
+  const weights = r?.weightLimits?.items ?? [];
+  map.showBridges([
+    ...items.map((it) => ({
+      key: bridgeKey(it), lonlat: it.point, level: it.level,
+      label: `Pont à vérifier, priorité ${it.level === 'high' ? 'haute' : 'moyenne'}${it.name ? ` : ${it.name}` : ''}`,
+    })),
+    ...weights.map((it) => ({
+      key: weightKey(it), lonlat: it.point, level: 'high', kind: 'weight', glyph: `${String(it.limit).replace('.', ',')} t`,
+      label: `Limite de poids à vérifier : ${String(it.limit).replace('.', ',')} t${it.local ? ', desserte locale possible' : ''}`,
+    })),
+  ]);
 }
 
 /** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
@@ -560,6 +582,7 @@ const settings = createSettings({
   onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
   onWindVoiceChange: (on) => setSetting({ windVoice: on }),
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
+  onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
   onOpen: () => restrictionsUi.render(),
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
@@ -608,6 +631,7 @@ const form = createRouteForm({
       weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
       access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
       bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
+      weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
       winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
       const route = options[0].route;
       update((d) => addTrip(d, {
@@ -623,6 +647,7 @@ const form = createRouteForm({
       weather.clear();
       access.clear();
       bridges.clear();
+      weightLimits.clear();
       map.showBridges([]);
       winter.clear();
       map.showZfe([]);

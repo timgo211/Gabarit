@@ -1,11 +1,11 @@
 // Mes restrictions (phase 12b) : Réglages › Mes restrictions (liste, ajout au centre de la carte, modification,
-// suppression) et panneau du repère de pont (« Éviter ce passage »). Ajout et modification à l'arrêt seulement
+// suppression) et panneau du repère de pont ou de limite de poids (phase 12a bis) (« Éviter ce passage »). Ajout et modification à l'arrêt seulement
 // (canEditRestrictions) : boutons grisés sinon. Textes affichés en textContent. Rien dans le guidage ni dans la voix.
 
 import { $, el } from './dom.js';
 import {
   addRestriction, updateRestriction, removeRestriction, restrictionLabel, canEditRestrictions, fromBridge,
-  HELP_TEXT, BRIDGE_AVOID_HELP, TYPE_LABELS,
+  fromWeight, HELP_TEXT, BRIDGE_AVOID_HELP, WEIGHT_AVOID_HELP, TYPE_LABELS,
 } from '../lib/restrictions.js';
 
 /**
@@ -24,8 +24,9 @@ export function createRestrictions(ctx) {
   const panelStatus = $('#bridge-panel-status');
   const avoid = $('#btn-bridge-avoid');
   $('#restrictions-help').textContent = HELP_TEXT;
-  $('#bridge-panel-help').textContent = BRIDGE_AVOID_HELP;
+  const panelHelp = $('#bridge-panel-help');
   let bridgeItem = null;
+  let bridgeKind = 'bridge'; // 'bridge' (pont, phase 12a) ou 'weight' (limite de poids, phase 12a bis)
   let editing = null;
 
   const allowed = () => canEditRestrictions(ctx.getDrive());
@@ -47,7 +48,7 @@ export function createRestrictions(ctx) {
     const items = ctx.getList();
     list.replaceChildren(...items.map((r) => el('li', { class: 'restr-item' }, [
       el('strong', { text: `${restrictionLabel(r)}${r.note ? ` — ${r.note}` : ''}` }),
-      el('span', { class: 'hint', text: `${r.lat.toFixed(5)}, ${r.lon.toFixed(5)} · ${r.date.split('-').reverse().join('/')} · ${r.origin === 'osm-bridge' ? 'depuis un pont OSM' : 'saisie'}` }),
+      el('span', { class: 'hint', text: `${r.lat.toFixed(5)}, ${r.lon.toFixed(5)} · ${r.date.split('-').reverse().join('/')} · ${r.origin === 'osm-bridge' ? 'depuis un pont OSM' : r.origin === 'osm-weight' ? 'depuis une limite de poids OSM' : 'saisie'}` }),
       el('div', { class: 'row' }, [
         el('button', { type: 'button', class: 'btn btn-restr-edit', disabled: !ok, onclick: () => startEdit(r), text: 'Modifier' }),
         el('button', { type: 'button', class: 'btn btn-restr-del', disabled: !ok, onclick: () => remove(r), text: 'Supprimer' }),
@@ -99,7 +100,7 @@ export function createRestrictions(ctx) {
   avoid.addEventListener('click', () => {
     if (!allowed() || !bridgeItem) return;
     try {
-      ctx.setList(addRestriction(ctx.getList(), fromBridge(bridgeItem)));
+      ctx.setList(addRestriction(ctx.getList(), bridgeKind === 'weight' ? fromWeight(bridgeItem) : fromBridge(bridgeItem)));
       say(panelStatus, 'Passage enregistré dans Mes restrictions : évité au prochain calcul (« Calculer l\'itinéraire »).');
     } catch (err) {
       say(panelStatus, err.message);
@@ -120,7 +121,19 @@ export function createRestrictions(ctx) {
     /** Repère de pont touché (à l'arrêt) : texte, aide et « Éviter ce passage ». */
     openBridge(item) {
       bridgeItem = item;
+      bridgeKind = 'bridge';
       panelText.textContent = `${item.text}${item.name ? ` (${item.name})` : ''}`;
+      panelHelp.textContent = BRIDGE_AVOID_HELP;
+      say(panelStatus, '');
+      panel.hidden = false;
+      render();
+    },
+    /** Repère de limite de poids touché (phase 12a bis, à l'arrêt) : texte, aide et « Éviter ce passage ». */
+    openWeight(item) {
+      bridgeItem = item;
+      bridgeKind = 'weight';
+      panelText.textContent = `${item.text} (km ${Math.round(item.along / 1000)})`;
+      panelHelp.textContent = WEIGHT_AVOID_HELP;
       say(panelStatus, '');
       panel.hidden = false;
       render();
