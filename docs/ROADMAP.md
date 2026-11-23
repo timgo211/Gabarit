@@ -212,6 +212,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       Panneau seulement si la limite est connue, alerte visuelle, « Limite X » à voix haute en option (étiquette OSM
       seulement). Fiche « Limites de vitesse connues : N % du trajet ». Données : attente de la première copie
       (Geofabrik France en 404 le 23/11/2026).
+    - [x] **Phase 11b — Directions des panneaux dans les consignes** (v47) : copie `data/directions-osm/` (bretelles
+      `motorway_link` / `trunk_link` avec `destination` / `destination:ref`, mêmes Action, cases et plafonds) ;
+      `directions.js` : « …, direction Metz » seulement si une seule bretelle à 60 m du point de manœuvre avec un cap
+      cohérent, dit seulement sans ambiguïté, calculé une fois par itinéraire. Reste à faire : repli « commune la plus
+      proche » (demande un jeu de données de lieux, trop volumineux pour la copie actuelle).
   - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
     `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
     tournée multi-arrêts de la phase 3.) (Reste de la phase 8.)

@@ -23,6 +23,7 @@ import { localAlongRoute, guidanceLocal } from './access-local.js';
 import { conditionalAlongRoute, guidanceConditional } from './access-conditional.js';
 import { countriesAlongRoute } from './countries.js';
 import { speedLimitsAlongRoute, limitAt } from './speed-limit.js';
+import { directionsForManeuvers, withDirections } from './directions.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -103,12 +104,16 @@ export function fixFromPosition(pos) {
   };
 }
 
-/** Itinéraire (lu par parseDirections) prêt pour le guidage. */
-export function prepareRoute(route) {
+/**
+ * Itinéraire (lu par parseDirections) prêt pour le guidage. Phase 11b : directions des panneaux (copie
+ * data/directions-osm/ des cases du trajet, mergeDirectionTiles) ajoutées aux manœuvres, une fois par itinéraire.
+ */
+export function prepareRoute(route, directions = null) {
   const line = prepareLine(route.coordinates);
+  const base = buildManeuvers(route.steps, line.cum);
   return {
     line,
-    maneuvers: buildManeuvers(route.steps, line.cum),
+    maneuvers: directions?.links?.length ? withDirections(base, directionsForManeuvers(route, base, directions)) : base,
     duration: isNum(route.duration) ? route.duration : 0,
     end: line.coords[line.coords.length - 1],
   };
@@ -206,7 +211,7 @@ function placeSpeeds(ctx, rules, route) {
  */
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
-  driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null,
+  driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null, directions = null,
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
   return {
@@ -234,7 +239,8 @@ export function startNavigation(route, {
     tunnels: placeTunnels(rules, route),
     tunnelsAnnounced: {},
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
-    route: prepareRoute(route),
+    directionsData: directions ?? null,
+    route: prepareRoute(route, directions),
     source: route,
     areaPool: Array.isArray(areas) ? areas : [],
     areas: placeAreas(areas, route),
@@ -352,7 +358,7 @@ export function updateNavigation(state, fix) {
       s.announced[s.uturnIndex] = 'now';
       events.push({ type: 'speak', text: `${UTURN_SAFE_TEXT}.` });
     } else if (maneuvers[0] && isDepart(maneuvers[0], 0) && maneuvers[0].instruction) {
-      events.push({ type: 'speak', text: `${maneuverText(maneuvers[0])}.` });
+      events.push({ type: 'speak', text: `${maneuverText(maneuvers[0], { spoken: true })}.` });
     }
   }
   const nm = nextManeuver(maneuvers, loc.along);
@@ -634,6 +640,16 @@ export function setNavigationSpeeds(state, data) {
   return { ...state, speedCtx, speedLimits: placeSpeeds(speedCtx, state.rules, state.source), speedCursor: 0 };
 }
 
+/**
+ * Cases de data/directions-osm/ arrivées après « Démarrer » ou au recalcul (phase 11b) : manœuvres refaites avec les
+ * directions (même tracé, mêmes positions ; annonces déjà faites gardées).
+ */
+export function setNavigationDirections(state, data) {
+  if (!state) return state;
+  const route = prepareRoute(state.source, data);
+  return { ...state, directionsData: data ?? null, route: { ...state.route, maneuvers: route.maneuvers } };
+}
+
 /** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
 export function setNavigationWind(state, forecast) {
   if (!state) return state;
@@ -656,7 +672,7 @@ export function markStopAsWork(state, now) {
 export function rerouteDone(state, route) {
   const s = {
     ...state,
-    route: prepareRoute(route),
+    route: prepareRoute(route, state.directionsData),
     source: route,
     areas: placeAreas(state.areaPool, route),
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),

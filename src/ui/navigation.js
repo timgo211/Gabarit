@@ -33,7 +33,7 @@ import { symbolSvg } from './nav-symbols.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, markStopAsWork, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, markStopAsWork, NAV,
 } from '../lib/navigation.js';
 import {
   systemAlert, guidanceAlerts, splitAlerts, parkedState, followPadding, buttonColumn, speedStatus, traveledUpdate,
@@ -856,7 +856,7 @@ export function createNavigation(ctx) {
    */
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
-    driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null,
+    driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
   }) {
     if (s) stop();
     const now = Date.now();
@@ -864,7 +864,7 @@ export function createNavigation(ctx) {
       // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
       state: startNavigation(route, {
         destination: params.end, now, areas, announceAreas, rules,
-        driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds,
+        driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
       }),
       drivingSavedAt: now,
       areasOpen: false, areasCount: Array.isArray(areas) ? areas.length : 0, areasShown: null,
@@ -1119,6 +1119,11 @@ export function createNavigation(ctx) {
     setAccess(ways) {
       if (!s) return;
       s.state = setNavigationAccess(s.state, ways);
+    },
+    /** Cases de data/directions-osm/ arrivées après « Démarrer » ou au recalcul (phase 11b) : consignes refaites. */
+    setDirections(data) {
+      if (!s) return;
+      s.state = setNavigationDirections(s.state, data);
     },
     /** Cases de data/vitesses-osm/ arrivées après « Démarrer » ou au recalcul (phase 11a) : limites recalculées. */
     setSpeeds(data) {

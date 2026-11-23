@@ -28,6 +28,7 @@ import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/
 import { BRIDGE } from '../src/lib/bridge-check.js';
 import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
 import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
+import { directionFromFeature, convertDirections } from '../src/lib/directions-convert.js';
 import { sunTimes } from '../src/lib/sun.js';
 import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
@@ -132,7 +133,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -311,6 +312,15 @@ async function open(browser, base, {
     const name = new URL(route.request().url()).pathname.split('/').pop();
     stats.speeds = [...(stats.speeds ?? []), name];
     const json = speedFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
+  // Phase 11b : copie data/directions-osm/ (null : absente, 404 ; 'fixture', 'proche', 'ambigu' : bretelles de
+  // tests/fixtures/osm-directions-sortie.geojsonseq passées par les fonctions de l'Action).
+  const dirFiles = directionsCopyFiles(directionsCopy);
+  await ctx.route(/\/data\/directions-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.dirCopy = [...(stats.dirCopy ?? []), name];
+    const json = dirFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
   const page = await ctx.newPage();
@@ -2615,6 +2625,68 @@ async function speedsCheck(browser, base) {
   await none.ctx.close();
 }
 
+/** Fichiers de la copie des directions simulée (nom → JSON), d'après les fonctions de l'Action (phase 11b). */
+function directionsCopyFiles(kind) {
+  if (!kind) return null;
+  const ids = kind === 'ambigu' ? ['w4001', 'w4002'] : kind === 'proche' ? ['w4001', 'w4003'] : ['w4001'];
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-directions-sortie.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).filter((f) => f && ids.includes(f.id));
+  const { index, tiles } = convertDirections(feats.map(directionFromFeature).filter(Boolean),
+    { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * Phase 11b : directions des panneaux. Itinéraire synthétique (autoroute puis bretelle, « Restez à droite » au km 2,2),
+ * copie data/directions-osm/ construite par les fonctions de l'Action. GPS émulé à 90 km/h vers la sortie : bandeau
+ * « Restez à droite, direction Metz, Nancy (A 31) » en entier dans le bandeau, dit à voix haute ; bretelle proche au
+ * cap opposé → affiché, pas dit ; deux bretelles au même cap ou copie absente → consigne inchangée.
+ * 412×900 jour, 900×412 nuit, 360×760 nuit, 1280×800 jour.
+ */
+async function directionsCheck(browser, base) {
+  const sortie = fixture('ors-directions-sortie.json');
+  const line = sortie.features[0].geometry.coordinates;
+  const FULL = 'Restez à droite, direction Metz, Nancy (A 31)';
+  const cases = [
+    [412, 900, 'day', 'fixture'], [900, 412, 'night', 'fixture'], [360, 760, 'night', 'fixture'], [1280, 800, 'day', 'fixture'],
+    [412, 900, 'day', 'proche'], [412, 900, 'day', 'ambigu'], [900, 412, 'night', null],
+  ];
+  for (const [width, height, theme, kind] of cases) {
+    const tag = `${width}×${height} ${theme} (${kind ?? 'copie absente'})`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => sortie, overpass: () => ({ elements: [] }), directionsCopy: kind,
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(800);
+    if (kind) check((stats.dirCopy ?? []).includes('index.json') && (stats.dirCopy ?? []).includes('6_49.json'), `${tag} : copie data/directions-osm/ lue`, (stats.dirCopy ?? []).join(','));
+    await setGeo(page, { lon: line[10][0], lat: line[10][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await page.waitForTimeout(800);
+    // À 1,1 km de la sortie (point 10 du tracé), à 90 km/h : bandeau de la prochaine manœuvre, annonce « loin ».
+    await drive(ctx, page, line.slice(10, 21), 90, 6);
+    const instr = (await page.textContent('#nav-instr')).replace(/ /g, ' ').trim();
+    const spoken = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /restez à droite/i.test(t));
+    if (kind === 'fixture') {
+      check(instr === FULL, `${tag} : bandeau avec la direction`, instr);
+      const fits = await page.evaluate(() => { const el = document.querySelector('#nav-instr'); return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1; });
+      check(fits, `${tag} : consigne entière dans le bandeau`);
+      check(spoken.length > 0 && spoken.every((t) => /direction Metz, Nancy \(A 31\)/.test(t)), `${tag} : direction dite à voix haute`, spoken.join(' | '));
+    } else if (kind === 'proche') {
+      check(instr === FULL, `${tag} : bretelle au cap opposé ignorée, direction affichée`, instr);
+      check(spoken.length > 0 && spoken.every((t) => !/direction/.test(t)), `${tag} : ambiguïté → direction non dite`, spoken.join(' | '));
+    } else {
+      check(instr === 'Restez à droite', `${tag} : consigne inchangée`, instr);
+      check(spoken.every((t) => !/direction/.test(t)), `${tag} : rien de plus à voix haute`, spoken.join(' | '));
+    }
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-directions-${kind ?? 'absente'}.png`) });
+    await noHorizontalScroll(page, `${tag} directions`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 /**
  * Phase 12b : Mes restrictions. « Éviter ce passage » depuis le repère du viaduc de Colombier (point de croisement),
  * liste dans Réglages, recalcul avec avoid_polygons et « Évite 1 restriction saisie par toi », échec 2009 avec la
@@ -3573,7 +3645,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck,
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, camion: truckIconCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;

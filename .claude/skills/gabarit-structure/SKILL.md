@@ -59,6 +59,13 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     `src/ui/speed-limits.js` (`createTileCopy`) ; moteur : `startNavigation({ speeds })`, `setNavigationSpeeds`,
     `view.speedLimit` / `speedLimitSource` ; fixture **synthétique** `osm-vitesses-colombier.geojsonseq` ; tests
     `tests/speed.test.js`
+  - phase 11b : `directions-convert.js` (Action : bretelles `motorway_link` / `trunk_link` avec `destination` ou
+    `destination:ref`, `;` → « , », `destination:lanes` seule ignorée, oneway=-1 retourné, oneway=no → deux sens,
+    300 premiers mètres, `data/directions-osm/` mêmes cases, 5 Mo / 40 Mo), `directions.js` (appli :
+    `directionsForManeuvers` — 60 m du point de manœuvre, cap du tracé sur 30 m, ≤ 30° — une seule bretelle →
+    complément, `speak` si aucune autre bretelle à 60 m ; `withDirections`) ; `prepareRoute(route, directions)`,
+    `setNavigationDirections` ; UI `src/ui/directions.js` ; fixtures **synthétiques** `ors-directions-sortie.json`,
+    `osm-directions-sortie.geojsonseq` ; tests `tests/directions.test.js`
   - phase 12a bis : `weight-convert.js` (Action : voies maxweight / maxweight:hgv en tonnes, drapeau desserte
     hgv=destination|delivery ou maxweight:conditional, mêmes filtrage osmium et cases de 1° que les ponts,
     `data/poids-osm/`, 5 Mo / 30 Mo, simplification 3 → 8 → 20 m si trop gros, chemin 190520091 écrit dans le journal),
@@ -131,7 +138,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   seulement dans les limites de taille (sinon ancienne copie gardée, journal « ⚠ data/ponts-osm/ non modifié ») ;
   phase 12a bis : limites de poids dans le même filtrage (`data/poids-osm/`, « ⚠ data/poids-osm/ non modifié » si trop
   gros) ; phase 11a : limitations de vitesse dans le même filtrage (`data/vitesses-osm/`, copie complète puis réduite,
-  « ⚠ data/vitesses-osm/ non modifié » si trop gros) ; case manuelle « r413 » : lecture du Code de la route,
+  « ⚠ data/vitesses-osm/ non modifié » si trop gros) ; phase 11b : directions des bretelles dans le même filtrage
+  (`data/directions-osm/`) ; case manuelle « r413 » : lecture du Code de la route,
   art. R413-1 à R413-10, dans le journal (pour `speed-rules.js`) ; l'étape « Enregistrer » n'ajoute que les chemins qui existent (une copie absente ne bloque pas les autres)
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute
