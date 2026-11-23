@@ -1,7 +1,7 @@
 {
  "source": "Bison Futé — point d'accès national (aires de stationnement PL)",
  "licence": "Licence Ouverte Etalab v2.0",
- "updated": "2026-11-19T20:11:07.374Z",
+ "updated": "2026-11-23T14:44:05.262Z",
  "files": [
   {
    "url": "https://www.bison-fute.gouv.fr/IMG/xlsx/Donnees_statiques_aire_PL_2025_SCA.xlsx",
@@ -18,7 +18,7 @@
  ],
  "areas": [
   {
-   "id": "off:ANC-aire_d_offekerque_offekerque_a0016",
+   "id": "off:ANC-aire_d_offekerque_offekerque_a16",
    "name": "AIRE D'OFFEKERQUE, Offekerque",
    "city": null,
    "lon": 2.00319,
@@ -30,8 +30,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "+",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -49,12 +49,12 @@
    "secure": null,
    "services": [],
    "road": "N88",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_douane_camphin_en_pevele_nord_ca_a0027",
+   "id": "off:ANC-aire_de_douane_camphin_en_pevele_nord_ca_a27",
    "name": "AIRE DE DOUANE CAMPHIN EN PEVELE Nord, Camphin-en-Pévèle",
    "city": null,
    "lon": 3.2739,
@@ -66,13 +66,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0027",
-   "direction": "-",
+   "road": "A27",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_douane_de_la_chapelle_nord_ville_n0058",
+   "id": "off:ANC-aire_de_douane_de_la_chapelle_nord_ville_n58",
    "name": "AIRE DE DOUANE DE LA CHAPELLE Nord, Villers-Cernay",
    "city": null,
    "lon": 5.03929,
@@ -84,13 +84,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "N0058",
-   "direction": "-",
+   "road": "N58",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_douane_de_la_chapelle_sud_viller_n0058",
+   "id": "off:ANC-aire_de_douane_de_la_chapelle_sud_viller_n58",
    "name": "AIRE DE DOUANE DE LA CHAPELLE Sud, Villers-Cernay",
    "city": null,
    "lon": 5.03909,
@@ -102,13 +102,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "N0058",
-   "direction": "+",
+   "road": "N58",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_douane_de_saint_aybert_nord_sain_a0002",
+   "id": "off:ANC-aire_de_douane_de_saint_aybert_nord_sain_a2",
    "name": "AIRE DE DOUANE DE SAINT-AYBERT – Nord, Saint-Aybert",
    "city": null,
    "lon": 3.66795,
@@ -120,8 +120,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0002",
-   "direction": "-",
+   "road": "A2",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -139,12 +139,12 @@
    "secure": null,
    "services": [],
    "road": "N13",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_ghyvelde_ghyvelde_a0016",
+   "id": "off:ANC-aire_de_ghyvelde_ghyvelde_a16",
    "name": "AIRE DE GHYVELDE, Ghyvelde",
    "city": null,
    "lon": 2.55653,
@@ -156,13 +156,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "+",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_grande_synthe_grande_synthe_a0016",
+   "id": "off:ANC-aire_de_grande_synthe_grande_synthe_a16",
    "name": "AIRE DE GRANDE-SYNTHE, Grande Synthe",
    "city": null,
    "lon": 2.30392,
@@ -174,8 +174,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "-",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -193,7 +193,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -211,12 +211,12 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_l_epitre_beuvrequen_a0016",
+   "id": "off:ANC-aire_de_l_epitre_beuvrequen_a16",
    "name": "AIRE DE L'EPITRE, Beuvrequen",
    "city": null,
    "lon": 1.68692,
@@ -228,13 +228,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "+",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_la_croix_greal_villers_saint_bar_n0031",
+   "id": "off:ANC-aire_de_la_croix_greal_villers_saint_bar_n31",
    "name": "AIRE DE LA CROIX GRÉAL, Villers-Saint-Barthélémy",
    "city": null,
    "lon": 1.96724,
@@ -246,8 +246,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "N0031",
-   "direction": "+ / -",
+   "road": "N31",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -265,7 +265,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -283,12 +283,12 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_la_scarpe_nord_millonfosse_a0023",
+   "id": "off:ANC-aire_de_la_scarpe_nord_millonfosse_a23",
    "name": "AIRE DE LA SCARPE Nord, Millonfosse",
    "city": null,
    "lon": 3.37162,
@@ -300,13 +300,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0023",
-   "direction": "-",
+   "road": "A23",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_la_scarpe_sud_millonfosse_a0023",
+   "id": "off:ANC-aire_de_la_scarpe_sud_millonfosse_a23",
    "name": "AIRE DE LA SCARPE Sud, Millonfosse",
    "city": null,
    "lon": 3.3689,
@@ -318,13 +318,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0023",
-   "direction": "+",
+   "road": "A23",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_la_sentinelle_nord_la_sentinelle_a0002",
+   "id": "off:ANC-aire_de_la_sentinelle_nord_la_sentinelle_a2",
    "name": "AIRE DE LA SENTINELLE Nord, La Sentinelle",
    "city": null,
    "lon": 3.46742,
@@ -336,13 +336,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0002",
-   "direction": "-",
+   "road": "A2",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_la_sentinelle_sud_la_sentinelle_a0002",
+   "id": "off:ANC-aire_de_la_sentinelle_sud_la_sentinelle_a2",
    "name": "AIRE DE LA SENTINELLE Sud, La Sentinelle",
    "city": null,
    "lon": 3.46959,
@@ -354,13 +354,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0002",
-   "direction": "+",
+   "road": "A2",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_lafaux_laffaux_n0002",
+   "id": "off:ANC-aire_de_lafaux_laffaux_n2",
    "name": "AIRE DE LAFAUX, Laffaux",
    "city": null,
    "lon": 3.43898,
@@ -372,8 +372,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "N0002",
-   "direction": "+ / -",
+   "road": "N2",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -391,12 +391,12 @@
    "secure": null,
    "services": [],
    "road": "N102",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_petite_foret_est_petite_foret_a0023",
+   "id": "off:ANC-aire_de_petite_foret_est_petite_foret_a23",
    "name": "AIRE DE PETITE-FORET Est, Petite Forêt",
    "city": null,
    "lon": 3.48373,
@@ -408,13 +408,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0023",
-   "direction": "-",
+   "road": "A23",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_phalempin_est_phalempin_a0001",
+   "id": "off:ANC-aire_de_phalempin_est_phalempin_a1",
    "name": "AIRE DE PHALEMPIN – Est, Phalempin",
    "city": null,
    "lon": 3.04681,
@@ -426,13 +426,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0001",
-   "direction": "+",
+   "road": "A1",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_phalempin_ouest_phalempin_a0001",
+   "id": "off:ANC-aire_de_phalempin_ouest_phalempin_a1",
    "name": "AIRE DE PHALEMPIN – Ouest, Phalempin",
    "city": null,
    "lon": 3.04563,
@@ -444,8 +444,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0001",
-   "direction": "-",
+   "road": "A1",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -463,12 +463,12 @@
    "secure": null,
    "services": [],
    "road": "N141",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_saint_eloi_steenworde_a0025",
+   "id": "off:ANC-aire_de_saint_eloi_steenworde_a25",
    "name": "AIRE DE SAINT-ELOI, Steenworde",
    "city": null,
    "lon": 2.58105,
@@ -480,13 +480,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0025",
-   "direction": "-",
+   "road": "A25",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_saint_laurent_steenworde_a0025",
+   "id": "off:ANC-aire_de_saint_laurent_steenworde_a25",
    "name": "AIRE DE SAINT-LAURENT, Steenworde",
    "city": null,
    "lon": 2.58452,
@@ -498,13 +498,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0025",
-   "direction": "+",
+   "road": "A25",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_steenwerk_nord_steenwerck_a0025",
+   "id": "off:ANC-aire_de_steenwerk_nord_steenwerck_a25",
    "name": "AIRE DE STEENWERK Nord, Steenwerck",
    "city": null,
    "lon": 2.80928,
@@ -516,13 +516,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0025",
-   "direction": "+",
+   "road": "A25",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_steenwerk_sud_steenwerck_a0025",
+   "id": "off:ANC-aire_de_steenwerk_sud_steenwerck_a25",
    "name": "AIRE DE STEENWERK Sud, Steenwerck",
    "city": null,
    "lon": 2.78803,
@@ -534,13 +534,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0025",
-   "direction": "-",
+   "road": "A25",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_de_teteghem_sud_teteghem_a0016",
+   "id": "off:ANC-aire_de_teteghem_sud_teteghem_a16",
    "name": "AIRE DE TETEGHEM Sud, Teteghem",
    "city": null,
    "lon": 2.42289,
@@ -552,8 +552,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "+",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -571,7 +571,7 @@
    "secure": null,
    "services": [],
    "road": "N113",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -589,7 +589,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -607,7 +607,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -625,7 +625,7 @@
    "secure": null,
    "services": [],
    "road": "N88",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -643,7 +643,7 @@
    "secure": null,
    "services": [],
    "road": "N88",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -661,7 +661,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -679,7 +679,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -697,12 +697,12 @@
    "secure": null,
    "services": [],
    "road": "N122",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_les_deux_caps_leubringhen_a0016",
+   "id": "off:ANC-aire_les_deux_caps_leubringhen_a16",
    "name": "AIRE LES DEUX-CAPS, Leubringhen",
    "city": null,
    "lon": 1.73491,
@@ -714,13 +714,13 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0016",
-   "direction": "-",
+   "road": "A16",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
   {
-   "id": "off:ANC-aire_relais_des_ardennes_saulces_monclin_a0034",
+   "id": "off:ANC-aire_relais_des_ardennes_saulces_monclin_a34",
    "name": "AIRE RELAIS DES ARDENNES, Saulces-Monclin",
    "city": null,
    "lon": 4.50445,
@@ -732,8 +732,8 @@
    "price": null,
    "secure": null,
    "services": [],
-   "road": "A0034",
-   "direction": "+ / -",
+   "road": "A34",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Nord",
    "network": "non concédé"
   },
@@ -751,7 +751,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -769,7 +769,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -787,7 +787,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -805,7 +805,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -823,7 +823,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -841,7 +841,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -859,7 +859,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -877,7 +877,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -895,7 +895,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -913,7 +913,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -931,7 +931,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -949,7 +949,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -967,7 +967,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -985,7 +985,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -1003,7 +1003,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1021,7 +1021,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1039,7 +1039,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1057,7 +1057,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1075,7 +1075,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1093,7 +1093,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1111,7 +1111,7 @@
    "secure": null,
    "services": [],
    "road": "A30",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1129,7 +1129,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1147,7 +1147,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -1165,7 +1165,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -1183,7 +1183,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -1201,7 +1201,7 @@
    "secure": null,
    "services": [],
    "road": "N70",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1219,7 +1219,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -1237,7 +1237,7 @@
    "secure": null,
    "services": [],
    "road": "N844",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1255,7 +1255,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1273,7 +1273,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1291,7 +1291,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1309,7 +1309,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "5",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1327,7 +1327,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -1345,7 +1345,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -1363,7 +1363,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1381,7 +1381,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1399,7 +1399,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -1417,7 +1417,7 @@
    "secure": null,
    "services": [],
    "road": "N13",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -1435,7 +1435,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1453,7 +1453,7 @@
    "secure": null,
    "services": [],
    "road": "A15",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -1471,7 +1471,7 @@
    "secure": null,
    "services": [],
    "road": "A15",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -1489,7 +1489,7 @@
    "secure": null,
    "services": [],
    "road": "A63",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1507,7 +1507,7 @@
    "secure": null,
    "services": [],
    "road": "A63",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1525,7 +1525,7 @@
    "secure": null,
    "services": [],
    "road": "N90",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1543,7 +1543,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -1561,7 +1561,7 @@
    "secure": null,
    "services": [],
    "road": "N44",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1579,7 +1579,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1597,7 +1597,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1615,7 +1615,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1633,7 +1633,7 @@
    "secure": null,
    "services": [],
    "road": "A33",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1651,7 +1651,7 @@
    "secure": null,
    "services": [],
    "road": "N141",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1669,7 +1669,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1687,7 +1687,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1723,7 +1723,7 @@
    "secure": null,
    "services": [],
    "road": "N44",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1741,7 +1741,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1759,7 +1759,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1777,7 +1777,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1795,7 +1795,7 @@
    "secure": null,
    "services": [],
    "road": "N157",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -1813,7 +1813,7 @@
    "secure": null,
    "services": [],
    "road": "N87",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -1831,7 +1831,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -1849,7 +1849,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -1867,7 +1867,7 @@
    "secure": null,
    "services": [],
    "road": "N230",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1885,7 +1885,7 @@
    "secure": null,
    "services": [],
    "road": "N230",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1903,7 +1903,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1921,7 +1921,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -1939,7 +1939,7 @@
    "secure": null,
    "services": [],
    "road": "N125",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -1957,7 +1957,7 @@
    "secure": null,
    "services": [],
    "road": "125",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -1975,7 +1975,7 @@
    "secure": null,
    "services": [],
    "road": "A63",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -1993,7 +1993,7 @@
    "secure": null,
    "services": [],
    "road": "A63",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -2011,7 +2011,7 @@
    "secure": null,
    "services": [],
    "road": "A64",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -2029,7 +2029,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2047,7 +2047,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2065,7 +2065,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2083,7 +2083,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2101,7 +2101,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -2119,7 +2119,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -2137,7 +2137,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -2155,7 +2155,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -2173,7 +2173,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2191,7 +2191,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2209,7 +2209,7 @@
    "secure": null,
    "services": [],
    "road": "N124",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -2227,7 +2227,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2245,7 +2245,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2263,7 +2263,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2281,7 +2281,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -2299,7 +2299,7 @@
    "secure": null,
    "services": [],
    "road": "A57",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -2317,7 +2317,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -2335,7 +2335,7 @@
    "secure": null,
    "services": [],
    "road": "A30",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -2353,7 +2353,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2371,7 +2371,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2389,7 +2389,7 @@
    "secure": null,
    "services": [],
    "road": "A51",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -2407,7 +2407,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2425,7 +2425,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2443,7 +2443,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2461,7 +2461,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2479,7 +2479,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2497,7 +2497,7 @@
    "secure": null,
    "services": [],
    "road": "A1",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -2515,7 +2515,7 @@
    "secure": null,
    "services": [],
    "road": "A1",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -2533,7 +2533,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -2551,7 +2551,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2569,7 +2569,7 @@
    "secure": null,
    "services": [],
    "road": "N844",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2587,7 +2587,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2605,7 +2605,7 @@
    "secure": null,
    "services": [],
    "road": "A83",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2623,7 +2623,7 @@
    "secure": null,
    "services": [],
    "road": "A83",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2641,7 +2641,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2659,7 +2659,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2677,7 +2677,7 @@
    "secure": null,
    "services": [],
    "road": "N80",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2695,7 +2695,7 @@
    "secure": null,
    "services": [],
    "road": "N141",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2713,7 +2713,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2731,7 +2731,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2749,7 +2749,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -2767,7 +2767,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -2785,7 +2785,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2803,7 +2803,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -2821,7 +2821,7 @@
    "secure": null,
    "services": [],
    "road": "N154",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2839,7 +2839,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -2857,7 +2857,7 @@
    "secure": null,
    "services": [],
    "road": "A55",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -2875,7 +2875,7 @@
    "secure": null,
    "services": [],
    "road": "N87",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -2893,7 +2893,7 @@
    "secure": null,
    "services": [],
    "road": "N154",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2911,7 +2911,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -2929,7 +2929,7 @@
    "secure": null,
    "services": [],
    "road": "A50",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -2947,7 +2947,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -2965,7 +2965,7 @@
    "secure": null,
    "services": [],
    "road": "A86",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -2983,7 +2983,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -3001,7 +3001,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -3019,7 +3019,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3037,7 +3037,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3055,7 +3055,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3073,7 +3073,7 @@
    "secure": null,
    "services": [],
    "road": "N237",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -3091,7 +3091,7 @@
    "secure": null,
    "services": [],
    "road": "N166",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3109,7 +3109,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -3127,7 +3127,7 @@
    "secure": null,
    "services": [],
    "road": "N90",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3145,7 +3145,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -3163,7 +3163,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3181,7 +3181,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3199,7 +3199,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3217,7 +3217,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3235,7 +3235,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3253,7 +3253,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3271,7 +3271,7 @@
    "secure": null,
    "services": [],
    "road": "N59",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -3289,7 +3289,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3307,7 +3307,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3325,7 +3325,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3343,7 +3343,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -3361,7 +3361,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -3379,7 +3379,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -3397,7 +3397,7 @@
    "secure": null,
    "services": [],
    "road": "A6",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3415,7 +3415,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3433,7 +3433,7 @@
    "secure": null,
    "services": [],
    "road": "A51",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -3451,7 +3451,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -3469,7 +3469,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -3487,7 +3487,7 @@
    "secure": null,
    "services": [],
    "road": "N70",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3505,7 +3505,7 @@
    "secure": null,
    "services": [],
    "road": "N70",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3523,7 +3523,7 @@
    "secure": null,
    "services": [],
    "road": "N162",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3541,7 +3541,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3559,7 +3559,7 @@
    "secure": null,
    "services": [],
    "road": "N532",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3577,7 +3577,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -3595,7 +3595,7 @@
    "secure": null,
    "services": [],
    "road": "A68",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -3613,7 +3613,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3631,7 +3631,7 @@
    "secure": null,
    "services": [],
    "road": "N70",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3649,7 +3649,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -3667,7 +3667,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3685,7 +3685,7 @@
    "secure": null,
    "services": [],
    "road": "N844",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3703,7 +3703,7 @@
    "secure": null,
    "services": [],
    "road": "N70",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3721,7 +3721,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -3739,7 +3739,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -3757,7 +3757,7 @@
    "secure": null,
    "services": [],
    "road": "A6",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3775,7 +3775,7 @@
    "secure": null,
    "services": [],
    "road": "A6",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -3793,7 +3793,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -3811,7 +3811,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3829,7 +3829,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3847,7 +3847,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -3865,7 +3865,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -3883,7 +3883,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -3901,7 +3901,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -3919,7 +3919,7 @@
    "secure": null,
    "services": [],
    "road": "N166",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3937,7 +3937,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -3955,7 +3955,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -3973,7 +3973,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -3991,7 +3991,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4009,7 +4009,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4027,7 +4027,7 @@
    "secure": null,
    "services": [],
    "road": "N157",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4045,7 +4045,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -4063,7 +4063,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -4081,7 +4081,7 @@
    "secure": null,
    "services": [],
    "road": "126",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -4099,7 +4099,7 @@
    "secure": null,
    "services": [],
    "road": "N162",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4117,7 +4117,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4135,7 +4135,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4153,7 +4153,7 @@
    "secure": null,
    "services": [],
    "road": "N82",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4171,7 +4171,7 @@
    "secure": null,
    "services": [],
    "road": "N82",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4189,7 +4189,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4207,7 +4207,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4225,7 +4225,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4243,7 +4243,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4261,7 +4261,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4279,7 +4279,7 @@
    "secure": null,
    "services": [],
    "road": "A36",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4297,7 +4297,7 @@
    "secure": null,
    "services": [],
    "road": "A36",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4315,7 +4315,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -4333,7 +4333,7 @@
    "secure": null,
    "services": [],
    "road": "N24",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4351,7 +4351,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4369,7 +4369,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -4387,7 +4387,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -4405,7 +4405,7 @@
    "secure": null,
    "services": [],
    "road": "N176",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4423,7 +4423,7 @@
    "secure": null,
    "services": [],
    "road": "N176",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4441,7 +4441,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4459,7 +4459,7 @@
    "secure": null,
    "services": [],
    "road": "N20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -4477,7 +4477,7 @@
    "secure": null,
    "services": [],
    "road": "N20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -4495,7 +4495,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4513,7 +4513,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4531,7 +4531,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4549,7 +4549,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4567,7 +4567,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -4585,7 +4585,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4603,7 +4603,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -4621,7 +4621,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4639,7 +4639,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4657,7 +4657,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4675,7 +4675,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4693,7 +4693,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4711,7 +4711,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4729,7 +4729,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4747,7 +4747,7 @@
    "secure": null,
    "services": [],
    "road": "A77",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4765,7 +4765,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4783,7 +4783,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -4801,7 +4801,7 @@
    "secure": null,
    "services": [],
    "road": "N11",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -4819,7 +4819,7 @@
    "secure": null,
    "services": [],
    "road": "A620",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -4837,7 +4837,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4855,7 +4855,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4873,7 +4873,7 @@
    "secure": null,
    "services": [],
    "road": "N184",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -4891,7 +4891,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -4909,7 +4909,7 @@
    "secure": null,
    "services": [],
    "road": "A28",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -4927,7 +4927,7 @@
    "secure": null,
    "services": [],
    "road": "N145",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -4945,7 +4945,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -4963,7 +4963,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -4981,7 +4981,7 @@
    "secure": null,
    "services": [],
    "road": "A55",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -4999,7 +4999,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5017,7 +5017,7 @@
    "secure": null,
    "services": [],
    "road": "N201",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5035,7 +5035,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5053,7 +5053,7 @@
    "secure": null,
    "services": [],
    "road": "A620",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -5071,7 +5071,7 @@
    "secure": null,
    "services": [],
    "road": "A35",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5089,7 +5089,7 @@
    "secure": null,
    "services": [],
    "road": "N141",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -5107,7 +5107,7 @@
    "secure": null,
    "services": [],
    "road": "N124",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -5125,7 +5125,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5143,7 +5143,7 @@
    "secure": null,
    "services": [],
    "road": "A150",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -5161,7 +5161,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5179,7 +5179,7 @@
    "secure": null,
    "services": [],
    "road": "N166",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5197,7 +5197,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5215,7 +5215,7 @@
    "secure": null,
    "services": [],
    "road": "A47",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5233,7 +5233,7 @@
    "secure": null,
    "services": [],
    "road": "A47",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5251,7 +5251,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5269,7 +5269,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5287,7 +5287,7 @@
    "secure": null,
    "services": [],
    "road": "N11",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5305,7 +5305,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -5323,7 +5323,7 @@
    "secure": null,
    "services": [],
    "road": "A68",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -5341,7 +5341,7 @@
    "secure": null,
    "services": [],
    "road": "A7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5359,7 +5359,7 @@
    "secure": null,
    "services": [],
    "road": "N4",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5377,7 +5377,7 @@
    "secure": null,
    "services": [],
    "road": "N158",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -5395,7 +5395,7 @@
    "secure": null,
    "services": [],
    "road": "N158",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -5413,7 +5413,7 @@
    "secure": null,
    "services": [],
    "road": "A570",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -5431,7 +5431,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -5449,7 +5449,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5467,7 +5467,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5485,7 +5485,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5503,7 +5503,7 @@
    "secure": null,
    "services": [],
    "road": "A3",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -5521,7 +5521,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5539,7 +5539,7 @@
    "secure": null,
    "services": [],
    "road": "N104",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -5557,7 +5557,7 @@
    "secure": null,
    "services": [],
    "road": "126",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -5575,7 +5575,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5593,7 +5593,7 @@
    "secure": null,
    "services": [],
    "road": "A630",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5611,7 +5611,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5629,7 +5629,7 @@
    "secure": null,
    "services": [],
    "road": "A31",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5647,7 +5647,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5665,7 +5665,7 @@
    "secure": null,
    "services": [],
    "road": "N137",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5683,7 +5683,7 @@
    "secure": null,
    "services": [],
    "road": "N59",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -5701,7 +5701,7 @@
    "secure": null,
    "services": [],
    "road": "N141",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5719,7 +5719,7 @@
    "secure": null,
    "services": [],
    "road": "N11",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5737,7 +5737,7 @@
    "secure": null,
    "services": [],
    "road": "N11",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5755,7 +5755,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -5773,7 +5773,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -5791,7 +5791,7 @@
    "secure": null,
    "services": [],
    "road": "N118",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -5809,7 +5809,7 @@
    "secure": null,
    "services": [],
    "road": "A20",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Ouest",
    "network": "non concédé"
   },
@@ -5827,7 +5827,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -5845,7 +5845,7 @@
    "secure": null,
    "services": [],
    "road": "A84",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes NordO",
    "network": "non concédé"
   },
@@ -5863,7 +5863,7 @@
    "secure": null,
    "services": [],
    "road": "N249",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -5881,7 +5881,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5899,7 +5899,7 @@
    "secure": null,
    "services": [],
    "road": "N79",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -5917,7 +5917,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -5935,7 +5935,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -5953,7 +5953,7 @@
    "secure": null,
    "services": [],
    "road": "A75",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Massif Central",
    "network": "non concédé"
   },
@@ -5971,7 +5971,7 @@
    "secure": null,
    "services": [],
    "road": "N10",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Atlantique",
    "network": "non concédé"
   },
@@ -5989,7 +5989,7 @@
    "secure": null,
    "services": [],
    "road": "N165",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
@@ -6007,7 +6007,7 @@
    "secure": null,
    "services": [],
    "road": "A6",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -6025,7 +6025,7 @@
    "secure": null,
    "services": [],
    "road": "N7",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Centre-Est",
    "network": "non concédé"
   },
@@ -6043,7 +6043,7 @@
    "secure": null,
    "services": [],
    "road": "A33",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -6061,7 +6061,7 @@
    "secure": null,
    "services": [],
    "road": "A104",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -6079,7 +6079,7 @@
    "secure": null,
    "services": [],
    "road": "A104",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction des Routes Ile-de-France",
    "network": "non concédé"
   },
@@ -6097,7 +6097,7 @@
    "secure": null,
    "services": [],
    "road": "N57",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Est",
    "network": "non concédé"
   },
@@ -6115,7 +6115,7 @@
    "secure": null,
    "services": [],
    "road": "A7",
-   "direction": "-",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Méditerrannée",
    "network": "non concédé"
   },
@@ -6133,7 +6133,7 @@
    "secure": null,
    "services": [],
    "road": "A64",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Sud-Ouest",
    "network": "non concédé"
   },
@@ -6151,7 +6151,7 @@
    "secure": null,
    "services": [],
    "road": "N12",
-   "direction": "+",
+   "direction": null,
    "operator": "Direction Interdépartementale des Routes Ouest",
    "network": "non concédé"
   },
