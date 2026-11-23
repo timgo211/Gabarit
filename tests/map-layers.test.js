@@ -68,10 +68,9 @@ test('7d : source choisie selon la position (une ville par pays codé, France pr
   for (const [name, p] of Object.entries(IN)) assert.equal(satelliteSourceAt(p)?.id, 'ign', name);
 });
 
-test('7d : hors de toute source codée → aucune source, message (Flandre, Wallonie, Bavière, Sarre, Italie, mer, Andorre)', () => {
+test('7d : hors de toute source codée → aucune source, message (Flandre, Wallonie, Sarre, Italie, mer, Andorre)', () => {
   const none = {
-    Gand: [3.7174, 51.0543], Namur: [4.8719, 50.4674], Munich: [11.575, 48.137], Sarrebruck: [7.0, 49.2402],
-    Fribourg: [7.85, 47.995], Francfort: [8.682, 50.11], Turin: OUT.Turin, Sardaigne: OUT.Sardaigne, Londres: OUT.Londres,
+    Gand: [3.7174, 51.0543], Namur: [4.8719, 50.4674], Sarrebruck: [7.0, 49.2402], Turin: OUT.Turin, Sardaigne: OUT.Sardaigne, Londres: OUT.Londres,
     Andorre: OUT.Andorre, 'Golfe de Gascogne': [-4, 45.5],
   };
   for (const [name, p] of Object.entries(none)) {
@@ -79,6 +78,14 @@ test('7d : hors de toute source codée → aucune source, message (Flandre, Wall
     assert.deepEqual(satelliteView({ layer: 'satellite', center: p }), { photos: false, message: SATELLITE_OUTSIDE_TEXT, button: true, source: null }, name);
   }
   for (const p of [null, [], [NaN, 1], ['6', '49']]) assert.equal(satelliteSourceAt(p), null);
+});
+
+test('v58 : Bade-Wurtemberg, Bavière, Hesse ; Strasbourg reste IGN, Bâle reste suisse', () => {
+  assert.equal(satelliteSourceAt([7.85, 47.995])?.id, 'de-bw', 'Fribourg-en-Brisgau');
+  assert.equal(satelliteSourceAt([11.575, 48.137])?.id, 'de-by', 'Munich');
+  assert.equal(satelliteSourceAt([8.682, 50.11])?.id, 'de-he', 'Francfort');
+  assert.equal(satelliteSourceAt([7.75, 48.58])?.id, 'ign', 'Strasbourg (France d\'abord)');
+  assert.equal(satelliteSourceAt([7.59, 47.56])?.id, 'ch', 'Bâle');
 });
 
 test('7d : frontière entre deux sources (France / Suisse à Vallorbe, France / Espagne à Hendaye, France / Luxembourg)', () => {
@@ -92,7 +99,7 @@ test('7d : frontière entre deux sources (France / Suisse à Vallorbe, France / 
 
 test('7d : chaque source a une attribution, une licence lue, aucune clé, tuiles jamais mises en cache', () => {
   assert.equal(SATELLITE_SOURCES[0].id, 'ign', 'la France d\'abord');
-  assert.deepEqual(SATELLITE_SOURCES.map((x) => x.id), ['ign', 'lu', 'be-bru', 'ch', 'es', 'de-nw', 'de-rp']);
+  assert.deepEqual(SATELLITE_SOURCES.map((x) => x.id), ['ign', 'lu', 'be-bru', 'ch', 'es', 'de-nw', 'de-rp', 'de-bw', 'de-by', 'de-he']);
   assert.equal(new Set(SATELLITE_SOURCES.map((x) => x.layer)).size, SATELLITE_SOURCES.length);
   assert.equal(SATELLITE_READ, 'lu le 23/11/2026 (journal de l\'Action Textes officiels)');
   for (const src of SATELLITE_SOURCES) {
@@ -109,6 +116,11 @@ test('7d : chaque source a une attribution, une licence lue, aucune clé, tuiles
   assert.match(SATELLITE_SOURCES.find((x) => x.id === 'ch').attributionText, /swisstopo/);
   assert.match(SATELLITE_SOURCES.find((x) => x.id === 'es').attributionText, /© Instituto Geográfico Nacional de España/);
   assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-rp').attributionText, /^©GeoBasis-DE \/ LVermGeoRP2026, dl-de\/by-2-0, www\.lvermgeo\.rlp\.de$/);
+  // v58 : Bade-Wurtemberg (mention imposée par le LGL), Bavière (CC BY 4.0), Hesse (open data).
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-bw').attributionText, /^LGL-BW \(2026\) Datenlizenz Deutschland – Namensnennung – Version 2\.0, www\.lgl-bw\.de$/);
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-bw').tiles[0], /VERSION=1\.1\.1.*SRS=EPSG:3857/);
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-by').attributionText, /Bayerische Vermessungsverwaltung.*CC BY 4\.0/);
+  assert.match(SATELLITE_SOURCES.find((x) => x.id === 'de-he').attributionText, /Hessische Verwaltung für Bodenmanagement und Geoinformation/);
   const credits = satelliteCredits();
   assert.equal(credits.length, SATELLITE_SOURCES.length);
   assert.ok(credits.every((c) => /^.+ : .+ — .+$/.test(c.text)));

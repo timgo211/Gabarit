@@ -16,10 +16,13 @@
 // (HTTP 200, image, en-tête CORS access-control-allow-origin pour https://timgo211.github.io : MapLibre charge les
 // tuiles raster par fetch). Lecture et essai : Action « Textes officiels » (tools/textes-officiels.json, entrées sat-*),
 // journal du 23/11/2026. Registre SATELLITE_SOURCES ci-dessous ; zones : src/lib/satellite-zones.js (Natural Earth,
-// domaine public). Ailleurs (et pour les sources non codées) : plan gardé, avec un message. Non codées le 23/11/2026 :
-// Flandre (texte de la licence « Gebruiksrecht geografische webdiensten » introuvable, pages 404), Wallonie (aucune
-// condition lisible), NGI (service national non essayé), Bade-Wurtemberg (service DOP20 accordé à OSM « unter
-// besonderer Erlaubnis »), Bavière, Sarre (conditions non lues), Hesse (service sans réponse).
+// domaine public). Ailleurs (et pour les sources non codées) : plan gardé, avec un message. v58 (restes, journal de
+// l'Action du 23/11/2026, entrées sat7d-*) : Bade-Wurtemberg, Bavière, Hesse codées (ci-dessous). Non codées :
+// Flandre (tuile WMTS 200 + CORS « * », service « kosteloos » et « door iedereen gebruikt », mais les conditions
+// d'usage des données renvoient à un texte non lu en entier : licence et mention non confirmées), Wallonie (tuile
+// 200 + CORS, aucune condition lisible : pages du géoportail en 404, GetCapabilities sans licence), Sarre (tuile 200 +
+// CORS « * », GetCapabilities « opendata », Fees « None », AccessConstraints « noLimitations », mais aucune licence
+// ni mention écrite lisible : pages de conditions vides ou 403), NGI (non demandé).
 // Esri World Imagery : compte ArcGIS exigé ; Sentinel-2 cloudless d'EOX : 10 m par pixel, licence non commerciale.
 
 import { SATELLITE_ZONES } from './satellite-zones.js';
@@ -40,6 +43,9 @@ export const IGN_ORTHO = Object.freeze({
 export const SATELLITE_OUTSIDE_TEXT = 'Vue satellite indisponible à cet endroit';
 
 const READ_ON = 'lu le 23/11/2026 (journal de l\'Action Textes officiels)';
+/** v58 : même requête en WMS 1.1.1 (SRS au lieu de CRS), seule version qui répond pour le DOP20 du LGL-BW. */
+const wms111 = (base, layer, format) => `${base}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=${layer}&STYLES=`
+  + `&FORMAT=${format}&SRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`;
 /** Requête WMS d'une tuile 256 px en Web Mercator (MapLibre remplace {bbox-epsg-3857}). */
 const wms = (base, layer, format) => `${base}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=${layer}&STYLES=`
   + `&FORMAT=${format}&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}`;
@@ -134,6 +140,48 @@ export const SATELLITE_SOURCES = Object.freeze([
     attribution: '©GeoBasis-DE / LVermGeoRP2026, dl-de/by-2-0, www.lvermgeo.rlp.de',
     attributionText: '©GeoBasis-DE / LVermGeoRP2026, dl-de/by-2-0, www.lvermgeo.rlp.de',
     licence: 'Datenlizenz Deutschland – Namensnennung 2.0', licenceUrl: 'https://www.govdata.de/dl-de/by-2-0',
+  }),
+  // v58 — Bade-Wurtemberg : DOP20 du LGL, WMS WMS_LGL-BW_ATKIS_DOP_20_C (couche IMAGES_DOP_20_RGB). GetCapabilities
+  // (lu le 23/11/2026, journal de l'Action) : « Unentgeltliche Nutzung nach Open Data Lizenz. Es gelten die
+  // Lizenzbedingungen „Datenlizenz Deutschland - Namensnennung - Version 2.0" […] Als Rechteinhaber und Bereitsteller
+  // ist die Datenhaltende Stelle, sowie das Jahr des Datenbezugs in Klammern anzugeben. Beispiel für Quellenvermerk:
+  // LGL-BW (2024) Datenlizenz Deutschland - Namensnennung - Version 2.0, www.lgl-bw.de » ; page
+  // https://www.lgl-bw.de/Produkte/Open-Data/ (« Rechtliches » : dl-de/by-2-0, unentgeltlich). Tuile WMS 1.1.1
+  // EPSG:3857 (chemin /owsproxy/ows/) : HTTP 200 image/jpeg, access-control-allow-origin « * » (la version 1.3.0 du
+  // chemin /owsproxy/wms/ : 404).
+  Object.freeze({
+    id: 'de-bw', layer: 'sat-de-bw', place: 'Bade-Wurtemberg', zone: 'DE-BW',
+    tiles: [wms111('https://owsproxy.lgl-bw.de/owsproxy/ows/WMS_LGL-BW_ATKIS_DOP_20_C', 'IMAGES_DOP_20_RGB', 'image/jpeg')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: 'LGL-BW (2026) Datenlizenz Deutschland – Namensnennung – Version 2.0, www.lgl-bw.de',
+    attributionText: 'LGL-BW (2026) Datenlizenz Deutschland – Namensnennung – Version 2.0, www.lgl-bw.de',
+    licence: 'Datenlizenz Deutschland – Namensnennung 2.0', licenceUrl: 'https://www.govdata.de/dl-de/by-2-0',
+  }),
+  // v58 — Bavière : DOP20 de la Bayerische Vermessungsverwaltung (LDBV), WMS open data dop20 (couche by_dop20c).
+  // GetCapabilities (lu le 23/11/2026, journal de l'Action) : « <Fees>kostenfrei</Fees> », « <AccessConstraints>CC BY 4.0
+  // vgl. https://creativecommons.org/licenses/by/4.0/deed.de</AccessConstraints> », mots-clés « kostenfrei »,
+  // « opendata ». Tuile WMS EPSG:3857 : HTTP 200 image/jpeg, access-control-allow-origin « https://timgo211.github.io ».
+  Object.freeze({
+    id: 'de-by', layer: 'sat-de-by', place: 'Bavière', zone: 'DE-BY',
+    tiles: [wms('https://geoservices.bayern.de/od/wms/dop/v1/dop20', 'by_dop20c', 'image/jpeg')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: '© Bayerische Vermessungsverwaltung – www.geodaten.bayern.de (CC BY 4.0)',
+    attributionText: '© Bayerische Vermessungsverwaltung – www.geodaten.bayern.de (CC BY 4.0)',
+    licence: 'Creative Commons BY 4.0', licenceUrl: 'https://creativecommons.org/licenses/by/4.0/deed.de',
+  }),
+  // v58 — Hesse : DOP20 de la HVBG, WMS ogc-free-images (couche he_dop20_rgb). Conditions de la HVBG (gds.hessen.de,
+  // « Nutzungsbedingungen », Stand 24.08.2026, lu le 23/11/2026, journal de l'Action) : « Mit dem Gesetz über die
+  // Bereitstellung offener Geobasisdaten vom 30. September 2021 werden die Geobasisdaten der HVBG […] unter
+  // OpenData-Grundsätzen bereitgestellt. Damit ist jede Nutzung dieser Daten ohne Einschränkung oder Bedingung
+  // erlaubt » (§ 18 HVGG) ; GetCapabilities : « Geobasisdaten © Hessische Verwaltung für Bodenmanagement und
+  // Geoinformation ». Tuile WMS EPSG:3857 : HTTP 200 image/jpeg, access-control-allow-origin « * ».
+  Object.freeze({
+    id: 'de-he', layer: 'sat-de-he', place: 'Hesse', zone: 'DE-HE',
+    tiles: [wms('https://www.gds-srv.hessen.de/cgi-bin/lika-services/ogc-free-images.ows', 'he_dop20_rgb', 'image/jpeg')],
+    tileSize: 256, minzoom: 2, maxzoom: 20,
+    attribution: 'Geobasisdaten © Hessische Verwaltung für Bodenmanagement und Geoinformation',
+    attributionText: 'Geobasisdaten © Hessische Verwaltung für Bodenmanagement und Geoinformation',
+    licence: 'Open Data Hessen (§ 18 HVGG, nutzung ohne Bedingung)', licenceUrl: 'https://gds.hessen.de/',
   }),
 ]);
 /** Date de lecture des conditions de toutes les sources étrangères (phase 7d). */
