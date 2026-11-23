@@ -12,6 +12,7 @@ import { fetchRouteOptions, fetchRoute } from './ui/api.js';
 import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption } from './lib/route-options.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
+import { createBridges } from './ui/bridges.js';
 import { createWinter } from './ui/winter.js';
 import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
 import { TOLLS_GEO, parseTollNetwork } from './lib/hgv-tolls-geo.js';
@@ -128,6 +129,7 @@ navigation = createNavigation({
     renderChoice();
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
     access.extend(route); // phase 5d : cases de data/acces-osm/ manquantes pour le nouveau tracé
+    bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
     winter.extend(route); // phase 5f : cases de data/hiver/ manquantes
   },
   onAreaOpen: (id) => areas.openSheet(id),
@@ -211,6 +213,17 @@ const access = createAccess({
   },
 });
 
+// ───────── Ponts sans hauteur connue (phase 12a) : data/ponts-osm/, cases touchées par les itinéraires proposés ─────────
+const bridges = createBridges({ onChange: () => renderChoice() });
+// Repère touché (à l'arrêt) : texte du pont en message, jamais dit à voix haute.
+map.onBridgePick((key) => {
+  if (!choice || navigation.active) return;
+  const items = rulesOf(choice.options[choice.selected].route, choice.vehicle, new Date()).bridges?.items ?? [];
+  const it = items.find((x) => bridgeKey(x) === key);
+  if (it) showMessage(messageNode, `${it.text}${it.name ? ` (${it.name})` : ''}`, 'info');
+});
+const bridgeKey = (it) => `${it.id}@${Math.round(it.along)}`;
+
 // ───────── Équipements d'hiver (phase 5f) : data/hiver/, cases traversées par les itinéraires proposés ─────────
 const winter = createWinter({ onChange: () => renderChoice() });
 
@@ -267,14 +280,17 @@ function rulesOf(route, vehicle, departure) {
   const acc = access.state;
   const win = winter.state;
   const tol = tolls;
-  if (hit && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  const brg = bridges.state;
+  const bw = data.settings.bridgeWarnings !== false;
+  if (hit && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
+    bridges: brg, bridgeWarnings: bw,
   });
-  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, rules });
+  rulesCache.set(route, { minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, rules });
   return rules;
 }
 
@@ -338,6 +354,7 @@ async function avoidZfe() {
     map.showRoutes(options.map((o) => o.route), choice.selected);
     areas.select(route); // aires déjà trouvées replacées (la requête Overpass couvrait les premiers itinéraires)
     access.extend(route);
+    bridges.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).banned;
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
@@ -376,6 +393,7 @@ async function avoidTunnel() {
     map.showRoutes(options.map((o) => o.route), choice.selected);
     areas.select(route);
     access.extend(route);
+    bridges.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).forbiddenTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
@@ -413,6 +431,7 @@ async function avoidLocal() {
     map.showRoutes(options.map((o) => o.route), choice.selected);
     areas.select(route);
     access.extend(route);
+    bridges.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).localTransit ?? [];
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans desserte » traverse encore une route réservée à la desserte locale (km ${still.map((p) => Math.round(p.enter / 1000)).join(', ')}). La signalisation fait foi.`, 'info');
@@ -437,6 +456,16 @@ function renderChoice() {
     windCredit: weather.status === 'ok',
   });
   showZfeOnMap(rules);
+  showBridgesOnMap(rules?.[choice.selected]);
+}
+
+/** Repères des ponts à vérifier de l'itinéraire choisi (phase 12a), à l'arrêt seulement (retirés en guidage). */
+function showBridgesOnMap(r) {
+  const items = r?.bridges?.items ?? [];
+  map.showBridges(items.map((it) => ({
+    key: bridgeKey(it), lonlat: it.point, level: it.level,
+    label: `Pont à vérifier, priorité ${it.level === 'high' ? 'haute' : 'moyenne'}${it.name ? ` : ${it.name}` : ''}`,
+  })));
 }
 
 /** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
@@ -514,6 +543,7 @@ const settings = createSettings({
   onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
   onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
   onWindVoiceChange: (on) => setSetting({ windVoice: on }),
+  onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
@@ -557,6 +587,7 @@ const form = createRouteForm({
       areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
       weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
       access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
+      bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
       winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
       const route = options[0].route;
       update((d) => addTrip(d, {
@@ -571,6 +602,8 @@ const form = createRouteForm({
       areas.clear();
       weather.clear();
       access.clear();
+      bridges.clear();
+      map.showBridges([]);
       winter.clear();
       map.showZfe([]);
       map.showRoutes([]); // ancien tracé et repères de départ / d'arrivée effacés : rien ne laisse croire à un itinéraire

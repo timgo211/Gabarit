@@ -436,6 +436,17 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
     pollution, fermetures de tunnels et de cols.
 
+## Bloc 5 — Ponts et restrictions (après l'écart de TomTom et HERE)
+
+- [x] **Phase 12a — Ponts sans hauteur connue d'après OSM** (v40)
+  Constat : Besançon → Luxeuil (Semi 44 t, H 4 m) passe sous le pont ferroviaire de Colombier (3,8 m, chemin OSM
+  243477938, sans maxheight). L'Action « Données OSM » copie aussi, pour la France, les ponts routiers et ferroviaires
+  (hors passerelles piétonnes et cyclables) et les tronçons qui portent un maxheight (`data/ponts-osm/`, 5 Mo par
+  fichier et 60 Mo en tout au plus, lus par cases du trajet, jamais précachés). Passage sous un pont sans hauteur
+  connue dessous : fiche et repère sur la carte à l'arrêt seulement, priorité haute (départementale et autres) ou
+  moyenne (nationale), autoroute comptée seulement ; jamais dit ni affiché en guidage. Réglage « Signaler les ponts
+  sans hauteur connue » (activé). Ligne technique « Ponts sans hauteur : N (haute x, moyenne y, autoroutes ignorées z) ».
+
 ## Ensuite
 
 - [ ] **Phase 7d — Satellite hors de France**

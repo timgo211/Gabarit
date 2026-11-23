@@ -669,6 +669,12 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .avis-ok { color: var(--avis-ok); }
 .areas-credit { font-size: .8rem; }
 
+/* Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement. */
+.bridge-marker {
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+  font-size: 18px; line-height: 1; font-weight: 800; border: 3px solid var(--text); background: var(--bg); color: var(--danger);
+}
+.bridge-marker.medium { color: var(--warn); }
 .area-marker {
   width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
   display: grid; place-items: center; font: 800 18px/1 system-ui, sans-serif;

@@ -101,3 +101,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   route : A … km, N … km, autre … km ; km inconnus … ; part A/N … ».
 - Phase 2g : message d'un code 2009 au diagnostic précis (départ sans sortie, départ isolé, arrivée inaccessible) :
   `NO_ROUTE_BASE_TEXT` + précision, sans le conseil péages / ferries (gardé seulement sans conclusion).
+- Phase 12a : ponts sans hauteur connue — lignes `warn` de la fiche (5 au plus + « +N »), résumé « N ponts à vérifier »,
+  repères `.bridge-marker` (`map.showBridges`, retirés par `setNavigating(true)`, jamais en guidage), repère touché →
+  message (texte du pont), jamais de voix ; Réglages › Ponts, case `#bridge-warnings` (`settings.bridgeWarnings`,
+  activée par défaut). Texte fixe `BRIDGE.TEXT` ; « à vérifier », « la signalisation fait foi ».

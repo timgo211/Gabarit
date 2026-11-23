@@ -59,6 +59,7 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
     }
   }
   if (!steps.length) lines.push('  (aucune étape)');
+  if (rules?.bridges?.tech) lines.push(rules.bridges.tech); // phase 12a : mesure du bruit sur de vrais trajets
   if (rules) {
     const zfe = rules.passages ?? [];
     lines.push(`ZFE (${zfe.length}) :${zfe.length ? '' : ' aucune'}`);
