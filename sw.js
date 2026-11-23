@@ -60,6 +60,7 @@ const APP_FILES = [
   './src/lib/hgv-bans.js',
   './src/lib/holidays.js',
   './src/lib/map-layers.js',
+  './src/lib/satellite-zones.js',
   './src/lib/map-palette.js',
   './src/lib/nav-anim.js',
   './src/lib/nav-layout.js',

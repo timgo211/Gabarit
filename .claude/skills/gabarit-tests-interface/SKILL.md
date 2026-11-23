@@ -20,7 +20,9 @@ node tools/ui-check.mjs            # ou un scénario : layout | long | satellite
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
-changement de thème, perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
+changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
+Cologne, Trèves — jour et nuit, 412×900 et 900×412, attribution sur la carte, Turin → plan et message, frontière
+Jougne → Vallorbe sans trou ; carte posée avec `moveMap` / `window.__maps`), perte du contexte WebGL, camion arrêté hors du tracé, boutons et réglages 7c, appui long et
 coordonnées (phase 8), vue d'ensemble avec des positions envoyées comme le vrai GPS (plan et satellite), saisie après
 un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans Overpass, hors zone : serveur Overpass de secours et cache, copie absente, encart en guidage avec le GPS
 émulé), réglementation (fiches, « Éviter la ZFE », bandeau du guidage, heure de la tablette décalée un samedi

@@ -66,6 +66,13 @@ function solidPng([r, g, b]) {
     chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 }
 const RED_TILE = solidPng([220, 0, 0]);
+/** Phase 7d : une couleur de tuile par source de photos (hôte → [id, couleur]), pour savoir laquelle est montrée. */
+const SAT_TILE_COLORS = [
+  ['wmts.geoportail.lu', 'lu', [0, 0, 220]], ['geoservices-grid.irisnet.be', 'be-bru', [0, 200, 0]],
+  ['wmts.geo.admin.ch', 'ch', [200, 0, 200]], ['www.ign.es', 'es', [0, 200, 200]],
+  ['www.wms.nrw.de', 'de-nw', [200, 200, 0]], ['geo4.service24.rlp.de', 'de-rp', [220, 110, 0]],
+];
+const SAT_TILES = new Map(SAT_TILE_COLORS.map(([host, id, rgb]) => [host, { id, png: solidPng(rgb), rgb }]));
 
 // Fond des faux styles : recoloré au chargement par src/lib/map-palette.js (2c-a) en crème le jour ; la nuit, fond du
 // niveau de luminosité (phase 2d : #22252F en Normal, par défaut).
@@ -134,10 +141,11 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null,
+  start = START,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
-    geolocation: { latitude: START[1], longitude: START[0], accuracy: 8 }, permissions: ['geolocation'],
+    geolocation: { latitude: start[1], longitude: start[0], accuracy: 8 }, permissions: ['geolocation'],
     serviceWorkers: sw ? 'allow' : 'block', locale: 'fr-FR', timezoneId: 'Europe/Paris',
   });
   // Heure de la tablette (phase 5 : interdictions PL) : Date décalée, les minuteries restent réelles.
@@ -152,7 +160,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [] };
+  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [], satTiles: {} };
   if (driving) await ctx.addInitScript((d) => { if (!sessionStorage.getItem('ui-check-init')) localStorage.setItem('gabarit.driving', d); }, JSON.stringify(driving));
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -202,6 +210,11 @@ async function open(browser, base, {
     if (url.includes('data.geopf.fr')) {
       stats.tiles += 1;
       return route.fulfill({ body: RED_TILE, contentType: 'image/png' });
+    }
+    const sat = SAT_TILES.get(new URL(url).host);
+    if (sat) {
+      stats.satTiles[sat.id] = (stats.satTiles[sat.id] ?? 0) + 1;
+      return route.fulfill({ body: sat.png, contentType: 'image/png', headers: { 'access-control-allow-origin': '*' } });
     }
     if (url.includes('/api/interpreter')) {
       stats.overpass.push(new URL(url).host);
@@ -719,6 +732,78 @@ async function satelliteThemeCheck(browser, base) {
   c = await mapColor(page);
   check(isDay(c), 'retour au plan : fond jour', `couleur ${c}`);
   await ctx.close();
+}
+
+/**
+ * Phase 7d : orthophotos hors de France. Une position par source codée (carte centrée sur la position GPS au
+ * démarrage), jour et nuit, portrait et paysage : couleur de la tuile de cette source (une couleur par hôte),
+ * assombrie la nuit, attribution sur la carte ; Turin (aucune source) : plan et message, jamais une couche vide.
+ */
+/** Carte posée sur un point (window.__maps, carte créée par la page), puis rendu. */
+async function moveMap(page, [lon, lat], zoom = 14) {
+  await page.waitForTimeout(1500);
+  await page.evaluate(([x, y, z]) => window.__maps.at(-1).jumpTo({ center: [x, y], zoom: z }), [lon, lat, zoom]);
+  await page.waitForTimeout(2000);
+}
+
+async function satelliteAbroadCheck(browser, base) {
+  const places = [
+    ['lu', 'Luxembourg', [6.1296, 49.6116], /ACT Luxembourg/], ['be-bru', 'Bruxelles', [4.3517, 50.8503], /UrbIS/],
+    ['ch', 'Berne', [7.4474, 46.948], /swisstopo/], ['es', 'Madrid', [-3.7038, 40.4168], /Instituto Geográfico Nacional/],
+    ['de-nw', 'Cologne', [6.958, 50.941], /Geobasis NRW/], ['de-rp', 'Trèves', [6.641, 49.756], /LVermGeoRP/],
+  ];
+  const norm = (c) => { const m = Math.max(1, ...c); return c.map((x) => x / m); };
+  const nearest = (c) => {
+    const n = norm(c);
+    let best = null; let dist = Infinity;
+    for (const [, id, rgb] of [['', 'ign', [220, 0, 0]], ...SAT_TILE_COLORS]) {
+      const d = norm(rgb).reduce((a, x, i) => a + (x - n[i]) ** 2, 0);
+      if (d < dist) { dist = d; best = id; }
+    }
+    return Math.max(...c) > 60 && dist < 0.15 ? best : null;
+  };
+  for (const [width, height] of [[412, 900], [900, 412]]) {
+    for (const [id, name, start, attrib] of places) {
+      const tag = `${name} ${width}×${height}`;
+      const { page, ctx, stats, errors } = await open(browser, base, { width, height, theme: 'day', layer: 'satellite', start });
+      await moveMap(page, start);
+      let c = await mapColor(page);
+      check(nearest(c) === id, `${tag} jour : photos de la source ${id}`, `couleur ${c}, tuiles ${JSON.stringify(stats.satTiles)}`);
+      const text = await page.evaluate(() => document.querySelector('.maplibregl-ctrl-attrib')?.textContent ?? '');
+      check(attrib.test(text), `${tag} : attribution sur la carte`, text.slice(0, 160));
+      check(await page.evaluate(() => document.querySelector('#layer-message')?.hidden !== false), `${tag} : aucun message`);
+      const day = c;
+      await setTheme(page, 'night');
+      c = await mapColor(page);
+      check(nearest(c) === id && Math.max(...c) < Math.max(...day) - 20, `${tag} nuit : mêmes photos, assombries`, `couleur ${c} (jour ${day})`);
+      await page.screenshot({ path: join(SHOTS, `7d-${id}-${width}x${height}-nuit.png`) });
+      check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+    // Frontière France → Suisse (Jougne → Vallorbe) : la nouvelle couche s'affiche avant que l'ancienne soit masquée.
+    {
+      const { page, ctx } = await open(browser, base, { width, height, theme: 'day', layer: 'satellite' });
+      await moveMap(page, [6.3417, 46.782]);
+      const seen = await page.evaluate(() => new Promise((resolve) => {
+        const m = window.__maps.at(-1);
+        const vis = () => ['ign-ortho', 'sat-ch'].filter((id) => m.getLayoutProperty(id, 'visibility') === 'visible');
+        const states = [vis()];
+        m.jumpTo({ center: [6.3786, 46.7123] });
+        states.push(vis());
+        m.once('idle', () => setTimeout(() => { states.push(vis()); resolve(states); }, 50));
+      }));
+      check(JSON.stringify(seen) === JSON.stringify([['ign-ortho'], ['ign-ortho', 'sat-ch'], ['sat-ch']]),
+        `frontière ${width}×${height} : IGN puis IGN + swisstopo pendant le chargement, puis swisstopo seul (pas de trou)`, JSON.stringify(seen));
+      await ctx.close();
+    }
+    // Aucune source codée (Turin) : plan et message.
+    const { page, ctx } = await open(browser, base, { width, height, theme: 'day', layer: 'satellite', start: [7.6869, 45.0703] });
+    await moveMap(page, [7.6869, 45.0703]);
+    const c = await mapColor(page);
+    const msg = await page.evaluate(() => { const m = document.querySelector('#layer-message'); return m && !m.hidden ? m.textContent : ''; });
+    check(isDay(c) && /Vue satellite indisponible à cet endroit/.test(msg), `Turin ${width}×${height} : plan gardé et message`, `couleur ${c}, « ${msg} »`);
+    await ctx.close();
+  }
 }
 
 async function contextLossCheck(browser, base) {
@@ -3720,7 +3805,7 @@ async function bannerCheck(browser, base) {
 
 const only = process.argv[2];
 try {
-  const all = { layout: layoutChecks, long: longTextCheck, satellite: satelliteThemeCheck, context: contextLossCheck,
+  const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,

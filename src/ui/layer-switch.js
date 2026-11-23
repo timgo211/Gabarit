@@ -1,4 +1,4 @@
-// Boutons « Plan / Satellite » sur la carte et message « Vue satellite disponible en France uniquement ».
+// Boutons « Plan / Satellite » sur la carte et message « Vue satellite indisponible à cet endroit » (phase 7d).
 // Ce qu'il faut montrer est décidé par src/lib/map-layers.js (satelliteView) ; ici, seulement l'affichage.
 
 import { sanitizeMapLayer } from '../lib/map-layers.js';
