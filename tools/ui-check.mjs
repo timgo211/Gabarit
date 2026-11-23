@@ -1725,6 +1725,25 @@ async function borderCheck(browser, base) {
   const at = cards.find((t) => /Autriche/.test(t));
   check(cards.some((t) => /Allemagne/.test(t)) && at && /à vérifier/.test(at), 'München → Innsbruck : fiches Allemagne et Autriche, Autriche « à vérifier »', cards.map((t) => t.slice(0, 120)).join(' | '));
   await noHorizontalScroll(mi.page, '412 px fiche Autriche');
+  // v49 : GO-Maut (tarifs ASFINAG 2026) : ligne grise d'information, jamais une alerte ni la fiche courte ; A 12
+  // (tarif propre) traversée → aucune estimation. Champ « Essieux » du profil (non précisé par défaut).
+  const maut = await mi.page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })).filter((x) => /^GO-Maut \(Autriche\) :/.test(x.text)));
+  check(maut.length === 1 && maut[0].cls === 'info' && /€\/km HT pour votre profil \(essieux non précisés/.test(maut[0].text)
+    && /estimation non calculée/.test(maut[0].text) && /Montants à vérifier\. La signalisation fait foi\.Tarifs$/.test(maut[0].text),
+  'München → Innsbruck : ligne GO-Maut grise, « à vérifier », A 12 sans estimation', maut.map((x) => `${x.cls}: ${x.text}`).join(' | '));
+  check(!/GO-Maut|€\/km/.test(await mi.page.textContent('.route-card[aria-checked="true"]')), 'GO-Maut jamais sur la fiche d\'itinéraire');
+  await mi.page.click('#btn-vehicles');
+  await mi.page.click('#vehicles-body .vehicle-card.active button:has-text("Modifier")');
+  const axles = await mi.page.$$eval('#veh-axles option', (o) => o.map((x) => x.textContent));
+  check(axles.join('|') === 'Non précisé|2 essieux|3 essieux|4 essieux|5 essieux et plus', 'profil : champ « Essieux » (non précisé par défaut)', axles.join('|'));
+  await noHorizontalScroll(mi.page, '412 px profil avec « Essieux »');
+  await mi.page.selectOption('#veh-axles', '5+');
+  await mi.page.click('#vehicles-body button[type="submit"]');
+  check(/5 essieux et plus/.test(await mi.page.textContent('#vehicles-body .vehicle-card.active .dims')), 'profil « 5 essieux et plus » enregistré');
+  await mi.page.keyboard.press('Escape');
+  await computeRoute(mi.page);
+  await mi.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  check(/4 essieux et plus/.test(await mi.page.textContent('#route-notes')), 'GO-Maut : catégorie 4+ pour 5 essieux');
   check(mi.errors.length === 0, 'München → Innsbruck : aucune erreur JavaScript', mi.errors.join(' | '));
   await mi.ctx.close();
 }

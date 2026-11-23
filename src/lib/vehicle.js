@@ -34,6 +34,14 @@ export const EURO_LABELS = Object.freeze({
   5: 'Euro 5 (V)', EEV: 'EEV', 6: 'Euro 6 (VI)',
 });
 
+/**
+ * Nombre d'essieux du véhicule ou de l'ensemble (phase 5h, taxes PL à l'étranger) : '' = non précisé (défaut, les
+ * deux cas sont donnés), 2, 3, 4, 5 et plus. Sert seulement aux montants qui en dépendent (voir foreign-tolls.js) :
+ * le champ n'est montré dans le profil que si un tel montant est codé.
+ */
+export const AXLE_VALUES = Object.freeze(['', '2', '3', '4', '5+']);
+export const AXLE_LABELS = Object.freeze({ '': 'Non précisé', 2: '2 essieux', 3: '3 essieux', 4: '4 essieux', '5+': '5 essieux et plus' });
+
 // Matières dangereuses (phase 5b) : réglage global (Réglages, settings.adr), plus dans le profil depuis la v19.
 // Voir src/lib/adr-settings.js (reprise des anciens profils, withAdr).
 
@@ -75,6 +83,7 @@ export function defaultVehicle() {
     combined: false,
     trailer: '',
     euroClass: '',
+    axles: '',
   };
 }
 
@@ -100,6 +109,8 @@ export function normalizeVehicle(raw) {
     trailer: TRAILER_VALUES.includes(raw?.trailer) ? raw.trailer : '',
     // Anciens profils et valeur inconnue : non précisée.
     euroClass: EURO_VALUES.includes(String(raw?.euroClass ?? '')) ? String(raw?.euroClass ?? '') : '',
+    // Anciens profils et valeur inconnue : non précisé.
+    axles: AXLE_VALUES.includes(String(raw?.axles ?? '')) ? String(raw?.axles ?? '') : '',
   };
   // Anciens champs ADR (hazmat, tunnelCode, adrClass, unNumber) : non gardés, repris dans settings.adr (store.js).
   for (const key of Object.keys(NUMERIC_FIELDS)) {
