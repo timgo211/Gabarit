@@ -3997,6 +3997,115 @@ async function bannerCheck(browser, base) {
  * « ancien », filtre « Piste PL », coût du trajet, ★ OK camion gardée, fermé en roulant, module refusé hors ligne →
  * message, trajet hors de France → message sans requête, guidage : stations devant seulement, rien dit.
  */
+/**
+ * v55 : étapes multiples. Saisie (même recherche que l'arrivée), ↑ ↓ ✕, 10 au plus ; un calcul avec tous les points
+ * (jamais alternative_routes) ; fiche par étape, repères numérotés ; guidage avec le GPS émulé : « Étape atteinte »
+ * dite une fois, prochaine étape dans les détails, recalcul hors itinéraire qui garde l'étape, « Autres itinéraires »
+ * qui la garde ; fiche carburant « Ajouter comme étape » grisé en roulant, actif à l'arrêt. 360 / 412 / 800 / 1280 px.
+ */
+async function stopsCheck(browser, base) {
+  const withStop = fixture('ors-directions-etapes.json');
+  const nav = fixture('ors-directions-nav.json');
+  const line = withStop.features[0].geometry.coordinates;
+  const now = Date.now();
+  const iso = (ms) => new Date(ms).toISOString().replace('.000Z', '+00:00');
+  const stations = [
+    { id: 2001, adresse: '1 rue de la Pompe', ville: 'Essai', cp: '69100', geom: { lon: line[20][0], lat: line[20][1] + 0.003 }, gazole_prix: 1.999, gazole_maj: iso(now - 3600e3), services_service: ['Piste poids lourds'] },
+  ];
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night'], [360, 760, 'day'], [800, 1280, 'day']]) {
+    const tag = `étapes ${width}×${height} ${theme}`;
+    const bodies = [];
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, overpass: () => ({ elements: [] }), fuel: () => stations,
+      directions: (b) => { bodies.push(b); return b.coordinates.length > 2 ? withStop : nav; },
+    });
+    // Deux étapes, ↓ puis ✕ : il en reste une.
+    for (const i of [0, 1]) {
+      await page.click('#btn-add-stop');
+      await page.fill(`#stop-input-${i}`, i === 0 ? 'Port' : 'Lyon');
+      await page.waitForSelector(`#stop-list-${i} li`, { timeout: 5000 });
+      await page.dispatchEvent(`#stop-list-${i} li >> nth=${i === 0 ? 1 : 0}`, 'pointerdown');
+    }
+    const labels = async () => page.$$eval('.stop-input', (n) => n.map((x) => x.value));
+    const before = await labels();
+    await page.click('[aria-label="Descendre l\'étape 1"]');
+    const after = await labels();
+    check(after.length === 2 && after[0] === before[1] && after[1] === before[0], `${tag} : ↓ change l'ordre`, after.join(' | '));
+    await page.click('[aria-label="Retirer l\'étape 1"]');
+    check((await labels()).length === 1, `${tag} : ✕ retire l'étape`);
+    const btnBox = await page.locator('.btn-stop >> nth=0').boundingBox();
+    check(btnBox && btnBox.width >= 48 && btnBox.height >= 48, `${tag} : boutons ↑ ↓ ✕ ≥ 48 px`, JSON.stringify(btnBox));
+    await noHorizontalScroll(page, `${tag} saisie`);
+    await computeRoute(page);
+    const sent = bodies.slice();
+    check(sent.length >= 1 && sent.length <= 3 && sent.every((b) => b.coordinates.length === 3 && !b.alternative_routes),
+      `${tag} : 1 à 3 requêtes, tous les points, jamais alternative_routes`, JSON.stringify(sent.map((b) => b.coordinates.length)));
+    const leg = await page.locator('.route-card-leg').first().textContent().catch(() => '');
+    check(/^Étape 1 · .+ — \d\d:\d\d \(\d+ min\)$/.test(leg.trim()), `${tag} : fiche, une ligne par étape`, leg);
+    check(/étape : Heures sans temps passé aux étapes\./.test(await page.textContent('#route-notes')), `${tag} : note « sans temps passé aux étapes »`);
+    check(await page.locator('.stop-marker').count() === 1, `${tag} : repère numéroté de l'étape`);
+    await noHorizontalScroll(page, `${tag} fiche`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-etapes-fiche.png`) });
+    if (width === 360 || width === 800) { check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | ')); await ctx.close(); continue; }
+    // Carburant en préparation : grisé en roulant, « Ajouter comme étape » à l'arrêt → nouveau calcul avec 2 étapes.
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    await page.click('#btn-fuel');
+    await page.waitForSelector('#fuel-list .fuel-add-stop', { timeout: 10000 }).catch(() => {});
+    check(await page.getAttribute('#fuel-list .fuel-add-stop', 'aria-disabled') === 'false', `${tag} : « Ajouter comme étape » actif à l'arrêt`);
+    const n0 = bodies.length;
+    await page.click('#fuel-list .fuel-add-stop');
+    await page.waitForFunction((n) => document.querySelectorAll('.stop-input').length === 2, null, { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1500);
+    const added = bodies.slice(n0);
+    check((await labels()).length === 2 && added.length >= 1 && added.every((b) => b.coordinates.length === 4),
+      `${tag} : station ajoutée comme étape, nouveau calcul avec tous les points`, JSON.stringify(added.map((b) => b.coordinates.length)));
+    // Retour à une seule étape pour le guidage.
+    await page.click('[aria-label="Retirer l\'étape 2"]');
+    await page.click('#btn-route');
+    await page.waitForTimeout(1500);
+    // Guidage, GPS émulé : prochaine étape dans les détails, « Étape atteinte » une fois.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    for (let i = 1; i <= 6; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(700); }
+    check(/Prochaine étape \(1\/1\)/.test(await page.textContent('#nav-facts')), `${tag} : prochaine étape dans les détails`, await page.textContent('#nav-facts'));
+    check(await page.locator('.stop-marker').count() === 1, `${tag} : repère de l'étape en guidage`);
+    // Hors itinéraire en roulant (300 m au nord, 14 m/s) → recalcul avec l'étape restante.
+    const n1 = bodies.length;
+    for (let k = 0; k < 9; k += 1) { await setGeo(page, { lon: line[6][0], lat: line[6][1] + 0.003 + k * 0.0002, accuracy: 5, speed: 14, heading: 0 }); await page.waitForTimeout(1000); }
+    await page.waitForTimeout(1500);
+    const rer = bodies.slice(n1);
+    check(rer.length >= 1 && rer[0].coordinates.length === 3, `${tag} : recalcul hors itinéraire avec l'étape restante`, JSON.stringify(rer.map((b) => b.coordinates.length)));
+    for (let i = 7; i <= 18; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 12 }); await page.waitForTimeout(600); }
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(spoken.filter((t) => t === 'Étape atteinte.').length === 1, `${tag} : « Étape atteinte. » dite une fois`, spoken.join(' | '));
+    check(!spoken.some((t) => /Destination atteinte/.test(t)), `${tag} : jamais « Destination atteinte » à l'étape`);
+    // « Autres itinéraires » à l'arrêt : plus d'étape restante → 2 points.
+    const stopAt = line[18];
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: stopAt[0], lat: stopAt[1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    const n2 = bodies.length;
+    await page.click('#btn-nav-alt');
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    check(bodies.slice(n2).every((b) => b.coordinates.length === 2), `${tag} : « Autres itinéraires » sans l'étape déjà atteinte`);
+    check(await page.isVisible('#alts-stop-input'), `${tag} : « Ajouter une étape » dans « Autres itinéraires » à l'arrêt`);
+    await page.fill('#alts-stop-input', 'Port');
+    await page.waitForSelector('#alts-stop-list li', { timeout: 5000 }).catch(() => {});
+    const n3 = bodies.length;
+    await page.dispatchEvent('#alts-stop-list li >> nth=1', 'pointerdown').catch(() => {});
+    await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(800);
+    check(bodies.slice(n3).length >= 1 && bodies.slice(n3).every((b) => b.coordinates.length === 3), `${tag} : étape ajoutée à l'arrêt → calcul avec elle`, JSON.stringify(bodies.slice(n3).map((b) => b.coordinates.length)));
+    await noHorizontalScroll(page, `${tag} autres itinéraires`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-etapes-autres.png`) });
+    // Le véhicule roule : panneau fermé.
+    for (let i = 19; i <= 21; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    check(await page.isHidden('#nav-alts'), `${tag} : panneau fermé dès que le véhicule roule`);
+    await stopGuidance(page);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function fuelCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
   const line = nav.features[0].geometry.coordinates;
@@ -4134,7 +4243,7 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck };
+    carburant: fuelCheck, etapes: stopsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

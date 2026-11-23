@@ -153,6 +153,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   // Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement, jamais en guidage.
   let bridgeItems = [];
   let bridgeMarkers = [];
+  /** v55 : étapes du trajet, repères numérotés (aussi en guidage) : [[lon, lat], …]. */
+  let stopItems = [];
+  let stopMarkers = [];
   let onBridge = null;
   let onArea = null;
   /** ZFE affichées (phase 5) : [{ name, banned, polygons }]. */
@@ -529,6 +532,20 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.pinFrom) marker('pinFrom', marks.pinFrom, MARK_COLORS.pin);
     drawAreas();
     drawBridges();
+    drawStops();
+  }
+
+  function drawStops() {
+    for (const m of stopMarkers) m.remove();
+    stopMarkers = [];
+    if (!map) return;
+    stopItems.forEach((p, i) => {
+      const node = document.createElement('div');
+      node.className = 'stop-marker';
+      node.textContent = String(i + 1);
+      node.setAttribute('aria-label', `Étape ${i + 1}`);
+      stopMarkers.push(new lib.Marker({ element: node, anchor: 'center' }).setLngLat(p).addTo(map));
+    });
   }
 
   function bridgeElement(item) {
@@ -867,6 +884,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     center() {
       const c = map?.getCenter();
       return c ? [c.lng, c.lat] : null;
+    },
+    /** v55 : repères numérotés des étapes ([lon, lat] dans l'ordre) ; liste vide → retirés. */
+    showStops(points) {
+      stopItems = (Array.isArray(points) ? points : []).filter((p) => Array.isArray(p) && p.length >= 2);
+      drawStops();
     },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];

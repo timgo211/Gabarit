@@ -11,7 +11,12 @@
 // - au retour : sauvegarde de moins de 12 h → reprise telle quelle ; plus de 12 h → question « Reprendre
 //   l'itinéraire ? », posée seulement à l'arrêt (Code de la route art. R412-6-2 : aucune saisie en roulant ; vitesse
 //   inconnue = en mouvement) ; format différent, contenu illisible ou profil supprimé → ignorée ;
-// - effacée à l'arrivée et quand le guidage est quitté (✕ puis « Quitter »).
+// - effacée à l'arrivée et quand le guidage est quitté (✕ puis « Quitter ») ;
+// - v55 : étapes (`choice.stops`, 10 au plus) et étapes déjà atteintes (`progress.nextStop`) gardées ; champs
+//   optionnels du même format 1 : une ancienne sauvegarde sans étapes est reprise comme avant ; des étapes présentes
+//   mais illisibles → sauvegarde ignorée.
+
+import { sanitizeStops } from './stops.js';
 
 export const ROUTE_SAVE = Object.freeze({
   FORMAT: 1,
@@ -43,7 +48,7 @@ function validRoute(r) {
  *   choice : itinéraires proposés (app.js) ; along / segIndex : progression du guidage
  * @returns {object|null} null si rien à garder
  */
-export function buildSave({ kind, choice, vehicleId, along = null, segIndex = null, now }) {
+export function buildSave({ kind, choice, vehicleId, along = null, segIndex = null, nextStop = 0, now }) {
   if (!ROUTE_SAVE.KINDS.includes(kind) || !choice || typeof vehicleId !== 'string' || !vehicleId) return null;
   const options = Array.isArray(choice.options) ? choice.options : [];
   if (!options.length || !options.every((o) => validRoute(o?.route))) return null;
@@ -64,9 +69,15 @@ export function buildSave({ kind, choice, vehicleId, along = null, segIndex = nu
       fromLabel: typeof choice.fromLabel === 'string' ? choice.fromLabel : '',
       toLabel: typeof choice.toLabel === 'string' ? choice.toLabel : '',
       startIsMyPosition: choice.startIsMyPosition === true,
+      stops: sanitizeStops(choice.stops) ?? [],
     }),
   };
-  if (kind === 'nav') save.progress = { along: isNum(along) && along >= 0 ? along : 0, segIndex: Number.isInteger(segIndex) ? segIndex : null };
+  if (kind === 'nav') {
+    save.progress = {
+      along: isNum(along) && along >= 0 ? along : 0, segIndex: Number.isInteger(segIndex) ? segIndex : null,
+      nextStop: Number.isInteger(nextStop) && nextStop >= 0 ? nextStop : 0,
+    };
+  }
   return save;
 }
 
@@ -78,6 +89,7 @@ export function isValidSave(save) {
   if (!c || !Array.isArray(c.options) || !c.options.length || !c.options.every((o) => validRoute(o?.route))) return false;
   if (!Number.isInteger(c.selected) || c.selected < 0 || c.selected >= c.options.length) return false;
   if (!isPoint(c.end)) return false;
+  if (sanitizeStops(c.stops) === null) return false; // v55 : absentes = aucune étape (ancienne sauvegarde)
   if (save.kind === 'nav' && !(save.progress && isNum(save.progress.along) && save.progress.along >= 0)) return false;
   return true;
 }
@@ -125,5 +137,5 @@ export function restoredChoice(save, vehicles) {
   if (!isValidSave(save)) return null;
   const vehicle = (vehicles ?? []).find((v) => v?.id === save.vehicleId);
   if (!vehicle) return null;
-  return { ...save.choice, failures: [], vehicle };
+  return { ...save.choice, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle };
 }

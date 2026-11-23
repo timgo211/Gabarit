@@ -33,6 +33,7 @@ import { symbolSvg } from './nav-symbols.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
+  remainingStops,
   setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, markStopAsWork, NAV,
   resumeNavigation,
 } from '../lib/navigation.js';
@@ -316,6 +317,12 @@ export function createNavigation(ctx) {
     if (next) {
       const d = describeNextArea(next, new Date());
       rows.push(['Prochaine aire PL', `${d.name} · ${d.distance} · ${d.eta} · ${d.places}`]);
+    }
+    // v55 : prochaine étape (affichage seulement, jamais dite).
+    const ns = view?.nextStop;
+    if (ns) {
+      rows.push([`Prochaine étape (${ns.index + 1}/${ns.count})`,
+        `${ns.label} · ${formatDistance(ns.distance)} · ${formatArrival(new Date(), ns.duration)}`]);
     }
     if (s?.tollDistance !== undefined) rows.push(['Péage', tollText(s.tollDistance)]);
     const key = JSON.stringify(rows);
@@ -701,6 +708,11 @@ export function createNavigation(ctx) {
     for (const e of events) {
       if (e.type === 'speak') ctx.voice.speak(e.text, { interrupt: !!e.interrupt });
       else if (e.type === 'reroute') reroute(e.from);
+      else if (e.type === 'stop-reached') {
+        // v55 : étape atteinte (phrase fixe déjà dite) : repères des étapes restantes, sauvegarde à jour.
+        ctx.map.showStops?.(remainingStops(s.state).map((x) => [x.lon, x.lat]));
+        ctx.onStopReached?.(remainingStops(s.state));
+      }
       else if (e.type === 'arrived') {
         ctx.onArrived?.(); // v53 : sauvegarde de l'itinéraire effacée
         clearTimeout(s.releaseTimer);
@@ -736,14 +748,17 @@ export function createNavigation(ctx) {
     refreshAlerts(s.view);
     try {
       // Mêmes réglages que l'itinéraire choisi à l'arrêt (plus court, sans péage…) : rien à choisir en roulant.
+      // v55 : étapes pas encore atteintes gardées (même requête, via).
+      const stops = remainingStops(session.state);
+      const via = stops.map((x) => [x.lon, x.lat]);
       const route = await fetchRoute({
         apiKey: ctx.getApiKey(), vehicle: session.vehicle, start: from, end: session.params.end,
         avoidTolls: session.params.avoidTolls, avoidFerries: session.params.avoidFerries,
-        preference: session.params.preference ?? null,
-        avoidPolygons: avoidForReroute(session.params.avoidPolygons, from, session.params.end),
+        preference: session.params.preference ?? null, via,
+        avoidPolygons: avoidForReroute(session.params.avoidPolygons, from, session.params.end, via),
       });
       if (s !== session) return; // guidage arrêté entre-temps
-      const done = rerouteDone(s.state, route);
+      const done = rerouteDone(s.state, route, stops);
       s.state = done.state;
       s.error = '';
       s.doneAlong = null;
@@ -752,7 +767,8 @@ export function createNavigation(ctx) {
       ctx.map.showTurns(maneuverMarks(s.state.route.line, s.state.route.maneuvers));
       // Simulation : le nouvel itinéraire part d'une fausse position, il ne remplace pas l'itinéraire réel.
       if (s.sim) s.sim.setRoute(route.coordinates);
-      else ctx.onRouteChange?.(route);
+      else ctx.onRouteChange?.(route, stops);
+      ctx.map.showStops?.(via);
       handle(done.events);
     } catch (err) {
       if (s !== session) return;
@@ -912,6 +928,7 @@ export function createNavigation(ctx) {
     const begun = startNavigation(route, {
       destination: params.end, now, areas, announceAreas, rules,
       driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
+      stops: params.stops ?? [], // v55
     });
     s = {
       // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
@@ -966,6 +983,7 @@ export function createNavigation(ctx) {
     renderVoice();
     ctx.map.setNavigating(true);
     ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
+    ctx.map.showStops?.(remainingStops(s.state).map((x) => [x.lon, x.lat])); // v55
     ctx.map.showTurns(maneuverMarks(s.state.route.line, s.state.route.maneuvers));
     ctx.voice.speak(s.sim ? 'Simulation du trajet.' : s.state.resumed ? 'Guidage repris.' : 'Guidage démarré.', { interrupt: true });
     ctx.wakeLock.enable();
@@ -1132,7 +1150,17 @@ export function createNavigation(ctx) {
     },
     /** Progression le long du tracé (v53, sauvegarde de l'itinéraire), null hors guidage. */
     get progress() {
-      return s ? { along: s.state.along, segIndex: s.state.segIndex, arrived: !!s.state.arrived } : null;
+      return s ? {
+        along: s.state.along, segIndex: s.state.segIndex, arrived: !!s.state.arrived, nextStop: s.state.nextStop ?? 0,
+      } : null;
+    },
+    /** v55 : dernière position reçue [lon, lat] (étape ajoutée depuis la fiche carburant), null sinon. */
+    get lastFix() {
+      return s ? (s.lastFix ?? s.view?.position ?? null) : null;
+    },
+    /** v55 : étapes pas encore atteintes ({ label, lon, lat }), [] hors guidage. */
+    get remainingStops() {
+      return s ? remainingStops(s.state) : [];
     },
     /** Message bref sur l'écran de guidage (v44 : choix d'itinéraire fermé en roulant), jamais dit à voix haute. */
     notify(text) {

@@ -29,6 +29,7 @@
 
 import { prepareLine, pointAt, haversine } from './nav-geo.js';
 import { timeAt } from './areas-route.js';
+import { pathCrow } from './zfe.js';
 
 export const ADR = Object.freeze({
   DATA_PATH: './data/tunnels-adr.json',
@@ -406,13 +407,13 @@ export function squareAround(p, size = ADR.AVOID_SQUARE_M) {
  * d'ORS que pour les ZFE (150 km à vol d'oiseau avec zones à éviter).
  * @returns {{ ok:true, geometry:object }|{ ok:false, text:string }}
  */
-export function avoidTunnelsFor(passages, { start, end, existing = null, maxDistance = 150000 }) {
+export function avoidTunnelsFor(passages, { start, end, existing = null, stops = [], maxDistance = 150000 }) {
   const list = (passages ?? []).filter((p) => p.forbidden && isPoint(p.mid));
   if (!list.length) return { ok: false, text: 'Aucun tunnel interdit sur cet itinéraire.' };
-  if (!isPoint(start) || !isPoint(end) || haversine(start, end) > maxDistance) {
+  if (!isPoint(start) || !isPoint(end) || pathCrow(start, stops, end) > maxDistance) {
     return {
       ok: false,
-      text: 'Éviter le tunnel : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le départ et l\'arrivée sont à 150 km au plus à vol d\'oiseau. Tunnel non évité, rien n\'a été envoyé : à vérifier. Choisis un autre itinéraire proposé ou ajoute une étape ; la signalisation fait foi.',
+      text: 'Éviter le tunnel : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le trajet (départ, étapes, arrivée) fait 150 km au plus à vol d\'oiseau. Tunnel non évité, rien n\'a été envoyé : à vérifier. Choisis un autre itinéraire proposé ; la signalisation fait foi.',
     };
   }
   const polygons = [];

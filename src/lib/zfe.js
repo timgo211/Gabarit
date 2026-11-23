@@ -19,6 +19,7 @@
 // Conseil constitutionnel (décision n° 2026-903 DC du 21 mai 2026) : les ZFE restent en vigueur selon leurs arrêtés.
 
 import { haversine } from './nav-geo.js';
+import { crowPath } from './stops.js';
 import { sampleRoute } from './route-samples.js';
 import { isHoliday } from './holidays.js';
 
@@ -442,13 +443,15 @@ function extentM(ring) {
  * @param {{ start:number[], end:number[] }} trip
  * @returns {{ ok:true, geometry:object, tiles:number }|{ ok:false, reason:'distance'|'start'|'end'|'none', text:string }}
  */
-export function avoidPolygonsFor(zones, { start, end }) {
+export function avoidPolygonsFor(zones, { start, end, stops = [] }) {
   const list = (zones ?? []).filter(Boolean);
   if (!list.length) return { ok: false, reason: 'none', text: 'Aucune ZFE interdite sur cet itinéraire.' };
-  if (haversine(start, end) > ZFE.AVOID_MAX_DISTANCE_M) {
+  // v55 : mesure d'ORS = somme des distances à vol d'oiseau entre points successifs (étapes comprises) ; ajouter une
+  // étape ne réduit jamais cette somme (ancien conseil « ajoute une étape » retiré).
+  if (pathCrow(start, stops, end) > ZFE.AVOID_MAX_DISTANCE_M) {
     return {
       ok: false, reason: 'distance',
-      text: 'Éviter la ZFE : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le départ et l\'arrivée sont à 150 km au plus à vol d\'oiseau. Ajoute une étape à moins de 150 km de la ZFE ou contourne-la par la signalisation.',
+      text: 'Éviter la ZFE : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le trajet (départ, étapes, arrivée) fait 150 km au plus à vol d\'oiseau. Contourne-la par la signalisation.',
     };
   }
   for (const z of list) {
@@ -481,9 +484,17 @@ export function avoidPolygonsFor(zones, { start, end }) {
  * Recalcul en guidage d'un itinéraire « Sans ZFE » : zones gardées seulement si la position et l'arrivée sont à
  * 150 km au plus à vol d'oiseau (limite de l'API publique d'ORS) ; sinon recalcul sans elles (l'alerte ZFE reste).
  */
-export function avoidForReroute(avoidPolygons, from, end) {
+export function avoidForReroute(avoidPolygons, from, end, stops = []) {
   if (!avoidPolygons || !Array.isArray(from) || !Array.isArray(end)) return null;
-  return haversine(from, end) <= ZFE.AVOID_MAX_DISTANCE_M ? avoidPolygons : null;
+  return pathCrow(from, stops, end) <= ZFE.AVOID_MAX_DISTANCE_M ? avoidPolygons : null;
+}
+
+/**
+ * v55 : distance mesurée par ORS pour la limite des zones évitées (ors-api, RoutingService.java,
+ * calculateTotalDistance) : somme des distances à vol d'oiseau entre points successifs, étapes comprises.
+ */
+export function pathCrow(start, stops, end) {
+  return crowPath([start, ...(Array.isArray(stops) ? stops : []).map((s) => (Array.isArray(s) ? s : [s?.lon, s?.lat])), end]);
 }
 
 // ───────── Textes ─────────

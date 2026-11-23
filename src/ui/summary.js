@@ -4,6 +4,7 @@
 
 import { el } from './dom.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
+import { STOPS } from '../lib/stops.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
@@ -75,6 +76,8 @@ function card(d, { checked, onSelect, rules }) {
       el('span', { class: 'route-card-time', text: d.duration }),
     ]),
     el('span', { class: 'route-card-facts', text: facts.join(' · ') }),
+    // v55 : une ligne par étape (heure d'arrivée, durée du tronçon).
+    ...(d.legs ?? []).map((t) => el('span', { class: 'route-card-leg legs', text: t })),
     d.an ? el('span', { class: 'route-card-an', text: d.an }) : null,
     rules?.speedLimits?.card ? el('span', { class: 'route-card-speed', text: rules.speedLimits.card }) : null,
     d.delta ? el('span', { class: 'route-card-delta', text: d.delta }) : null,
@@ -190,7 +193,8 @@ export function renderRouteChoice(node, notesNode, {
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
-  const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now }), {
+  const stops = Array.isArray(choice.stops) ? choice.stops : [];
+  const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now, stops }), {
     checked: i === selected, onSelect: () => onSelect(i), rules: rules?.[i],
   }));
 
@@ -209,6 +213,7 @@ export function renderRouteChoice(node, notesNode, {
   if (typeof vehicle.consumption === 'number' && dieselPrice === null) {
     notes.push('Indique le prix du gazole dans Réglages (⚙) pour estimer le coût.');
   }
+  if (stops.length) notes.push(`${stops.length} étape${stops.length > 1 ? 's' : ''} : ${STOPS.NO_TIME_TEXT}`); // v55
   for (const w of current.route.warnings ?? []) notes.push(`Avertissement : ${w}`);
 
   node.replaceChildren(...[

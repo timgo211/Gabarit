@@ -114,6 +114,19 @@ function parseFeature(feature, fallbackBbox) {
     }
   }
   const warnings = (props.warnings ?? []).map((w) => w?.message).filter(Boolean);
+  // Étapes (v55) : un segment ORS par tronçon entre deux points demandés ; properties.way_points = indices de ces
+  // points dans le tracé (départ, étapes, arrivée). Absents ou incohérents → un seul tronçon (le total).
+  const last = coords.length - 1;
+  const wp = Array.isArray(props.way_points) && props.way_points.length >= 2
+    && props.way_points.every((i) => Number.isInteger(i) && i >= 0 && i <= last) ? [...props.way_points] : null;
+  const segs = Array.isArray(props.segments) ? props.segments : [];
+  const legs = wp && segs.length === wp.length - 1
+    ? segs.map((sg, i) => ({
+      distance: typeof sg?.distance === 'number' ? sg.distance : 0,
+      duration: typeof sg?.duration === 'number' ? sg.duration : 0,
+      endIndex: wp[i + 1],
+    }))
+    : null;
 
   return {
     // ORS omet distance/duration quand elles valent 0.
@@ -131,6 +144,12 @@ function parseFeature(feature, fallbackBbox) {
     roadExtras: parseRoadExtras(props.extras),
     steps,
     warnings,
+    wayPoints: wp,
+    legs: legs ?? [{
+      distance: typeof summary.distance === 'number' ? summary.distance : 0,
+      duration: typeof summary.duration === 'number' ? summary.duration : 0,
+      endIndex: last,
+    }],
   };
 }
 

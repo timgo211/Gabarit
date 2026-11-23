@@ -66,9 +66,12 @@ function postDirections(apiKey, req) {
  * (null = recommandé) ; avoidPolygons : zones à éviter (GeoJSON).
  * @returns route analysée (voir parseDirections).
  */
-export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null }) {
+export async function fetchRoute({
+  apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null, via = [],
+}) {
   requireKey(apiKey);
-  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons });
+  // v55 : étapes (via) entre le départ et l'arrivée, dans la même requête.
+  const req = buildDirectionsRequest({ start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, via });
   const json = await postDirections(apiKey, req);
   try {
     return parseDirections(json);
@@ -82,11 +85,13 @@ export async function fetchRoute({ apiKey, start, end, vehicle, avoidTolls, avoi
  * Itinéraires proposés au calcul (Recommandé + alternatives ou variantes, 3 requêtes au plus) : voir route-options.js.
  * @returns {{ options:object[], failures:object[], requests:number }}
  */
-export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons = null, isForbidden = null }) {
+export async function fetchRouteOptions({
+  apiKey, start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons = null, isForbidden = null, via = [],
+}) {
   requireKey(apiKey);
   try {
     return await computeRouteOptions({
-      start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons, isForbidden, send: (req) => postDirections(apiKey, req),
+      start, end, vehicle, avoidTolls, avoidFerries, avoidPolygons, isForbidden, via, send: (req) => postDirections(apiKey, req),
     });
   } catch (err) {
     // Phase 12b : restrictions saisies évitées → « Une restriction saisie bloque peut-être le seul passage. »
@@ -100,11 +105,13 @@ export async function fetchRouteOptions({ apiKey, start, end, vehicle, avoidToll
  * calcul de départ (computeAvoidRoute, route-options.js).
  * @returns route analysée (voir parseDirections).
  */
-export async function fetchAvoidRoute({ apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null }) {
+export async function fetchAvoidRoute({
+  apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null, via = [],
+}) {
   requireKey(apiKey);
   try {
     const { route } = await computeAvoidRoute({
-      start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, send: (req) => postDirections(apiKey, req),
+      start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, via, send: (req) => postDirections(apiKey, req),
     });
     return route;
   } catch (err) {

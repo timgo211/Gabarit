@@ -4,7 +4,8 @@ import { $, showMessage } from './ui/dom.js';
 import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.js';
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
-import { createRouteForm } from './ui/route-form.js';
+import { createRouteForm, attachAutocomplete } from './ui/route-form.js';
+import { stopPoints, insertStopByRoute } from './lib/stops.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
@@ -133,11 +134,12 @@ navigation = createNavigation({
   onVoiceToggle: (on) => setSetting({ voice: on }),
   onSimSpeedChange: (kmh) => setSetting({ simSpeed: kmh }),
   // Recalcul en route (GPS réel) : les autres itinéraires partaient de l'ancien départ, il ne reste que le nouveau.
-  onRouteChange: (route) => {
+  onRouteChange: (route, stops = []) => {
     if (!choice) return;
     choice = {
       ...choice, options: [reroutedOption(choice.options[choice.selected], route)], failures: [], selected: 0,
       start: route.coordinates[0], startIsMyPosition: true, // recalcul depuis la position GPS
+      stops: Array.isArray(stops) ? stops : [], // v55 : étapes non atteintes, celles du nouveau tracé
     };
     renderChoice();
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
@@ -153,6 +155,7 @@ navigation = createNavigation({
   onView: () => { areas.refreshDrive(); saveRoute(); },
   // v53 : sauvegarde de l'itinéraire effacée à l'arrivée et quand le guidage est quitté (✕ puis « Quitter »).
   onArrived: () => forgetRoute(),
+  onStopReached: () => saveRoute({ force: true }), // v55 : étapes atteintes gardées (progress.nextStop)
   onQuit: () => forgetRoute(),
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
   onAlternatives: (from) => openAlternatives(from),
@@ -167,6 +170,7 @@ navigation = createNavigation({
     closeAlternatives(); // v44
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
+    map.showStops(choice ? stopPoints(choice.stops) : []);
     if (message) showMessage(messageNode, message);
   },
 });
@@ -402,7 +406,7 @@ async function avoidZfe() {
   const option = choice.options[choice.selected];
   const rules = rulesOf(option.route, choice.vehicle, new Date());
   const zones = [...new Set(rules.banned.map((p) => p.zone))];
-  const plan = avoidPolygonsFor(zones, { start: choice.start, end: choice.end });
+  const plan = avoidPolygonsFor(zones, { start: choice.start, end: choice.end, stops: choice.stops ?? [] });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   avoidBusy = true;
   renderChoice();
@@ -412,6 +416,7 @@ async function avoidZfe() {
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
       avoidPolygons: mergeAvoid(option.request.avoidPolygons, plan.geometry), // phase 12b : restrictions gardées
+      via: stopPoints(choice.stops),
     });
     if (!choice || navigation.active) return;
     const nz = noZfeOption(option, route, mergeAvoid(option.request.avoidPolygons, plan.geometry), zones.map((z) => z.name));
@@ -458,7 +463,9 @@ async function avoidTunnel() {
   if (!tunnelAllowed()) { showMessage(messageNode, AVOID_PARKED_TEXT, 'info'); return; }
   const option = choice.options[choice.selected];
   const forbidden = rulesOf(option.route, choice.vehicle, new Date()).avoidableTunnels ?? [];
-  const plan = avoidTunnelsFor(forbidden, { start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null });
+  const plan = avoidTunnelsFor(forbidden, {
+    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: choice.stops ?? [],
+  });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   tunnelBusy = true;
   renderChoice();
@@ -467,7 +474,7 @@ async function avoidTunnel() {
     const route = await fetchAvoidRoute({
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
-      avoidPolygons: plan.geometry,
+      avoidPolygons: plan.geometry, via: stopPoints(choice.stops),
     });
     if (!choice || navigation.active) return;
     const names = [...new Set(forbidden.map(tunnelName))];
@@ -500,7 +507,9 @@ async function avoidLocal() {
   if (!choice || navigation.active || localBusy) return;
   const option = choice.options[choice.selected];
   const transit = rulesOf(option.route, choice.vehicle, new Date()).localTransit ?? [];
-  const plan = avoidLocalFor(transit, { start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null });
+  const plan = avoidLocalFor(transit, {
+    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: choice.stops ?? [],
+  });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   localBusy = true;
   renderChoice();
@@ -509,7 +518,7 @@ async function avoidLocal() {
     const route = await fetchRoute({
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
-      avoidPolygons: plan.geometry,
+      avoidPolygons: plan.geometry, via: stopPoints(choice.stops),
     });
     if (!choice || navigation.active) return;
     const nl = noLocalOption(option, route, plan.geometry);
@@ -665,8 +674,21 @@ function closeAlternatives(reason = '') {
   altUi.status.textContent = '';
   if (wasOpen && reason === 'moving') navigation.notify('Autres itinéraires : disponible à l\'arrêt');
 }
-async function openAlternatives(from) {
+/** Départ du dernier calcul « Autres itinéraires » (v55 : étape ajoutée depuis ce panneau). */
+let altFrom = null;
+/**
+ * v44 / v55 : calcul depuis la dernière position, étapes non atteintes gardées ; `extraStop` (fiche carburant ou champ
+ * « Ajouter une étape », à l'arrêt seulement) rangé parmi elles selon sa place sur le tracé en cours.
+ */
+async function openAlternatives(from, extraStop = null) {
   if (!choice || !navigation.active || !navigation.parked) return;
+  altFrom = from;
+  let stops = navigation.remainingStops;
+  if (extraStop) {
+    const ins = insertStopByRoute(stops, extraStop, choice.options[choice.selected]?.route?.coordinates ?? null, navigation.progress?.along ?? 0);
+    if (!ins.ok) { altUi.panel.hidden = false; altUi.status.textContent = ins.text; return; }
+    stops = ins.list;
+  }
   const my = ++altTicket;
   altChoice = null;
   altUi.panel.hidden = false;
@@ -675,18 +697,22 @@ async function openAlternatives(from) {
   altUi.summary.replaceChildren(); // fiches d'un calcul précédent : jamais montrées après un échec
   altUi.notes.replaceChildren();
   altUi.go.hidden = true;
-  altUi.status.textContent = 'Calcul des itinéraires depuis ta position…';
+  altUi.status.textContent = extraStop
+    ? `Calcul avec l'étape « ${extraStop.label} » depuis ta position…`
+    : 'Calcul des itinéraires depuis ta position…';
   const vehicle = activeVehicle(data);
   try {
     await ensureTunnels(vehicle);
-    const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: from, end: choice.end });
+    const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: from, end: choice.end, stops });
     const { options, failures } = await fetchRouteOptions({
       apiKey: store.getApiKey(), vehicle, start: from, end: choice.end, avoidTolls: choice.avoidTolls,
       avoidFerries: choice.avoidFerries, avoidPolygons: restr.geometry, isForbidden: tunnelBanCheck(vehicle),
+      via: stopPoints(stops),
     });
     if (my !== altTicket || !navigation.active) return;
     altChoice = {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
+      stops,
     };
     for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
@@ -698,6 +724,18 @@ async function openAlternatives(from) {
   }
 }
 $('#btn-alts-close').addEventListener('click', () => closeAlternatives());
+// v55 : « Ajouter une étape » dans « Autres itinéraires » (panneau ouvert à l'arrêt seulement, fermé en roulant).
+const altsStopInput = $('#alts-stop-input');
+attachAutocomplete(altsStopInput, $('#alts-stop-list'), {
+  getApiKey: () => store.getApiKey(), getFocus: () => navigation.progress ? altFrom : myPosition,
+  onError: (err) => { if (err) altUi.status.textContent = errorText(err); },
+  onPick: (place) => {
+    if (!place) return;
+    altsStopInput.value = '';
+    if (!navigation.parked) { closeAlternatives('moving'); return; }
+    if (altFrom) openAlternatives(altFrom, place);
+  },
+});
 altUi.go.addEventListener('click', () => {
   if (!altChoice || !navigation.active) return;
   if (!navigation.parked) { closeAlternatives('moving'); return; }
@@ -731,6 +769,7 @@ async function openFuel(from = null) {
     getOk: () => data.fuelStations ?? [],
     onToggleOk: (station) => update((d) => ({ ...d, fuelStations: toggleFuelStation(d.fuelStations, station) })),
     isParked: fuelParked,
+    onAddStop: (stop) => addStopFromFuel(stop), // v55
   });
   const route = choice.options[choice.selected].route;
   fuelPanel.open({ key: route, route, vehicle: choice.vehicle, from: navigation.active ? from : null });
@@ -741,6 +780,26 @@ function closeFuel(reason = '') {
   if (reason === 'moving') fuelMessage(FUEL.PARKED_TEXT);
 }
 fuelBtn.addEventListener('click', () => openFuel(null));
+
+/**
+ * v55 : « Ajouter comme étape » (fiche carburant, à l'arrêt seulement). Préparation : étape rangée selon sa place sur
+ * le tracé, nouveau calcul (budget de 3 requêtes). Guidage : « Autres itinéraires » avec cette étape, choix à l'arrêt.
+ */
+function addStopFromFuel(stop) {
+  if (!choice || !fuelParked()) { fuelMessage(FUEL.PARKED_TEXT); return; }
+  closeFuel();
+  if (navigation.active) {
+    const from = navigation.lastFix;
+    if (from) openAlternatives(from, stop);
+    else navigation.notify('Position inconnue : étape non ajoutée');
+    return;
+  }
+  const ins = insertStopByRoute(form.getStops(), stop, choice.options[choice.selected]?.route?.coordinates ?? null);
+  if (!ins.ok) { showMessage(messageNode, ins.text); return; }
+  form.setStops(ins.list);
+  showMessage(messageNode, `Étape ajoutée : ${stop.label}. Nouveau calcul…`, 'info');
+  $('#route-form').requestSubmit();
+}
 
 // Écrans
 const settings = createSettings({
@@ -807,11 +866,13 @@ const form = createRouteForm({
     const tunnelsRead = ensureTunnels(vehicle); // phase 5b : fichier des tunnels lu seulement pour un véhicule ADR avec code tunnel
     try {
       // Phase 12b : restrictions saisies proches du trajet évitées (avoid_polygons), 150 km au plus à vol d'oiseau.
-      const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: p.start, end: p.end });
+      const stops = Array.isArray(p.stops) ? p.stops : []; // v55 : étapes, une seule requête avec tous les points
+      const restr = restrictionsForTrip(data.restrictions ?? [], { vehicle, start: p.start, end: p.end, stops });
       restrictionsUi.closeBridge();
       await tunnelsRead; // v43 : tunnels ADR connus avant de choisir le « Recommandé »
       const { options, failures } = await fetchRouteOptions({
-        apiKey: store.getApiKey(), vehicle, ...p, avoidPolygons: restr.geometry, isForbidden: tunnelBanCheck(vehicle),
+        apiKey: store.getApiKey(), vehicle, start: p.start, end: p.end, avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries,
+        avoidPolygons: restr.geometry, isForbidden: tunnelBanCheck(vehicle), via: stopPoints(stops),
       });
       // Lien partagé : la variante choisie par l'expéditeur est présélectionnée (choix modifiable à l'arrêt).
       let selected = 0;
@@ -825,7 +886,7 @@ const form = createRouteForm({
       choice = {
         options, failures, selected, vehicle, start: p.start, end: p.end, restr,
         avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, fromLabel: p.fromLabel, toLabel: p.toLabel,
-        startIsMyPosition: p.startIsMyPosition,
+        startIsMyPosition: p.startIsMyPosition, stops,
       };
       showChoice(selected);
       routeSaveOn = true;
@@ -854,6 +915,7 @@ const form = createRouteForm({
       winter.clear();
       map.showZfe([]);
       map.showRoutes([]); // ancien tracé et repères de départ / d'arrivée effacés : rien ne laisse croire à un itinéraire
+      map.showStops([]);
       showMessage(messageNode, errorText(err) || 'Erreur inattendue pendant le calcul.', 'error', serviceDetailText(err, store.getApiKey() ?? ''));
     } finally {
       form.setBusy(false);
@@ -873,6 +935,7 @@ function showChoice(selected) {
   renderChoice();
   navStartBtn.hidden = false;
   map.showRoutes(options.map((o) => o.route), selected);
+  map.showStops(stopPoints(choice.stops)); // v55
   areas.load(choice); // une requête Overpass pour tous les itinéraires proposés, sans bloquer le calcul
   weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
   access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
@@ -904,7 +967,8 @@ function writeRoute({ force = false } = {}) {
   const now = Date.now();
   if (!shouldSave(lastRouteSave, { now, key, force })) return;
   const save = buildSave({
-    kind, choice, vehicleId: choice.vehicle?.id ?? '', along: progress?.along ?? null, segIndex: progress?.segIndex ?? null, now,
+    kind, choice, vehicleId: choice.vehicle?.id ?? '', along: progress?.along ?? null, segIndex: progress?.segIndex ?? null,
+    nextStop: progress?.nextStop ?? 0, now,
   });
   if (!save) return;
   lastRouteSave = { at: now, key };
@@ -933,6 +997,7 @@ function applyResume(save) {
   ensureTunnels(back.vehicle); // phase 5b : tunnels ADR lus comme au calcul
   if (!back.startIsMyPosition && Array.isArray(back.start)) form.setPlace('from', { lon: back.start[0], lat: back.start[1], label: back.fromLabel });
   form.setPlace('to', { lon: back.end[0], lat: back.end[1], label: back.toLabel });
+  form.setStops(back.stops ?? []); // v55
   showChoice(back.selected);
   if (save.kind === 'nav') startGuidance(null, save.progress);
   else showMessage(messageNode, 'Itinéraire repris (calculé avant la mise en arrière-plan).', 'info');

@@ -22,6 +22,7 @@ import { parseAllDirections, haversine, NoRouteError, fuelEstimate, fuelCost, bb
 import { ERROR_KINDS, failedSegment, NO_ROUTE_BASE_TEXT } from './ors-errors.js';
 import { pickRecommendedIndex, anShareText } from './road-class.js';
 import { BLOCKED_TEXT } from './restrictions.js';
+import { legLines } from './stops.js';
 import { ORS_MAX_ALTERNATIVE_ROUTES, ORS_ALTERNATIVE_ROUTES_MAX_DISTANCE_M } from './config.js';
 import {
   formatDistance, formatDuration, formatArrival, formatDurationDelta, formatDistanceDelta, formatEuros,
@@ -239,7 +240,23 @@ export function nameAlternatives(options) {
 }
 
 /** Diagnostics d'un 2009 qui concluent sur le départ ou l'arrivée : message sans le conseil péages / ferries. */
-export const PRECISE_HINTS = Object.freeze(new Set(['start-no-exit', 'start-unreachable', 'end-unreachable']));
+export const PRECISE_HINTS = Object.freeze(new Set([
+  'start-no-exit', 'start-unreachable', 'end-unreachable', 'stop-unreachable', 'point-no-exit',
+]));
+
+/**
+ * v55 : code 2009 avec étapes. ORS s'arrête au premier tronçon impossible et le nomme (« between points N and N+1 »,
+ * failedSegment) : phrase qui nomme les deux points du tronçon, sans requête de plus (l'un des deux est en cause,
+ * sans savoir lequel : conditionnel). Jamais en voix.
+ * @param {number} seg tronçon (1 = départ → étape 1)
+ * @param {number} count nombre d'étapes
+ */
+export function stopUnreachableText(seg, count) {
+  const name = (k) => (k === 0 ? 'le départ' : k === count + 1 ? "l'arrivée" : `l'étape ${k}`);
+  return `Aucun itinéraire camion trouvé entre ${name(seg - 1)} et ${name(seg)} : l'un de ces deux points semble inaccessible ou sans sortie pour ton camion (sens unique, zone piétonne, accès interdit ou limite de gabarit). Déplace ou retire l'étape en cause. La signalisation fait foi.`;
+}
+/** v55 : avec étapes, le trajet inverse passe : un point (départ ou étape) semble sans sortie. Jamais en voix. */
+export const POINT_NO_EXIT_TEXT = 'Le départ ou une étape semble sans sortie pour un camion (sens unique, zone piétonne, sortie interdite) : le trajet inverse passe. Déplace le point en cause sur une route voisine plus large. La signalisation fait foi.';
 
 /**
  * Diagnostic d'un code 2009 (aucun itinéraire), phases 5h ter et 2f, dans le budget de 3 requêtes du calcul
@@ -257,7 +274,12 @@ export const PRECISE_HINTS = Object.freeze(new Set(['start-no-exit', 'start-unre
  * Diagnostic en échec pour une autre raison (quota, réseau) : message d'origine, raison dans err.diagnosticNote.
  * @returns {Promise<number>} nombre de requêtes du calcul après le diagnostic
  */
-export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons = null }) {
+export async function diagnose2009({
+  err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons = null, via = [],
+}) {
+  if (Array.isArray(via) && via.length) {
+    return diagnoseWithStops({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons, via });
+  }
   const hint = (kind, text) => {
     err.hint = kind;
     err.restrictionHint = kind === 'restrictions';
@@ -292,13 +314,13 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
   // (b) Point de passage au milieu (moyenne des coordonnées : assez précis pour un repère, pas pour un guidage).
   if (!left()) return requests;
   const mid = [(start[0] + end[0]) / 2, (start[1] + end[1]) / 2];
-  const via = await probe({ start, end, via: [mid], radiuses: [-1, -1, -1] });
-  if (!via.ok && via.noRoute) {
-    const seg = failedSegment(via.detail);
+  const mp = await probe({ start, end, via: [mid], radiuses: [-1, -1, -1] });
+  if (!mp.ok && mp.noRoute) {
+    const seg = failedSegment(mp.detail);
     if (seg === 1) { hint('start-unreachable', START_UNREACHABLE_TEXT); return requests; }
     if (seg === 2) { hint('end-unreachable', END_UNREACHABLE_TEXT); return requests; }
-  } else if (!via.ok && !VIA_INCONCLUSIVE_KINDS.has(via.kind)) {
-    interrupted(via);
+  } else if (!mp.ok && !VIA_INCONCLUSIVE_KINDS.has(mp.kind)) {
+    interrupted(mp);
     return requests;
   }
 
@@ -316,6 +338,57 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
 }
 
 /**
+ * v55 : diagnostic d'un code 2009 avec étapes, même budget. Les étapes découpent déjà le trajet : le point de passage
+ * au milieu (b) est remplacé par la lecture du tronçon en échec dans le message d'ORS (failedSegment, aucune
+ * requête) : les deux points du tronçon sont nommés. Puis (a) sens inverse (liste complète inversée) et (c) sans les
+ * restrictions du profil, avec tous les points.
+ */
+async function diagnoseWithStops({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons, via }) {
+  const hint = (kind, text) => {
+    err.hint = kind;
+    err.restrictionHint = kind === 'restrictions';
+    const base = PRECISE_HINTS.has(kind) ? NO_ROUTE_BASE_TEXT : err.message;
+    err.message = `${base ? `${base} ` : ''}${text}`;
+  };
+  const left = () => requests < ROUTE_OPTIONS.MAX_REQUESTS;
+  const probe = async (params) => {
+    requests += 1;
+    try {
+      parseAllDirections(await send(buildDirectionsRequest({ vehicle, avoidFerries, avoidTolls, avoidPolygons, ...params })));
+      return { ok: true };
+    } catch (e) {
+      const noRoute = e?.code === 2009 || e instanceof NoRouteError;
+      return { ok: false, noRoute, kind: errorKind(e) };
+    }
+  };
+  const interrupted = (r) => {
+    err.diagnosticNote = `Diagnostic interrompu : ${FAILURE_REASONS[r.kind] ?? 'erreur du service'}.`;
+  };
+
+  // (b) Tronçon nommé par ORS dans le message d'erreur d'origine.
+  const seg = failedSegment(String(err?.detail || err?.message || ''));
+  if (seg !== null && seg >= 1 && seg <= via.length + 1) {
+    hint('stop-unreachable', stopUnreachableText(seg, via.length));
+    return requests;
+  }
+
+  // (a) Sens inverse, étapes à l'envers.
+  if (!left()) return requests;
+  const back = await probe({ start: end, end: start, via: [...via].reverse() });
+  if (back.ok) { hint('point-no-exit', POINT_NO_EXIT_TEXT); return requests; }
+  if (!back.noRoute) { interrupted(back); return requests; }
+
+  // (c) Sans les restrictions du profil.
+  if (!Object.keys(buildRestrictions(vehicle)).length) { hint('dead-end', DEAD_END_HINT_TEXT); return requests; }
+  if (!left()) { err.diagnosticNote = 'Diagnostic sans conclusion.'; return requests; }
+  const bare = await probe({ start, end, via, noRestrictions: true });
+  if (bare.ok) hint('restrictions', RESTRICTION_HINT_TEXT);
+  else if (bare.noRoute) hint('dead-end', DEAD_END_HINT_TEXT);
+  else interrupted(bare);
+  return requests;
+}
+
+/**
  * Calcule les itinéraires proposés (3 requêtes au plus).
  * @param {{ start:number[], end:number[], vehicle:object, avoidTolls?:boolean, avoidFerries?:boolean,
  *   send:(req:{url:string,method:string,body:object})=>Promise<object> }} p
@@ -325,15 +398,17 @@ export async function diagnose2009({ err, start, end, vehicle, avoidTolls, avoid
  *   options[0] est toujours le Recommandé. S'il échoue, l'erreur est relancée telle quelle (message existant).
  */
 export async function computeRouteOptions({
-  start, end, vehicle, avoidTolls = false, avoidFerries = false, send, avoidPolygons = null, isForbidden = null,
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, send, avoidPolygons = null, isForbidden = null, via = [],
 }) {
   let requests = 0;
+  // v55 : étapes (via) dans chaque requête ; jamais alternative_routes avec des étapes (2 points seulement).
+  const stops = Array.isArray(via) ? via : [];
   const ask = async (variant, alternatives = 0) => {
     // avoidPolygons (phase 12b) gardé dans la requête : le recalcul en guidage évite les mêmes restrictions.
     const request = avoidPolygons ? { ...requestFor(variant, avoidTolls), avoidPolygons } : requestFor(variant, avoidTolls);
     const req = buildDirectionsRequest({
       start, end, vehicle, avoidFerries, avoidTolls: request.avoidTolls, preference: request.preference, alternatives,
-      avoidPolygons,
+      avoidPolygons, via: stops,
     });
     requests += 1;
     return { request, routes: parseAllDirections(await send(req)) };
@@ -341,7 +416,7 @@ export async function computeRouteOptions({
 
   let main = null;
   try {
-    if (wantsAlternatives(start, end)) {
+    if (!stops.length && wantsAlternatives(start, end)) {
       try {
         main = await ask(VARIANTS.recommended, ROUTE_OPTIONS.TARGET_COUNT);
       } catch (err) {
@@ -351,7 +426,7 @@ export async function computeRouteOptions({
     if (!main) main = await ask(VARIANTS.recommended);
   } catch (err) {
     if (err?.code === 2009) {
-      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons });
+      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons, via: stops });
     }
     throw withBlockedHint(err, avoidPolygons);
   }
@@ -412,7 +487,7 @@ export function tollText(m) {
  * @param {object|null} reference option de référence (la première) ; écart vide pour elle-même
  * @param {{ vehicle:object, dieselPrice:number|null, now:Date }} ctx
  */
-export function describeOption(option, reference, { vehicle, dieselPrice = null, now = new Date() }) {
+export function describeOption(option, reference, { vehicle, dieselPrice = null, now = new Date(), stops = [] }) {
   const r = option.route;
   const liters = fuelEstimate(r.distance, vehicle?.consumption);
   const cost = fuelCost(liters, dieselPrice);
@@ -431,6 +506,8 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
     an: anShareText(r), // phase 2g
     fuel,
     delta: reference && reference !== option ? deltaText(r, reference.route) : '',
+    // v55 : une ligne par étape (heure d'arrivée, durée du tronçon), heures sans temps passé aux étapes.
+    legs: legLines(r, stops, now),
   };
 }
 
@@ -439,10 +516,11 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
  * (« Plus court » → preference shortest, « Sans péage » → péages évités). Une alternative d'ORS ne peut pas être
  * redemandée : son recalcul est celui du Recommandé.
  */
-export function guidanceParams(option, { start, end, avoidFerries = false }) {
+export function guidanceParams(option, { start, end, avoidFerries = false, stops = [] }) {
   return {
     start, end, avoidFerries, avoidTolls: option.request.avoidTolls, preference: option.request.preference ?? null,
     avoidPolygons: option.request.avoidPolygons ?? null, // « Sans ZFE » (phase 5)
+    stops: Array.isArray(stops) ? stops : [], // v55 : étapes (le recalcul garde celles qui ne sont pas atteintes)
   };
 }
 
@@ -464,16 +542,16 @@ export function noZfeOption(option, route, avoidPolygons, names) {
  * @returns {Promise<{ route:object, requests:number }>}
  */
 export async function computeAvoidRoute({
-  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, avoidPolygons = null, send,
+  start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, avoidPolygons = null, send, via = [],
 }) {
   let requests = 1;
   try {
-    const req = buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, preference, avoidPolygons });
+    const req = buildDirectionsRequest({ start, end, vehicle, avoidFerries, avoidTolls, preference, avoidPolygons, via });
     const routes = parseAllDirections(await send(req));
     return { route: routes[0], requests };
   } catch (err) {
     if (err?.code === 2009) {
-      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons });
+      requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons, via });
     }
     throw withBlockedHint(err, avoidPolygons);
   }
