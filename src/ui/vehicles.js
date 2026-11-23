@@ -2,10 +2,11 @@
 
 import { $, el, wireDialog } from './dom.js';
 import {
-  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, COMBINED_LABEL, TRAILER_VALUES, TRAILER_LABELS, EURO_VALUES, EURO_LABELS, normalizeVehicle, validateVehicle, defaultVehicle,
+  NUMERIC_FIELDS, CRITAIR_VALUES, BAN_STATUS_VALUES, COMBINED_LABEL, TRAILER_VALUES, TRAILER_LABELS, EURO_VALUES, EURO_LABELS, AXLE_VALUES, AXLE_LABELS, normalizeVehicle, validateVehicle, defaultVehicle,
 } from '../lib/vehicle.js';
 import { BAN_STATUS } from '../lib/hgv-bans.js';
 import { adrSummary } from '../lib/adr-settings.js';
+import { AXLE_AMOUNTS } from '../lib/foreign-tolls.js';
 
 const fmt = (x) => (x === null || x === undefined ? '' : String(x).replace('.', ','));
 
@@ -23,6 +24,7 @@ function dims(v, adr = null) {
   if (v.trailer === 'with') p.push('avec remorque');
   if (v.trailer === 'none') p.push('sans remorque');
   if (v.euroClass) p.push(v.euroClass === 'EEV' ? 'EEV' : `Euro ${v.euroClass}`);
+  if (AXLE_AMOUNTS && v.axles) p.push(AXLE_LABELS[v.axles]);
   return p.join(' · ');
 }
 
@@ -113,6 +115,13 @@ export function createVehicles(ctx) {
         el('p', { class: 'hint', text: "Indiquée sur le certificat d'immatriculation ou le certificat de conformité du véhicule. Sert aux tunnels du Mont-Blanc et du Fréjus et aux fiches pays. Non précisé : les deux cas sont affichés." }),
         el('p', { class: 'err', 'data-err': 'euroClass' }),
       ]),
+      // Phase 5h : seulement tant qu'un montant codé en dépend (péage autrichien) ; valeur gardée et exportée sinon.
+      AXLE_AMOUNTS ? el('div', { class: 'full' }, [
+        el('label', { for: 'veh-axles', text: 'Essieux (véhicule ou ensemble)' }),
+        el('select', { id: 'veh-axles', name: 'axles' },
+          AXLE_VALUES.map((c) => el('option', { value: c, text: AXLE_LABELS[c], selected: c === (v.axles ?? '') }))),
+        el('p', { class: 'hint', text: "Sert seulement au péage au km de l'Autriche (catégories 2, 3, 4 essieux et plus). Non précisé : les deux cas sont affichés." }),
+      ]) : null,
       el('div', { class: 'full' }, [
         el('label', { class: 'toggle' }, [
           el('input', { type: 'checkbox', id: 'veh-combined', name: 'combined', checked: !!v.combined }),
@@ -133,6 +142,7 @@ export function createVehicles(ctx) {
       const fd = new FormData(form);
       const raw = Object.fromEntries(fd.entries());
       raw.id = v.id;
+      if (!AXLE_AMOUNTS) raw.axles = v.axles ?? ''; // champ caché : valeur gardée
       const nv = normalizeVehicle(raw);
       const { valid, errors } = validateVehicle(nv);
       for (const p of form.querySelectorAll('[data-err]')) p.textContent = errors[p.dataset.err] ?? '';

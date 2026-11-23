@@ -97,6 +97,8 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   v43 : jamais un itinéraire par un tunnel interdit confirmé pour le profil (`confirmedTunnelBans` : Euro texte
   officiel ou exploitant, ADR avec matières dangereuses ; « à vérifier », « annoncée », classe vide : non) si une autre
   option calculée l'évite ; toutes → choix gardé + `ALL_TUNNELS_NOTE`. Sans requête de plus ; fiche, jamais la voix.
+- Péages PL à l'étranger (5h, v49, `foreign-tolls.js`) : Autriche (GO-Maut 2026) seulement, taux du profil (champ
+  « Essieux » `axles`, non précisé = les deux cas) et estimation « à vérifier, pas une facture », ligne grise, jamais dite.
 - Prix du gazole : saisi dans Réglages (`settings.dieselPrice`, €/L, vide par défaut) en attendant la phase 4.
 - Doc à jour : giscience.github.io, openrouteservice.org et legifrance.gouv.fr peuvent être bloqués depuis le conteneur ;
   lire la doc ORS sur raw.githubusercontent.com (GIScience/openrouteservice : dossier `docs/`, et le code `ors-api/` pour

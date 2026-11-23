@@ -137,3 +137,15 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   bloqué depuis le conteneur). Passage sur autoroute (référence A de l'étape) dans la zone : interdiction gardée par
   prudence + « Passage par A 31 : inclusion de l'autoroute dans la ZFE à vérifier dans l'arrêté. La signalisation
   fait foi. » Retirer l'entrée seulement d'après l'arrêté (source et date en commentaire).
+
+- Péages PL au km à l'étranger (phase 5h, v49, `foreign-tolls.js`, grille en code) : Autriche seulement, GO-Maut
+  ASFINAG 2026 (PDF texte + page HTML, lus le 23/11/2026 par l'Action « Textes officiels ») ; € /km HT, catégories 2, 3,
+  4+ essieux ; classe CO₂ absente du profil → Euro VI = fourchette classes 4 à 1 ; non précisé (essieux ou Euro) → les
+  deux cas. Estimation = taux × km à péage en Autriche (`tollRanges` d'ORS × countryinfo) ; étape A 9, A 10, A 11, A 12,
+  A 13 ou S 16 (tarifs propres) → aucune estimation. Ligne `info` seulement, jamais sur la fiche courte ni dite,
+  « Montants à vérifier », jamais une facture. Test de cohérence : total = infrastructure + air/bruit + CO₂.
+  Allemagne (Maut) : grille Toll Collect « ab 1. Juli 2024 » lue mais validité 2026 et BFStrMG annexe 1 non lus
+  (gesetze-im-internet.de, bmv.de ne répondent pas à l'Action) → aucun montant. Burgenland : RIS 503, rien codé.
+  R-Pass : délibération et issue du recours illisibles (alsace.eu, r-pass.eu) → `announced` inchangé.
+- Champ « Essieux » du profil (`axles` : '', '2', '3', '4', '5+') : montré seulement si `AXLE_AMOUNTS` (un montant codé
+  en dépend), sinon valeur gardée ; exporté avec les véhicules (normalizeVehicle).

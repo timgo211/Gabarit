@@ -447,14 +447,20 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     restrictions → « rue sans sortie possible pour le camion ». Diagnostic : version demandée au service worker.
   - [ ] **Contours Admin Express à jour** (millésime récent, site IGN) : remplacer les contours COG 2018 de
     `data/taxes-pl.json` (Alsace, Eurométropole, Grand Est, Meurthe-et-Moselle).
-  - [ ] **Taxes PL : montants Maut (DE) et péage autrichien** : champ « Essieux » du profil (non précisé par défaut :
-    les deux cas ; 2, 3, 4, 5 et plus) seulement quand un montant qui en dépend est affiché, grilles officielles lues
-    (BFStrMG annexe 1, Mauttarifverordnung).
+  - [x] **Taxes PL : péage autrichien** (fait en v49) : champ « Essieux » du profil (non précisé par défaut : les deux
+    cas ; 2, 3, 4, 5 et plus), montré tant qu'un montant en dépend ; GO-Maut ASFINAG 2026 (PDF texte et page HTML lus
+    le 23/11/2026, sommes des composantes vérifiées) : taux du profil et estimation sur les km à péage, « à vérifier »,
+    ligne grise, jamais dite ; tronçons à tarif propre (A 9, A 10, A 11, A 12, A 13, S 16) : pas d'estimation.
+  - [ ] **Taxes PL : montants Maut (DE)** : grille Toll Collect « ab 1. Juli 2024 » lue, mais BFStrMG annexe 1
+    (gesetze-im-internet.de) et grille du ministère (bmv.de) sans réponse à l'Action le 23/11/2026 : validité en 2026
+    non lue, aucun montant codé. Classe CO₂ du profil à prévoir avec.
   - [ ] **Péage PL sur les routes régionales du Burgenland (Autriche, 2027)** : routes, date et base légale à lire
-    (RIS, Landesgesetzblatt) avant de coder.
+    (RIS, Landesgesetzblatt) avant de coder. 23/11/2026 : RIS en 503 pour l'Action, pages du Land en 404 ; rien codé
+    (la presse de septembre 2026 dit le projet abandonné : non officiel, à vérifier).
   - [ ] **R-Pass / écocontribution Grand Est confirmés** : passer `status` à 'confirmed' dans `data/taxes-pl.json`
     après lecture des délibérations (R-Pass n° CD-2025-4-7-1 du 20/10/2025 ; ECPL : non retrouvée) et de l'issue du
-    recours ; carte détaillée des sections (PDF « Réseau taxable » de r-pass.eu illisible en texte) ; ECPL : grille
+    recours (23/11/2026 : alsace.eu sans réponse, r-pass.eu en erreur de certificat pour l'Action, rien de nouveau ;
+    statut inchangé) ; carte détaillée des sections (PDF « Réseau taxable » de r-pass.eu illisible en texte) ; ECPL : grille
     avec la classe CO2 du profil (nouveau champ, non précisé par défaut).
   - **À étudier avec la phase 10 (pas de code)** : barrières de dégel, circulation différenciée en épisode de
     pollution, fermetures de tunnels et de cols.

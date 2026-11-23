@@ -20,6 +20,21 @@ export function haversine(a, b) {
 }
 
 /**
+ * Tronçons à péage (extra « tollways », valeur 1) en indices de points du tracé : [{ from, to }] ; null si l'extra est
+ * absent ou illisible. Phase 5h (péages PL à l'étranger) : km à péage par pays avec countryinfo.
+ */
+export function parseTollRanges(extras) {
+  const values = extras?.tollways?.values;
+  if (!Array.isArray(values)) return null;
+  const out = [];
+  for (const v of values) {
+    if (!Array.isArray(v) || v.length < 3 || !Number.isInteger(v[0]) || !Number.isInteger(v[1]) || v[1] < v[0]) return null;
+    if (Number(v[2]) === 1) out.push({ from: v[0], to: v[1] });
+  }
+  return out;
+}
+
+/**
  * Km à péage, en mètres. null si l'extra « tollways » est absent ou illisible (→ « inconnu »).
  * 1) somme des summary[value=1].distance ; 2) sinon recalcul depuis values + géométrie.
  */
@@ -107,6 +122,7 @@ function parseFeature(feature, fallbackBbox) {
     coordinates: coords,
     bbox: Array.isArray(feature.bbox) ? feature.bbox : (Array.isArray(fallbackBbox) ? fallbackBbox : null),
     tollDistance: tollDistance(props.extras, coords),
+    tollRanges: parseTollRanges(props.extras),
     // Pays traversés (phase 5c, extra « countryinfo ») : [{ from, to, code }] ou null (→ « Pays traversés indisponibles »).
     countries: parseCountryInfo(props.extras),
     // Routes réservées à la desserte locale (phase 5d, extra « roadaccessrestrictions ») : [{ from, to, value }] ou null.

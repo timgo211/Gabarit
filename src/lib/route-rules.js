@@ -3,6 +3,7 @@
 // hgv-bans.js, driving-time.js et wind.js. Les heures de passage (ZFE, interdictions, vent) tiennent compte des pauses
 // conseillées (breakSchedule().elapsed).
 
+import { foreignTollRules } from './foreign-tolls.js';
 import { zfeAlongRoute, describeZfePassage, describeZfeAllowed, ZFE } from './zfe.js';
 import { bansAlongRoute, describeBanConflict, banShortText, CALENDAR_UNKNOWN_TEXT } from './hgv-bans.js';
 import { planDriving, breakSchedule } from './driving-time.js';
@@ -211,6 +212,9 @@ export function routeRules(route, {
   lines.push(...brg.lines.filter((l) => l.level !== 'warn'));
   lines.push(...wlim.lines.filter((l) => l.level !== 'warn'));
   if (vehicle?.hazmat) lines.push({ level: 'info', text: ADR.REMINDER_TEXT });
+  // Péages PL au km à l'étranger (phase 5h) : Autriche (grille ASFINAG 2026), information seulement, jamais dite.
+  const ftoll = foreignTollRules(route, { vehicle });
+  lines.push(...ftoll.lines);
   // Pays traversés (phase 5c) : frontières (km, heure recalée par les pauses), une fiche par pays hors France.
   const ctry = countryRules(route, { vehicle, departure, elapsed, countries, tunnels: tun.passages });
   lines.push(...ctry.lines);
@@ -223,7 +227,7 @@ export function routeRules(route, {
   return {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
     avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
-    countries: ctry, weight, winter: win, euro, tolls: toll,
+    countries: ctry, weight, winter: win, euro, tolls: toll, foreignTolls: ftoll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
   };
 }
