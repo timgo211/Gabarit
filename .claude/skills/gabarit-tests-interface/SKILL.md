@@ -82,7 +82,8 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
 - Environnement (constaté le 23/11/2026) : Chromium sans écran refuse la wake lock → « Écran non maintenu allumé »
   dans le panneau du bas, plus haut que sur la tablette ; à 412×900 (`guidage`) le message bref passe alors sur les
   alertes (✘ « nav-toast », vert avec une wake lock simulée). 760×360 à l'arrêt (alerte de conduite avec « Pas une
-  pause (travail) » sous le panneau du bas) : ✘ aussi en v37 et v38, même avec la wake lock simulée, non traité.
+  pause (travail) » sous le panneau du bas) : ✘ de v37 à v50, corrigé en v51 (petit paysage, hauteur < 400 px : bouton
+  sur deux lignes, 7em, media query de `styles.css`) ; `guidage 760x360` vert.
 - `camion` (v45) : guidage avec le GPS émulé à 412×900 et 900×412, jour, nuit, satellite : repère `data-icon="truck"`
   (pare-brise), 60 px, tourné au cap ; Réglages › Affichage « Flèche » → flèche au même point, réglage mémorisé.
 - `autres` (v44) : GPS émulé ; en roulant, bouton grisé, « Disponible à l'arrêt », aucune requête ; à l'arrêt 3 s :
@@ -104,7 +105,10 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   règles françaises). 412×900 jour (réglage désactivé puis activé), 900×412 nuit, 360×760 nuit, 1280×800 jour : ligne
   `.route-card-speed`, cases lues, ligne technique, Réglages (case décochée, texte fixe), GPS émulé à 40 km/h → panneau
   « 50 » aux couleurs réglementaires, 70 km/h → `over` (bord 4 px), rien dit par défaut, « Limite 50. » une fois avec
-  le réglage ; copie absente → « inconnues » et aucun panneau.
+  le réglage ; copie absente → « inconnues » et aucun panneau. v51 : semi de 44 t à 412×900 jour et 900×412 nuit,
+  GPS émulé point par point : limite plafonnée par la règle générale (60, 90) → mention « règle » (`#nav-limit-src`,
+  couleur `--muted`) sous le panneau ; limite écrite dans OSM (50) ou sans panneau → aucune mention ; couleurs du
+  panneau inchangées, rien dit, aucun chevauchement.
 - `directions` (phase 11b) : itinéraire synthétique `ors-directions-sortie.json` (autoroute puis « Restez à droite »),
   copie `data/directions-osm/` construite par les fonctions de l'Action (`directionsCopy` : 'fixture', 'proche' = avec
   une bretelle au cap opposé, 'ambigu' = deux bretelles au même cap, null = 404). GPS émulé à 90 km/h depuis 1,1 km

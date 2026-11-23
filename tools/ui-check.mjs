@@ -2653,6 +2653,45 @@ async function speedsCheck(browser, base) {
       await ctx.close();
     }
   }
+  // v51 : semi de 44 t, limites OSM au-dessus de la règle PL (90, 130) plafonnées par la règle générale : mention
+  // « règle » sous le panneau (couleur neutre), jamais pour une limite écrite dans OSM (50) ; panneau inchangé, rien dit.
+  const semi44 = { id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90 };
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night']]) {
+    const tag = `${width}×${height} ${theme} semi 44 t`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, vehicle: semi44, directions: () => col, overpass: () => ({ elements: [] }), speedsCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(800);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    const seen = [];
+    for (const c of line) {
+      await setGeo(page, { lon: c[0], lat: c[1], accuracy: 5, speed: 14, heading: 90 });
+      await page.waitForTimeout(900);
+      seen.push(await page.evaluate(() => ({
+        limit: document.querySelector('#nav-limit').hidden ? null : document.querySelector('#nav-limit').textContent,
+        rule: !document.querySelector('#nav-limit-src').hidden, src: document.querySelector('#nav-limit-src').textContent,
+        colors: (() => { const cs = getComputedStyle(document.querySelector('#nav-limit')); return [cs.backgroundColor, cs.borderTopColor, cs.color].join(); })(),
+      })));
+    }
+    const ruled = seen.filter((x) => x.rule);
+    check(ruled.length > 0 && ruled.every((x) => x.limit !== null && x.src === 'règle'), `${tag} : limite d'une règle générale → mention « règle » sous le panneau`, JSON.stringify(seen.map((x) => `${x.limit}${x.rule ? 'R' : ''}`)));
+    check(seen.filter((x) => x.limit === '50').every((x) => !x.rule), `${tag} : limite écrite dans OSM (50) → pas de mention`);
+    check(seen.every((x) => x.limit === null ? !x.rule : true), `${tag} : sans panneau, pas de mention`);
+    check(seen.filter((x) => x.limit !== null).every((x) => x.colors === 'rgb(255, 255, 255),rgb(200, 16, 46),rgb(0, 0, 0)'), `${tag} : couleurs réglementaires du panneau inchangées`);
+    const srcColor = await page.evaluate(() => { const n = document.querySelector('#nav-limit-src'); const cs = getComputedStyle(n); return { c: cs.color, muted: getComputedStyle(document.documentElement).getPropertyValue('--muted').trim() }; });
+    check(!/200, 16, 46/.test(srcColor.c), `${tag} : mention en couleur neutre (jamais le rouge du panneau)`, JSON.stringify(srcColor));
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${tag} : mention « règle » sans chevauchement`, foot.out.join(' ; '));
+    const spoken = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /Limite|règle/i.test(t));
+    check(spoken.length === 0, `${tag} : rien dit (voix inchangée)`, spoken.join(' | '));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-vitesse-regle.png`) });
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+
   // Sans copie : fiche « inconnues », aucun panneau en guidage.
   const none = await open(browser, base, { width: 412, height: 900, vehicle: van, directions: () => col, overpass: () => ({ elements: [] }) });
   await computeRoute(none.page);

@@ -213,14 +213,17 @@ export function buttonColumn({ height, minTop = 0, maxBottom = null, count }) {
 }
 
 /**
- * Compteur de vitesse : chiffre, panneau seulement si la limite PL de la route est connue, dépassement.
- * @param {number|null} kmh
- * @param {number|null} limitKmh limite PL connue du tronçon (phase 11a, speed-limit.js) ou null (aucun panneau)
+ * Compteur et panneau de limitation (phase 11a). rule (v51) : la limite vient d'une règle générale (speed-rules.js,
+ * plafond PL d'une étiquette maxspeed d'OSM) et non d'une limite PL écrite dans OSM : petite mention « règle » sous
+ * le panneau, couleur neutre ; le panneau garde ses couleurs réglementaires.
+ * @param {number|null} kmh vitesse
+ * @param {number|null} limitKmh limite PL connue du tronçon
+ * @param {'osm'|'rule'|null} source origine de la limite
  */
-export function speedStatus(kmh, limitKmh = null) {
+export function speedStatus(kmh, limitKmh = null, source = null) {
   const v = Number.isFinite(kmh) && kmh >= 0 ? Math.round(kmh) : null;
   const limit = Number.isFinite(limitKmh) && limitKmh > 0 ? Math.round(limitKmh) : null;
-  return { value: v === null ? '—' : String(v), limit, over: v !== null && limit !== null && v > limit };
+  return { value: v === null ? '—' : String(v), limit, over: v !== null && limit !== null && v > limit, rule: limit !== null && source === 'rule' };
 }
 
 /** Faut-il redessiner la partie parcourue ? Seulement en roulant, tous les 25 m (ou en arrière : recalcul). */

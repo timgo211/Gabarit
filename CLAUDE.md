@@ -24,7 +24,8 @@ node --test
 (lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert. Un hook Stop le relance tout seul à la fin de chaque tour où le code a changé.
 
 Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relancer après toute modif d'interface) — mode d'emploi et scénarios : skill `gabarit-tests-interface`.
-Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesurer le travail (compteur) à la place.
+Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesurer le travail (compteur) à la place ;
+adresse d'import unique = compteur, jamais `Date.now()`.
 
 ## Modèles (choisis automatiquement)
 - Mode plan → Opus ; exécution → Sonnet (`"model": "opusplan"` dans `.claude/settings.json`).
@@ -68,6 +69,7 @@ Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesure
   5 Mo / 40 Mo, copie réduite au-delà) : `maxspeed:hgv`, sinon `maxspeed` plafonné par la règle PL vérifiée
   (`speed-rules.js`), sinon inconnue (aucun panneau, rien d'inventé ; agglomération jamais déduite). Calculée une fois
   par itinéraire. Alerte visuelle ; « Limite X » dit seulement si `settings.speedVoice` (non par défaut) et étiquette OSM.
+- Limite d'une règle générale (v51) : mention « règle » neutre sous le panneau, couleurs du panneau inchangées.
 - Directions (11b, `directions.js`, copie `data/directions-osm/` mêmes Action et cases, jamais précachée) : « direction X »
   seulement si UNE bretelle à 60 m du point de manœuvre au cap cohérent ; dit seulement sans autre bretelle à 60 m ;
   sinon consigne inchangée (jamais devinée). `maneuverText(m, { spoken })` : affiché ≠ dit.

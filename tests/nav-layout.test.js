@@ -96,8 +96,12 @@ test('colonne de boutons : 64 px entre 45 et 85 %, remonte puis 56 px, deux colo
 });
 
 test('vitesse : panneau seulement si la limite est connue, dépassement', () => {
-  assert.deepEqual(speedStatus(87.4), { value: '87', limit: null, over: false });
-  assert.deepEqual(speedStatus(95, 90), { value: '95', limit: 90, over: true });
+  assert.deepEqual(speedStatus(87.4), { value: '87', limit: null, over: false, rule: false });
+  assert.deepEqual(speedStatus(95, 90), { value: '95', limit: 90, over: true, rule: false });
+  // v51 : limite d'une règle générale → mention « règle » ; limite OSM ou inconnue → rien.
+  assert.equal(speedStatus(70, 80, 'rule').rule, true);
+  assert.equal(speedStatus(70, 80, 'osm').rule, false);
+  assert.equal(speedStatus(70, null, 'rule').rule, false, 'sans panneau, pas de mention');
   assert.equal(speedStatus(null).value, '—');
 });
 
