@@ -6,7 +6,7 @@ import { $, wireDialog } from './dom.js';
 import { satelliteCredits } from '../lib/map-layers.js';
 import { requestVersionLabel, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
-import { exportData, importData, parseDieselPrice } from '../lib/store.js';
+import { exportData, readExport, parseDieselPrice } from '../lib/store.js';
 import { formatPricePerLiter } from '../lib/format.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
 import { sanitizeVoiceRate, sanitizeVoiceVolume } from '../lib/prefs.js';
@@ -295,9 +295,11 @@ export function createSettings(ctx) {
     else dlg.close();
   });
 
-  $('#btn-export').addEventListener('click', () => {
+  $('#btn-export').addEventListener('click', async () => {
     try {
-      const json = exportData(ctx.getData());
+      // Phase 6 : historique des trajets (IndexedDB) inclus ; indisponible → export sans lui, dit dans le message.
+      const history = (await ctx.getHistory?.()) ?? null;
+      const json = exportData(ctx.getData(), new Date(), history);
       const blob = new Blob([json], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -306,7 +308,7 @@ export function createSettings(ctx) {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-      setStatus(dataStatus, 'Export prêt (dossier Téléchargements). La clé n\'y figure pas.', true);
+      setStatus(dataStatus, `Export prêt (dossier Téléchargements). La clé n'y figure pas.${history === null ? ' Historique des trajets indisponible : non inclus.' : ''}`, true);
     } catch (err) {
       setStatus(dataStatus, `Export impossible : ${err.message}`, false);
     }
@@ -317,9 +319,10 @@ export function createSettings(ctx) {
     e.target.value = '';
     if (!file) return;
     try {
-      const data = importData(await file.text());
+      const { data, history } = readExport(await file.text());
       if (!window.confirm(`Remplacer les données actuelles par celles du fichier (${data.vehicles.length} véhicule(s)) ?`)) return;
       ctx.onDataReplaced(data);
+      if (history.length) await ctx.onHistoryImported?.(history); // phase 6 : ajouté à l'historique de l'appareil
       setStatus(dataStatus, 'Données importées.', true);
       syncChoices(data.settings);
     } catch (err) {

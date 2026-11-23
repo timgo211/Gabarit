@@ -4106,6 +4106,105 @@ async function stopsCheck(browser, base) {
   }
 }
 
+/**
+ * v56 (phase 6) : historique et notes. Trajet guidé jusqu'à l'arrivée avec le GPS émulé (jamais en simulation) →
+ * une ligne dans Réglages › Historique (départ, arrivée, km, durée, profil), statistiques du mois, phrase « Gardé
+ * seulement sur cet appareil. Inclus dans l'export. », aucune coordonnée dans IndexedDB ; relevé imprimé
+ * (feuille d'impression : seul le relevé, un tableau) ; export avec `history`. Note d'aire : grisée en roulant,
+ * enregistrée à l'arrêt, affichée dans la liste et dans l'encart du guidage, jamais dite. 412×900 jour, 1280×800 nuit.
+ */
+async function historyCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night'], [360, 760, 'day']]) {
+    const tag = `historique ${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, overpass: () => ({ elements: [] }), directions: () => nav,
+    });
+    await computeRoute(page);
+    const park = async (p, speed, n = 4) => { for (let i = 0; i < n; i += 1) { await setGeo(page, { lon: p[0], lat: p[1], accuracy: 5, speed }); await page.waitForTimeout(900); } };
+    // Note d'aire : en roulant (préparation) → grisée ; à l'arrêt → enregistrée.
+    const hasArea = await page.locator('#areas-list .area-row').count() > 0;
+    check(hasArea, `${tag} : aires du trajet listées`);
+    if (hasArea) {
+      await park(line[0], 14);
+      await page.locator('#areas-list .area-row').first().click();
+      await page.waitForSelector('#dlg-area[open]');
+      check(await page.isDisabled('#btn-area-note-save') && await page.isDisabled('#area-note-text'), `${tag} : « Ma note » grisée en roulant`);
+      await page.click('#dlg-area [data-close]');
+      await park(line[0], 0, 5);
+      await page.locator('#areas-list .area-row').first().click();
+      await page.waitForSelector('#dlg-area[open]');
+      await page.waitForFunction(() => !document.querySelector('#btn-area-note-save').disabled, null, { timeout: 6000 }).catch(() => {});
+      check(!(await page.isDisabled('#btn-area-note-save')), `${tag} : « Ma note » active à l'arrêt`);
+      await page.click('#area-note-fields [aria-label="Sécurité"] button >> nth=2');
+      await page.click('#area-note-fields [aria-label="Douches"] button >> nth=0');
+      await page.fill('#area-note-text', 'Éclairage en panne');
+      await page.click('#btn-area-note-save');
+      const last = await page.textContent('#area-note-last');
+      check(/Ma note : sécurité mauvaise · douches oui/.test(last), `${tag} : note enregistrée`, last);
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).areaNotes ?? []);
+      check(saved.length === 1 && saved[0].text === 'Éclairage en panne', `${tag} : note dans gabarit.data`);
+      await noHorizontalScroll(page, `${tag} fiche aire`);
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-note-aire.png`) });
+      await page.click('#dlg-area [data-close]');
+      check(/Ma note : sécurité mauvaise/.test(await page.textContent('#areas-list')), `${tag} : note affichée dans la liste des aires`);
+    }
+    // Guidage avec le GPS émulé jusqu'à l'arrivée.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    for (let i = 1; i < line.length; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(350); }
+    for (let i = 0; i < 3; i += 1) { await setGeo(page, { lon: line.at(-1)[0], lat: line.at(-1)[1], accuracy: 5, speed: 0 }); await page.waitForTimeout(600); }
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(spoken.some((t) => /Destination atteinte/.test(t)), `${tag} : arrivée`);
+    check(!spoken.some((t) => /Ma note|sécurité|douches|Éclairage/i.test(t)), `${tag} : note jamais dite`, spoken.join(' | '));
+    await page.waitForTimeout(800);
+    const stored = await page.evaluate(() => new Promise((resolve) => {
+      const r = indexedDB.open('gabarit-history', 1);
+      r.onsuccess = () => { const tx = r.result.transaction('trips', 'readonly'); const g = tx.objectStore('trips').get('list'); g.onsuccess = () => resolve(g.result ?? []); g.onerror = () => resolve(null); };
+      r.onerror = () => resolve(null);
+    }));
+    check(Array.isArray(stored) && stored.length === 1 && stored[0].km > 5 && stored[0].km < 7 && stored[0].profile,
+      `${tag} : trajet gardé à l'arrivée (km, profil)`, JSON.stringify(stored));
+    check(!/"lon"|"lat"|4\.9[0-9]{3}|45\.7[0-9]{3}/.test(JSON.stringify(stored)), `${tag} : aucune coordonnée gardée`);
+    await stopGuidance(page);
+    // Réglages › Historique.
+    await page.click('#btn-settings');
+    await page.waitForSelector('#dlg-settings[open]');
+    await page.waitForTimeout(500);
+    check(await page.textContent('#history-privacy') === "Gardé seulement sur cet appareil. Inclus dans l'export.", `${tag} : phrase de confidentialité`);
+    check(await page.locator('#history-list li').count() === 1 && / → Lyon/.test(await page.textContent('#history-list')), `${tag} : une ligne dans l'historique`, await page.textContent('#history-list'));
+    check(/: 1 trajet · \d+(,\d)? km · \d+ min/.test(await page.textContent('#history-stats')), `${tag} : statistiques du mois`, await page.textContent('#history-stats'));
+    await page.locator('#history-card').scrollIntoViewIfNeeded();
+    await noHorizontalScroll(page, `${tag} historique`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-historique.png`) });
+    // Relevé : seule la partie relevé à l'impression.
+    await page.emulateMedia({ media: 'print' });
+    await page.evaluate(() => {
+      window.print = () => {
+        const sheet = document.querySelector('#history-print');
+        window.__print = {
+          sheet: getComputedStyle(sheet).display, dialog: getComputedStyle(document.querySelector('#dlg-settings')).display,
+          rows: sheet.querySelectorAll('tbody tr').length, title: sheet.querySelector('h1')?.textContent ?? '',
+        };
+      };
+    });
+    await page.click('#btn-history-print');
+    const pr = await page.evaluate(() => window.__print);
+    check(pr && pr.sheet === 'block' && pr.dialog === 'none' && pr.rows === 1 && /relevé personnel/.test(pr.title), `${tag} : relevé imprimé seul, un trajet`, JSON.stringify(pr));
+    await page.emulateMedia({ media: 'screen' });
+    // Export : historique inclus.
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.click('#btn-export')]);
+    const file = await dl.path();
+    const exp = JSON.parse(readFileSync(file, 'utf8'));
+    check(Array.isArray(exp.history) && exp.history.length === 1 && Array.isArray(exp.areaNotes) && !JSON.stringify(exp).includes('cle-factice'),
+      `${tag} : export avec l'historique et les notes, sans la clé`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function fuelCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
   const line = nav.features[0].geometry.coordinates;
@@ -4243,7 +4342,7 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck, etapes: stopsCheck };
+    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

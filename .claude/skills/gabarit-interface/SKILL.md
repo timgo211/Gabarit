@@ -178,6 +178,11 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   « Ajouter comme étape » de la fiche carburant (préparation : nouveau calcul ; guidage : « Autres itinéraires » avec
   l'étape) et champ « Ajouter une étape » du panneau `#nav-alts` (fermé dès que le véhicule roule) ; étape rangée selon
   sa place sur le tracé. Recalcul et « Autres itinéraires » : étapes non atteintes gardées.
+- Phase 6 (v56) : Réglages › « Historique des trajets » (`#history-card`) : phrase « Gardé seulement sur cet appareil.
+  Inclus dans l'export. », statistiques par mois, 30 derniers trajets, « Relevé PDF (imprimer) » (`window.print`, seule
+  la section `#history-print` imprimée, noir sur blanc, tableau de tous les trajets), « Effacer l'historique »
+  (confirmation). IndexedDB refusé ou plein : message, rien de bloqué. Fiche d'une aire : carte « Ma note » (3 groupes
+  de boutons `aria-pressed`, remarque, « Enregistrer la note »), grisée hors de l'arrêt.
 - Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
   de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
   `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.

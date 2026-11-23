@@ -48,7 +48,10 @@ function validRoute(r) {
  *   choice : itinéraires proposés (app.js) ; along / segIndex : progression du guidage
  * @returns {object|null} null si rien à garder
  */
-export function buildSave({ kind, choice, vehicleId, along = null, segIndex = null, nextStop = 0, now }) {
+export function buildSave({
+  kind, choice, vehicleId, along = null, segIndex = null, nextStop = 0, drivenBefore = 0, tripStartedAt = null,
+  stopsDone = [], now,
+}) {
   if (!ROUTE_SAVE.KINDS.includes(kind) || !choice || typeof vehicleId !== 'string' || !vehicleId) return null;
   const options = Array.isArray(choice.options) ? choice.options : [];
   if (!options.length || !options.every((o) => validRoute(o?.route))) return null;
@@ -76,6 +79,10 @@ export function buildSave({ kind, choice, vehicleId, along = null, segIndex = nu
     save.progress = {
       along: isNum(along) && along >= 0 ? along : 0, segIndex: Number.isInteger(segIndex) ? segIndex : null,
       nextStop: Number.isInteger(nextStop) && nextStop >= 0 ? nextStop : 0,
+      // v56 : historique (km et durée du trajet repris après une mise en arrière-plan).
+      drivenBefore: isNum(drivenBefore) && drivenBefore >= 0 ? drivenBefore : 0,
+      tripStartedAt: isNum(tripStartedAt) ? tripStartedAt : null,
+      stopsDone: Array.isArray(stopsDone) ? stopsDone.filter((x) => typeof x === 'string').slice(0, 10) : [],
     };
   }
   return save;

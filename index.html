@@ -414,9 +414,24 @@
         <p id="diesel-status" class="status" role="status"></p>
       </section>
 
+      <!-- Phase 6 (v56) : trajets terminés (date, départ, arrivée, étapes, km, durée, profil), aucune coordonnée. -->
+      <section class="card" id="history-card">
+        <h3>Historique des trajets</h3>
+        <p id="history-privacy" class="hint"></p>
+        <h4 class="history-sub">Par mois</h4>
+        <ul id="history-stats" class="history-stats"></ul>
+        <h4 class="history-sub">Derniers trajets</h4>
+        <ol id="history-list" class="history-list"></ol>
+        <div class="row">
+          <button type="button" id="btn-history-print" class="btn">Relevé PDF (imprimer)</button>
+          <button type="button" id="btn-history-clear" class="btn">Effacer l'historique</button>
+        </div>
+        <p id="history-status" class="status" role="status"></p>
+      </section>
+
       <section class="card">
         <h3>Mes données</h3>
-        <p class="hint">Véhicules, lieux, signalements, avis sur les aires et trajets. Exporte régulièrement une sauvegarde.</p>
+        <p class="hint">Véhicules, lieux, signalements, avis et notes sur les aires, historique des trajets. Exporte régulièrement une sauvegarde.</p>
         <div class="row">
           <button type="button" id="btn-export" class="btn">Exporter (JSON)</button>
           <label class="btn" for="import-file">Importer…</label>
@@ -537,8 +552,21 @@
         </div>
         <p id="area-avis-hint" class="hint"></p>
       </section>
+      <!-- Phase 6 (v56) : notes perso, saisie à l'arrêt seulement, jamais dites à voix haute. -->
+      <section class="card" id="area-note-card">
+        <h3>Ma note</h3>
+        <p id="area-note-last" class="area-last"></p>
+        <div id="area-note-fields" class="area-note-fields"></div>
+        <label for="area-note-text">Remarque</label>
+        <textarea id="area-note-text" class="area-note-text" rows="2" maxlength="280"></textarea>
+        <button type="button" id="btn-area-note-save" class="btn btn-primary">Enregistrer la note</button>
+        <p id="area-note-hint" class="hint"></p>
+      </section>
     </div>
   </dialog>
+
+  <!-- Phase 6 (v56) : relevé des trajets, seule partie imprimée (body.printing-history, feuille d'impression). -->
+  <section id="history-print" class="history-print" aria-hidden="true"></section>
 
   <dialog id="dlg-vehicles" class="dialog" aria-labelledby="vehicles-title">
     <div class="dialog-head">

@@ -12,6 +12,8 @@ import {
 import { sanitizeAreaReports } from './areas-avis.js';
 import { sanitizeRestrictions } from './restrictions.js';
 import { sanitizeFuelStations } from './fuel-stations.js';
+import { sanitizeAreaNotes } from './area-notes.js';
+import { sanitizeHistory } from './trip-history.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -52,6 +54,7 @@ export function emptyData() {
     areaReports: [],
     restrictions: [],
     fuelStations: [],
+    areaNotes: [],
     settings: {
       theme: 'auto', nightMapLevel: DEFAULT_NIGHT_LEVEL, avoidTolls: false, avoidFerries: false, voice: true, simSpeed: SIM_DEFAULT_SPEED, dieselPrice: null,
       mapLayer: DEFAULT_MAP_LAYER,
@@ -102,6 +105,7 @@ export function sanitizeData(raw) {
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
     restrictions: sanitizeRestrictions(raw.restrictions).list, // Mes restrictions (phase 12b) : invalides et doublons écartés
     fuelStations: sanitizeFuelStations(raw.fuelStations), // Mes stations « OK camion » (phase 4)
+    areaNotes: sanitizeAreaNotes(raw.areaNotes), // notes perso sur les aires (phase 6)
     settings: {
       theme: THEME_MODES.includes(s.theme) ? s.theme : 'auto',
       nightMapLevel: sanitizeNightLevel(s.nightMapLevel), // luminosité de la carte la nuit (phase 2d), Normal par défaut
@@ -130,10 +134,28 @@ export function sanitizeData(raw) {
   };
 }
 
-/** JSON d'export : toutes les données, jamais la clé ORS. */
-export function exportData(data, now = new Date()) {
+/**
+ * JSON d'export : toutes les données, jamais la clé ORS. history (phase 6) : trajets terminés lus dans IndexedDB
+ * (src/ui/trip-history.js), sans coordonnées ; null → champ absent (historique indisponible).
+ */
+export function exportData(data, now = new Date(), history = null) {
   const clean = sanitizeData(data);
-  return JSON.stringify({ app: 'gabarit', exportedAt: now.toISOString(), ...clean }, null, 2);
+  const extra = Array.isArray(history) ? { history: sanitizeHistory(history) } : {};
+  return JSON.stringify({ app: 'gabarit', exportedAt: now.toISOString(), ...clean, ...extra }, null, 2);
+}
+
+/**
+ * Phase 6 : lit un export complet → { data (gabarit.data), history (trajets, [] si absent : ancien export) }.
+ * L'historique n'entre pas dans gabarit.data : il va dans IndexedDB.
+ */
+export function readExport(text) {
+  let raw;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new Error("Fichier illisible : ce n'est pas du JSON valide.");
+  }
+  return { data: sanitizeData(raw), history: sanitizeHistory(raw?.history) };
 }
 
 /** Lit un JSON d'export. Toute propriété inconnue (dont une éventuelle clé) est ignorée. */

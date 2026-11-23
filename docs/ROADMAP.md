@@ -551,7 +551,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   `prix-des-carburants-en-france-flux-instantane-v2`), filtre « piste poids lourds » si le champ services le permet,
   tri par prix du gazole, détour estimé, mes stations « OK camion », coût carburant du trajet.
 
-- [ ] **Phase 6 — Historique et notes**
+- [x] **Phase 6 — Historique et notes** (v56 : trajets terminés gardés sur l'appareil (IndexedDB, aucune trace GPS ni
+  coordonnée, export / import), statistiques par mois, relevé PDF par impression, notes perso sur les aires (sécurité,
+  douches, propreté, remarque) saisies à l'arrêt et affichées au prochain passage)
   Historique des trajets, statistiques, relevé PDF via impression. Notes perso détaillées sur les aires et parkings
   utilisés (sécurité, douches, propreté…), affichées au prochain passage, en plus de « Mon avis » de la phase 9.
   (Aires et parkings PL, prochain parking en guidage : phase 9.)

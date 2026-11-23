@@ -76,6 +76,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Écran de navigation v53 : boutons ronds de la colonne 48 px (zone tactile ≥ 40 px, ces boutons seulement), pastille
   de la rue sous le véhicule, ligne de sortie (règle 11b, jamais dite), mémoire de l'itinéraire en IndexedDB (question
   > 12 h seulement à l'arrêt). Détail : skill `gabarit-interface`.
+- Historique (phase 6, v56, `trip-history.js`) : trajet gardé à l'arrivée seulement (jamais en simulation), IndexedDB
+  `gabarit-history` jamais bloquant, aucune coordonnée, inclus dans l'export (`history`) ; notes d'aires (`areaNotes`)
+  saisies à l'arrêt seulement, jamais dites ; relevé PDF par `@media print`.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais

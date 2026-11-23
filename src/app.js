@@ -47,6 +47,9 @@ import { placeAlongRoute } from './lib/areas-route.js';
 import { loadDriving, saveDriving, emptyDriving } from './lib/driving-time.js';
 import { buildSave, checkSave, restoredChoice, saveKey, shouldSave, RESUME_QUESTION } from './lib/route-save.js';
 import { createRouteStore } from './ui/route-save.js';
+import { createHistoryStore } from './ui/trip-history.js';
+import { createHistoryPanel } from './ui/history.js';
+import { buildTrip } from './lib/trip-history.js';
 import { FUEL, lazyLoader, toggleFuelStation } from './lib/fuel-stations.js';
 
 function pickStorage() {
@@ -154,7 +157,7 @@ navigation = createNavigation({
   areaFacts: (id) => areas.shortFacts(id),
   onView: () => { areas.refreshDrive(); saveRoute(); },
   // v53 : sauvegarde de l'itinéraire effacée à l'arrivée et quand le guidage est quitté (✕ puis « Quitter »).
-  onArrived: () => forgetRoute(),
+  onArrived: (trip) => { forgetRoute(); recordTrip(trip); },
   onStopReached: () => saveRoute({ force: true }), // v55 : étapes atteintes gardées (progress.nextStop)
   onQuit: () => forgetRoute(),
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
@@ -181,7 +184,8 @@ const areas = createAreas({
   storage,
   getData: () => data,
   update,
-  getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh }),
+  // Phase 6 : parked (« Ma note » à l'arrêt seulement) : parkedState en guidage, relevés GPS hors guidage.
+  getDrive: () => ({ navigating: navigation.active, speedKmh: navigation.speedKmh, parked: navigation.active ? navigation.parked : !!planPark?.parked }),
   getRoute: () => (choice ? choice.options[choice.selected]?.route ?? null : null),
   onNavPick: (id) => navigation.pickArea(id), // phase 2d : repère touché en guidage
   onPool: (pool) => {
@@ -448,6 +452,7 @@ const planPark = createPlanPark({
   onChange: (parked) => {
     if (!parked && !navigation.active) closeFuel('moving');
     renderChoice();
+    areas.refreshDrive(); // v56 : « Ma note » grisée / active selon l'arrêt
   },
 });
 const tunnelAllowed = () => avoidTunnelAllowed({ guiding: navigation.active, parked: planPark.parked });
@@ -596,7 +601,7 @@ function selectRoute(index) {
 }
 map.onRoutePick(selectRoute);
 
-function startGuidance(simulate = null, resume = null) {
+function startGuidance(simulate = null, resume = null, carry = null) {
   if (!choice) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
   const option = choice.options[choice.selected];
   showMessage(messageNode, '');
@@ -628,6 +633,7 @@ function startGuidance(simulate = null, resume = null) {
     // Phase 11b : directions des panneaux dans les consignes (copie des cases du trajet).
     directions: directions.state.status === 'ok' ? directions.state.data : null,
     resume, // v53 : reprise d'un guidage sauvegardé
+    carry, tripFrom: choice.fromLabel ?? '', // v56 : historique
   });
   saveRoute({ force: true });
   return null;
@@ -753,11 +759,12 @@ altUi.go.addEventListener('click', () => {
   if (!altChoice || !navigation.active) return;
   if (!navigation.parked) { closeAlternatives('moving'); return; }
   const sim = navigation.simulating ? { speedKmh: navigation.simSpeedKmh ?? data.settings.simSpeed } : null;
+  const carry = navigation.tripCarry; // v56 : même trajet pour l'historique (km, début, étapes faites)
   choice = altChoice;
   closeAlternatives();
   renderChoice();
   areas.select(choice.options[choice.selected].route);
-  startGuidance(sim); // le guidage repart sur l'itinéraire choisi
+  startGuidance(sim, null, carry); // le guidage repart sur l'itinéraire choisi
 });
 
 // ───────── Phase 4 : « Carburant sur le trajet », à l'arrêt seulement (préparation et guidage) ─────────
@@ -855,7 +862,9 @@ const settings = createSettings({
   onSpeedVoiceChange: (on) => setSetting({ speedVoice: on }), // phase 11a : « Limite X » au dépassement, désactivé par défaut
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
   onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
-  onOpen: () => restrictionsUi.render(),
+  onOpen: () => { restrictionsUi.render(); historyPanel.refresh(); }, // v56 : historique relu
+  getHistory: () => historyStore.list(),
+  onHistoryImported: async (list) => { await historyStore.merge(list); await historyPanel.refresh(); },
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
@@ -965,6 +974,20 @@ function showChoice(selected) {
 // l'arrivée et par « Quitter ». Au démarrage : moins de 12 h → repris tel quel ; plus → « Reprendre l'itinéraire ? »
 // posé seulement à l'arrêt (vitesse inconnue = en mouvement, R412-6-2) ; sinon rien n'est demandé, la sauvegarde reste.
 const routeStore = createRouteStore();
+
+// ───────── Phase 6 (v56) : historique des trajets terminés (IndexedDB, jamais bloquant, aucune coordonnée) ─────────
+const historyStore = createHistoryStore();
+const historyPanel = createHistoryPanel({ store: historyStore });
+let tripSeq = 0; // identifiant unique : compteur, jamais l'horloge seule
+function recordTrip(t) {
+  if (!t || t.simulating || !choice) return;
+  const trip = buildTrip({
+    startedAt: t.tripStartedAt, arrivedAt: Date.now(), from: t.from || choice.fromLabel, to: choice.toLabel,
+    stops: (t.stopsDone ?? []).map((label) => ({ label })), drivenM: t.drivenBefore, profile: choice.vehicle?.name ?? '',
+    seq: tripSeq++,
+  });
+  if (trip) historyStore.add(trip).then(() => historyPanel.refresh()).catch(() => {});
+}
 let lastRouteSave = null;
 /** Faux après « Quitter » ou l'arrivée : rien n'est regardé jusqu'au prochain calcul ou choix d'itinéraire. */
 let routeSaveOn = false;
@@ -981,7 +1004,8 @@ function writeRoute({ force = false } = {}) {
   if (!shouldSave(lastRouteSave, { now, key, force })) return;
   const save = buildSave({
     kind, choice, vehicleId: choice.vehicle?.id ?? '', along: progress?.along ?? null, segIndex: progress?.segIndex ?? null,
-    nextStop: progress?.nextStop ?? 0, now,
+    nextStop: progress?.nextStop ?? 0, drivenBefore: progress?.drivenBefore ?? 0,
+    tripStartedAt: progress?.tripStartedAt ?? null, stopsDone: progress?.stopsDone ?? [], now,
   });
   if (!save) return;
   lastRouteSave = { at: now, key };

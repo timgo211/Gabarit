@@ -164,6 +164,18 @@ export function placeStops(stops, route, line) {
   });
 }
 
+/**
+ * v56 : ce qui suit le trajet d'un guidage à l'autre (« Autres itinéraires » choisi en route, sauvegarde) et sert à
+ * l'historique : distance faite (m), début, étapes faites (libellés), départ. Jamais de position.
+ */
+export function tripSoFar(state) {
+  if (!state) return null;
+  return {
+    drivenBefore: (state.drivenBefore ?? 0) + (isNum(state.along) ? state.along : 0),
+    tripStartedAt: state.tripStartedAt, stopsDone: [...(state.stopsDone ?? [])], from: state.tripFrom ?? '',
+  };
+}
+
 /** Étapes pas encore atteintes (recalcul, « Autres itinéraires », sauvegarde) : { label, lon, lat }. */
 export function remainingStops(state) {
   const list = state?.stops ?? [];
@@ -242,7 +254,7 @@ function placeSpeeds(ctx, rules, route) {
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
   driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null, directions = null,
-  stops = [],
+  stops = [], carry = null, tripFrom = '',
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
   const prepared = prepareRoute(route, directions);
@@ -250,6 +262,12 @@ export function startNavigation(route, {
     // v55 : étapes restantes, dans l'ordre du tracé ; nextStop = première non atteinte.
     stops: placeStops(stops, route, prepared.line),
     nextStop: 0,
+    // Phase 6 (v56) : historique — distance faite avant le dernier recalcul (m), début du trajet, étapes faites,
+    // départ. `carry` : trajet repris (« Autres itinéraires » choisi en route) : rien n'est remis à zéro.
+    drivenBefore: isNum(carry?.drivenBefore) && carry.drivenBefore >= 0 ? carry.drivenBefore : 0,
+    tripStartedAt: isNum(carry?.tripStartedAt) ? carry.tripStartedAt : now,
+    stopsDone: Array.isArray(carry?.stopsDone) ? carry.stopsDone.filter((x) => typeof x === 'string').slice(0, 10) : [],
+    tripFrom: typeof carry?.from === 'string' ? carry.from : (typeof tripFrom === 'string' ? tripFrom : ''),
     speedCtx,
     speedLimits: placeSpeeds(speedCtx, rules, route),
     speedCursor: 0,
@@ -320,7 +338,12 @@ export function resumeNavigation(state, progress) {
   // v55 : étapes déjà atteintes (sauvegarde sans étapes → 0).
   const n = state.stops?.length ?? 0;
   const nextStop = Number.isInteger(progress?.nextStop) ? Math.min(Math.max(0, progress.nextStop), n) : 0;
-  return { ...state, along, segIndex, announced, started: true, resumed: true, nextStop };
+  // v56 : historique — distance avant le dernier recalcul et début du trajet gardés (sauvegarde sans eux → reprise).
+  const drivenBefore = isNum(progress?.drivenBefore) && progress.drivenBefore >= 0 ? progress.drivenBefore : 0;
+  const tripStartedAt = isNum(progress?.tripStartedAt) && progress.tripStartedAt <= (state.tripStartedAt || Infinity)
+    ? progress.tripStartedAt : state.tripStartedAt;
+  const stopsDone = Array.isArray(progress?.stopsDone) ? progress.stopsDone.filter((x) => typeof x === 'string').slice(0, 10) : state.stopsDone;
+  return { ...state, along, segIndex, announced, started: true, resumed: true, nextStop, drivenBefore, tripStartedAt, stopsDone };
 }
 
 /**
@@ -394,10 +417,15 @@ export function updateNavigation(state, fix) {
       const toStop = Math.min(haversine(p, st.point), haversine(p, st.snap));
       if (toStop <= NAV.ARRIVAL_RADIUS_M && (!onRoute || st.along - loc.along <= NAV.ARRIVAL_MAX_REMAINING_M)) {
         s.nextStop += 1;
+        s.stopsDone = [...(s.stopsDone ?? []), st.label].slice(0, 10); // v56 : historique
         events.push({ type: 'speak', text: STOP_REACHED_TEXT, interrupt: true }, { type: 'stop-reached', index: s.nextStop - 1 });
         break;
       }
-      if (onRoute && loc.along > st.along + NAV.STOP_PASSED_M) { s.nextStop += 1; continue; }
+      if (onRoute && loc.along > st.along + NAV.STOP_PASSED_M) {
+        s.nextStop += 1;
+        s.stopsDone = [...(s.stopsDone ?? []), st.label].slice(0, 10);
+        continue;
+      }
       break;
     }
   }
@@ -759,6 +787,7 @@ export function rerouteDone(state, route, stops = null) {
     // v55 : le recalcul a été demandé avec les étapes restantes (remainingStops) : replacées sur le nouveau tracé.
     stops: placeStops(Array.isArray(stops) ? stops : remainingStops(state), route, prepared.line),
     nextStop: 0,
+    drivenBefore: (state.drivenBefore ?? 0) + (isNum(state.along) ? state.along : 0), // v56 : historique
     route: prepared,
     source: route,
     areas: placeAreas(state.areaPool, route),

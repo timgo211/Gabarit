@@ -32,7 +32,7 @@ test('sauvegarde : itinéraire en préparation et guidage, profil par identifian
   assert.equal(plan.choice.options[0].key, 'recommended', 'clé de variante gardée (pas un secret)');
   assert.equal(plan.progress, undefined);
   const nav = buildSave({ kind: 'nav', choice, vehicleId: 'v1', along: 523.4, segIndex: 7, now: 2000 });
-  assert.deepEqual(nav.progress, { along: 523.4, segIndex: 7, nextStop: 0 });
+  assert.deepEqual(nav.progress, { along: 523.4, segIndex: 7, nextStop: 0, drivenBefore: 0, tripStartedAt: null, stopsDone: [] });
   // Champ secret glissé n'importe où : retiré.
   const leaky = { ...choice, options: [{ ...choice.options[0], apiKey: 'SECRET1', route: { ...route, meta: { orsKey: 'SECRET2', token: 'SECRET3' } } }] };
   const text = JSON.stringify(buildSave({ kind: 'plan', choice: leaky, vehicleId: 'v1', now: 1 }));
