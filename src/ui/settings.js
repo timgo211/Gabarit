@@ -8,6 +8,7 @@ import { requestVersionLabel, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
 import { exportData, readExport, parseDieselPrice } from '../lib/store.js';
 import { formatPricePerLiter } from '../lib/format.js';
+import { RECENT } from '../lib/recent-places.js';
 import { summarizeKeyTest } from '../lib/ors-errors.js';
 import { sanitizeVoiceRate, sanitizeVoiceVolume } from '../lib/prefs.js';
 import { sanitizeWindGust } from '../lib/wind.js';
@@ -36,7 +37,8 @@ function setStatus(node, text, ok) {
  *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
  *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void,
  *   onDriveVoiceChange?:(on:boolean)=>void, onWindVoiceChange?:(on:boolean)=>void, onWindGustChange?:(g:number)=>void,
- *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void }} ctx
+ *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void, onCreditsToggle?:(open:boolean)=>void,
+ *   recent?:{ list:()=>object[], clear:()=>void, merge:(l:object[])=>void } }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 /** Phase 7d : crédits des photos aériennes (texte seulement, lien vers la licence). */
@@ -120,7 +122,35 @@ export function createSettings(ctx) {
     $('#voice-volume-out').textContent = volumeText(sanitizeVoiceVolume(voiceVolume.value));
   }
 
+  // v63 : « Sources et licences » repliable, repliée par défaut (settings.creditsOpen) ; contenu inchangé.
+  const creditsBtn = $('#btn-credits');
+  const creditsBody = $('#credits-body');
+  function applyCredits(open) {
+    creditsBtn.setAttribute('aria-expanded', String(open));
+    creditsBody.hidden = !open;
+  }
+  creditsBtn.addEventListener('click', () => {
+    const open = creditsBtn.getAttribute('aria-expanded') !== 'true';
+    applyCredits(open);
+    ctx.onCreditsToggle?.(open);
+  });
+
+  // v63 : recherches récentes (src/lib/recent-places.js), effacées après confirmation.
+  const recentStatus = $('#recent-status');
+  const recentClear = $('#btn-recent-clear');
+  function syncRecent() {
+    recentClear.disabled = !(ctx.recent?.list().length);
+  }
+  recentClear.addEventListener('click', () => {
+    if (!ctx.recent?.list().length || !window.confirm(RECENT.CLEAR_CONFIRM)) return;
+    ctx.recent.clear();
+    syncRecent();
+    setStatus(recentStatus, RECENT.CLEARED_TEXT, true);
+  });
+
   function syncChoices(settings) {
+    applyCredits(settings.creditsOpen === true);
+    syncRecent();
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
     for (const r of dlg.querySelectorAll('input[name="night-level"]')) r.checked = r.value === settings.nightMapLevel;
     for (const r of dlg.querySelectorAll('input[name="sim-speed"]')) r.checked = Number(r.value) === settings.simSpeed;
@@ -184,6 +214,7 @@ export function createSettings(ctx) {
     setStatus(windStatus, '');
     setStatus(drivingStatus, '');
     setStatus(adrStatus, '');
+    setStatus(recentStatus, '');
     syncChoices(ctx.getData().settings);
     showVersion();
     ctx.onOpen?.(); // phase 12b : Mes restrictions relue (liste, boutons grisés en roulant)
@@ -299,7 +330,8 @@ export function createSettings(ctx) {
     try {
       // Phase 6 : historique des trajets (IndexedDB) inclus ; indisponible → export sans lui, dit dans le message.
       const history = (await ctx.getHistory?.()) ?? null;
-      const json = exportData(ctx.getData(), new Date(), history);
+      // v63 : recherches récentes incluses (champ recentPlaces).
+      const json = exportData(ctx.getData(), new Date(), history, ctx.recent?.list() ?? null);
       const blob = new Blob([json], { type: 'application/json' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -319,10 +351,11 @@ export function createSettings(ctx) {
     e.target.value = '';
     if (!file) return;
     try {
-      const { data, history } = readExport(await file.text());
+      const { data, history, recentPlaces } = readExport(await file.text());
       if (!window.confirm(`Remplacer les données actuelles par celles du fichier (${data.vehicles.length} véhicule(s)) ?`)) return;
       ctx.onDataReplaced(data);
       if (history.length) await ctx.onHistoryImported?.(history); // phase 6 : ajouté à l'historique de l'appareil
+      if (recentPlaces.length) ctx.recent?.merge(recentPlaces); // v63 : ajoutées après celles de l'appareil
       setStatus(dataStatus, 'Données importées.', true);
       syncChoices(data.settings);
     } catch (err) {

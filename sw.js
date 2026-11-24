@@ -87,6 +87,7 @@ const APP_FILES = [
   './src/lib/geocode-quota.js',
   './src/lib/place-resolve.js',
   './src/lib/trip-history.js',
+  './src/lib/recent-places.js',
   './src/lib/area-notes.js',
   './src/lib/route-options.js',
   './src/lib/road-class.js',

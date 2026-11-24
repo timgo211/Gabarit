@@ -168,4 +168,8 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   liste au-dessus du clavier ; homonymes (`pelias-homonymes.json` : 3 Sainte-Colombe aux codes postaux différents ;
   `pelias-sans-code.json` : Saint-Martin des Hautes-Alpes séparés par l'arrondissement, Gers, Bruyères 88600) ;
   validé sans choix → /search (plusieurs → liste, un → calcul) ; plafond du jour → ligne,
-  0 appel, validation toujours possible ; mesure : 2 car./s → 14 appels.
+  0 appel, validation toujours possible ; mesure : 2 car./s → 14 appels. v63 : récents = choix de la liste seulement ;
+  focus champ vide → titre gris + 5 récents, 0 appel ; « SAINT etienne » filtré ; récent avant ORS sans doublon ;
+  ✕ ≥ 48 px retire sans fermer ; récent choisi remonte ; « Sources et licences » repliée au premier affichage
+  (titre ≥ 48 px), effacer avec confirmation (refus → rien), dépliée gardée au rechargement.
+- Lire un crédit de Réglages (v63) : `openCredits(page)` d'abord (section repliée par défaut).

@@ -8,10 +8,12 @@
 // - 5 résultats au plus ; chaque ligne : nom du lieu, puis commune et pays (gris) ;
 // - aucune suggestion → ligne « Aucun résultat » ; pas de réseau → ligne « Pas de connexion » ; plafond de géocodage
 //   atteint → ligne qui renvoie à la validation (recherche à part, place-resolve.js) : jamais une impasse ;
-// - clé absente, refusée, quota d'ORS (403 / 429) : message habituel (onError), liste fermée.
+// - clé absente, refusée, quota d'ORS (403 / 429) : message habituel (onError), liste fermée ;
+// - v63 : recherches récentes (recent-places.js) en tête, sans appel réseau ni place dans le plafond.
 
 import { suggestionPlan } from './coords.js';
 import { SUGGEST_MAX } from './ors-request.js';
+import { RECENT, samePlace } from './recent-places.js';
 
 export const SUGGEST = Object.freeze({
   DELAY_MS: 400,
@@ -60,23 +62,30 @@ export function homonymDetails(items) {
 }
 
 /**
- * Lignes de la liste.
- * @param {{ items?:object[], status:'idle'|'results'|'empty'|'offline'|'exhausted' }} st
- * @returns {{ kind:'place'|'info', text:string, sub?:string, index?:number }[]}
+ * Lignes de la liste. v63 : recherches récentes (recent, déjà filtrées : recent-places.js) d'abord, sous le titre gris
+ * « Recherches récentes », puis les suggestions d'ORS sans les lieux déjà proposés ; « Aucun résultat » omis quand un
+ * récent correspond.
+ * @param {{ items?:object[], recent?:object[], status:'idle'|'results'|'empty'|'offline'|'exhausted' }} st
+ * @returns {{ kind:'title'|'recent'|'place'|'info', text:string, sub?:string, index?:number }[]}
  */
 export function suggestionRows(st) {
+  const recent = (st?.recent ?? []).slice(0, RECENT.SHOW);
+  const head = recent.length
+    ? [{ kind: 'title', text: RECENT.TITLE }, ...recent.map((p, index) => ({ kind: 'recent', text: p.name || p.label, sub: p.place ?? '', index }))]
+    : [];
   switch (st?.status) {
     case 'results': {
       const items = (st.items ?? []).slice(0, SUGGEST.MAX);
       const extra = homonymDetails(items);
-      return items.map((s, index) => ({
+      const rows = items.map((s, index) => ({
         kind: 'place', text: s.name || s.label, sub: [s.place ?? '', extra[index]].filter(Boolean).join(' · '), index,
-      }));
+      })).filter((r) => !recent.some((p) => samePlace(p, items[r.index])));
+      return [...head, ...rows];
     }
-    case 'empty': return [{ kind: 'info', text: SUGGEST.NO_RESULT_TEXT }];
-    case 'offline': return [{ kind: 'info', text: SUGGEST.OFFLINE_TEXT }];
-    case 'exhausted': return [{ kind: 'info', text: SUGGEST.EXHAUSTED_TEXT }];
-    default: return [];
+    case 'empty': return recent.length ? head : [{ kind: 'info', text: SUGGEST.NO_RESULT_TEXT }];
+    case 'offline': return [...head, { kind: 'info', text: SUGGEST.OFFLINE_TEXT }];
+    case 'exhausted': return [...head, { kind: 'info', text: SUGGEST.EXHAUSTED_TEXT }];
+    default: return head;
   }
 }
 

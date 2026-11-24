@@ -4,7 +4,7 @@ import { $, el, showMessage } from './ui/dom.js';
 import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.js';
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
-import { createRouteForm, attachAutocomplete } from './ui/route-form.js';
+import { createRouteForm, attachAutocomplete, recentPlaces } from './ui/route-form.js';
 import { stopPoints, insertStopByRoute } from './lib/stops.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
@@ -909,6 +909,8 @@ const settings = createSettings({
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
   onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
+  onCreditsToggle: (open) => setSetting({ creditsOpen: open }), // v63
+  recent: recentPlaces, // v63 : effacer, exporter, importer
 });
 createVehicles({ getData: () => data, update });
 

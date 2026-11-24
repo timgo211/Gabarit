@@ -6,6 +6,7 @@ import { createSuggester, suggestionRows, SUGGEST } from '../lib/suggest.js';
 import { resolvePlace, RESOLVE } from '../lib/place-resolve.js';
 import { createGeocodeBudget, createTextCache } from '../lib/geocode-quota.js';
 import { STOPS, moveStop, removeStop } from '../lib/stops.js';
+import { RECENT, createRecentStore } from '../lib/recent-places.js';
 
 // v62 : budget de géocodage (compteur du jour en localStorage, minute en mémoire) et cache des 20 derniers textes
 // (mémoire seulement), partagés par tous les champs.
@@ -14,6 +15,11 @@ function safeStorage() {
 }
 const geocodeBudget = createGeocodeBudget({ storage: safeStorage(), now: () => Date.now() });
 const textCache = createTextCache();
+/**
+ * v63 : recherches récentes, une seule liste pour tous les champs (clé localStorage à part, jamais bloquante :
+ * src/lib/recent-places.js). Réglages (effacer) et export / import passent par cet objet.
+ */
+export const recentPlaces = createRecentStore(safeStorage());
 /** Appels de géocodage du jour (contrôle d'ui-check, chiffre de la PR). */
 export const geocodeCount = (kind) => geocodeBudget.count(kind);
 
@@ -70,11 +76,15 @@ if (window.visualViewport) {
  * Liste déroulante de suggestions attachée à un champ : un seul composant pour départ, arrivée, étapes et « Ajouter une
  * étape » du guidage (v55). v62 : 400 ms, 5 lignes (nom + commune et pays en gris, 48 px au moins), « Aucun résultat »,
  * « Pas de connexion », ✕, fermeture au choix, au ✕ et au toucher dehors, visible clavier ouvert.
+ * v63 : recherches récentes en tête (titre gris, ✕ par ligne), au focus d'un champ vide et en tapant (filtre local) ;
+ * enregistrées seulement au choix dans la liste.
  * Renvoie { resolve(what) } : texte validé sans choix → recherche (place-resolve.js).
  */
 export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
   let items = [];
+  let recent = [];
   let rows = [];
+  let last = { status: 'idle', items: [] };
   const self = { input, list, close };
 
   function close() {
@@ -85,40 +95,76 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
     openLists.delete(self);
   }
 
+  const keep = (e) => { e.preventDefault(); }; // le champ garde le focus (clavier ouvert)
+
+  function recentRow(r, i) {
+    const p = recent[r.index];
+    return el('li', {
+      role: 'option', id: `${list.id}-${i}`, class: 'suggest-row suggest-recent',
+      onpointerdown: keep,
+      onclick: (e) => { e.preventDefault(); pickRecent(r.index); },
+    }, [
+      el('span', { class: 'suggest-text' }, [
+        el('span', { class: 'suggest-name', text: r.text }),
+        r.sub ? el('span', { class: 'suggest-sub', text: r.sub }) : null,
+      ]),
+      el('button', {
+        type: 'button', class: 'suggest-remove', 'aria-label': RECENT.REMOVE_LABEL(r.text), text: '✕',
+        onpointerdown: keep,
+        onclick: (e) => { e.preventDefault(); e.stopPropagation(); recentPlaces.remove(p); show(last.status, last.items); },
+      }),
+    ]);
+  }
+
   function show(status, list2 = []) {
+    last = { status, items: list2 };
     items = status === 'results' ? list2 : [];
-    rows = suggestionRows({ status, items });
+    // v63 : récents qui correspondent au texte (tous les 5 derniers si le champ est vide), sans appel réseau.
+    recent = recentPlaces.match(input.value);
+    rows = suggestionRows({ status, items, recent });
     if (!rows.length) { close(); return; }
     const closeBtn = el('li', { class: 'suggest-head', role: 'presentation' }, [
       el('button', {
         type: 'button', class: 'suggest-close', 'aria-label': SUGGEST.CLOSE_LABEL, text: '✕',
-        onpointerdown: (e) => { e.preventDefault(); },
+        onpointerdown: keep,
         onclick: (e) => { e.preventDefault(); suggester.cancel(); close(); },
       }),
     ]);
-    list.replaceChildren(closeBtn, ...rows.map((r, i) => (r.kind === 'place'
-      ? el('li', {
-        role: 'option', id: `${list.id}-${i}`, class: 'suggest-row',
-        onpointerdown: (e) => { e.preventDefault(); },
-        onclick: (e) => { e.preventDefault(); pick(r.index); },
-      }, [
-        el('span', { class: 'suggest-name', text: r.text }),
-        r.sub ? el('span', { class: 'suggest-sub', text: r.sub }) : null,
-      ])
-      : el('li', { role: 'option', 'aria-disabled': 'true', class: 'suggest-info', text: r.text }))));
+    list.replaceChildren(closeBtn, ...rows.map((r, i) => {
+      if (r.kind === 'title') return el('li', { role: 'presentation', class: 'suggest-title', text: r.text });
+      if (r.kind === 'recent') return recentRow(r, i);
+      if (r.kind === 'place') {
+        return el('li', {
+          role: 'option', id: `${list.id}-${i}`, class: 'suggest-row',
+          onpointerdown: keep,
+          onclick: (e) => { e.preventDefault(); pick(r.index); },
+        }, [
+          el('span', { class: 'suggest-name', text: r.text }),
+          r.sub ? el('span', { class: 'suggest-sub', text: r.sub }) : null,
+        ]);
+      }
+      return el('li', { role: 'option', 'aria-disabled': 'true', class: 'suggest-info', text: r.text });
+    }));
     list.hidden = false;
     input.setAttribute('aria-expanded', 'true');
     openLists.add(self);
     fitList(self);
   }
 
-  function pick(i) {
-    const s = items[i];
-    if (!s) return;
+  /** Lieu choisi dans la liste : seul cas où il entre dans les recherches récentes (jamais le texte tapé). */
+  function choose(s) {
     input.value = s.label;
     suggester.cancel();
     close();
+    recentPlaces.add(s);
     onPick(s);
+  }
+  function pick(i) {
+    if (items[i]) choose(items[i]);
+  }
+  function pickRecent(i) {
+    const p = recent[i];
+    if (p) choose({ label: p.label, name: p.name, place: p.place, lon: p.lon, lat: p.lat });
   }
 
   const search = (text, signal) => fetchSuggestions({ apiKey: getApiKey(), text, focus: getFocus(), signal });
@@ -139,11 +185,16 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
     suggester.input(input.value);
   });
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' && !list.hidden && items.length) { e.preventDefault(); pick(0); }
+    if (e.key === 'Enter' && !list.hidden) {
+      const first = rows.find((r) => r.kind === 'recent' || r.kind === 'place');
+      if (first) { e.preventDefault(); if (first.kind === 'recent') pickRecent(first.index); else pick(first.index); }
+    }
     if (e.key === 'Escape') { suggester.cancel(); close(); }
   });
   // Clavier ouvert : le champ remonte en haut du panneau, la liste garde la place visible dessous.
   input.addEventListener('focus', () => {
+    // v63 : champ vide → « Recherches récentes » (aucun appel).
+    if (!input.value.trim() && list.hidden) show('idle');
     setTimeout(() => {
       if (document.activeElement !== input) return;
       input.scrollIntoView({ block: 'start', behavior: 'smooth' });
