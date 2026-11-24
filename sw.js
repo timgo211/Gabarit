@@ -66,6 +66,7 @@ const APP_FILES = [
   './src/lib/map-layers.js',
   './src/lib/satellite-zones.js',
   './src/lib/map-palette.js',
+  './src/lib/photo-cover.js',
   './src/lib/nav-anim.js',
   './src/lib/nav-layout.js',
   './src/lib/road-badge.js',

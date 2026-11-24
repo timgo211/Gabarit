@@ -121,9 +121,9 @@ test('bulles des noms de rues en guidage, réglages d\'origine ensuite', () => {
 });
 
 test('satellite la nuit : photos assombries, libellés clairs', () => {
-  assert.deepEqual(satellitePaint('night'), { 'raster-brightness-max': 0.8 }, 'Normal (phase 2d)');
+  assert.deepEqual(satellitePaint('night'), { 'raster-brightness-max': 0.85 }, 'Normal (v65)');
   assert.deepEqual(satellitePaint('night', 'dark'), { 'raster-brightness-max': 0.6 }, 'Sombre = v35');
-  assert.deepEqual(satellitePaint('night', 'light'), { 'raster-brightness-max': 0.9 });
+  assert.deepEqual(satellitePaint('night', 'light'), { 'raster-brightness-max': 1 });
   assert.deepEqual(satellitePaint('day', 'dark'), { 'raster-brightness-max': 1 });
   assert.deepEqual(satellitePaint('day'), { 'raster-brightness-max': 1 });
   const layers = [{ id: 'place', type: 'symbol', paint: {} }, { id: 'road', type: 'line', 'source-layer': 'transportation' }];

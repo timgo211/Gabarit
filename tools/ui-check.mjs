@@ -105,6 +105,27 @@ const slowStyle = (bg) => ({
     { id: 'slow', type: 'raster', source: 'slow', paint: { 'raster-opacity': 0 } }],
 });
 const SLOW_TILE_MS = 6000;
+/**
+ * v65 : ordre des couches d'OpenFreeMap liberty / dark (bâtiments après le premier libellé, donc au-dessus des photos
+ * glissées avant ce libellé). Bâtiments factices verts (fill) et bleus (fill-extrusion) sur toute la zone de l'écran :
+ * photos montrées → ils doivent être masqués (couleur des photos), plan → de nouveau visibles.
+ */
+const BUILDING_FILL = '#00a000';
+const BUILDING_3D = '#0000c0';
+const buildingStyle = (bg) => {
+  const box = [[[-20, 30], [30, 30], [30, 60], [-20, 60], [-20, 30]]];
+  const area = { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: box } };
+  const dot = { type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [4.8, 45.7] } };
+  return {
+    version: 8,
+    sources: { bati: { type: 'geojson', data: area }, dot: { type: 'geojson', data: dot } },
+    layers: [{ id: 'bg', type: 'background', paint: { 'background-color': bg } },
+      { id: 'road_one_way_arrow', type: 'symbol', source: 'dot', layout: {} },
+      { id: 'building', type: 'fill', source: 'bati', paint: { 'fill-color': BUILDING_FILL } },
+      { id: 'building-3d', type: 'fill-extrusion', source: 'bati',
+        paint: { 'fill-extrusion-color': BUILDING_3D, 'fill-extrusion-height': 0, 'fill-extrusion-opacity': 0.8 } }],
+  };
+};
 
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css',
   '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.png': 'image/png' };
@@ -144,7 +165,7 @@ async function open(browser, base, {
   width, height, theme = 'day', layer = 'plan', directions = null, overpass = null, official = null,
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
-  tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
+  tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
   start = START, fuel = null, pelias = null,
 } = {}) {
@@ -206,7 +227,7 @@ async function open(browser, base, {
     }
     if (url.includes('tiles.openfreemap.org/styles/') || url.includes('tiles.versatiles.org')) {
       const bg = url.includes('/dark') || url.includes('eclipse') ? NIGHT_BG : DAY_BG;
-      return route.fulfill({ json: slowTiles ? slowStyle(bg) : style(bg, streets) });
+      return route.fulfill({ json: slowTiles ? slowStyle(bg) : buildings ? buildingStyle(bg) : style(bg, streets) });
     }
     if (url.startsWith('https://slow-tiles.test/')) {
       await new Promise((r) => setTimeout(r, SLOW_TILE_MS));
@@ -781,7 +802,7 @@ async function satelliteThemeCheck(browser, base) {
   // Phase 2c : la nuit, mêmes photos assombries (raster-brightness-max 0,8 au niveau Normal, phase 2d).
   const dayRed = c;
   c = await mapColor(page);
-  check(c[0] > 90 && c[1] < 60 && c[2] < 60 && c[0] < dayRed[0] - 40, 'satellite, jour → nuit : photos affichées, assombries', `couleur ${c} (jour ${dayRed})`);
+  check(c[0] > 90 && c[1] < 60 && c[2] < 60 && c[0] < dayRed[0] - 25, 'satellite, jour → nuit : photos affichées, assombries', `couleur ${c} (jour ${dayRed})`);
   await page.screenshot({ path: join(SHOTS, 'satellite-nuit.png') });
   await setTheme(page, 'day');
   c = await mapColor(page);
@@ -792,6 +813,72 @@ async function satelliteThemeCheck(browser, base) {
   c = await mapColor(page);
   check(isDay(c), 'retour au plan : fond jour', `couleur ${c}`);
   await ctx.close();
+}
+
+/**
+ * v65 : bâtiments du plan (fill + fill-extrusion placés après le premier libellé, comme dans OpenFreeMap) masqués
+ * quand les photos sont montrées, jour et nuit (setStyle), aux trois niveaux de la nuit, en France et en Espagne
+ * (zoom 17 ≈ 100 m), en guidage ; rendus en plan et hors de toute source (Turin). 412 × 900.
+ */
+async function satelliteBuildingsCheck(browser, base) {
+  const W = 412; const H = 900;
+  const hex = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const near = (c, rgb, tol = 40) => c.every((x, i) => Math.abs(x - rgb[i]) <= tol);
+  const isBuilding = (c) => near(c, hex(BUILDING_FILL), 60) || near(c, hex(BUILDING_3D), 60);
+  const hidden = (page) => page.evaluate(() => {
+    const m = window.__maps.at(-1);
+    return ['building', 'building-3d'].map((id) => m.getLayoutProperty(id, 'visibility') ?? 'visible');
+  });
+  const lyon = [4.8357, 45.764];
+  {
+    const { page, ctx, errors } = await open(browser, base, { width: W, height: H, theme: 'day', layer: 'satellite', buildings: true });
+    await moveMap(page, lyon, 17);
+    let c = await mapColor(page);
+    check(isRed(c), 'bâtiments, satellite jour : photo visible, aucun aplat dessus', `couleur ${c}`);
+    check(JSON.stringify(await hidden(page)) === '["none","none"]', 'bâtiments, satellite jour : building et building-3d masqués', JSON.stringify(await hidden(page)));
+    await page.screenshot({ path: join(SHOTS, 'v65-satellite-jour-z17.png') });
+    await page.click('[data-layer="plan"]');
+    await page.waitForTimeout(800);
+    c = await mapColor(page);
+    check(isBuilding(c), 'bâtiments, retour au plan : bâtiments de nouveau visibles', `couleur ${c}`);
+    check(JSON.stringify(await hidden(page)) === '["visible","visible"]', 'bâtiments, retour au plan : visibilité rendue', JSON.stringify(await hidden(page)));
+    await page.screenshot({ path: join(SHOTS, 'v65-plan-jour-z17.png') });
+    await page.click('[data-layer="satellite"]');
+    await page.waitForTimeout(800);
+    await setTheme(page, 'night');
+    c = await mapColor(page);
+    check(isPhoto(c) && !isBuilding(c), 'bâtiments, jour → nuit (nouveau style) : photo visible, bâtiments masqués', `couleur ${c}`);
+    await page.screenshot({ path: join(SHOTS, 'v65-satellite-nuit-z17.png') });
+    // Zone sans photos : plan et bâtiments rendus.
+    await moveMap(page, [7.6869, 45.0703], 17);
+    c = await mapColor(page);
+    check(isBuilding(c), 'bâtiments, Turin (aucune source) : plan avec ses bâtiments', `couleur ${c}`);
+    await moveMap(page, lyon, 17);
+    c = await mapColor(page);
+    check(isPhoto(c) && !isBuilding(c), 'bâtiments, retour en France : photos et bâtiments masqués', `couleur ${c}`);
+    check(errors.length === 0, 'bâtiments : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+  for (const level of ['dark', 'normal', 'light']) {
+    const { page, ctx } = await open(browser, base, { width: W, height: H, theme: 'night', nightLevel: level, layer: 'satellite', buildings: true });
+    await moveMap(page, lyon, 17);
+    const c = await mapColor(page);
+    const want = Math.round(220 * SATELLITE_NIGHT_BRIGHTNESS[level]);
+    check(isPhoto(c) && Math.abs(c[0] - want) <= 20, `bâtiments, nuit ${level} : photo visible à ${SATELLITE_NIGHT_BRIGHTNESS[level]}`, `couleur ${c}, attendu ≈ ${want}`);
+    if (level === 'light') await page.screenshot({ path: join(SHOTS, 'v65-satellite-nuit-clair-z17.png') });
+    await ctx.close();
+  }
+  {
+    const madrid = [-3.7038, 40.4168];
+    const { page, ctx } = await open(browser, base, { width: W, height: H, theme: 'night', nightLevel: 'light', layer: 'satellite', buildings: true, start: madrid });
+    for (const z of [17, 19]) {
+      await moveMap(page, madrid, z);
+      const c = await mapColor(page);
+      check(near(c, [0, 200, 200], 40), `bâtiments, Madrid nuit Clair zoom ${z} : photo PNOA visible, aucun aplat`, `couleur ${c}`);
+      await page.screenshot({ path: join(SHOTS, `v65-espagne-nuit-z${z}.png`) });
+    }
+    await ctx.close();
+  }
 }
 
 /**
@@ -4994,7 +5081,7 @@ async function fuelCheck(browser, base) {
 
 const only = process.argv[2];
 try {
-  const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
+  const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
     parked: parkedCheck, comfort: comfortCheck, destinations: destinationsCheck,
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,

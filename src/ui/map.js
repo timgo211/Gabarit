@@ -23,6 +23,7 @@ import {
 import { vehicleElement } from './vehicle-icon.js';
 import { clusterAreas, groupLabel, AREA_CLUSTER } from '../lib/area-cluster.js';
 import { sanitizeVehicleIcon } from '../lib/prefs.js';
+import { photoCoverPatches } from '../lib/photo-cover.js';
 import { ROUTE_ARROWS } from '../lib/nav-layout.js';
 import { CHEVRON_IMAGE, TURN_IMAGE, chevronImage, turnImage } from './route-arrows.js';
 
@@ -125,6 +126,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let lastView = null;
   /** Couche de photos visible (phase 7d), bascule en cours. */
   let shownSat = null;
+  /** v65 : aplats du plan masqués au-dessus des photos (bâtiments…), rendus au retour en plan (photo-cover.js). */
+  let coverHidden = new Set();
   let swapTimer = null;
   let styleUrl = null;
   let lost = false;
@@ -356,6 +359,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       map.addLayer({ id: src.layer, type: 'raster', source: src.layer, layout: { visibility: 'none' }, paint: satellitePaint(theme, nightLevel) }, beforeId);
     }
     shownSat = null; // style neuf : couches toutes masquées
+    coverHidden = new Set(); // style neuf : aplats d'origine, visibles
     applyLayer();
   }
 
@@ -390,8 +394,22 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (!lastView || lastView.photos !== view.photos || lastView.message !== view.message || lastView.button !== view.button) {
       const photosChanged = lastView?.photos !== view.photos;
       lastView = view;
-      if (photosChanged) { paintRoutes(); paintLabels(); }
+      if (photosChanged) { paintRoutes(); paintLabels(); applyPhotoCover(); }
       opts.onLayerView?.(view);
+    }
+  }
+
+  /**
+   * v65 : bâtiments (fill, fill-extrusion) et autres aplats du style placés au-dessus des photos masqués tant que les
+   * photos sont montrées ; rendus en plan, hors zone de photos et rappliqués après chaque nouveau style.
+   */
+  function applyPhotoCover() {
+    const layers = map?.getStyle()?.layers;
+    if (!layers) return;
+    const r = photoCoverPatches(layers, { photos: !!lastView?.photos, satIds: SAT_LAYERS, keep: OWN_LAYERS, hidden: coverHidden });
+    coverHidden = r.hidden;
+    for (const p of r.patches) {
+      try { map.setLayoutProperty(p.id, 'visibility', p.value); } catch { /* couche refusée : laissée */ }
     }
   }
 
@@ -450,6 +468,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       for (const [prop, value] of Object.entries(satellitePaint(theme, nightLevel))) map.setPaintProperty(id, prop, value);
     }
     paintLabels();
+    applyPhotoCover();
     if (navigating) putBubble();
     if (navigating || bubbles) {
       for (const p of streetBubblePatches(layers, theme, navigating, nightLevel)) {
@@ -482,6 +501,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
    * carryOverlay les recopie (photos sous les libellés, tracés au-dessus, aux couleurs du nouveau thème).
    */
   function transformStyle(prev, next) {
+    coverHidden = new Set(); // nouveau style : aplats d'origine, remasqués par applyGuidanceStyle si photos
     const c = routeColors();
     const paint = Object.fromEntries(Object.entries(c).map(([id, color]) => [id, { 'line-color': color }]));
     return carryOverlay(prev, recolorStyle(next, theme, OWN_LAYERS, nightLevel), { below: [...SAT_LAYERS, ...ZFE_LAYERS], above: [...ROUTE_LAYERS].reverse(), paint });
