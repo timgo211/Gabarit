@@ -90,6 +90,7 @@ const APP_FILES = [
   './src/lib/trip-history.js',
   './src/lib/recent-places.js',
   './src/lib/reports.js',
+  './src/lib/reports-share.js',
   './src/lib/saved-places.js',
   './src/lib/area-notes.js',
   './src/lib/route-options.js',

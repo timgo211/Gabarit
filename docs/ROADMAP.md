@@ -44,7 +44,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - l'appli : son adresse, chacun avec sa propre clé HeiGIT gratuite.
   Le profil véhicule et la clé ne sont jamais partagés ; un lien reçu est validé et affiché en texte brut.
   Pas de position en direct (il faudrait un serveur).
-  **Reste pour après la phase 3 :** mes signalements en fichier à importer dans le Gabarit d'un ami (fusion sans doublons).
+  Mes signalements en fichier à importer dans le Gabarit d'un ami : fait en phase 3c (v68).
   **Satellite hors de France :** voir phase 7d.
 
 - [x] **Phase 7b — Correctifs (retours du premier vrai trajet, sur téléphone)**
@@ -612,7 +612,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Tout à la fin
 
-- [ ] **Phase 3 — Mes signalements + Ma journée** (reportée : à faire en dernier)
+- [x] **Phase 3 — Mes signalements + Ma journée** (faite en v66 à v68)
   Signalement perso avec alerte vocale à l'approche. En roulant, un seul gros bouton qui marque la position (aucune
   saisie pendant le guidage, comme en phase 2 – R412-6-2) ; le type (pont bas, accès difficile, contrôle, parking,
   danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients) ; les étapes sont en
@@ -633,7 +633,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     en tête (champ vide : domicile, dépôts, clients ; en tapant : filtre local sans accents), puis les récents et ORS sans
     doublon ; un toucher = le lieu ; aucun appel. Données personnelles : sur l'appareil (`places` de `gabarit.data`),
     export complet seulement, jamais dans le fichier de la 3c. Modification : hors guidage, ou à l'arrêt en guidage.
-  - [ ] **Phase 3c — Signalements pour un ami** (fichier sans mes lieux ni notes par défaut, import validé et marqué).
+  - [x] **Phase 3c — Signalements pour un ami** (v68, `reports-share.js`) : Réglages › Mes signalements › « Partager
+    mes signalements (fichier) » (partage Android si le fichier est accepté, sinon téléchargement) : seulement mes
+    signalements confirmés (type, position, cap, jour ; date arrondie au jour), jamais mes lieux, la clé, le profil ni
+    les identifiants ; notes exclues par défaut (« Inclure mes notes »). « Importer le fichier d'un ami » : 512 Ko au plus,
+    format `gabarit-reports` version 1, 500 lignes au plus, champs connus recopiés un par un, type obligatoire ; aperçu
+    « N signalements à importer (M déjà présents) » et confirmation avant la fusion ; doublons retirés, 500 au plus en
+    gardant les miens d'abord ; importés « importés, à vérifier », jamais confirmés (sauf repris à mon compte à l'arrêt),
+    jamais dits ; textes en textContent. Aucun serveur, aucun compte, rien envoyé.
 
 ## Rouges connus des vérifications
 

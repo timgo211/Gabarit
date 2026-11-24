@@ -275,3 +275,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   - un toucher = `choose(savedToPick(p))` (comme une suggestion) ; Entrée prend la première ligne choisissable ;
   - ajout depuis `form.getPlace('to')` (arrivée choisie dans la liste) ou le centre de la carte (nom obligatoire) ;
     boutons grisés en guidage hors de l'arrêt (`recentEditAllowed`).
+- Phase 3c (v68), signalements pour un ami (`src/lib/reports-share.js`, bas de `#reports-card`) : `#btn-reports-share`
+  (`buildShareFile`, `pickShareMethod` fichier : partage Android ou téléchargement `gabarit-signalements-AAAA-MM-JJ.json`),
+  case `#reports-share-notes` (décochée) ; `#reports-import-file` → `parseShareFile` (ne lève jamais) → `previewImport` +
+  `window.confirm(previewText)` → `mergeImported` ; refus → rien. Vérifié par `node tools/ui-check.mjs ami`.

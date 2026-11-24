@@ -5210,6 +5210,63 @@ async function savedPlacesCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 3c (v68) : signalements pour un ami. 412×900 jour, 1280×800 nuit : fichier téléchargé = signalements confirmés
+ * seulement, jour seulement, sans notes ni lieux ; import d'un fichier piégé (note HTML, champs inconnus, type inconnu) :
+ * aperçu + confirmation (refus → rien), puis accepté → « importé, à vérifier », note en texte brut, aucun élément créé.
+ */
+async function reportsShareCheck(browser, base) {
+  const reports = [
+    { id: 'm1', lon: 5.5, lat: 47.25, heading: 90, createdAt: '2026-11-20T08:15', type: 'low-bridge', note: 'note privée', confirmed: true, origin: 'mine' },
+    { id: 'm2', lon: 5.6, lat: 47.25, heading: null, createdAt: '2026-11-21T09:00', type: null, note: '', confirmed: false, origin: 'mine' },
+  ];
+  const places = [{ id: 'p1', kind: 'home', name: 'Maison Test', label: '1 rue Exemple', lon: 5.9, lat: 47.9 }];
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, { width, height, theme, reports, settings: null });
+    await page.evaluate((pl) => { const d = JSON.parse(localStorage.getItem('gabarit.data')); d.places = pl; localStorage.setItem('gabarit.data', JSON.stringify(d)); }, places);
+    await page.reload();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => { navigator.share = undefined; }); // téléchargement (comme un navigateur sans partage de fichier)
+    await page.click('#btn-settings');
+    await page.waitForSelector('#reports-card');
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#btn-reports-share')]);
+    let text = '';
+    if (dl) text = await (await import('node:fs/promises')).readFile(await dl.path(), 'utf8');
+    const f = text ? JSON.parse(text) : null;
+    check(f?.kind === 'gabarit-reports' && f.reports.length === 1 && f.reports[0].createdAt === '2026-11-20'
+      && !/note privée|Maison|Exemple|orsKey|m1|08:15/.test(text), `${tag} : fichier = 1 signalement confirmé, jour seulement, sans note ni lieu`, text.slice(0, 200));
+    const piege = JSON.stringify({ kind: 'gabarit-reports', version: 1, reports: [
+      { type: 'danger', lat: 47.1, lon: 5.1, createdAt: '2026-11-01', note: '<img src=x id=piege onerror="window.__pwn=1">', confirmed: true, origin: 'mine', extra: 1 },
+      { type: 'control', lat: 47.2, lon: 5.2, createdAt: '2026-11-02' },
+      { type: 'inconnu', lat: 47.3, lon: 5.3, createdAt: '2026-11-03' },
+      { type: 'low-bridge', lat: 47.25, lon: 5.50001, createdAt: '2026-11-03' },
+    ] });
+    const file = { name: 'ami.json', mimeType: 'application/json', buffer: Buffer.from(piege) };
+    let asked = '';
+    page.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
+    await page.setInputFiles('#reports-import-file', file);
+    await page.waitForTimeout(500);
+    const afterRefuse = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports.length);
+    check(/^2 signalements à importer \(1 déjà présent\)/.test(asked) && afterRefuse === 2, `${tag} : aperçu « 2 signalements à importer », refus → rien`, asked);
+    page.once('dialog', (d) => d.accept());
+    await page.setInputFiles('#reports-import-file', file);
+    await page.waitForTimeout(500);
+    const list = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports);
+    const imp = list.filter((r) => r.origin === 'imported');
+    check(list.length === 4 && imp.length === 2 && imp.every((r) => r.confirmed === false && !('extra' in r)), `${tag} : 2 importés, jamais confirmés, champs connus seulement`, JSON.stringify(imp));
+    const shown = await page.textContent('#reports-list');
+    check(/importé, à vérifier/.test(shown) && shown.includes('<img src=x') && await page.locator('#piege').count() === 0
+      && await page.evaluate(() => window.__pwn === undefined), `${tag} : note reçue affichée en texte brut, aucun élément créé`);
+    await noHorizontalScroll(page, `${tag} Réglages signalements (ami)`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-signalements-ami.png`) });
+    await page.click('#dlg-settings [data-close]');
+    check(await page.locator('.report-marker').count() === 4, `${tag} : 4 repères sur la carte`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5220,7 +5277,7 @@ try {
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck,
-    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck };
+    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);
