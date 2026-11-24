@@ -31,7 +31,7 @@ const EXPECTED = [{ values: ['through'], ok: false }, { values: ['through'], ok:
 test('lecture : nombre de valeurs = nombre de voies, valeurs reconnues seulement', () => {
   assert.deepEqual(splitTurnLanes('left|through;right', 2), [['left'], ['through', 'right']]);
   assert.equal(splitTurnLanes('left|through', 3), null);
-  // v62 : « none » lu comme voie sans flèche (la copie ne le garde que sur autoroute).
+  // v63 : « none » lu comme voie sans flèche (la copie ne le garde que sur autoroute).
   assert.deepEqual(splitTurnLanes('left|none', 2), [['left'], ['none']]);
   assert.equal(splitTurnLanes('left|foo', 2), null);
   assert.equal(parseLaneTile(null), null);
@@ -75,7 +75,7 @@ test('voie coupée en deux chemins : mêmes flèches → voies ; flèches diffé
   assert.equal(lanesForManeuvers(route, maneuvers, copy([w7001, other])).size, 0);
 });
 
-test('v62 : voie sans flèche gardée, grisée, jamais à prendre ; rangée toute sans flèche → rien', () => {
+test('v63 : voie sans flèche gardée, grisée, jamais à prendre ; rangée toute sans flèche → rien', () => {
   assert.deepEqual(splitTurnLanes('through|none|slight_right', 3), [['through'], ['none'], ['slight_right']]);
   assert.equal(splitTurnLanes('none|none', 2), null);
   assert.equal(splitTurnLanes('none;left|right', 2), null);

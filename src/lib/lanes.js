@@ -10,7 +10,7 @@
 // Voies valides : celles dont une flèche correspond au type de manœuvre ORS (VALID_TURNS) ; aucune voie valide : rien
 // (jamais de voie inventée). Affichage seulement (pictogrammes, voies valides en clair, les autres grisées), jamais
 // dit ; la signalisation fait foi.
-// v62 : voie « none » (sans flèche, gardée sur autoroute et bretelle d'autoroute seulement par lanes-convert.js) :
+// v63 : voie « none » (sans flèche, gardée sur autoroute et bretelle d'autoroute seulement par lanes-convert.js) :
 // jamais valide, toujours grisée, pictogramme neutre ; une rangée entièrement sans flèche n'est jamais affichée.
 // Types ORS : docs/api-reference/endpoints/directions/instruction-types.md (GIScience/openrouteservice) ; valeurs
 // turn:lanes : wiki OSM Key:turn (lu le 24/11/2026).
@@ -56,7 +56,7 @@ function decodeLine(arr, start) {
 }
 
 /**
- * « left|through;right » → [['left'], ['through','right']] si n valeurs reconnues, sinon null. « none » (v62) : seul
+ * « left|through;right » → [['left'], ['through','right']] si n valeurs reconnues, sinon null. « none » (v63) : seul
  * dans sa voie ; toutes les voies « none » → null.
  */
 export function splitTurnLanes(text, n) {

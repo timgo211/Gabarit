@@ -194,7 +194,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   « direction X » pour un lieu (point OSM, pas un panneau). Copie `data/lieux-osm/` absente ou vide : consigne
   inchangée, aucun message. Crédit fixe `#places-credit` dans Réglages › Sources et licences. Vérifié par
   `node tools/ui-check.mjs directions` (cas lieux).
-- Phase 11d (v61 ; v62 : voie sans flèche `.nav-lane.none` sur autoroute, trait horizontal sans pointe, couleur
+- Phase 11d (v61 ; v63 : voie sans flèche `.nav-lane.none` sur autoroute, trait horizontal sans pointe, couleur
   `--lane-off`, jamais `ok`) : voies à prendre — rangée `#nav-lanes` dans la pile du haut, sous « Puis », pour la manœuvre du
   bandeau à 1 km au plus (`lanesRow`) ; une case par voie (pictogramme maison `lane-icons.js`, flèches superposées pour
   « through;right »), voies valides `--nav-fg`, autres `--lane-off` (#6B6E77, ≥ 3:1 sur le bandeau, `contrast.test.js`),

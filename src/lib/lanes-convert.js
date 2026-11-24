@@ -16,10 +16,10 @@
 // sont gardées. Ignorées, avec un compteur par motif dans le journal : rond-point (`junction=roundabout|circular`),
 // `oneway=-1` ou autre sens particulier, `turn:lanes` sans suffixe sur une voie à double sens, nombre de voies absent
 // ou illisible, nombre différent, valeur `none` ou vide (compteur à part pour juger la couverture), valeur inconnue.
-// v62 (décision du 24/11/2026) : sur `highway=motorway` et `motorway_link` seulement, une voie `none` (ou vide) est
+// v63 (décision du 24/11/2026) : sur `highway=motorway` et `motorway_link` seulement, une voie `none` (ou vide) est
 // gardée comme voie SANS flèche (valeur « none » : pictogramme neutre, toujours grisée, jamais une voie à prendre) ;
 // rangée entièrement sans flèche → ignorée (motif « allnone »). Ailleurs, `none` reste ignorée (« none hors
-// autoroute »). Journal : lignes gardées et ignorées avant (règle v59) et après (règle v62). Un lecteur d'avant (v61)
+// autoroute »). Journal : lignes gardées et ignorées avant (règle v59) et après (règle v63). Un lecteur d'avant (v61)
 // ne connaît pas « none » : il ignore ces lignes (aucune voie inventée).
 //
 // Format (lu par parseLaneTile, src/lib/lanes.js, PR C) : index.json (source, license, updated, countries, count,
@@ -51,7 +51,7 @@ export const LANES = Object.freeze({
     'left', 'slight_left', 'sharp_left', 'through', 'right', 'slight_right', 'sharp_right', 'reverse',
     'merge_to_left', 'merge_to_right',
   ])),
-  /** Voie sans flèche (v62) : gardée seulement sur ces types de voie. */
+  /** Voie sans flèche (v63) : gardée seulement sur ces types de voie. */
   NONE: 'none',
   NONE_HIGHWAYS: Object.freeze(new Set(['motorway', 'motorway_link'])),
   /** Longueur gardée avant le carrefour (m). */
@@ -91,7 +91,7 @@ export function laneCount(text) {
 
 /**
  * Texte turn:lanes + nombre de voies → { ok:true, text, lanes:[[valeurs]], none } ou { ok:false, reason } (LANE_SKIPS).
- * `allowNone` (autoroute, v62) : voie `none` ou vide → « none » (sans flèche) ; `none` mêlé à des flèches dans une même
+ * `allowNone` (autoroute, v63) : voie `none` ou vide → « none » (sans flèche) ; `none` mêlé à des flèches dans une même
  * voie → valeur inconnue ; toutes les voies sans flèche → « allnone ». `none` : nombre de voies sans flèche.
  * @param {string} text
  * @param {number|null} n
@@ -130,7 +130,7 @@ function tailPart(coords) {
 
 /**
  * Objet GeoJSON exporté par osmium → { lines:[{ kind:'oneway'|'forward'|'backward', turn, n, none, coords }],
- * skips:[motif…] } (none : nombre de voies sans flèche gardées, autoroute seulement, v62) ; null si ce n'est pas une voie portant turn:lanes, turn:lanes:forward ou turn:lanes:backward.
+ * skips:[motif…] } (none : nombre de voies sans flèche gardées, autoroute seulement, v63) ; null si ce n'est pas une voie portant turn:lanes, turn:lanes:forward ou turn:lanes:backward.
  */
 export function lanesFromFeature(f) {
   const t = f?.properties && typeof f.properties === 'object' ? f.properties : null;
@@ -175,7 +175,7 @@ export function emptyLaneSkips() {
 
 /**
  * Lignes du journal : motifs de refus (« none » hors autoroute et sur autoroute à part) et, avec `kept` (lignes
- * gardées, chacune avec `none`), lignes gardées et ignorées avant (règle v59 : tout « none » ignoré) et après (v62).
+ * gardées, chacune avec `none`), lignes gardées et ignorées avant (règle v59 : tout « none » ignoré) et après (v63).
  */
 export function laneSkipLog(skips, kept = null) {
   const s = { ...emptyLaneSkips(), ...(skips ?? {}) };
@@ -190,7 +190,7 @@ export function laneSkipLog(skips, kept = null) {
     const withNone = kept.filter((l) => l.none > 0).length;
     const other = Object.keys(LANE_SKIPS).filter((k) => !NONES.includes(k)).reduce((a, k) => a + s[k], 0);
     out.push(`Avant (règle v59, tout « none » ignoré) : ${kept.length - withNone} lignes gardées ; ignorées : none ${s.none + s.allnone + withNone}, autres motifs ${other}.`);
-    out.push(`Après (règle v62, « none » gardé sur autoroute) : ${kept.length} lignes gardées (dont ${withNone} avec une voie sans flèche) ; ignorées : none hors autoroute ${s.none}, none sur autoroute ${s.allnone}, autres motifs ${other}.`);
+    out.push(`Après (règle v63, « none » gardé sur autoroute) : ${kept.length} lignes gardées (dont ${withNone} avec une voie sans flèche) ; ignorées : none hors autoroute ${s.none}, none sur autoroute ${s.allnone}, autres motifs ${other}.`);
   }
   return out;
 }

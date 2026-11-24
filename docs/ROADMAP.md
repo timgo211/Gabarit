@@ -243,7 +243,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       - [x] Interface (PR C, v61) : `lanes.js` (ligne qui arrive au point de manœuvre, une seule ou plusieurs aux
         flèches identiques ; voies valides selon le type ORS), rangée `#nav-lanes` sous « Puis » à 1 km au plus
         (pictogrammes maison `lane-icons.js`, cachée en `nav-tight` comme « Puis »), jamais dite.
-      - [x] v62 (décision du 24/11/2026) : « none » (ou vide) gardé sur `motorway` / `motorway_link` seulement, comme
+      - [x] v63 (décision du 24/11/2026) : « none » (ou vide) gardé sur `motorway` / `motorway_link` seulement, comme
         voie sans flèche (pictogramme neutre, grisée, jamais à prendre) ; rangée toute sans flèche ignorée ; ailleurs
         « none » ignoré comme avant. Journal : lignes gardées / ignorées avant et après, « none hors autoroute » et
         « none sur autoroute » séparés. Données : à la copie suivante (run lancé par la PR).

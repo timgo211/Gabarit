@@ -1,7 +1,7 @@
 // Copie des voies à flèches au sol (phase 11d) : conversion côté Action vers data/voies-osm/. Fixture SYNTHÉTIQUE
 // osm-voies.geojsonseq : autoroute à sens unique vers le carrefour de ors-directions-sortie.json (point 20), voie à
 // double sens forward / backward, refus (nombre ≠, lanes absent, none, vide, rond-point, oneway=-1, valeur inconnue,
-// turn:lanes sans suffixe à double sens, chemin piéton) et voie de 1,1 km coupée aux 200 derniers mètres ; v62 :
+// turn:lanes sans suffixe à double sens, chemin piéton) et voie de 1,1 km coupée aux 200 derniers mètres ; v63 :
 // « none » gardé sur motorway_link (w7014) et motorway (w7018, valeur vide), ignoré sur residential (w7016), rangée
 // toute en « none » ignorée (w7015), « none » mêlé à une flèche refusé (w7017).
 
@@ -51,7 +51,7 @@ test('turn:lanes : nombre égal exigé, none et vide à part, valeur inconnue re
   assert.deepEqual(parseTurnLanes(null, 2), { ok: false, reason: 'value' });
 });
 
-test('v62 : « none » sur autoroute = voie sans flèche ; toute la rangée sans flèche → ignorée', () => {
+test('v63 : « none » sur autoroute = voie sans flèche ; toute la rangée sans flèche → ignorée', () => {
   const opt = { allowNone: true };
   assert.deepEqual(parseTurnLanes('through|none|slight_right', 3, opt),
     { ok: true, text: 'through|none|slight_right', lanes: [['through'], ['none'], ['slight_right']], none: 1 });
@@ -63,7 +63,7 @@ test('v62 : « none » sur autoroute = voie sans flèche ; toute la rangée sans
   assert.equal(parseTurnLanes('left|through', 2, opt).none, 0);
 });
 
-test('v62 : « none » gardé sur motorway_link et motorway, ignoré sur residential', () => {
+test('v63 : « none » gardé sur motorway_link et motorway, ignoré sur residential', () => {
   const kept = lanesFromFeature(byId('w7014'));
   assert.deepEqual(kept.skips, []);
   assert.equal(kept.lines[0].turn, 'through|none|slight_right');
@@ -164,7 +164,7 @@ test('journal : « none » hors autoroute et sur autoroute à part, avant / apr�
   assert.doesNotMatch(log[2], /none/);
   // Avant : 4 gardées (sans w7014 ni w7018), none 3 + 1 + 2 = 6 ; après : 6 gardées, none 3 et 1.
   assert.match(log[3], /^Avant \(règle v59, tout « none » ignoré\) : 4 lignes gardées ; ignorées : none 6, autres motifs \d+\.$/);
-  assert.match(log[4], /^Après \(règle v62, « none » gardé sur autoroute\) : 6 lignes gardées \(dont 2 avec une voie sans flèche\) ; ignorées : none hors autoroute 3, none sur autoroute 1, autres motifs \d+\.$/);
+  assert.match(log[4], /^Après \(règle v63, « none » gardé sur autoroute\) : 6 lignes gardées \(dont 2 avec une voie sans flèche\) ; ignorées : none hors autoroute 3, none sur autoroute 1, autres motifs \d+\.$/);
   const other = Number(log[3].match(/autres motifs (\d+)/)[1]);
   assert.equal(other, Number(log[4].match(/autres motifs (\d+)/)[1]));
   assert.equal(laneSkipLog(emptyLaneSkips())[2], 'Voies ignorées pour un autre motif : aucune.');

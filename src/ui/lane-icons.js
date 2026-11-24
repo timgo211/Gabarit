@@ -1,6 +1,6 @@
 // Pictogrammes des voies à prendre (phase 11d) : dessin maison, formes simples (une tige, un trait coudé et une pointe
 // par flèche, plusieurs flèches superposées pour « through;right »), jamais une icône copiée. Couleur : currentColor
-// (voie valide en clair, les autres grisées par la feuille de style). v62 : voie sans flèche (« none ») → simple trait
+// (voie valide en clair, les autres grisées par la feuille de style). v63 : voie sans flèche (« none ») → simple trait
 // horizontal neutre, sans pointe (jamais une flèche), toujours grisé.
 
 const NS = 'http://www.w3.org/2000/svg';

@@ -3033,7 +3033,7 @@ function lanesCopyFiles(kind) {
       geometry: { type: 'LineString', coordinates: [[6.1, 49.016], [6.1, 49.0197]] } });
   }
   if (kind === 'nombre') feats[0] = { ...f, properties: { ...f.properties, lanes: '4' } };
-  // v62 : voie sans flèche au milieu (autoroute : gardée) ; toutes sans flèche (ignorée par l'Action).
+  // v63 : voie sans flèche au milieu (autoroute : gardée) ; toutes sans flèche (ignorée par l'Action).
   if (kind === 'none') feats[0] = { ...f, properties: { ...f.properties, 'turn:lanes': 'through|none|slight_right' } };
   if (kind === 'toutnone') feats[0] = { ...f, properties: { ...f.properties, 'turn:lanes': 'none|none|none' } };
   const lines = feats.flatMap((x) => lanesFromFeature(x)?.lines ?? []);
@@ -3047,7 +3047,7 @@ function lanesCopyFiles(kind) {
  * les fonctions de l'Action, GPS émulé à 90 km/h (une position par seconde, comme le vrai) : à plus de 1 km de
  * « Restez à droite », pas de rangée ; à moins de 1 km, rangée sous le bandeau (3 voies, la droite en clair, les deux
  * autres grisées), dans la pile du haut, sans chevaucher la colonne de boutons ; jamais dite ; après la manœuvre (D 1,
- * sans voies) : cachée. Copie ambiguë, nombre faux ou absente : jamais de rangée, aucune erreur. v62 : voie sans flèche
+ * sans voies) : cachée. Copie ambiguë, nombre faux ou absente : jamais de rangée, aucune erreur. v63 : voie sans flèche
  * (« none » sur autoroute) grisée, pictogramme neutre ; rangée toute sans flèche : jamais de rangée.
  * 412×900 jour, 900×412 nuit, 360×760 nuit, 1280×800 jour, 760×360 jour.
  */
@@ -3057,7 +3057,7 @@ async function lanesCheck(browser, base) {
   const cases = [
     [412, 900, 'day', 'fixture'], [900, 412, 'night', 'fixture'], [360, 760, 'night', 'fixture'], [1280, 800, 'day', 'fixture'],
     [760, 360, 'day', 'fixture'], [412, 900, 'day', 'ambigu'], [412, 900, 'night', 'nombre'], [900, 412, 'day', null],
-    // v62 : voie sans flèche sur autoroute (gardée, grisée, pictogramme neutre) ; rangée toute sans flèche (rien).
+    // v63 : voie sans flèche sur autoroute (gardée, grisée, pictogramme neutre) ; rangée toute sans flèche (rien).
     [412, 900, 'day', 'none'], [900, 412, 'night', 'none'], [412, 900, 'day', 'toutnone'],
   ];
   const row = (page) => page.evaluate(() => {
