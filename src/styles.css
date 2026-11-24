@@ -1026,7 +1026,7 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .report-types { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .report-types .btn { min-height: var(--tap); flex: 1 1 140px; }
 .report-types .btn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
-.report-panel .btn:disabled, .reports-card-btn:disabled { background: var(--nav-off-bg, var(--panel)); color: var(--nav-off-fg, var(--muted)); border-color: var(--nav-off-border, var(--border)); }
+.report-panel .btn:disabled, .reports-card-btn:disabled, .reports-card-btn[aria-disabled="true"] { background: var(--nav-off-bg, var(--panel)); color: var(--nav-off-fg, var(--muted)); border-color: var(--nav-off-border, var(--border)); }
 .report-marker {
   width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
   background: var(--card); color: var(--fg); border: 3px dashed var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.4);

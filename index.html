@@ -443,8 +443,16 @@
         <label class="toggle"><input type="checkbox" id="reports-share-notes"> Inclure mes notes</label>
         <div class="row">
           <button type="button" id="btn-reports-share" class="btn">Partager mes signalements (fichier)</button>
-          <label class="btn" for="reports-import-file">Importer le fichier d'un ami…</label>
+          <label class="btn reports-card-btn" id="btn-reports-import" for="reports-import-file">Importer le fichier d'un ami…</label>
           <input id="reports-import-file" type="file" accept="application/json,.json" hidden>
+        </div>
+        <p id="reports-import-hint" class="hint" hidden>Disponible à l'arrêt</p>
+        <div id="reports-import-preview" hidden>
+          <p id="reports-import-text" class="status"></p>
+          <div class="row">
+            <button type="button" id="btn-reports-import-ok" class="btn btn-primary">Importer</button>
+            <button type="button" id="btn-reports-import-cancel" class="btn">Annuler</button>
+          </div>
         </div>
         <p id="reports-share-status" class="status" role="status"></p>
       </section>

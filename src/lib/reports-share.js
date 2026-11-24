@@ -6,8 +6,11 @@
 // champs connus sont recopiés ; chaque signalement reçu est marqué « importé » (origin 'imported'), jamais confirmé,
 // jamais dit à voix haute (reports.js : isSpeakable) ; fusion sans doublons, 500 au plus en gardant les miens d'abord ;
 // aperçu « N signalements à importer » et confirmation avant la fusion (src/ui/reports.js).
+// v69 : import à l'arrêt seulement, comme l'édition 3a (canEditReports : parkedState < 5 km/h pendant 3 s ; vitesse
+// inconnue ou GPS refusé = en mouvement, Code de la route art. R412-6-2) : bouton grisé, et contrôle redit au moment
+// de « Importer » (confirmImport) : camion reparti → rien n'est fusionné.
 
-import { REPORT, cleanReport, isDuplicate, sanitizeReports } from './reports.js';
+import { REPORT, cleanReport, isDuplicate, sanitizeReports, canEditReports } from './reports.js';
 
 export const SHARE = Object.freeze({
   KIND: 'gabarit-reports',
@@ -15,6 +18,10 @@ export const SHARE = Object.freeze({
   /** 512 Ko au plus (500 signalements avec notes tiennent en moins de 200 Ko). */
   MAX_BYTES: 512 * 1024,
   MIME: 'application/json',
+  /** v69 : bouton d'import grisé hors de l'arrêt. */
+  PARKED_ONLY_TEXT: 'Disponible à l\'arrêt',
+  /** v69 : « Importer » touché alors que le camion roule (ou vitesse inconnue). */
+  MOVING_CANCEL_TEXT: 'Import annulé : camion en mouvement.',
   NONE_TEXT: 'Aucun signalement confirmé à partager.',
 });
 
@@ -97,4 +104,22 @@ export function previewText(p) {
 /** Fusion : les miens d'abord, doublons retirés, 500 au plus (sanitizeReports garde les miens en tête). */
 export function mergeImported(current, imported) {
   return sanitizeReports([...sanitizeReports(current), ...(Array.isArray(imported) ? imported : [])]);
+}
+
+/**
+ * v69 : import permis seulement à l'arrêt confirmé (même règle que l'édition 3a, canEditReports). `parked` vient de
+ * parkedState (en guidage) ou des relevés GPS hors guidage (plan-park.js) : vitesse inconnue, GPS refusé → false.
+ */
+export function canImportShare({ parked = false } = {}) {
+  return canEditReports({ parked });
+}
+
+/**
+ * v69 : « Importer » touché après l'aperçu. À l'arrêt → liste fusionnée ; sinon → rien ne change (même liste) et
+ * message « Import annulé : camion en mouvement. ».
+ * @returns {{ ok:boolean, list:object[], text?:string }}
+ */
+export function confirmImport(current, imported, { parked = false } = {}) {
+  if (!canImportShare({ parked })) return { ok: false, list: current, text: SHARE.MOVING_CANCEL_TEXT };
+  return { ok: true, list: mergeImported(current, imported) };
 }

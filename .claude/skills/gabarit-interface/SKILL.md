@@ -279,3 +279,4 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   (`buildShareFile`, `pickShareMethod` fichier : partage Android ou téléchargement `gabarit-signalements-AAAA-MM-JJ.json`),
   case `#reports-share-notes` (décochée) ; `#reports-import-file` → `parseShareFile` (ne lève jamais) → `previewImport` +
   `window.confirm(previewText)` → `mergeImported` ; refus → rien. Vérifié par `node tools/ui-check.mjs ami`.
+- v69 : import à l'arrêt seulement : `#btn-reports-import` (label, `aria-disabled`) et `#reports-import-file` grisés + `#reports-import-hint` « Disponible à l'arrêt » hors `canImportShare` (getParked de 3a) ; aperçu dans la page `#reports-import-preview` (« Importer » / « Annuler », remplace `window.confirm`) ; « Importer » → `confirmImport`, camion reparti → « Import annulé : camion en mouvement. », rien fusionné.

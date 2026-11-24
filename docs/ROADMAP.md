@@ -641,6 +641,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     « N signalements à importer (M déjà présents) » et confirmation avant la fusion ; doublons retirés, 500 au plus en
     gardant les miens d'abord ; importés « importés, à vérifier », jamais confirmés (sauf repris à mon compte à l'arrêt),
     jamais dits ; textes en textContent. Aucun serveur, aucun compte, rien envoyé.
+  - [x] **v69 — Import du fichier d'un ami à l'arrêt seulement** (`canImportShare`, `confirmImport`) : bouton grisé hors de l'arrêt (« Disponible à l'arrêt »), contrôle redit à « Importer » (« Import annulé : camion en mouvement. »).
 
 ## Rouges connus des vérifications
 

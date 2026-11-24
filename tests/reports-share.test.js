@@ -104,3 +104,47 @@ test('aperçu puis fusion : sans doublons, les miens d\'abord, 500 au plus', () 
   assert.equal(m2.length, REPORT.MAX_COUNT);
   assert.equal(m2.filter((r) => r.origin === 'mine').length, 499);
 });
+
+// v69 : import à l'arrêt seulement (parkedState : < 5 km/h pendant 3 s ; vitesse inconnue / GPS refusé = en mouvement).
+import { canImportShare, confirmImport } from '../src/lib/reports-share.js';
+import { parkedState } from '../src/lib/nav-layout.js';
+
+/** État d'arrêt après une suite de vitesses (km/h ou null), une par seconde (horloge simulée, aucun temps réel). */
+const parkAfter = (speeds) => speeds.reduce((p, kmh, i) => parkedState(p, kmh, i * 1000), { since: null, parked: false }).parked;
+const friend = () => parseShareFile(JSON.stringify({ kind: SHARE.KIND, version: 1, reports: [
+  { type: 'danger', lat: 47.1, lon: 5.1, createdAt: '2026-11-01' },
+] }), { makeId }).reports;
+
+test('import : à l\'arrêt (< 5 km/h pendant 3 s) → permis et fusionné', () => {
+  const parked = parkAfter([2, 1, 0, 0]);
+  assert.equal(parked, true);
+  assert.equal(canImportShare({ parked }), true);
+  const cur = [mine()];
+  const r = confirmImport(cur, friend(), { parked });
+  assert.equal(r.ok, true);
+  assert.equal(r.list.length, 2);
+  assert.ok(r.list.filter((x) => x.origin === 'imported').every((x) => x.confirmed === false && !isSpeakable(x)));
+});
+
+test('import : en mouvement → grisé, et « Importer » touché en roulant → rien ne change', () => {
+  for (const speeds of [[60], [0, 0, 0, 30], [0, 0]]) { // roule ; reparti après l'arrêt ; arrêt de moins de 3 s
+    const parked = parkAfter(speeds);
+    assert.equal(canImportShare({ parked }), false, JSON.stringify(speeds));
+    const cur = [mine()];
+    const before = JSON.stringify(cur);
+    const r = confirmImport(cur, friend(), { parked });
+    assert.equal(r.ok, false);
+    assert.equal(r.text, 'Import annulé : camion en mouvement.');
+    assert.equal(r.list, cur);
+    assert.equal(JSON.stringify(cur), before);
+  }
+});
+
+test('import : vitesse inconnue ou GPS refusé = en mouvement', () => {
+  assert.equal(parkAfter([null, null, null, null]), false); // vitesse inconnue
+  assert.equal(parkAfter([0, 0, 0, null]), false); // GPS refusé ensuite (plan-park pousse null)
+  assert.equal(canImportShare({}), false); // aucun relevé
+  assert.equal(canImportShare({ parked: 'true' }), false);
+  assert.equal(confirmImport([], friend(), {}).ok, false);
+  assert.equal(SHARE.PARKED_ONLY_TEXT, 'Disponible à l\'arrêt');
+});
