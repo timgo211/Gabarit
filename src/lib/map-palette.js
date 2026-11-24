@@ -196,10 +196,12 @@ export function streetBubblePatches(layers, theme, on, level = DEFAULT_NIGHT_LEV
 }
 
 /**
- * Photos IGN la nuit : même image, assombrie (pas d'éblouissement). Phase 2d : 0,6 (Sombre, = v35), 0,8 (Normal),
- * 0,9 (Clair).
+ * Photos la nuit : même image, assombrie (pas d'éblouissement). Phase 2d : 0,6 (Sombre, = v35), 0,8 (Normal),
+ * 0,9 (Clair). v65 : la photo « presque invisible » de nuit venait surtout des bâtiments noirs du style dark dessinés
+ * par-dessus (photo-cover.js) ; en plus, Normal 0,85 et Clair 1 (photo comme le jour : c'est le choix « Clair »),
+ * Sombre inchangé.
  */
-export const SATELLITE_NIGHT_BRIGHTNESS = Object.freeze({ dark: 0.6, normal: 0.8, light: 0.9 });
+export const SATELLITE_NIGHT_BRIGHTNESS = Object.freeze({ dark: 0.6, normal: 0.85, light: 1 });
 export function satellitePaint(theme, level = DEFAULT_NIGHT_LEVEL) {
   return { 'raster-brightness-max': theme === 'night' ? SATELLITE_NIGHT_BRIGHTNESS[sanitizeNightLevel(level)] : 1 };
 }

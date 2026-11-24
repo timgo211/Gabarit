@@ -618,6 +618,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients) ; les étapes sont en
   phase 8.
 
+## Rouges connus des vérifications
+
+- `node tools/ui-check.mjs context` : « contexte WebGL perdu puis restauré : carte redessinée » (couleur 255,0,255).
+  Rouge connu du conteneur (Chromium sans carte graphique) : la restauration simulée n'y redessine pas la carte ; aussi
+  rouge sur main (constaté le 24/11/2026, v63), hors CI. Toléré : ne pas s'arrêter dessus. À vérifier sur la tablette.
+
 ## Hors de portée d'une appli web
 - **Android Auto / CarPlay** : réservés aux applis natives validées par Google ou Apple. Il faudrait réécrire Gabarit
   en appli Android native ; ce n'est pas prévu.

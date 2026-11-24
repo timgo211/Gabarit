@@ -30,6 +30,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   - phase 2d : `areas-route.js` (liste du guidage : `LIST_COUNT`, `areaRowsPlan`, `AREA_LIST`), `nav-layout.js`
     (`areaListBox`), `map-palette.js` (nuit Sombre / Normal / Clair : `NIGHT_PALETTES`, `NIGHT_BUBBLES`,
     `SATELLITE_NIGHT_BRIGHTNESS`, `sanitizeNightLevel` ; réglage `settings.nightMapLevel` de `store.js`)
+  - v65 : `photo-cover.js` (aplats du style masqués au-dessus des photos ; tests `photo-cover.test.js` sur les fixtures
+    `style-liberty-layers.json` / `style-dark-layers.json`, ordre réel des couches OpenFreeMap)
   - phase 5e : `weights.js` (PTAC > 40 t sur un trajet international : alerte avant le départ, transport combiné) ;
     poids total maximal national et hauteur maximale des pays (bloc `limits` de `data/pays/*.json`, `country-rules.js`)
   - phase 5f : `winter.js` (communes de `data/hiver/` coupées exactement par le tracé, période 1er novembre – 31 mars,

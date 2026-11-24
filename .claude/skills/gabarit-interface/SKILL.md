@@ -28,6 +28,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   couche par source (`sat-<id>`, IGN garde `ign-ortho`), toutes dans `below` de `carryOverlay`, nuit à 3 niveaux sur
   toutes ; bascule sans trou (`showSatLayer` : nouvelle couche visible, ancienne masquée au premier `idle`, 1,5 s au
   plus). Hors de toute source : plan + « Vue satellite indisponible à cet endroit », jamais une couche vide.
+  v65 : photos montrées → aplats du style au-dessus des photos masqués (`photoCoverPatches` de `src/lib/photo-cover.js` :
+  fill, fill-extrusion, background, hillshade, contours de bâtiments ; liberty : `building`, `building-3d` ; dark :
+  `building`, `aeroway-area`, `road_area_pier`), rendus en plan / hors zone, rappliqués après chaque style
+  (`applyGuidanceStyle`) ; routes, libellés et nos couches jamais touchés. Vérifié par `ui-check satellite` (bâtiments).
   Attribution : contrôle MapLibre (sources visibles) et Réglages › Sources et licences (`#satellite-credit-list`,
   `satelliteCredits`, textContent). Tuiles jamais en cache (autre origine = réseau, `sw-routing.js`).
 - Écran de guidage (phase 2c, façon GPS de téléphone, `src/ui/navigation.js` + décisions dans `src/lib/nav-layout.js`) :
@@ -52,7 +56,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   jamais la carte (`parked`). Boussole : `navigateTo({ northUp })`, comparé par `holdStill`.
 - Carte en guidage : tracé épais `ROUTE_WIDTH_NAV` (bord 2 px), partie parcourue grise (source `route-done`, mise à jour
   par `traveledUpdate` : en roulant, tous les 25 m), noms des rues en bulles (`streetBubblePatches`, image
-  `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` la nuit selon le niveau (0,6 / 0,8 / 0,9, phase 2d)
+  `gabarit-bubble` redessinée sur `styleimagemissing` après setStyle), photos IGN `raster-brightness-max` la nuit selon le niveau (0,6 / 0,85 / 1, phase 2d, v65)
   et libellés clairs (`photoLabelPatches`). Réglages du style appliqués par `applyGuidanceStyle` (chargement de
   style, thème, entrée / sortie du guidage), jamais à chaque position. Repère : `src/ui/vehicle-icon.js` (registre
   d'icônes : flèche, camion vu de dessus — dessin maison, formes simples, jamais un logo ni une icône copiée ; v45),
