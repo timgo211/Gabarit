@@ -67,7 +67,8 @@ test('jamais de clé ni de profil véhicule dans un lien ou un GPX', () => {
   const vehicle = { ...defaultVehicle(), name: 'Mon Actros secret', height: 4.12 };
   const polluted = { ...route, apiKey: FAKE_KEY, key: FAKE_KEY, vehicle, height: 4.12, weight: 44 };
   const url = encodeRouteLink(BASE, polluted);
-  const gpx = buildGpx({ route: { coordinates: [LYON, PARIS], apiKey: FAKE_KEY, vehicle }, ...polluted });
+  // Heure figée : l'heure réelle du GPX (« …:04.123Z ») contenait parfois « 4.12 » (échec au hasard).
+  const gpx = buildGpx({ route: { coordinates: [LYON, PARIS], apiKey: FAKE_KEY, vehicle }, ...polluted, now: new Date(Date.UTC(2026, 0, 1)) });
   for (const text of [url, decodeURIComponent(url), gpx, JSON.stringify(decodeRouteLink(hashOf(url)))]) {
     assert.doesNotMatch(text, new RegExp(FAKE_KEY));
     assert.doesNotMatch(text, /Actros|4\.12|apiKey|api_key|vehicle|height|weight/i);
