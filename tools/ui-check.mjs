@@ -5186,7 +5186,7 @@ async function savedPlacesCheck(browser, base) {
     await page.click('#dlg-settings [data-close]');
     const calls = stats.pelias;
     await page.fill('#to-input', '');
-    await page.blur('#to-input');
+    await page.locator('#to-input').blur();
     await page.focus('#to-input');
     await page.waitForSelector('#to-list li.suggest-saved', { timeout: 3000 }).catch(() => {});
     const head = await page.textContent('#to-list .suggest-head');
