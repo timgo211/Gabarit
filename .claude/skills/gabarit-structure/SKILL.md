@@ -70,6 +70,16 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     `osm-directions-sortie.geojsonseq` ; tests `tests/directions.test.js` ; v53 : sorties (nœuds `motorway_junction`
     ref / name, `junction:ref` et `exit_to` des bretelles, champs `j` et `e` des cases, `exitOfLink`, `exitText`),
     fixture **synthétique** `osm-sorties.geojsonseq`
+  - phases 11d et 11c, données (PR A, v59) : `lanes-convert.js` (Action : `turn:lanes` + `lanes` à sens unique,
+    motorway / motorway_link sens unique implicite, `turn:lanes:forward|backward` + `lanes:forward|backward` à double
+    sens, backward retourné ; nombre de valeurs = nombre de voies exigé ; refus comptés par motif : rond-point,
+    oneway=-1, sans suffixe à double sens, lanes absent, nombre ≠, `none` / vide (compteur à part), valeur inconnue ;
+    200 derniers mètres avant le carrefour, `data/voies-osm/` cases `{ t, v:[[i_turn, n, x0, y0, dx, dy…]] }`, 5 Mo /
+    40 Mo, plafond du volume lu 1 Go) ; `places-convert.js` (nœuds `place=city|town|village` avec `name`,
+    `data/lieux-osm/` cases `{ t, p:[[i_nom, rang, x, y]] }`, 5 Mo / 40 Mo, plafond lu 256 Mo) ; fixtures
+    **synthétiques** `osm-voies.geojsonseq` (autoroute vers le point 20 de `ors-directions-sortie.json`),
+    `osm-lieux.geojsonseq` ; tests `tests/lanes-convert.test.js`, `tests/places-convert.test.js`. Lecture dans
+    l'appli : PR B (11c, « vers X », jamais dit) et PR C (11d, pictogrammes sous « Puis », jamais dits)
   - v53 : `route-save.js` (mémoire de l'itinéraire : `buildSave`, `checkSave`, `shouldSave`, `restoredChoice`,
     `withoutSecrets`), UI `src/ui/route-save.js` (IndexedDB), `resumeNavigation` de `navigation.js` ; tests
     `tests/route-save.test.js`, `tests/route-store.test.js` (faux IndexedDB : absent, refusé, bloqué, plein) ; `src/ui/route-arrows.js` (chevrons et pastilles de manœuvre), `maneuverMarks`,
@@ -180,7 +190,10 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   phase 12a bis : limites de poids dans le même filtrage (`data/poids-osm/`, « ⚠ data/poids-osm/ non modifié » si trop
   gros) ; phase 11a : limitations de vitesse dans le même filtrage (`data/vitesses-osm/`, copie complète puis réduite,
   « ⚠ data/vitesses-osm/ non modifié » si trop gros) ; phase 11b : directions des bretelles dans le même filtrage
-  (`data/directions-osm/`) ; case manuelle « r413 » : lecture du Code de la route,
+  (`data/directions-osm/`) ; phases 11d / 11c : voies à flèches (`data/voies-osm/`) et lieux (`data/lieux-osm/`) dans
+  le même filtrage, chacune écrite à part (« ⚠ data/voies-osm/ non modifié » si trop grosse, repli : retirer
+  residential et unclassified), journal : taille de l'extrait filtré, temps du filtrage et de l'export, volume lu
+  pour les voies et les lieux, voies ignorées à cause de « none » (compteur à part) et par autre motif ; case manuelle « r413 » : lecture du Code de la route,
   art. R413-1 à R413-10, dans le journal (pour `speed-rules.js`) ; l'étape « Enregistrer » n'ajoute que les chemins qui existent (une copie absente ne bloque pas les autres)
 - `tools/hiver-update.mjs` + `.github/workflows/hiver.yml` (Action « Équipements d'hiver (loi Montagne) ») : copie
   annuelle (15 octobre, à la main, à chaque envoi qui modifie l'outil, `winter-convert.js` ou le workflow, toute

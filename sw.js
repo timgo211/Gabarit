@@ -41,6 +41,8 @@ const APP_FILES = [
   './src/lib/speed-rules.js',
   './src/lib/directions.js',
   './src/lib/directions-convert.js',
+  './src/lib/lanes-convert.js',
+  './src/lib/places-convert.js',
   './src/lib/adr.js',
   './src/lib/adr-settings.js',
   './src/lib/app-version.js',

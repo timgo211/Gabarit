@@ -228,6 +228,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       `directions.js` : « …, direction Metz » seulement si une seule bretelle à 60 m du point de manœuvre avec un cap
       cohérent, dit seulement sans ambiguïté, calculé une fois par itinéraire. Reste à faire : repli « commune la plus
       proche » (demande un jeu de données de lieux, trop volumineux pour la copie actuelle).
+    - [ ] **Phase 11c — « vers X » (commune la plus proche)** : quand 11b n'a aucune bretelle sûre, consigne
+      « …, vers Metz » (lieu OSM `place=city|town|village` le long du tracé, jamais « direction », jamais dit).
+      - [x] Données (PR A, v59) : copie `data/lieux-osm/` par l'Action « Données OSM » (même filtrage que les ponts,
+        5 Mo / 40 Mo). Attente de la première copie (Geofabrik en échec).
+      - [ ] Interface (PR B).
+    - [ ] **Phase 11d — Voies à prendre** : pictogrammes sous « Puis », voies valides en clair, les autres grisées ;
+      tags OSM `turn:lanes` (+ `:forward` / `:backward`) et `lanes` ; nombre ≠ ou tag absent : rien ; ronds-points
+      ignorés ; pas de voix ; « la signalisation fait foi ».
+      - [x] Données (PR A, v59) : copie `data/voies-osm/` (200 derniers mètres avant le carrefour, mêmes cases,
+        5 Mo / 40 Mo ; journal : taille de l'extrait filtré, temps, voies ignorées à cause de « none »). Attente de la
+        première copie.
+      - [ ] Interface (PR C).
   - [x] Étapes (v55) : jusqu'à 10 arrêts entre le départ et l'arrivée (même recherche que l'arrivée, ↑ ↓ ✕), un
     seul calcul ORS avec tous les points (budget de 3, sans `alternative_routes` : variantes de la phase 2b), heure
     d'arrivée et durée par étape sur la fiche, repères numérotés ; ajout en route à l'arrêt seulement (fiche carburant
