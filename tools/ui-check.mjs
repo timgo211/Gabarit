@@ -204,7 +204,7 @@ async function open(browser, base, {
       }
     });
   }
-  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on, nightLevel: nl, extra, restr }) => {
+  await ctx.addInitScript(({ theme: t, layer: l, vehicle: v, voice: on, nightLevel: nl, extra, restr, rep }) => {
     if (sessionStorage.getItem('ui-check-init')) return;
     sessionStorage.setItem('ui-check-init', '1');
     localStorage.setItem('gabarit.orsKey', 'cle-factice-de-test');
@@ -1733,7 +1733,7 @@ async function footCheck(browser, base) {
     const label = `${width}×${height}`;
     const closed = await footOverlaps(page);
     check(closed.out.length === 0, `${label} guidage, encart fermé : boutons hors du bandeau et de la barre du bas`, closed.out.join(' ; '));
-    check(closed.sizes.length === 4 && closed.sizes.every((h) => h >= 40), `${label} : boutons ronds d'au moins 40 px (v53)`,
+    check(closed.sizes.length === 5 && closed.sizes.every((h) => h >= 40), `${label} : boutons ronds d'au moins 40 px (v53)`,
       closed.sizes.join(', '));
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-pied-ferme.png`) });
     await navAreas(page);
