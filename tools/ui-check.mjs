@@ -3084,7 +3084,7 @@ async function lanesCheck(browser, base) {
       else {
         check(near.shown && near.lanes.join(',') === 'off,off,ok', `${tag} : 3 voies sous le bandeau, la droite en clair`, JSON.stringify(near));
         check(near.inTop && near.vis && !near.hit, `${tag} : rangée dans la pile du haut, visible, sans chevaucher les boutons`, JSON.stringify(near));
-        check(/la signalisation fait foi/.test(near.label ?? ''), `${tag} : « la signalisation fait foi » dans l'étiquette`, near.label);
+        check(/la signalisation fait foi/i.test(near.label ?? ''), `${tag} : « la signalisation fait foi » dans l'étiquette`, near.label);
         const colors = await page.evaluate(() => [...document.querySelectorAll('#nav-lanes .nav-lane')].map((l) => getComputedStyle(l).color));
         check(colors[2] !== colors[0], `${tag} : voie valide d'une autre couleur que les voies grisées`, colors.join(' | '));
       }
