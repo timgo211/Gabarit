@@ -139,6 +139,10 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   « Guidage repris. », progression gardée ; sauvegarde vieillie de 13 h : rien demandé à vitesse inconnue ou en
   roulant, « Reprendre l'itinéraire ? » à l'arrêt, « Reprendre » relance ; ✕ + « Quitter » efface. 412×900 jour,
   900×412 nuit. Boutons ronds de la colonne : ≥ 40 px (v53), panneau du bas ≥ 56 px.
+- `voies` (phase 11d, v61) : `ors-directions-sortie.json`, copie `data/voies-osm/` (`lanesCopy` : 'fixture' = w7001,
+  'ambigu' = chemin juste avant aux flèches différentes, 'nombre' = lanes faux, absente), GPS émulé à 90 km/h : pas de
+  rangée à plus de 1 km ; à moins de 1 km, 3 voies « off,off,ok » dans la pile du haut, sans chevaucher les boutons
+  (en `nav-tight` : cachée) ; jamais dites ; cachée après la manœuvre ; 412×900, 900×412, 360×760, 1280×800, 760×360.
 - `directions` (phase 11b ; v53 : ligne « Sortie 12 · Vallorbe » avec la copie 'fixture', jamais dite, cachée sinon ;
   v60, 11c : copie lieux `placesCopy` 'fixture' → « Restez à droite, vers Ennery-Test » sans bretelle sûre, entière dans
   le bandeau, jamais dite ; 'fixture' des bretelles → direction gardée ; 'egalite' ou copie absente → inchangée) : itinéraire synthétique `ors-directions-sortie.json` (autoroute puis « Restez à droite »),

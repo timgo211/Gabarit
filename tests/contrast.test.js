@@ -47,7 +47,7 @@ const TEXT = [
 const LARGE = [
   ['--border', '--panel'], ['--border', '--card'], ['--border', '--bg'],
   ['--chrome-border', '--chrome-bg'], ['--focus', '--bg'], ['--focus', '--panel'],
-  ['--nav-accent', '--nav-bg'], ['--route', '--route-casing'], ['--route-alt', '--route-alt-casing'],
+  ['--nav-accent', '--nav-bg'], ['--lane-off', '--nav-bg'], ['--route', '--route-casing'], ['--route-alt', '--route-alt-casing'],
   ['--fg', '--panel'], // contour des pastilles de couleur de la flèche (Réglages)
 ];
 

@@ -78,6 +78,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - « vers X » (11c, `places.js`, copie `data/lieux-osm/` mêmes Action et cases, jamais précachée) : sans direction 11b,
   premier lieu OSM city/town/village à ≤ 1 km du tracé, 300 m à 15 km après la manœuvre (avant étape/arrivée) ; deux
   lieux à < 300 m → rien. Affiché seulement, jamais dit ; jamais « direction ».
+- Voies à prendre (11d, `lanes.js`, copie `data/voies-osm/` mêmes Action et cases, jamais précachée) : ligne qui arrive
+  à la manœuvre (60 m, cap ≤ 30° avant, fin à 60 m), une seule ou flèches identiques ; nombre ≠, `none`, rond-point,
+  aucune voie valide → rien. Rangée `#nav-lanes` sous « Puis » à ≤ 1 km, valides en clair, autres `--lane-off` ; jamais dit.
 - Écran de navigation v53 : boutons ronds de la colonne 48 px (zone tactile ≥ 40 px, ces boutons seulement), pastille
   de la rue sous le véhicule, ligne de sortie (règle 11b, jamais dite), mémoire de l'itinéraire en IndexedDB (question
   > 12 h seulement à l'arrêt). Détail : skill `gabarit-interface`.

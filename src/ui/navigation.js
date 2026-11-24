@@ -30,11 +30,13 @@ import { $, setValueUnit, fitText, shrinkUntil } from './dom.js';
 const BANNER_MIN_SCALE = 0.7;
 import { maneuverSvg } from './nav-icon.js';
 import { symbolSvg } from './nav-symbols.js';
+import { laneSvg } from './lane-icons.js';
+import { lanesRow } from '../lib/lanes.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
   remainingStops, tripSoFar,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, setNavigationPlaces, markStopAsWork, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, setNavigationPlaces, setNavigationLanes, markStopAsWork, NAV,
   resumeNavigation,
 } from '../lib/navigation.js';
 import {
@@ -85,6 +87,7 @@ export function createNavigation(ctx) {
     instr: $('#nav-instr'),
     exit: $('#nav-exit'),
     then: $('#nav-then'),
+    lanes: $('#nav-lanes'),
     alerts: $('#nav-alerts'),
     alert: $('#nav-alert'),
     alertText: $('#nav-alert-text'),
@@ -231,6 +234,26 @@ export function createNavigation(ctx) {
     icon.append(maneuverSvg(then.icon));
     ui.then.replaceChildren(document.createTextNode('Puis'), icon);
     ui.then.setAttribute('aria-label', `Puis : ${then.text}`);
+  }
+
+  /**
+   * Phase 11d : rangée des voies (lanesRow : manœuvre du bandeau, à 1 km au plus). Mise à jour sur place, seulement
+   * quand les voies changent (jamais à chaque position) ; rien n'est dit.
+   */
+  function renderLanes(lanes) {
+    const key = lanes ? JSON.stringify(lanes) : '';
+    if (ui.lanes.dataset.key === key) return;
+    ui.lanes.dataset.key = key;
+    if (!lanes) { ui.lanes.hidden = true; ui.lanes.replaceChildren(); return; }
+    ui.lanes.replaceChildren(...lanes.map((l) => {
+      const el = document.createElement('span');
+      el.className = l.ok ? 'nav-lane ok' : 'nav-lane';
+      el.append(laneSvg(l.values));
+      return el;
+    }));
+    const ok = lanes.filter((l) => l.ok).length;
+    ui.lanes.setAttribute('aria-label', `Voies conseillées : ${ok} sur ${lanes.length}. La signalisation fait foi.`);
+    ui.lanes.hidden = false;
   }
 
   // ───────── Alertes ─────────
@@ -495,6 +518,7 @@ export function createNavigation(ctx) {
       setInstruction('Destination atteinte');
       renderExit(null);
       renderThen(null);
+      renderLanes(null);
       ui.stop.setAttribute('aria-label', 'Terminer le guidage');
     } else if (view.maneuver) {
       setIcon(view.maneuver.icon);
@@ -502,12 +526,14 @@ export function createNavigation(ctx) {
       setBanner(bannerText(view.maneuver));
       renderExit(exitLine(view.maneuver, view.roadName));
       renderThen(view.then);
+      renderLanes(lanesRow(view.maneuver));
     } else {
       setIcon({ kind: 'arrow', angle: 0 });
       ui.dist.textContent = '';
       setInstruction('Suivez l\'itinéraire');
       renderExit(null);
       renderThen(null);
+      renderLanes(null);
     }
     setStat(ui.remaining, formatDistance(view.remainingDistance));
     setStat(ui.time, formatDuration(view.remainingDuration));
@@ -923,13 +949,13 @@ export function createNavigation(ctx) {
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
     driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
-    places = null, resume = null, carry = null, tripFrom = '',
+    places = null, lanes = null, resume = null, carry = null, tripFrom = '',
   }) {
     if (s) stop();
     const now = Date.now();
     const begun = startNavigation(route, {
       destination: params.end, now, areas, announceAreas, rules,
-      driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions, places,
+      driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions, places, lanes,
       stops: params.stops ?? [], // v55
       carry: simulate ? null : carry, tripFrom, // v56 : historique
     });
@@ -969,6 +995,7 @@ export function createNavigation(ctx) {
     ctx.map.setLayer(s.layer);
     renderLayer();
     renderThen(null);
+    renderLanes(null);
     ui.alert.hidden = true;
     ui.rule.hidden = true;
     ui.drive.hidden = true;
@@ -1231,6 +1258,11 @@ export function createNavigation(ctx) {
     setPlaces(data) {
       if (!s) return;
       s.state = setNavigationPlaces(s.state, data);
+    },
+    /** Cases de data/voies-osm/ arrivées après « Démarrer » ou au recalcul (phase 11d) : voies recalculées. */
+    setLanes(data) {
+      if (!s) return;
+      s.state = setNavigationLanes(s.state, data);
     },
     /** Cases de data/vitesses-osm/ arrivées après « Démarrer » ou au recalcul (phase 11a) : limites recalculées. */
     setSpeeds(data) {

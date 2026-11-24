@@ -194,6 +194,12 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   « direction X » pour un lieu (point OSM, pas un panneau). Copie `data/lieux-osm/` absente ou vide : consigne
   inchangée, aucun message. Crédit fixe `#places-credit` dans Réglages › Sources et licences. Vérifié par
   `node tools/ui-check.mjs directions` (cas lieux).
+- Phase 11d (v61) : voies à prendre — rangée `#nav-lanes` dans la pile du haut, sous « Puis », pour la manœuvre du
+  bandeau à 1 km au plus (`lanesRow`) ; une case par voie (pictogramme maison `lane-icons.js`, flèches superposées pour
+  « through;right »), voies valides `--nav-fg`, autres `--lane-off` (#6B6E77, ≥ 3:1 sur le bandeau, `contrast.test.js`),
+  séparateurs pointillés ; cachée en `nav-tight` (comme « Puis ») ; mise à jour sur place seulement quand les voies
+  changent ; `aria-label` « Voies conseillées : N sur M. La signalisation fait foi. » ; jamais dite. Copie absente,
+  ambiguë ou refusée : aucune rangée, aucun message. Vérifié par `node tools/ui-check.mjs voies`.
 - v51 : petit paysage (hauteur < 400 px, media query) : bouton « Pas une pause (travail) » sur deux lignes (7em) pour
   que l'alerte de conduite tienne au-dessus du panneau du bas ; panneau de limitation : mention « règle » (`#nav-limit-src`,
   `speedStatus(…).rule`) sous le panneau quand la limite vient d'une règle générale, couleur `--muted`, jamais dite.
