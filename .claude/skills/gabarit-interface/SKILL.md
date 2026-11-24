@@ -258,3 +258,13 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - v64, « Sources et licences » : titre = `button#btn-credits.section-toggle` (≥ 48 px, chevron CSS selon
   `aria-expanded`), contenu `#credits-body` (hidden si replié) inchangé ; `settings.creditsOpen` (false par défaut,
   exporté). ui-check : `openCredits(page)` avant de lire un crédit.
+- Phase 3a (v66), mes signalements (`src/lib/reports.js`, `src/ui/reports.js`) :
+  - bouton rond `#btn-nav-report` (drapeau Material Symbols `flag`, à la place de `.nav-slot`) : un appui → `markReport`
+    du moteur (dernière position reçue, cap du moment ; doublon < 20 m refusé ; jamais annoncé pendant ce guidage),
+    message bref « Repère posé. Type et note à l'arrêt. » ; aucun choix, aucune saisie, à toutes les vitesses ;
+  - repères `.report-marker` (`map.showReports`, aussi en guidage ; pointillés = à vérifier, plein = confirmé) ;
+    touché en roulant (guidage) → « Disponible à l'arrêt » ; sinon fiche `#report-panel` (fixe, z-index 45) ;
+  - fiche et Réglages › Mes signalements (`#reports-card`) : boutons grisés hors de l'arrêt confirmé (en guidage
+    `navigation.parked`, hors guidage `reportPark` = `createPlanPark` relevé tant que la fiche ou Réglages est ouvert) ;
+    fiche fermée en roulant (`onParkChange`) et au départ du guidage ; textes en textContent ;
+  - encart d'alerte : `view.report` → `guidanceAlerts` kind `report` (rang entre frontière et vent, carte `#nav-rule`).

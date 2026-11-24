@@ -201,7 +201,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     précisée : non), actif seulement à l'arrêt confirmé (relevés GPS hors guidage, vitesse inconnue = grisé, ADR
     compris), une requête dans le budget de 3 avec les diagnostics d'échec du départ (2f) ; au-delà de 150 km à vol
     d'oiseau : rien envoyé, « à vérifier » ; jamais dit, rien dans le guidage.
-  - [ ] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
+  - [x] **Phase 11 — Infos route : limitations de vitesse et directions** (ancienne phase 9, renumérotée)
     Limitation de vitesse PL pendant le guidage (tags OpenStreetMap `maxspeed:hgv` / `maxspeed` des voies du trajet,
     via ORS si possible ou Overpass ; à défaut, règles françaises par type de route, source officielle citée), avec
     alerte en cas de dépassement. Dans les consignes, la direction écrite sur les panneaux (tags OSM `destination` des
@@ -617,6 +617,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   saisie pendant le guidage, comme en phase 2 – R412-6-2) ; le type (pont bas, accès difficile, contrôle, parking,
   danger) et la note se choisissent à l'arrêt. Lieux enregistrés (domicile, dépôt, clients) ; les étapes sont en
   phase 8.
+  Découpage décidé le 24/11/2026 : 3 PR (3a → 3b → 3c) ; « Ma journée » = lieux enregistrés seulement.
+  - [x] **Phase 3a — Mes signalements** (v66, `reports.js`) : bouton drapeau du guidage (place `.nav-slot`), un seul
+    appui à toutes les vitesses, sans choix ni saisie : repère à la dernière position reçue, cap du moment ; fiche
+    `#report-panel` (type, note, « Je confirme ») et Réglages › Mes signalements : modification et suppression à l'arrêt
+    confirmé seulement, en guidage (parkedState) comme hors guidage (relevés GPS `plan-park.js`, vitesse inconnue =
+    grisé) ; fiche fermée dès que le véhicule roule. Repères sur la carte (pointillés : à vérifier ; plein : confirmé).
+    Alerte : encart sous 1 km, « La signalisation fait foi. » ; voix (réglage « Annoncer mes signalements confirmés »,
+    désactivé par défaut) une fois par signalement et par passage, entre 500 et 50 m, phrase fixe, seulement pour un
+    signalement à moi et confirmé ; jamais pour un repère à vérifier ni importé. 500 au plus, champs connus seulement
+    (`sanitizeReports`), export complet. Seul le point marqué volontairement est gardé (aucune trace GPS).
+  - [ ] **Phase 3b — Lieux enregistrés** (domicile, dépôt, clients ; locaux, export complet seulement).
+  - [ ] **Phase 3c — Signalements pour un ami** (fichier sans mes lieux ni notes par défaut, import validé et marqué).
 
 ## Rouges connus des vérifications
 

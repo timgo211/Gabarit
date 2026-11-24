@@ -167,7 +167,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
-  start = START, fuel = null, pelias = null,
+  start = START, fuel = null, pelias = null, reports = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -213,8 +213,9 @@ async function open(browser, base, {
         weight: 44, axleload: 11.5, maxSpeed: 90 }],
       activeVehicleId: 'v1', settings: { theme: t, mapLayer: l, voice: on, ...(nl ? { nightMapLevel: nl } : {}), ...(extra ?? {}) },
       ...(restr ? { restrictions: restr } : {}),
+      ...(rep ? { reports: rep } : {}),
     }));
-  }, { theme, layer, vehicle, voice, nightLevel, extra: settings, restr: restrictions });
+  }, { theme, layer, vehicle, voice, nightLevel, extra: settings, restr: restrictions, rep: reports });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async (route) => {
     const url = route.request().url();
     if (url.includes('unpkg.com/maplibre-gl')) {
@@ -5079,6 +5080,85 @@ async function fuelCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 3a (v66) : mes signalements. GPS émulé sur `ors-directions-nav.json`, un signalement confirmé à ≈ 900 m.
+ * 412×900 jour (voix activée : dit une fois), 900×412 nuit (voix par défaut : jamais dit), 1280×800 jour.
+ * En roulant : « Signaler » = un appui, repère sans type, aucune fiche ni saisie ; repère touché → « Disponible à
+ * l'arrêt ». À l'arrêt 3 s : fiche, type, confirmation, enregistré ; le véhicule roule → fiche fermée. Hors guidage :
+ * Réglages › Mes signalements, boutons actifs à l'arrêt seulement (relevés GPS), grisés en roulant.
+ */
+async function reportsCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const segLen = (a, b) => Math.hypot((b[0] - a[0]) * 111320 * Math.cos((a[1] * Math.PI) / 180), (b[1] - a[1]) * 110540);
+  let cum = 0; let idx = 0;
+  while (idx < line.length - 1 && cum < 900) { cum += segLen(line[idx], line[idx + 1]); idx += 1; }
+  const seeded = { id: 'seed1', lon: line[idx][0], lat: line[idx][1], heading: null, createdAt: '2026-11-20T08:00', type: 'low-bridge', note: '', confirmed: true, origin: 'mine' };
+  const stored = (page) => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports ?? []);
+  for (const [width, height, theme, reportVoice] of [[412, 900, 'day', true], [900, 412, 'night', false], [1280, 800, 'day', false]]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, overpass: () => ({ elements: [] }), directions: () => nav, reports: [seeded],
+      settings: reportVoice ? { reportVoice: true } : null,
+    });
+    await computeRoute(page);
+    check(await page.locator('.report-marker').count() === 1, `${tag} : repère du signalement sur la carte (préparation)`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await drive(ctx, page, line, 90, 26);
+    const rule = await page.textContent('#nav-rule');
+    check(/Signalement à \d+ m : pont bas\. La signalisation fait foi\./.test(rule), `${tag} : encart à l'approche avec « La signalisation fait foi. »`, rule);
+    const foot = await footOverlaps(page);
+    check(foot.out.length === 0, `${tag} : rien ne se chevauche (bouton drapeau compris)`, foot.out.join(' ; '));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-signalement.png`) });
+    const said = (await page.evaluate(() => window.__spoken ?? [])).filter((t) => /^Signalement/.test(t));
+    check(reportVoice ? said.length === 1 && /La signalisation fait foi\./.test(said[0]) : said.length === 0,
+      `${tag} : voix ${reportVoice ? 'une fois (réglage activé)' : 'jamais (réglage par défaut)'}`, said.join(' | '));
+    // En roulant : un seul appui, aucun choix ni saisie.
+    await page.click('#btn-nav-report');
+    await page.waitForTimeout(300);
+    let list = await stored(page);
+    const mark = list.find((r) => r.id !== 'seed1');
+    check(list.length === 2 && mark && mark.type === null && mark.confirmed === false && /Repère posé/.test(await page.textContent('#nav-toast')),
+      `${tag} : « Signaler » en roulant → repère sans type, message`, JSON.stringify(mark));
+    check(await page.isHidden('#report-panel') && await page.locator('#nav input:visible, #nav select:visible, #nav textarea:visible').count() === 0,
+      `${tag} : aucune fiche ni champ en roulant`);
+    await setGeo(page, { lon: mark.lon, lat: mark.lat, accuracy: 5, speed: 14, heading: 90 });
+    await page.waitForTimeout(1000);
+    await page.locator(`.report-marker[data-id="${mark.id}"]`).click({ force: true });
+    await page.waitForTimeout(300);
+    check(await page.isHidden('#report-panel') && /Disponible à l'arrêt/.test(await page.textContent('#nav-toast')), `${tag} : repère touché en roulant → « Disponible à l'arrêt »`);
+    // À l'arrêt 3 s : fiche, type, confirmation.
+    for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: mark.lon, lat: mark.lat, accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
+    await page.locator(`.report-marker[data-id="${mark.id}"]`).click({ force: true });
+    await page.waitForSelector('#report-panel:not([hidden])', { timeout: 3000 }).catch(() => {});
+    check(await page.isVisible('#report-panel') && await page.isEnabled('#report-types .btn[data-type="danger"]'), `${tag} : fiche à l'arrêt, types actifs`);
+    await noHorizontalScroll(page, `${tag} fiche du signalement`);
+    await page.click('#report-types .btn[data-type="danger"]');
+    await page.check('#report-confirm');
+    await page.click('#btn-report-save');
+    list = await stored(page);
+    const saved = list.find((r) => r.id === mark.id);
+    check(saved?.type === 'danger' && saved.confirmed === true, `${tag} : type et confirmation enregistrés à l'arrêt`, JSON.stringify(saved));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-signalement-fiche.png`) });
+    for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: line[idx + i][0], lat: line[idx + i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+    check(await page.isHidden('#report-panel'), `${tag} : fiche fermée dès que le véhicule roule`);
+    await stopGuidance(page);
+    // Hors guidage : Réglages › Mes signalements, à l'arrêt seulement.
+    for (let i = 0; i < 2; i += 1) { await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(500); }
+    await page.click('#btn-settings');
+    await page.waitForTimeout(6000);
+    const n = await page.locator('#reports-list .reports-card-btn').count();
+    check(n === 4 && await page.isEnabled('#reports-list .reports-card-btn >> nth=0'), `${tag} : Réglages › Mes signalements, 2 lignes, actives à l'arrêt`, String(n));
+    for (let i = 0; i < 3; i += 1) { await setGeo(page, { lon: line[1][0], lat: line[1][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(2000); }
+    check(await page.isDisabled('#reports-list .reports-card-btn >> nth=0'), `${tag} : grisées en roulant (hors guidage)`);
+    await noHorizontalScroll(page, `${tag} Réglages signalements`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5089,7 +5169,7 @@ try {
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck,
-    preparation: preparationCheck, suggestions: suggestionsCheck };
+    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

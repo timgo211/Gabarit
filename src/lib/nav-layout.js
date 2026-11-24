@@ -69,7 +69,7 @@ export function exitLine(maneuver, roadName) {
 
 /** Ordre d'importance des alertes (plus petit = plus important). */
 const RANK = Object.freeze({
-  system: 0, tunnel: 1, zfe: 2, access: 3, ban: 4, drivingOver: 5, border: 6, wind: 7, drivingSoon: 8,
+  system: 0, tunnel: 1, zfe: 2, access: 3, ban: 4, drivingOver: 5, border: 6, report: 7, wind: 8, drivingSoon: 9,
 });
 
 /**
@@ -109,6 +109,10 @@ export function guidanceAlerts(view, system = null) {
     if (!a?.text) continue;
     const level = kind === 'border' || kind === 'wind' || (kind === 'ban' && !a.active) ? 'warn' : 'danger';
     out.push({ key: kind, kind, text: a.text, level, rank: RANK[kind], distance: Number.isFinite(a.distance) ? a.distance : 0 });
+  }
+  // Phase 3a : prochain de mes signalements (texte fixe, « La signalisation fait foi. »).
+  if (view?.report?.text) {
+    out.push({ key: 'report', kind: 'report', text: view.report.text, level: 'warn', rank: RANK.report, distance: Number.isFinite(view.report.distance) ? view.report.distance : 0 });
   }
   const d = view?.driving;
   if (d && (d.level === 'over' || d.level === 'soon')) {

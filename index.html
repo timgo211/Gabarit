@@ -78,8 +78,8 @@
           <button type="button" id="btn-nav-search" class="nav-round" aria-expanded="false" aria-controls="nav-search" aria-label="Le long du trajet"></button>
           <button type="button" id="btn-nav-voice" class="nav-round" aria-pressed="true" aria-label="Couper la voix"></button>
           <button type="button" id="btn-nav-alt" class="nav-round" aria-disabled="true" aria-label="Autres itinéraires (à l'arrêt)"></button>
-          <!-- Place réservée au bouton « Signalement » (phase 3), non affiché. -->
-          <span class="nav-slot" aria-hidden="true"></span>
+          <!-- Phase 3a : un seul appui, sans choix ni saisie (R412-6-2) ; type et note à l'arrêt. -->
+          <button type="button" id="btn-nav-report" class="nav-round" aria-label="Signaler : poser un repère ici"></button>
         </div>
         <div id="nav-search" class="nav-search" role="group" aria-label="Le long du trajet" hidden>
           <button type="button" id="btn-nav-areas" class="nav-chip" aria-pressed="false" aria-controls="nav-areas"></button>
@@ -166,6 +166,26 @@
       </div>
       <!-- Phase 4 : « Carburant sur le trajet » (préparation et guidage), à l'arrêt seulement ; fermé dès que le véhicule
            roule (R412-6-2). Module src/ui/fuel.js chargé à la demande. -->
+      <!-- Phase 3a : fiche d'un de mes signalements ; modification à l'arrêt seulement (R412-6-2). -->
+      <section id="report-panel" class="report-panel" role="dialog" aria-labelledby="report-title" hidden>
+        <div class="fuel-head">
+          <h2 id="report-title">Signalement</h2>
+          <button type="button" id="btn-report-close" class="btn">Fermer</button>
+        </div>
+        <p id="report-info" class="hint"></p>
+        <fieldset id="report-types" class="report-types">
+          <legend class="field-label">Type</legend>
+        </fieldset>
+        <label for="report-note" class="field-label">Note (facultative)</label>
+        <input id="report-note" type="text" maxlength="200" autocomplete="off" placeholder="ex. 3,6 m sous le pont">
+        <label class="toggle"><input type="checkbox" id="report-confirm"> Je confirme ce signalement</label>
+        <p class="hint">Seul un signalement confirmé peut être annoncé à voix haute (réglage dans Guidage vocal). La signalisation fait foi.</p>
+        <div class="row">
+          <button type="button" id="btn-report-save" class="btn btn-primary">Enregistrer</button>
+          <button type="button" id="btn-report-del" class="btn">Supprimer</button>
+        </div>
+        <p id="report-status" class="status" role="status"></p>
+      </section>
       <section id="fuel-panel" class="fuel-panel" role="dialog" aria-labelledby="fuel-title" hidden>
         <div class="fuel-head">
           <h2 id="fuel-title">Carburant sur le trajet</h2>
@@ -326,6 +346,7 @@
         <label class="toggle"><input type="checkbox" id="drive-voice"> Annoncer les pauses (30 min avant 4 h 30 de conduite, pause faite, 9 h du jour)</label>
         <label class="toggle"><input type="checkbox" id="wind-voice"> Annoncer le vent fort (vers 15 km avant)</label>
         <label class="toggle"><input type="checkbox" id="speed-voice"> Annoncer les dépassements de limite</label>
+        <label class="toggle"><input type="checkbox" id="report-voice"> Annoncer mes signalements confirmés</label>
         <p class="hint" id="speed-hint">Limites d'après OpenStreetMap et règles générales : la signalisation fait foi.</p>
         <p id="voice-status" class="status" role="status"></p>
         <p id="voice-music" class="hint"></p>
@@ -391,6 +412,13 @@
         <h3>Limites de poids</h3>
         <label class="toggle"><input type="checkbox" id="weight-warnings"> Signaler les limites de poids</label>
         <p class="hint">Tronçons d'OpenStreetMap suivis par le trajet dont la limite de poids est inférieure au PTAC du profil (le calcul ne l'a peut-être pas prise en compte) : listés sur la fiche et repérés sur la carte avant le départ, jamais pendant le guidage ni à voix haute. À vérifier : la signalisation fait foi.</p>
+      </section>
+
+      <section class="card" id="reports-card">
+        <h3>Mes signalements</h3>
+        <p class="hint">En guidage, le bouton drapeau pose un repère d'un seul appui. Type, note et confirmation se règlent ici ou sur la fiche du repère, à l'arrêt seulement. Gardés seulement sur cet appareil. Inclus dans l'export.</p>
+        <p id="reports-status" class="status" role="status"></p>
+        <ul id="reports-list" class="restr-list" aria-label="Mes signalements"></ul>
       </section>
 
       <section class="card" id="restrictions-card">

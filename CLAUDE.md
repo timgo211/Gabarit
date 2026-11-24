@@ -91,6 +91,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   saisies à l'arrêt seulement, jamais dites ; relevé PDF par `@media print`.
 - Recherches récentes (v64, `recent-places.js`) : clé `gabarit.recentPlaces` hors de `gabarit.data`, jamais bloquante,
   exportée (`recentPlaces`) ; seulement un lieu choisi dans la liste ; aucun appel. Détail : skill `gabarit-interface`.
+- Mes signalements (3a, v66, `reports.js`) : « Signaler » = un appui en roulant, sans choix ni saisie (repère sans
+  type) ; type, note, confirmation à l'arrêt confirmé seulement, aussi hors guidage (`canEditReports`) ; encart avec
+  « La signalisation fait foi. » ; voix (`settings.reportVoice`, non par défaut) une fois, confirmé et à moi seulement.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais
