@@ -4549,6 +4549,7 @@ async function suggestionsCheck(browser, base) {
     check(fromKinds === 'RROOO', `${tag} : départ, même liste (2 récents puis ORS sans doublon)`, fromKinds);
     await closeLists(page);
     await page.fill('#from-input', '');
+    await closeLists(page); // v63 : champ vidé → liste des récents (voulu), fermée ici
     // Clavier ouvert : l'appli tient dans la partie visible, la liste reste au-dessus du clavier.
     if (width < 700) {
       await page.click('#to-input');
