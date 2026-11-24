@@ -471,6 +471,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     du 16/02/2010, p. 659, PDF texte) : ONU 2919, 3291, 3331, 3359 et 3373 seulement, « en application de » l'arrêté
     DDT 2010-60 daté du 20 janvier 2010 (et non du 29). Arrêté DDT-2010-60 illisible (haute-savoie.gouv.fr refuse le
     conteneur et l'Action). 3077 et 3082 : toujours à vérifier, rien ajouté à `KNOWN_TUNNELS`.
+    Relecture du 24/11/2026 (Action « Textes officiels », runs 18 et 19, entrées `mb2-*` et `mb3-*`) : arrêté
+    DDT-2010-60 toujours introuvable. Lu : index des copies archivées (web.archive.org) de haute-savoie.gouv.fr et
+    haute-savoie.pref.gouv.fr (aucun fichier « 2010-60 » de 2010 ; `circ_2010-60.pdf` archivé = circulaire du
+    23/11/2010 sans rapport, sans aucun n° ONU) ; pages archivées « Transport de matières dangereuses » (2019-2026) et
+    « Tunnels routiers » : aucun n° ONU ; recueil des actes administratifs actuel : 404 ; préfecture en direct : refus
+    (HTTP/2 « ENHANCE_YOUR_CALM »). Vallée d'Aoste : aucun décret modifiant le n° 33 trouvé (pages viabilité en 404,
+    index archivé sans document sur le tunnel). Exploitant (tunnelmb.net), arrêtés 2009-3425 et 2020-0825 (Bison Futé),
+    ecologie.gouv.fr : ni 3077 ni 3082. Ce qui manque : le texte de l'arrêté DDT-2010-60 ; et le décret n° 33, lui, ne
+    nomme pas 3077 ni 3082 (2919, 3291, 3331, 3359, 3373 seulement). Condition « les deux textes les nomment » non
+    remplie : statut « à vérifier », rien codé. Seule voie restante : demander le texte à la préfecture (ou à l'ATMB).
   - [x] **Phase 5h — Taxes PL régionales** (avant le 1er janvier 2027)
     Fait : `data/taxes-pl.json` (dans `APP_FILES`) et `hgv-tolls.js`. R-Pass (Collectivité européenne d'Alsace,
     prévue au 1er janvier 2027, réseau et grille du site officiel r-pass.eu) et écocontribution PL du Grand Est
@@ -642,6 +652,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     gardant les miens d'abord ; importés « importés, à vérifier », jamais confirmés (sauf repris à mon compte à l'arrêt),
     jamais dits ; textes en textContent. Aucun serveur, aucun compte, rien envoyé.
   - [x] **v69 — Import du fichier d'un ami à l'arrêt seulement** (`canImportShare`, `confirmImport`) : bouton grisé hors de l'arrêt (« Disponible à l'arrêt »), contrôle redit à « Importer » (« Import annulé : camion en mouvement. »).
+  - [x] **v70 — Ligne d'étape jamais coupée en portrait** (vu sur la tablette : « Étape 1/1 : 1 h 57 · 148 … ») : plus de « … » ; une ligne, taille réduite au besoin (80 % au plus), sinon retour à la ligne entre « Étape 1/1 : », « 1 h 57 · » et « 148 km » (`nextStopParts`) ; durée et km jamais coupés ; ui-check `ligne-etape` (360, 412, 760×360, jour et nuit).
 
 ## Rouges connus des vérifications
 

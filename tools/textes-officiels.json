@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles).",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles). 6e lecture (24/11/2026, phase 5b bis, 2e tour) : arrêté DDT-2010-60 (copies archivées, recueil des actes), décrets de la Vallée d'Aoste modifiant le n° 33, page de l'exploitant.",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -1080,11 +1080,129 @@
       "head": 0,
       "ocr": "deu",
       "follow": "(lizenz|nutzungsbedingung|opendata|open-data|dl-de)"
+    },
+    {
+      "id": "mb2-cdx",
+      "title": "5b bis, 2e tour (24/11/2026) — Mont-Blanc : copies archivées (web.archive.org, index CDX) des pages de la préfecture de la Haute-Savoie et de la Vallée d'Aoste",
+      "urls": [
+        "https://web.archive.org/cdx/search/cdx?url=haute-savoie.gouv.fr/*&matchType=domain&filter=original:.*(2010-60|2010_60|DDT-2010|DDT_2010|tunnel|Tunnel|mont-blanc|Mont-Blanc|matieres|dangereuses).*&collapse=urlkey&limit=200",
+        "https://web.archive.org/cdx/search/cdx?url=haute-savoie.pref.gouv.fr/*&matchType=domain&filter=original:.*(2010-60|2010_60|DDT|tunnel|mont-blanc|recueil|RAA|raa).*&collapse=urlkey&limit=200",
+        "https://web.archive.org/cdx/search/cdx?url=regione.vda.it/*&matchType=domain&filter=original:.*(traforo|Monte_Bianco|monte-bianco|merci_pericolose|merci-pericolose|decreto).*&collapse=urlkey&limit=200"
+      ],
+      "keywords": [
+        "2010-60|2010_60|DDT",
+        "tunnel|mont-blanc|Monte_Bianco|traforo",
+        "dangereuses|pericolose"
+      ],
+      "span": 300,
+      "max": 8,
+      "maxDocs": 3,
+      "head": 3000
+    },
+    {
+      "id": "mb2-rampe-fr",
+      "title": "5b bis, 2e tour (24/11/2026) — Mont-Blanc, rampe française : arrêté DDT-2010-60 (copies archivées, recueil des actes administratifs)",
+      "urls": [
+        "https://www.haute-savoie.gouv.fr/Publications/Recueil-des-actes-administratifs-RAA",
+        "https://www.haute-savoie.gouv.fr/Publications/Recueil-des-actes-administratifs-RAA/2010"
+      ],
+      "follow": "(2010-60|2010_60|DDT-2010|DDT_2010|RAA.*2010|2010.*RAA|recueil.*2010|janvier-2010|fevrier-2010|/content/download/)",
+      "keywords": [
+        "2010-60|2010_60",
+        "3077|3082",
+        "2919",
+        "rampes?",
+        "num[ée]ros? ONU"
+      ],
+      "span": 700,
+      "max": 4,
+      "maxDocs": 12,
+      "ocr": "fra",
+      "head": 400
+    },
+    {
+      "id": "mb2-rampe-it",
+      "title": "5b bis, 2e tour (24/11/2026) — Mont-Blanc, rampe italienne : décrets de la Vallée d'Aoste modifiant le n° 33 du 26/01/2010",
+      "urls": [
+        "https://www.regione.vda.it/territorio/viabilita/default_i.aspx",
+        "https://www.regione.vda.it/territorio/viabilita/traforo_monte_bianco_i.aspx"
+      ],
+      "follow": "(traforo|Monte_Bianco|monte-bianco|merci|pericolos|decreto|33)",
+      "keywords": [
+        "3077|3082",
+        "n\\.? ?33 del 26|26 gennaio 2010",
+        "merci pericolose|rampe",
+        "2919"
+      ],
+      "span": 700,
+      "max": 4,
+      "maxDocs": 10,
+      "ocr": "ita",
+      "head": 300
+    },
+    {
+      "id": "mb2-exploitant",
+      "title": "5b bis, 2e tour (24/11/2026) — Mont-Blanc : règlement de circulation et page « matières dangereuses » de l'exploitant (recoupement seulement)",
+      "urls": [
+        "https://www.tunnelmb.net/fr/",
+        "https://www.bison-fute.gouv.fr/tunnel-du-mont-blanc-74-categorie,10307.html"
+      ],
+      "follow": "(reglement|r%C3%A8glement|règlement|marchandises|dangereuses|matieres|matières|\\.pdf)",
+      "keywords": [
+        "3077|3082",
+        "2010-60|n° ?33",
+        "rampes?",
+        "ONU"
+      ],
+      "span": 700,
+      "max": 4,
+      "maxDocs": 8,
+      "ocr": "fra",
+      "head": 200
+    },
+    {
+      "id": "mb3-arrete-fr",
+      "title": "5b bis, 3e tour (24/11/2026) — Mont-Blanc, rampe française : copie archivée de circ_2010-60.pdf et des pages « Transport de matières dangereuses » de la préfecture (web.archive.org)",
+      "urls": [
+        "https://web.archive.org/web/2024id_/https://www.haute-savoie.gouv.fr/contenu/telechargement/1781/8918/file/circ_2010-60.pdf",
+        "https://www.haute-savoie.gouv.fr/contenu/telechargement/1781/8918/file/circ_2010-60.pdf",
+        "https://web.archive.org/web/2015/http://www.haute-savoie.gouv.fr/Demarches-administratives/Activites-reglementees/Transport-de-matieres-dangereuses",
+        "https://web.archive.org/web/2022/https://www.haute-savoie.gouv.fr/Actions-de-l-Etat/Prevenir-le-risque-et-se-proteger/Risques-technologiques/Transport-de-matieres-dangereuses",
+        "https://web.archive.org/web/2012/http://www.haute-savoie.gouv.fr/Actions-de-l-Etat/Prevenir-le-risque-et-se-proteger/Risques-technologiques/Tunnels-routiers"
+      ],
+      "follow": "(2010-60|2010_60|circ_|telechargement.*(tunnel|mont|tmd|TMD|circ)|content/download)",
+      "keywords": [
+        "2010-60|2010_60",
+        "3077|3082",
+        "2919|3291|3331|3359|3373",
+        "rampes?|Passy|Le Fayet|Chamonix",
+        "num[ée]ros? ONU|matières dangereuses"
+      ],
+      "span": 800,
+      "max": 4,
+      "maxDocs": 12,
+      "ocr": "fra",
+      "head": 400
+    },
+    {
+      "id": "mb3-cdx-it",
+      "title": "5b bis, 3e tour (24/11/2026) — Mont-Blanc, rampe italienne : index CDX de regione.vda.it (requête réduite)",
+      "urls": [
+        "https://web.archive.org/cdx/search/cdx?url=regione.vda.it/territorio/*&filter=original:.*(traforo|Bianco|pericolos).*&collapse=urlkey&limit=100",
+        "https://web.archive.org/cdx/search/cdx?url=regione.vda.it/amministrazione/leggi/*&filter=original:.*(traforo|Bianco|pericolos|2919).*&collapse=urlkey&limit=100"
+      ],
+      "keywords": [
+        "traforo|Bianco",
+        "pericolos"
+      ],
+      "span": 300,
+      "max": 8,
+      "maxDocs": 2,
+      "head": 3000
     }
   ],
   "run": [
-    "sat7d-lic2-vl",
-    "sat7d-lic2-wa",
-    "sat7d-lic2-sl"
+    "mb3-arrete-fr",
+    "mb3-cdx-it"
   ]
 }
