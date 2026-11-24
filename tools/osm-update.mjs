@@ -479,7 +479,7 @@ async function main() {
   // Voies à prendre (phase 11d) et lieux (phase 11c) : mêmes cases ; chacune écrite seulement dans ses limites (volume
   // lu dans l'export, 5 Mo par fichier, 40 Mo en tout) ; sinon ancienne copie gardée. Une erreur ici n'empêche jamais
   // les autres copies (déjà écrites) ni l'autre des deux.
-  for (const line of laneSkipLog(extra.laneSkips)) console.log(line);
+  for (const line of laneSkipLog(extra.laneSkips, [...extra.lanes.values()])) console.log(line);
   try {
     if (extra.laneProblem) console.log(`⚠ data/voies-osm/ non modifié : ${extra.laneProblem}. Repli possible : retirer residential et unclassified.`);
     else if (extra.lanes.size) {

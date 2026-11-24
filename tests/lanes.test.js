@@ -31,7 +31,8 @@ const EXPECTED = [{ values: ['through'], ok: false }, { values: ['through'], ok:
 test('lecture : nombre de valeurs = nombre de voies, valeurs reconnues seulement', () => {
   assert.deepEqual(splitTurnLanes('left|through;right', 2), [['left'], ['through', 'right']]);
   assert.equal(splitTurnLanes('left|through', 3), null);
-  assert.equal(splitTurnLanes('left|none', 2), null);
+  // v63 : « none » lu comme voie sans flèche (la copie ne le garde que sur autoroute).
+  assert.deepEqual(splitTurnLanes('left|none', 2), [['left'], ['none']]);
   assert.equal(splitTurnLanes('left|foo', 2), null);
   assert.equal(parseLaneTile(null), null);
   const t = parseLaneTile({ t: ['left|through', 'left'], v: [[0, 2, 610000, 4900000, 0, 100], [0, 3, 1, 1, 0, 1], [1, 1, 5], 'x'] });
@@ -72,6 +73,20 @@ test('voie coupée en deux chemins : mêmes flèches → voies ; flèches diffé
   assert.deepEqual(lanesForManeuvers(route, maneuvers, copy([w7001, before])).get(1), EXPECTED);
   const other = { ...before, turn: 'through|slight_right|slight_right' };
   assert.equal(lanesForManeuvers(route, maneuvers, copy([w7001, other])).size, 0);
+});
+
+test('v63 : voie sans flèche gardée, grisée, jamais à prendre ; rangée toute sans flèche → rien', () => {
+  assert.deepEqual(splitTurnLanes('through|none|slight_right', 3), [['through'], ['none'], ['slight_right']]);
+  assert.equal(splitTurnLanes('none|none', 2), null);
+  assert.equal(splitTurnLanes('none;left|right', 2), null);
+  const withNone = { ...w7001, turn: 'through|none|slight_right', none: 1 };
+  assert.deepEqual(lanesForManeuvers(route, maneuvers, copy([withNone])).get(1),
+    [{ values: ['through'], ok: false }, { values: ['none'], ok: false }, { values: ['slight_right'], ok: true }]);
+  // « none » jamais valide, même tout droit.
+  assert.deepEqual(lanesFor([['none'], ['through']], STEP_TYPES.STRAIGHT).map((l) => l.ok), [false, true]);
+  assert.equal(lanesFor([['none'], ['left']], STEP_TYPES.STRAIGHT), null);
+  // Case qui contiendrait une rangée toute en « none » (copie abîmée) : ignorée à la lecture.
+  assert.equal(parseLaneTile({ t: ['none|none'], v: [[0, 2, 610000, 4900000, 0, 100]] }).lines.length, 0);
 });
 
 test('rangée : manœuvre du bandeau à 1 km au plus seulement', () => {

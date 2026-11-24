@@ -249,7 +249,7 @@ export function createNavigation(ctx) {
     if (!lanes) { ui.lanes.hidden = true; ui.lanes.replaceChildren(); return; }
     ui.lanes.replaceChildren(...lanes.map((l) => {
       const el = document.createElement('span');
-      el.className = l.ok ? 'nav-lane ok' : 'nav-lane';
+      el.className = l.ok ? 'nav-lane ok' : l.values[0] === 'none' ? 'nav-lane none' : 'nav-lane';
       el.append(laneSvg(l.values));
       return el;
     }));

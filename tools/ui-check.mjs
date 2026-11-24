@@ -3033,6 +3033,9 @@ function lanesCopyFiles(kind) {
       geometry: { type: 'LineString', coordinates: [[6.1, 49.016], [6.1, 49.0197]] } });
   }
   if (kind === 'nombre') feats[0] = { ...f, properties: { ...f.properties, lanes: '4' } };
+  // v63 : voie sans flèche au milieu (autoroute : gardée) ; toutes sans flèche (ignorée par l'Action).
+  if (kind === 'none') feats[0] = { ...f, properties: { ...f.properties, 'turn:lanes': 'through|none|slight_right' } };
+  if (kind === 'toutnone') feats[0] = { ...f, properties: { ...f.properties, 'turn:lanes': 'none|none|none' } };
   const lines = feats.flatMap((x) => lanesFromFeature(x)?.lines ?? []);
   if (!lines.length) return new Map([['index.json', { tiles: {} }]]);
   const { index, tiles } = convertLanes(lines, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
@@ -3044,7 +3047,8 @@ function lanesCopyFiles(kind) {
  * les fonctions de l'Action, GPS émulé à 90 km/h (une position par seconde, comme le vrai) : à plus de 1 km de
  * « Restez à droite », pas de rangée ; à moins de 1 km, rangée sous le bandeau (3 voies, la droite en clair, les deux
  * autres grisées), dans la pile du haut, sans chevaucher la colonne de boutons ; jamais dite ; après la manœuvre (D 1,
- * sans voies) : cachée. Copie ambiguë, nombre faux ou absente : jamais de rangée, aucune erreur.
+ * sans voies) : cachée. Copie ambiguë, nombre faux ou absente : jamais de rangée, aucune erreur. v63 : voie sans flèche
+ * (« none » sur autoroute) grisée, pictogramme neutre ; rangée toute sans flèche : jamais de rangée.
  * 412×900 jour, 900×412 nuit, 360×760 nuit, 1280×800 jour, 760×360 jour.
  */
 async function lanesCheck(browser, base) {
@@ -3053,19 +3057,22 @@ async function lanesCheck(browser, base) {
   const cases = [
     [412, 900, 'day', 'fixture'], [900, 412, 'night', 'fixture'], [360, 760, 'night', 'fixture'], [1280, 800, 'day', 'fixture'],
     [760, 360, 'day', 'fixture'], [412, 900, 'day', 'ambigu'], [412, 900, 'night', 'nombre'], [900, 412, 'day', null],
+    // v63 : voie sans flèche sur autoroute (gardée, grisée, pictogramme neutre) ; rangée toute sans flèche (rien).
+    [412, 900, 'day', 'none'], [900, 412, 'night', 'none'], [412, 900, 'day', 'toutnone'],
   ];
   const row = (page) => page.evaluate(() => {
     const el = document.querySelector('#nav-lanes');
     const shown = !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
     const r = el.getBoundingClientRect();
-    const lanes = [...el.querySelectorAll('.nav-lane')].map((l) => (l.classList.contains('ok') ? 'ok' : 'off'));
+    const lanes = [...el.querySelectorAll('.nav-lane')].map((l) => (l.classList.contains('ok') ? 'ok' : l.classList.contains('none') ? 'none' : 'off'));
+    const noneArrow = [...el.querySelectorAll('.nav-lane.none')].some((l) => l.querySelector('polygon'));
     const cols = [...document.querySelectorAll('.nav-round')].filter((b) => b.getClientRects().length && !b.hidden).map((b) => b.getBoundingClientRect());
     const hit = cols.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
     const top = document.querySelector('.nav-top').getBoundingClientRect();
     const inTop = r.top >= top.top - 1 && r.bottom <= top.bottom + 1;
     const vis = r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1;
     const tight = document.querySelector('#nav').classList.contains('nav-tight') || document.querySelector('.app')?.classList.contains('nav-tight');
-    return { shown, lanes, hit, inTop, vis, tight, label: el.getAttribute('aria-label') };
+    return { shown, lanes, hit, inTop, vis, tight, noneArrow, label: el.getAttribute('aria-label') };
   });
   for (const [width, height, theme, kind] of cases) {
     const tag = `${width}×${height} ${theme} (${kind ?? 'copie absente'})`;
@@ -3094,6 +3101,16 @@ async function lanesCheck(browser, base) {
         check(/la signalisation fait foi/i.test(near.label ?? ''), `${tag} : « la signalisation fait foi » dans l'étiquette`, near.label);
         const colors = await page.evaluate(() => [...document.querySelectorAll('#nav-lanes .nav-lane')].map((l) => getComputedStyle(l).color));
         check(colors[2] !== colors[0], `${tag} : voie valide d'une autre couleur que les voies grisées`, colors.join(' | '));
+      }
+    } else if (kind === 'none') {
+      if (near.tight) check(!near.shown, `${tag} : écran bas (nav-tight) → rangée cachée`, JSON.stringify(near));
+      else {
+        check(near.shown && near.lanes.join(',') === 'off,none,ok', `${tag} : voie sans flèche gardée, grisée, la droite en clair`, JSON.stringify(near));
+        check(!near.noneArrow, `${tag} : voie sans flèche → pictogramme neutre (aucune pointe)`, JSON.stringify(near));
+        check(near.inTop && near.vis && !near.hit, `${tag} : rangée dans la pile du haut, sans chevaucher les boutons`, JSON.stringify(near));
+        const colors = await page.evaluate(() => [...document.querySelectorAll('#nav-lanes .nav-lane')].map((l) => getComputedStyle(l).color));
+        check(colors[1] === colors[0] && colors[1] !== colors[2], `${tag} : voie sans flèche de la couleur des voies grisées`, colors.join(' | '));
+        check(/1 sur 3/.test(near.label ?? ''), `${tag} : une seule voie conseillée sur trois`, near.label);
       }
     } else check(!near.shown, `${tag} : jamais de rangée`, JSON.stringify(near));
     const spoken = await page.evaluate(() => window.__spoken ?? []);

@@ -74,6 +74,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     motorway / motorway_link sens unique implicite, `turn:lanes:forward|backward` + `lanes:forward|backward` à double
     sens, backward retourné ; nombre de valeurs = nombre de voies exigé ; refus comptés par motif : rond-point,
     oneway=-1, sans suffixe à double sens, lanes absent, nombre ≠, `none` / vide (compteur à part), valeur inconnue ;
+    v63 : `none` / vide gardé sur motorway / motorway_link (`LANES.NONE_HIGHWAYS`, valeur « none », `none` = nombre de
+    voies sans flèche), toutes `none` → motif `allnone` ; journal avant / après (`laneSkipLog(skips, kept)`) ;
     200 derniers mètres avant le carrefour, `data/voies-osm/` cases `{ t, v:[[i_turn, n, x0, y0, dx, dy…]] }`, 5 Mo /
     40 Mo, plafond du volume lu 1 Go) ; `places-convert.js` (nœuds `place=city|town|village` avec `name`,
     `data/lieux-osm/` cases `{ t, p:[[i_nom, rang, x, y]] }`, 5 Mo / 40 Mo, plafond lu 256 Mo) ; fixtures
