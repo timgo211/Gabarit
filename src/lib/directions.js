@@ -108,7 +108,8 @@ export function directionText(link) {
   return link.dest ?? link.ref ?? '';
 }
 
-function indexLinks(links) {
+/** Index des segments de lignes par cellules de DIRECTION.CELL_DEG (réutilisé par lanes.js, phase 11d). */
+export function indexLinks(links) {
   const cells = new Map();
   const C = DIRECTION.CELL_DEG;
   links.forEach((l) => {
@@ -141,7 +142,7 @@ function distSeg(p, a, b) {
  * Bretelles proches d'un point : { near:Set, coherent:Set }.
  * near : toutes les bretelles à 60 m ; coherent : celles dont un segment à 60 m suit le cap du tracé.
  */
-function linksNear(cells, p, heading) {
+export function linksNear(cells, p, heading) {
   const C = DIRECTION.CELL_DEG;
   const cx = Math.floor(p[0] / C); const cy = Math.floor(p[1] / C);
   const near = new Set(); const coherent = new Set();

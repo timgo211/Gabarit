@@ -30,6 +30,7 @@ import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js'
 import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
 import { directionFromFeature, convertDirections } from '../src/lib/directions-convert.js';
 import { placeFromFeature, convertPlaces } from '../src/lib/places-convert.js';
+import { lanesFromFeature, convertLanes } from '../src/lib/lanes-convert.js';
 import { sunTimes } from '../src/lib/sun.js';
 import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
@@ -144,7 +145,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
   start = START, fuel = null,
 } = {}) {
   const ctx = await browser.newContext({
@@ -355,6 +356,15 @@ async function open(browser, base, {
     const name = new URL(route.request().url()).pathname.split('/').pop();
     stats.placeCopy = [...(stats.placeCopy ?? []), name];
     const json = placeFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
+  // Phase 11d : copie data/voies-osm/ (null : absente, 404 ; 'fixture', 'ambigu', 'nombre' : voies de
+  // tests/fixtures/osm-voies.geojsonseq passées par les fonctions de l'Action).
+  const laneFiles = lanesCopyFiles(lanesCopy);
+  await ctx.route(/\/data\/voies-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.laneCopy = [...(stats.laneCopy ?? []), name];
+    const json = laneFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
   const page = await ctx.newPage();
@@ -3001,6 +3011,98 @@ function placesCopyFiles(kind) {
 }
 
 /**
+ * Fichiers de la copie des voies simulée (nom → JSON), d'après les fonctions de l'Action (phase 11d) : 'fixture' =
+ * w7001 (through|through|slight_right jusqu'au point 20 de ors-directions-sortie.json) ; 'ambigu' = w7001 et un
+ * chemin juste avant aux flèches différentes ; 'nombre' = w7001 avec un nombre de voies faux (refusé par l'Action).
+ */
+function lanesCopyFiles(kind) {
+  if (!kind) return null;
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const f = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-voies.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).find((x) => x?.id === 'w7001');
+  const feats = [f];
+  if (kind === 'ambigu') {
+    feats.push({ ...f, id: 'w7101', properties: { ...f.properties, 'turn:lanes': 'through|slight_right|slight_right' },
+      geometry: { type: 'LineString', coordinates: [[6.1, 49.016], [6.1, 49.0197]] } });
+  }
+  if (kind === 'nombre') feats[0] = { ...f, properties: { ...f.properties, lanes: '4' } };
+  const lines = feats.flatMap((x) => lanesFromFeature(x)?.lines ?? []);
+  if (!lines.length) return new Map([['index.json', { tiles: {} }]]);
+  const { index, tiles } = convertLanes(lines, { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * Phase 11d : voies à prendre. Itinéraire synthétique ors-directions-sortie.json, copie data/voies-osm/ construite par
+ * les fonctions de l'Action, GPS émulé à 90 km/h (une position par seconde, comme le vrai) : à plus de 1 km de
+ * « Restez à droite », pas de rangée ; à moins de 1 km, rangée sous le bandeau (3 voies, la droite en clair, les deux
+ * autres grisées), dans la pile du haut, sans chevaucher la colonne de boutons ; jamais dite ; après la manœuvre (D 1,
+ * sans voies) : cachée. Copie ambiguë, nombre faux ou absente : jamais de rangée, aucune erreur.
+ * 412×900 jour, 900×412 nuit, 360×760 nuit, 1280×800 jour, 760×360 jour.
+ */
+async function lanesCheck(browser, base) {
+  const sortie = fixture('ors-directions-sortie.json');
+  const line = sortie.features[0].geometry.coordinates;
+  const cases = [
+    [412, 900, 'day', 'fixture'], [900, 412, 'night', 'fixture'], [360, 760, 'night', 'fixture'], [1280, 800, 'day', 'fixture'],
+    [760, 360, 'day', 'fixture'], [412, 900, 'day', 'ambigu'], [412, 900, 'night', 'nombre'], [900, 412, 'day', null],
+  ];
+  const row = (page) => page.evaluate(() => {
+    const el = document.querySelector('#nav-lanes');
+    const shown = !el.hidden && el.getClientRects().length > 0 && getComputedStyle(el).display !== 'none';
+    const r = el.getBoundingClientRect();
+    const lanes = [...el.querySelectorAll('.nav-lane')].map((l) => (l.classList.contains('ok') ? 'ok' : 'off'));
+    const cols = [...document.querySelectorAll('.nav-round')].filter((b) => b.getClientRects().length && !b.hidden).map((b) => b.getBoundingClientRect());
+    const hit = cols.some((c) => r.left < c.right && r.right > c.left && r.top < c.bottom && r.bottom > c.top);
+    const top = document.querySelector('.nav-top').getBoundingClientRect();
+    const inTop = r.top >= top.top - 1 && r.bottom <= top.bottom + 1;
+    const vis = r.left >= 0 && r.right <= innerWidth + 1 && r.top >= 0 && r.bottom <= innerHeight + 1;
+    const tight = document.querySelector('#nav').classList.contains('nav-tight') || document.querySelector('.app')?.classList.contains('nav-tight');
+    return { shown, lanes, hit, inTop, vis, tight, label: el.getAttribute('aria-label') };
+  });
+  for (const [width, height, theme, kind] of cases) {
+    const tag = `${width}×${height} ${theme} (${kind ?? 'copie absente'})`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => sortie, overpass: () => ({ elements: [] }), lanesCopy: kind,
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(800);
+    if (kind) check((stats.laneCopy ?? []).includes('index.json'), `${tag} : copie data/voies-osm/ lue`, (stats.laneCopy ?? []).join(','));
+    // Point 9 : ≈ 1,2 km de la manœuvre (plus de 1 km) → pas de rangée.
+    await setGeo(page, { lon: line[9][0], lat: line[9][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await page.waitForTimeout(800);
+    await drive(ctx, page, line.slice(9, 12), 90, 2);
+    const far = await row(page);
+    check(!far.shown, `${tag} : à plus de 1 km, pas de rangée de voies`, JSON.stringify(far));
+    // Vers la sortie, à 90 km/h : à moins de 1 km.
+    await drive(ctx, page, line.slice(11, 21), 90, 10);
+    const near = await row(page);
+    if (kind === 'fixture') {
+      if (near.tight) check(!near.shown, `${tag} : écran bas (nav-tight) → rangée cachée comme « Puis »`, JSON.stringify(near));
+      else {
+        check(near.shown && near.lanes.join(',') === 'off,off,ok', `${tag} : 3 voies sous le bandeau, la droite en clair`, JSON.stringify(near));
+        check(near.inTop && near.vis && !near.hit, `${tag} : rangée dans la pile du haut, visible, sans chevaucher les boutons`, JSON.stringify(near));
+        check(/la signalisation fait foi/.test(near.label ?? ''), `${tag} : « la signalisation fait foi » dans l'étiquette`, near.label);
+        const colors = await page.evaluate(() => [...document.querySelectorAll('#nav-lanes .nav-lane')].map((l) => getComputedStyle(l).color));
+        check(colors[2] !== colors[0], `${tag} : voie valide d'une autre couleur que les voies grisées`, colors.join(' | '));
+      }
+    } else check(!near.shown, `${tag} : jamais de rangée`, JSON.stringify(near));
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(spoken.every((t) => !/\bvoie/i.test(t)), `${tag} : voies jamais dites`, spoken.join(' | '));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-voies-${kind ?? 'absente'}.png`) });
+    // Après la manœuvre : « Tournez à droite sur D 1 », sans voies.
+    await drive(ctx, page, line.slice(20, 26), 60, 4);
+    const after = await row(page);
+    check(!after.shown, `${tag} : après la manœuvre, rangée cachée`, JSON.stringify(after));
+    await noHorizontalScroll(page, `${tag} voies`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+/**
  * Phase 11b : directions des panneaux. Itinéraire synthétique (autoroute puis bretelle, « Restez à droite » au km 2,2),
  * copie data/directions-osm/ construite par les fonctions de l'Action. GPS émulé à 90 km/h vers la sortie : bandeau
  * « Restez à droite, direction Metz, Nancy (A 31) » en entier dans le bandeau, dit à voix haute ; bretelle proche au
@@ -4438,7 +4540,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck,
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck };
   for (const [name, fn] of Object.entries(all)) {

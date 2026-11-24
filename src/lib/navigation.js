@@ -25,6 +25,7 @@ import { countriesAlongRoute } from './countries.js';
 import { speedLimitsAlongRoute, limitAt } from './speed-limit.js';
 import { directionsForManeuvers, withDirections } from './directions.js';
 import { placesForManeuvers, withPlaces } from './places.js';
+import { lanesForManeuvers, withLanes } from './lanes.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -107,18 +108,24 @@ export function fixFromPosition(pos) {
   };
 }
 
+/** Phase 11d : voies à prendre ajoutées aux manœuvres (copie data/voies-osm/), sinon manœuvres inchangées. */
+function withLaneData(maneuvers, route, lanes) {
+  return lanes?.lines?.length ? withLanes(maneuvers, lanesForManeuvers(route, maneuvers, lanes)) : maneuvers;
+}
+
 /**
  * Itinéraire (lu par parseDirections) prêt pour le guidage. Phase 11b : directions des panneaux (copie
  * data/directions-osm/ des cases du trajet, mergeDirectionTiles) ajoutées aux manœuvres, une fois par itinéraire ;
- * phase 11c : lieux « vers X » (copie data/lieux-osm/, mergePlaceTiles) pour celles restées sans direction.
+ * phase 11c : lieux « vers X » (copie data/lieux-osm/, mergePlaceTiles) pour celles restées sans direction ; phase 11d :
+ * voies à prendre (copie data/voies-osm/, mergeLaneTiles), affichées seulement.
  */
-export function prepareRoute(route, directions = null, places = null) {
+export function prepareRoute(route, directions = null, places = null, lanes = null) {
   const line = prepareLine(route.coordinates);
   const base = buildManeuvers(route.steps, line.cum);
   const withDir = directions?.links?.length ? withDirections(base, directionsForManeuvers(route, base, directions)) : base;
   return {
     line,
-    maneuvers: places?.places?.length ? withPlaces(withDir, placesForManeuvers(route, withDir, places)) : withDir,
+    maneuvers: withLaneData(places?.places?.length ? withPlaces(withDir, placesForManeuvers(route, withDir, places)) : withDir, route, lanes),
     duration: isNum(route.duration) ? route.duration : 0,
     end: line.coords[line.coords.length - 1],
   };
@@ -257,10 +264,10 @@ function placeSpeeds(ctx, rules, route) {
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
   driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null, directions = null,
-  places = null, stops = [], carry = null, tripFrom = '',
+  places = null, lanes = null, stops = [], carry = null, tripFrom = '',
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
-  const prepared = prepareRoute(route, directions, places);
+  const prepared = prepareRoute(route, directions, places, lanes);
   return {
     // v55 : étapes restantes, dans l'ordre du tracé ; nextStop = première non atteinte.
     stops: placeStops(stops, route, prepared.line),
@@ -297,6 +304,7 @@ export function startNavigation(route, {
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     directionsData: directions ?? null,
     placesData: places ?? null,
+    lanesData: lanes ?? null,
     route: prepared,
     source: route,
     areaPool: Array.isArray(areas) ? areas : [],
@@ -635,6 +643,7 @@ export function updateNavigation(state, fix) {
       exitNumber: m.exitNumber,
       exit: m.exit ?? null,
       place: m.place?.text ?? null,
+      lanes: m.lanes ?? null,
       distance: nm.distance,
       icon: maneuverIcon(m.type, m.exitNumber),
     };
@@ -764,7 +773,7 @@ export function setNavigationSpeeds(state, data) {
  */
 export function setNavigationDirections(state, data) {
   if (!state) return state;
-  const route = prepareRoute(state.source, data, state.placesData);
+  const route = prepareRoute(state.source, data, state.placesData, state.lanesData);
   return { ...state, directionsData: data ?? null, route: { ...state.route, maneuvers: route.maneuvers } };
 }
 
@@ -774,8 +783,18 @@ export function setNavigationDirections(state, data) {
  */
 export function setNavigationPlaces(state, data) {
   if (!state) return state;
-  const route = prepareRoute(state.source, state.directionsData, data);
+  const route = prepareRoute(state.source, state.directionsData, data, state.lanesData);
   return { ...state, placesData: data ?? null, route: { ...state.route, maneuvers: route.maneuvers } };
+}
+
+/**
+ * Cases de data/voies-osm/ arrivées après « Démarrer » ou au recalcul (phase 11d) : voies des manœuvres refaites (même
+ * tracé, mêmes positions ; annonces déjà faites gardées).
+ */
+export function setNavigationLanes(state, data) {
+  if (!state) return state;
+  const route = prepareRoute(state.source, state.directionsData, state.placesData, data);
+  return { ...state, lanesData: data ?? null, route: { ...state.route, maneuvers: route.maneuvers } };
 }
 
 /** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
@@ -798,7 +817,7 @@ export function markStopAsWork(state, now) {
 
 /** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
 export function rerouteDone(state, route, stops = null) {
-  const prepared = prepareRoute(route, state.directionsData, state.placesData);
+  const prepared = prepareRoute(route, state.directionsData, state.placesData, state.lanesData);
   const s = {
     ...state,
     // v55 : le recalcul a été demandé avec les étapes restantes (remainingStops) : replacées sur le nouveau tracé.

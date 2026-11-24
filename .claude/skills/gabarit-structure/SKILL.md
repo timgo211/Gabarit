@@ -86,6 +86,11 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     consigne entière si `place` ; UI `src/ui/places.js` (`createTileCopy`) ; tests `tests/places.test.js`, fixture
     **synthétique** `osm-lieux-sortie.geojsonseq` (lieux le long de `ors-directions-sortie.json`) ; ui-check
     `directions` : cas lieux `fixture` / `egalite` / absente
+  - phase 11d, appli (v61) : `lanes.js` (`parseLaneTile` revérifie n = nombre de valeurs, `mergeLaneTiles`, `lanesFor`
+    — `VALID_TURNS` par type ORS —, `lanesForManeuvers` — `indexLinks` / `linksNear` exportés de `directions.js` —,
+    `withLanes`, `lanesRow` 1 km) ; `prepareRoute(route, directions, places, lanes)`, `setNavigationLanes` ; UI
+    `src/ui/lanes.js`, `src/ui/lane-icons.js` (dessin maison) ; tests `tests/lanes.test.js` (fixture `osm-voies.geojsonseq`,
+    w7001 finit au point 20 de `ors-directions-sortie.json`) ; ui-check `voies`
   - v53 : `route-save.js` (mémoire de l'itinéraire : `buildSave`, `checkSave`, `shouldSave`, `restoredChoice`,
     `withoutSecrets`), UI `src/ui/route-save.js` (IndexedDB), `resumeNavigation` de `navigation.js` ; tests
     `tests/route-save.test.js`, `tests/route-store.test.js` (faux IndexedDB : absent, refusé, bloqué, plein) ; `src/ui/route-arrows.js` (chevrons et pastilles de manœuvre), `maneuverMarks`,

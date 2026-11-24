@@ -365,6 +365,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   --nav-off-bg: #D8D5CD;
   --nav-off-fg: #4A4D56;
   --nav-off-border: #A9A79E;
+  /* Phase 11d : voie à ne pas prendre (grisée sur le bandeau noir, jour et nuit ; contraste ≥ 3:1 des pictogrammes). */
+  --lane-off: #6B6E77;
 }
 :root[data-theme="night"] {
   --nav-off-bg: #2B2E37;
@@ -445,6 +447,18 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow-wrap: anywhere;
 }
 .nav-then-icon { flex: 0 0 auto; width: 36px; height: 36px; color: var(--nav-accent); }
+/* Phase 11d : rangée des voies à prendre sous « Puis » (bandeau noir, voies valides crème, autres grisées). */
+.nav-lanes {
+  justify-self: start; max-width: 100%; display: flex; align-items: center; gap: 2px; padding: 4px 10px;
+  border-radius: 16px; background: var(--nav-bg); box-shadow: 0 4px 14px rgba(0,0,0,.35); overflow: hidden;
+}
+.nav-lanes[hidden] { display: none; }
+.nav-lane { flex: 0 1 40px; min-width: 22px; height: 48px; color: var(--lane-off); }
+.nav-lane + .nav-lane { border-left: 2px dashed var(--nav-sep); }
+.nav-lane.ok { color: var(--nav-fg); }
+.nav-lane svg { width: 100%; height: 100%; display: block; }
+.lane-stroke { fill: none; stroke: currentColor; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+.lane-fill { fill: currentColor; }
 .nav-alerts-row { display: flex; align-items: flex-end; gap: 6px; min-width: 0; }
 .nav-alerts { flex: 1 1 auto; display: grid; gap: 6px; justify-items: start; min-width: 0; }
 .nav-alerts > * { max-width: 100%; min-width: 0; }
@@ -647,7 +661,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 }
 /* Écran bas (posé par fitBanner) : bandeau resserré, jamais sous le panneau du bas. */
 .nav-tight .nav-top { gap: 4px; }
-.nav-tight .nav-then, .nav-tight .nav-drive-detail { display: none; }
+.nav-tight .nav-then, .nav-tight .nav-lanes, .nav-tight .nav-drive-detail { display: none; }
 .nav-tight .nav-icon { width: 52px; height: 52px; }
 .nav-tight .nav-maneuver { padding: 6px 10px 6px 6px; gap: 8px; }
 .nav-tight .nav-dist { font-size: 1.15rem; }

@@ -19,6 +19,7 @@ import { createWeightLimits } from './ui/weight-limits.js';
 import { createSpeedLimits } from './ui/speed-limits.js';
 import { createDirections } from './ui/directions.js';
 import { createPlaces } from './ui/places.js';
+import { createLanes } from './ui/lanes.js';
 import { createRestrictions } from './ui/restrictions.js';
 import { restrictionsForTrip, restrictionLines, mergeAvoid } from './lib/restrictions.js';
 import { createWinter } from './ui/winter.js';
@@ -153,6 +154,7 @@ navigation = createNavigation({
     speedLimits.extend(route); // phase 11a : cases de data/vitesses-osm/ manquantes
     directions.extend(route); // phase 11b : cases de data/directions-osm/ manquantes
     places.extend(route); // phase 11c : cases de data/lieux-osm/ manquantes
+    lanes.extend(route); // phase 11d : cases de data/voies-osm/ manquantes
     winter.extend(route); // phase 5f : cases de data/hiver/ manquantes
   },
   onAreaOpen: (id) => areas.openSheet(id),
@@ -275,6 +277,10 @@ const directions = createDirections({
 // Lieux « vers X » (phase 11c) : consignes du guidage seulement, affichés, jamais dits ; copie vide → rien.
 const places = createPlaces({
   onChange: (st) => { if (navigation?.active) navigation.setPlaces(st.status === 'ok' ? st.data : null); },
+});
+// Voies à prendre (phase 11d) : rangée sous « Puis » pendant le guidage, jamais dite ; copie vide → rien.
+const lanes = createLanes({
+  onChange: (st) => { if (navigation?.active) navigation.setLanes(st.status === 'ok' ? st.data : null); },
 });
 // Repère touché (à l'arrêt) : texte du pont ou de la limite de poids, jamais dit à voix haute.
 map.onBridgePick((key) => {
@@ -440,6 +446,7 @@ async function avoidZfe() {
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
+    lanes.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).banned;
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans ZFE » passe encore par : ${still.map((p) => p.name).join(', ')}.`, 'info');
@@ -501,6 +508,7 @@ async function avoidTunnel() {
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
+    lanes.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).avoidableTunnels ?? [];
     if (still.length) showMessage(messageNode, `Le contournement passe encore par : ${[...new Set(still.map(tunnelName))].join(', ')}. La signalisation fait foi.`, 'info');
@@ -545,6 +553,7 @@ async function avoidLocal() {
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
+    lanes.extend(route);
     winter.extend(route);
     const still = rulesOf(route, choice.vehicle, new Date()).localTransit ?? [];
     if (still.length) showMessage(messageNode, `L'itinéraire « Sans desserte » traverse encore une route réservée à la desserte locale (km ${still.map((p) => Math.round(p.enter / 1000)).join(', ')}). La signalisation fait foi.`, 'info');
@@ -643,6 +652,8 @@ function startGuidance(simulate = null, resume = null, carry = null) {
     directions: directions.state.status === 'ok' ? directions.state.data : null,
     // Phase 11c : lieux « vers X » des manœuvres sans direction de panneau (affichés seulement).
     places: places.state.status === 'ok' ? places.state.data : null,
+    // Phase 11d : voies à prendre (affichées seulement).
+    lanes: lanes.state.status === 'ok' ? lanes.state.data : null,
     resume, // v53 : reprise d'un guidage sauvegardé
     carry, tripFrom: choice.fromLabel ?? '', // v56 : historique
   });
@@ -733,7 +744,7 @@ async function openAlternatives(from, extraStop = null) {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
       stops,
     };
-    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); winter.extend(o.route); }
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
   } catch (err) {
@@ -945,6 +956,7 @@ const form = createRouteForm({
       speedLimits.clear();
       directions.clear();
       places.clear();
+      lanes.clear();
       map.showBridges([]);
       winter.clear();
       map.showZfe([]);
@@ -978,6 +990,7 @@ function showChoice(selected) {
   speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
   directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/
   places.load(options.map((o) => o.route)); // phase 11c : cases de data/lieux-osm/
+  lanes.load(options.map((o) => o.route)); // phase 11d : cases de data/voies-osm/
   winter.load(options.map((o) => o.route)); // phase 5f : cases de data/hiver/ du trajet, sans requête d'API
 }
 
