@@ -19,9 +19,12 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   bouton passe en satellite pour ce guidage seulement (non mémorisé).
 - Phase 7d (satellite hors de France) : registre `SATELLITE_SOURCES` de `src/lib/map-layers.js` (France d'abord, puis
   Luxembourg ACT CC0, Bruxelles UrbIS CC0, Suisse swisstopo, Espagne PNOA IGN CC BY 4.0, NRW dl-de/zero, Rhénanie-Palatinat
-  dl-de/by) ; source choisie d'après le centre de la carte (`satelliteSourceAt`, zones `satellite-zones.js`). Une
+  dl-de/by ; v58 : Bade-Wurtemberg LGL dl-de/by (WMS 1.1.1, `wms111`), Bavière LDBV CC BY 4.0, Hesse HVBG open data ;
+  non codées : Flandre, Wallonie, Sarre (licence non lisible, raisons dans l'en-tête de `map-layers.js`)) ; source choisie d'après le centre de la carte (`satelliteSourceAt`, zones `satellite-zones.js`). Une
   source n'est codée que si ses conditions sont lues (citées en commentaire avec URL et date) ET qu'une tuile réelle a
-  répondu 200 image/* avec `access-control-allow-origin` (Action « Textes officiels », entrée `tiles`). Carte : une
+  répondu 200 image/* avec `access-control-allow-origin` (Action « Textes officiels », entrée `tiles`). Journal lu par
+  l'outil GitHub `get_job_logs` (`tail_lines`) : garder les tours courts (tuiles seules ; `span` / `max` / `maxDocs`
+  par entrée pour les pages de conditions), sinon le journal est trop long à lire. Carte : une
   couche par source (`sat-<id>`, IGN garde `ign-ortho`), toutes dans `below` de `carryOverlay`, nuit à 3 niveaux sur
   toutes ; bascule sans trou (`showSatLayer` : nouvelle couche visible, ancienne masquée au premier `idle`, 1,5 s au
   plus). Hors de toute source : plan + « Vue satellite indisponible à cet endroit », jamais une couche vide.

@@ -93,6 +93,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +
   CORS vérifiées par l'Action (entrée `tiles`) ; sinon message, jamais une couche vide. Détail : skill `gabarit-interface`.
+  v58 : + Bade-Wurtemberg, Bavière, Hesse ; Flandre, Wallonie, Sarre non codées (licence non lisible).
 - « Autres itinéraires » (v44, `openAlternatives` d'`app.js`, panneau `#nav-alts`) : seulement à l'arrêt (`parkedState`),
   depuis la dernière position reçue vers l'arrivée, profil actif, même calcul que le départ (`fetchRouteOptions`,
   restrictions, tunnels v43) ; fermé dès que le véhicule roule (`onParkChange`) ; échec : message, rien de guidé.

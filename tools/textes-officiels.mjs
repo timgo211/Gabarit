@@ -9,7 +9,8 @@
 // HTTP, type de contenu, taille et en-tête CORS access-control-allow-origin (MapLibre charge les tuiles raster par fetch).
 // Entrée « headers » (phase 4) : API JSON demandée avec l'en-tête Origin du site publié ; le journal donne tous les
 // en-têtes de réponse (CORS, quotas) et le début du corps.
-// Champ « run » du fichier : liste des entrées lues (toutes si absent).
+// Champ « run » du fichier : liste des entrées lues (toutes si absent). Facultatifs par entrée (v58) : span (caractères
+// par extrait), max (extraits par mot-clé et par document), maxDocs (documents lus).
 //
 // Usage : node tools/textes-officiels.mjs [fichier.json] [id…]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -79,16 +80,17 @@ async function fetchDoc(url) {
   }
 }
 
-function extracts(text, keywords) {
+// span / max (v58, facultatifs par entrée) : extraits plus courts et moins nombreux (journal lisible d'un coup).
+function extracts(text, keywords, { span = SPAN, max = MAX_EXTRACTS } = {}) {
   const out = [];
   const flat = text;
   for (const kw of keywords) {
     const re = new RegExp(kw, 'gi');
     let m; let n = 0; let last = -Infinity;
-    while ((m = re.exec(flat)) && n < MAX_EXTRACTS) {
-      if (m.index - last < SPAN) continue;
+    while ((m = re.exec(flat)) && n < max) {
+      if (m.index - last < span) continue;
       last = m.index; n += 1;
-      out.push(`  ── « ${kw} » (position ${m.index}) ──\n${flat.slice(Math.max(0, m.index - SPAN / 2), m.index + SPAN)}`);
+      out.push(`  ── « ${kw} » (position ${m.index}) ──\n${flat.slice(Math.max(0, m.index - span / 2), m.index + span)}`);
     }
     if (!n) out.push(`  ── « ${kw} » : absent`);
   }
@@ -164,7 +166,7 @@ async function readEntry(entry) {
   const queue = [...(entry.urls ?? [])];
   const seen = new Set();
   let docs = 0;
-  while (queue.length && docs < MAX_DOCS) {
+  while (queue.length && docs < (entry.maxDocs ?? MAX_DOCS)) {
     const url = queue.shift();
     if (seen.has(url)) continue;
     seen.add(url);
@@ -198,7 +200,7 @@ async function readEntry(entry) {
     }
     console.log(`   méthode : ${method}, ${text.length} caractères`);
     if (entry.head) console.log(`   début : ${text.slice(0, entry.head).replace(/\s+/g, ' ')}`);
-    for (const e of extracts(text, entry.keywords)) console.log(e);
+    for (const e of extracts(text, entry.keywords, { span: entry.span, max: entry.max })) console.log(e);
   }
 }
 

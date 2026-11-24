@@ -542,9 +542,13 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   (PNOA, IGN España, CC BY 4.0), Rhénanie-du-Nord-Westphalie (dl-de/zero), Rhénanie-Palatinat (dl-de/by). Source
   choisie selon le centre de la carte, bascule sans trou, nuit à 3 niveaux, crédits dans Réglages. Ailleurs : « Vue
   satellite indisponible à cet endroit ».
-  - [ ] Reste : Flandre (licence « Gebruiksrecht geografische webdiensten » introuvable), Wallonie (aucune condition
-    lisible), NGI (service national à essayer), Bade-Wurtemberg (DOP20 accordé à OSM seulement), Bavière, Sarre
-    (conditions non lues), Hesse (service sans réponse) : relire par l'Action avant de coder.
+  - [x] v58 (relu par l'Action le 23/11/2026, tuiles + GetCapabilities + conditions) : Bade-Wurtemberg (LGL, dl-de/by-2-0,
+    gratuit, mention « LGL-BW (2026) … », WMS 1.1.1), Bavière (LDBV, CC BY 4.0, « kostenfrei »), Hesse (HVBG, open data
+    « ohne Einschränkung oder Bedingung », § 18 HVGG) codées ; toutes : tuile 200 image + CORS.
+  - [ ] Non codées (tuile 200 + CORS, mais licence non lisible après 2 essais) : Flandre (« kosteloos », « door iedereen
+    gebruikt », texte des conditions des données non lu en entier), Wallonie (pages du géoportail en 404, GetCapabilities
+    sans licence), Sarre (« opendata », AccessConstraints « noLimitations », aucune licence ni mention écrite lisible).
+    NGI : non essayé.
 
 - [x] **Phase 4 — Carburant** (v54 : fiche « Carburant sur le trajet » à l'arrêt, stations à ≤ 2 km, tri par prix du
   gazole, « ancien » > 48 h, filtre « Piste PL » (valeur lue dans la facette du jeu), détour à vol d'oiseau, mes

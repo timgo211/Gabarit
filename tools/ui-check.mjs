@@ -71,6 +71,9 @@ const SAT_TILE_COLORS = [
   ['wmts.geoportail.lu', 'lu', [0, 0, 220]], ['geoservices-grid.irisnet.be', 'be-bru', [0, 200, 0]],
   ['wmts.geo.admin.ch', 'ch', [200, 0, 200]], ['www.ign.es', 'es', [0, 200, 200]],
   ['www.wms.nrw.de', 'de-nw', [200, 200, 0]], ['geo4.service24.rlp.de', 'de-rp', [220, 110, 0]],
+  // v58 : Bade-Wurtemberg, Bavière, Hesse.
+  ['owsproxy.lgl-bw.de', 'de-bw', [110, 0, 220]], ['geoservices.bayern.de', 'de-by', [0, 200, 100]],
+  ['www.gds-srv.hessen.de', 'de-he', [220, 0, 110]],
 ];
 const SAT_TILES = new Map(SAT_TILE_COLORS.map(([host, id, rgb]) => [host, { id, png: solidPng(rgb), rgb }]));
 
@@ -781,6 +784,8 @@ async function satelliteAbroadCheck(browser, base) {
     ['lu', 'Luxembourg', [6.1296, 49.6116], /ACT Luxembourg/], ['be-bru', 'Bruxelles', [4.3517, 50.8503], /UrbIS/],
     ['ch', 'Berne', [7.4474, 46.948], /swisstopo/], ['es', 'Madrid', [-3.7038, 40.4168], /Instituto Geográfico Nacional/],
     ['de-nw', 'Cologne', [6.958, 50.941], /Geobasis NRW/], ['de-rp', 'Trèves', [6.641, 49.756], /LVermGeoRP/],
+    ['de-bw', 'Fribourg-en-Brisgau', [7.85, 47.995], /LGL-BW \(2026\)/], ['de-by', 'Munich', [11.575, 48.137], /Bayerische Vermessungsverwaltung/],
+    ['de-he', 'Francfort', [8.682, 50.11], /Hessische Verwaltung für Bodenmanagement/],
   ];
   const norm = (c) => { const m = Math.max(1, ...c); return c.map((x) => x / m); };
   const nearest = (c) => {
