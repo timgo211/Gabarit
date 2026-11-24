@@ -865,7 +865,7 @@ async function satelliteBuildingsCheck(browser, base) {
     const c = await mapColor(page);
     const want = Math.round(220 * SATELLITE_NIGHT_BRIGHTNESS[level]);
     check(isPhoto(c) && Math.abs(c[0] - want) <= 20, `bâtiments, nuit ${level} : photo visible à ${SATELLITE_NIGHT_BRIGHTNESS[level]}`, `couleur ${c}, attendu ≈ ${want}`);
-    if (level === 'light') await page.screenshot({ path: join(SHOTS, 'v65-satellite-nuit-clair-z17.png') });
+    if (level !== 'normal') await page.screenshot({ path: join(SHOTS, `v65-satellite-nuit-${level === 'light' ? 'clair' : 'sombre'}-z17.png`) });
     await ctx.close();
   }
   {
