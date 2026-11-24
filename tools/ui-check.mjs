@@ -4534,14 +4534,19 @@ async function suggestionsCheck(browser, base) {
     await closeLists(page);
     // Étape : même composant.
     await page.click('#btn-add-stop');
+    // v63 : le récent « Clermont » s'affiche tout de suite ; les lignes d'ORS (sans lui : doublon) arrivent après.
+    const orsRows = (id) => page.waitForFunction((sel) => document.querySelectorAll(`${sel} li.suggest-row:not(.suggest-recent)`).length > 0, id, { timeout: 5000 }).catch(() => {});
+    const rowKinds = (id) => page.$$eval(`${id} li.suggest-row`, (ls) => ls.map((l) => (l.classList.contains('suggest-recent') ? 'R' : 'O')).join(''));
     await page.fill('#stop-input-0', 'Clermont');
-    await page.waitForSelector('#stop-list-0 li.suggest-row', { timeout: 5000 });
-    check(await page.locator('#stop-list-0 li.suggest-row').count() === 5 && await page.locator('#stop-list-0 .suggest-close').count() === 1, `${tag} : étape, même liste`);
-    await page.locator('#stop-list-0 li.suggest-row').first().click();
+    await orsRows('#stop-list-0');
+    const stopKinds = await rowKinds('#stop-list-0');
+    check(stopKinds === 'ROOOO' && await page.locator('#stop-list-0 .suggest-close').count() === 1, `${tag} : étape, même liste (récent puis ORS sans doublon)`, stopKinds);
+    await page.locator('#stop-list-0 li.suggest-row:not(.suggest-recent)').nth(1).click(); // Aire de Clermont-Ferrand Nord
     // Départ : même composant.
     await page.fill('#from-input', 'Clermont');
-    await page.waitForSelector('#from-list li.suggest-row', { timeout: 5000 });
-    check(await page.locator('#from-list li.suggest-row').count() === 5, `${tag} : départ, même liste`);
+    await orsRows('#from-list');
+    const fromKinds = await rowKinds('#from-list');
+    check(fromKinds === 'RROOO', `${tag} : départ, même liste (2 récents puis ORS sans doublon)`, fromKinds);
     await closeLists(page);
     await page.fill('#from-input', '');
     // Clavier ouvert : l'appli tient dans la partie visible, la liste reste au-dessus du clavier.
@@ -4587,7 +4592,8 @@ async function suggestionsCheck(browser, base) {
     // v63 : recherches récentes. Choix dans la liste gardé (Clermont), texte validé sans choix jamais (Clermont-Ferrand).
     const recentSaved = async () => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.recentPlaces') ?? '[]'));
     let rec = await recentSaved();
-    check(rec[0]?.label === 'Clermont, Clermont, France' && !rec.some((p) => /Clermont-Ferrand/.test(p.label)) && rec.every((p) => Object.keys(p).sort().join() === 'label,lat,lon,name,place'),
+    check(rec.map((p) => p.label).join(' / ') === 'Aire de Clermont-Ferrand Nord, Gerzat, France / Clermont, Clermont, France'
+      && !rec.some((p) => p.label === 'Clermont-Ferrand, Clermont-Ferrand, France') && rec.every((p) => Object.keys(p).sort().join() === 'label,lat,lon,name,place'),
       `${tag} : récents = lieux choisis dans la liste seulement (nom, commune, coordonnées)`, JSON.stringify(rec));
     await page.evaluate(() => {
       const mk = (i) => ({ label: `Dépôt ${i}, Ville ${i}, France`, name: `Dépôt ${i}`, place: `0100${i} Ville ${i}, France`, lon: 4 + i / 10, lat: 46 + i / 10 });
