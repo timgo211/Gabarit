@@ -71,6 +71,7 @@ export function createSettings(ctx) {
   const weightWarnings = $('#weight-warnings');
   const windVoice = $('#wind-voice');
   const speedVoice = $('#speed-voice');
+  const reportVoice = $('#report-voice'); // phase 3a
   const windGust = $('#wind-gust');
   const windStatus = $('#wind-status');
   const drivingStatus = $('#driving-status');
@@ -164,6 +165,7 @@ export function createSettings(ctx) {
     weightWarnings.checked = settings.weightWarnings !== false;
     windVoice.checked = settings.windVoice;
     speedVoice.checked = settings.speedVoice === true;
+    reportVoice.checked = settings.reportVoice === true;
     windGust.value = String(settings.windGust);
     fillVoices(settings.voiceName);
     voiceRate.value = String(settings.voiceRate);
@@ -282,6 +284,8 @@ export function createSettings(ctx) {
   weightWarnings.addEventListener('change', () => ctx.onWeightWarningsChange?.(weightWarnings.checked));
   windVoice.addEventListener('change', () => ctx.onWindVoiceChange?.(windVoice.checked));
   speedVoice.addEventListener('change', () => ctx.onSpeedVoiceChange?.(speedVoice.checked));
+  reportVoice.addEventListener('change', () => ctx.onReportVoiceChange?.(reportVoice.checked));
+  dlg.addEventListener('close', () => ctx.onClose?.()); // phase 3a : plus de relevés GPS pour Mes signalements
   $('#btn-wind-save').addEventListener('click', () => {
     const g = sanitizeWindGust(windGust.value);
     windGust.value = String(g);

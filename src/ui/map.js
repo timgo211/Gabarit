@@ -26,6 +26,7 @@ import { sanitizeVehicleIcon } from '../lib/prefs.js';
 import { photoCoverPatches } from '../lib/photo-cover.js';
 import { ROUTE_ARROWS } from '../lib/nav-layout.js';
 import { CHEVRON_IMAGE, TURN_IMAGE, chevronImage, turnImage } from './route-arrows.js';
+import { symbolSvg } from './nav-symbols.js';
 
 const EMPTY_FC = Object.freeze({ type: 'FeatureCollection', features: [] });
 
@@ -162,6 +163,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   /** v55 : étapes du trajet, repères numérotés (aussi en guidage) : [[lon, lat], …]. */
   let stopItems = [];
   let stopMarkers = [];
+  let reportItems = []; // phase 3a : mes signalements [{ id, lonlat, label, confirmed }]
+  let reportMarkers = [];
+  let onReport = null;
   let onBridge = null;
   let onArea = null;
   /** ZFE affichées (phase 5) : [{ name, banned, polygons }]. */
@@ -558,6 +562,30 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     drawAreas({ force: true });
     drawBridges();
     drawStops();
+    drawReports();
+  }
+
+  /** Phase 3a : repères de mes signalements (hors guidage et en guidage) ; toucher → fiche (à l'arrêt, app.js). */
+  function drawReports() {
+    for (const m of reportMarkers) m.remove();
+    reportMarkers = [];
+    if (!map) return;
+    for (const item of reportItems) {
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = `report-marker${item.confirmed ? ' confirmed' : ''}`;
+      node.dataset.id = item.id;
+      node.append(symbolSvg('flag'));
+      node.setAttribute('aria-label', item.label);
+      node.title = item.label;
+      for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onReport?.(item.id);
+      });
+      reportMarkers.push(new lib.Marker({ element: node, anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
+    }
   }
 
   function drawStops() {
@@ -952,6 +980,15 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       stopItems = (Array.isArray(points) ? points : []).filter((p) => Array.isArray(p) && p.length >= 2);
       drawStops();
       drawAreas(); // v62 : un P seul collé à une étape est masqué à zoom bas
+    },
+    /** Phase 3a : mes signalements [{ id, lonlat, label, confirmed }] ; liste vide → retirés. */
+    showReports(items) {
+      reportItems = (Array.isArray(items) ? items : []).filter((i) => Array.isArray(i?.lonlat) && typeof i.id === 'string');
+      drawReports();
+    },
+    /** Appelé avec l'identifiant du signalement touché. */
+    onReportPick(cb) {
+      onReport = cb;
     },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];

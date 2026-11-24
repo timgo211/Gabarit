@@ -1,0 +1,134 @@
+// Phase 3a — Mes signalements : fiche d'un repère (#report-panel) et liste de Réglages › Mes signalements.
+// Type, note, confirmation et suppression seulement à l'arrêt confirmé (canEditReports : parkedState, en guidage
+// comme hors guidage ; vitesse inconnue = en mouvement, R412-6-2) : boutons grisés sinon. Textes en textContent.
+
+import { $, el } from './dom.js';
+import {
+  REPORT, canEditReports, updateReport, removeReport, reportLabel, reportStatus, MOVING_TEXT,
+} from '../lib/reports.js';
+
+/** « 24/11/2026 14:05 » (date gardée au format 2026-11-24T14:05 ou 2026-11-24). */
+function dateText(stamp) {
+  const [d, t] = String(stamp).split('T');
+  return `${d.split('-').reverse().join('/')}${t ? ` ${t}` : ''}`;
+}
+
+/**
+ * @param {{ getList:()=>object[], setList:(list:object[])=>void, getParked:()=>boolean,
+ *   onOpenChange?:(open:boolean)=>void }} ctx
+ */
+export function createReports(ctx) {
+  const panel = $('#report-panel');
+  const info = $('#report-info');
+  const types = $('#report-types');
+  const note = $('#report-note');
+  const confirm = $('#report-confirm');
+  const save = $('#btn-report-save');
+  const del = $('#btn-report-del');
+  const status = $('#report-status');
+  const list = $('#reports-list');
+  const listStatus = $('#reports-status');
+  let openId = null;
+  let chosen = null; // type choisi dans la fiche (pas encore enregistré)
+
+  const allowed = () => canEditReports({ parked: ctx.getParked() === true });
+  const find = (id) => ctx.getList().find((r) => r.id === id) ?? null;
+
+  const typeButtons = Object.entries(REPORT.TYPES).map(([id, label]) => el('button', {
+    type: 'button', class: 'btn', 'data-type': id, 'aria-pressed': 'false',
+    text: label.charAt(0).toUpperCase() + label.slice(1),
+    onclick: () => { if (!allowed()) return; chosen = chosen === id ? null : id; renderPanel(); },
+  }));
+  types.append(...typeButtons);
+
+  function renderPanel() {
+    const r = openId ? find(openId) : null;
+    if (!r) { panel.hidden = true; return; }
+    const ok = allowed();
+    const imported = r.origin === 'imported';
+    info.textContent = `${reportLabel(r)} · ${reportStatus(r)} · posé le ${dateText(r.createdAt)}${ok ? '' : ` · ${MOVING_TEXT}`}`;
+    for (const b of typeButtons) {
+      b.setAttribute('aria-pressed', String(b.dataset.type === chosen));
+      b.disabled = !ok;
+    }
+    note.disabled = !ok;
+    // Confirmation : un type choisi ; un signalement importé se confirme en le reprenant à mon compte.
+    confirm.disabled = !ok || chosen === null;
+    if (chosen === null) confirm.checked = false;
+    confirm.parentElement.lastChild.textContent = imported ? ' Je confirme (je le reprends à mon compte)' : ' Je confirme ce signalement';
+    save.disabled = !ok;
+    del.disabled = !ok;
+  }
+
+  function renderList() {
+    const ok = allowed();
+    const items = ctx.getList();
+    list.replaceChildren(...items.map((r) => el('li', { class: 'restr-item' }, [
+      el('strong', { text: `${reportLabel(r)}${r.note ? ` — ${r.note}` : ''}` }),
+      el('span', { class: 'hint', text: `${reportStatus(r)} · ${dateText(r.createdAt)} · ${r.lat.toFixed(5)}, ${r.lon.toFixed(5)}` }),
+      el('div', { class: 'row' }, [
+        el('button', { type: 'button', class: 'btn reports-card-btn', disabled: !ok, onclick: () => open(r.id), text: 'Modifier' }),
+        el('button', { type: 'button', class: 'btn reports-card-btn', disabled: !ok, onclick: () => remove(r.id, listStatus), text: 'Supprimer' }),
+      ]),
+    ])));
+    if (!items.length) list.replaceChildren(el('li', { class: 'hint', text: 'Aucun signalement enregistré.' }));
+    listStatus.textContent = items.length && !ok ? MOVING_TEXT : listStatus.textContent;
+  }
+
+  function render() {
+    renderPanel();
+    renderList();
+  }
+
+  function remove(id, node) {
+    if (!allowed()) { node.textContent = MOVING_TEXT; return; }
+    ctx.setList(removeReport(ctx.getList(), id));
+    node.textContent = 'Signalement supprimé.';
+    if (openId === id) close();
+    render();
+  }
+
+  function open(id) {
+    const r = find(id);
+    if (!r) return;
+    openId = id;
+    chosen = r.type;
+    note.value = r.note;
+    confirm.checked = r.confirmed;
+    status.textContent = '';
+    panel.hidden = false;
+    ctx.onOpenChange?.(true);
+    render();
+  }
+
+  function close() {
+    if (openId === null && panel.hidden) return;
+    openId = null;
+    chosen = null;
+    panel.hidden = true;
+    status.textContent = '';
+    ctx.onOpenChange?.(false);
+  }
+
+  save.addEventListener('click', () => {
+    const r = openId ? find(openId) : null;
+    if (!r) return;
+    if (!allowed()) { status.textContent = MOVING_TEXT; renderPanel(); return; }
+    const confirmed = confirm.checked && chosen !== null;
+    ctx.setList(updateReport(ctx.getList(), r.id, {
+      type: chosen, note: note.value, confirmed, adopt: confirmed && r.origin === 'imported',
+    }));
+    status.textContent = confirmed ? 'Signalement enregistré et confirmé.' : 'Signalement enregistré (à vérifier).';
+    render();
+  });
+  del.addEventListener('click', () => { if (openId) remove(openId, status); });
+  $('#btn-report-close').addEventListener('click', close);
+
+  render();
+  return {
+    render,
+    open,
+    close,
+    get isOpen() { return !panel.hidden; },
+  };
+}

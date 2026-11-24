@@ -33,11 +33,12 @@ import { symbolSvg } from './nav-symbols.js';
 import { laneSvg } from './lane-icons.js';
 import { lanesRow } from '../lib/lanes.js';
 import { nextStopLine } from '../lib/stops.js';
+import { REPORT, MARKED_TEXT as REPORT_MARKED_TEXT, DUPLICATE_MARK_TEXT as REPORT_DUPLICATE_TEXT, NO_FIX_TEXT as REPORT_NO_FIX_TEXT } from '../lib/reports.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
   remainingStops, tripSoFar,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, setNavigationPlaces, setNavigationLanes, markStopAsWork, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, setNavigationPlaces, setNavigationLanes, markStopAsWork, NAV, setNavigationReports, markReport,
   resumeNavigation,
 } from '../lib/navigation.js';
 import {
@@ -70,7 +71,7 @@ const DRAG_PX = 24;
 const INSET = 12;
 /** Écart entre le véhicule et le bas du message bref (px) ; la pastille de la rue est sous le véhicule (v53). */
 const PILL_ABOVE_PX = 40;
-const RULE_KINDS = new Set(['tunnel', 'zfe', 'access', 'ban', 'border', 'wind']);
+const RULE_KINDS = new Set(['tunnel', 'zfe', 'access', 'ban', 'border', 'wind', 'report']); // v66 : mes signalements (3a)
 
 /**
  * @param {{ map:object, voice:object, wakeLock:object, getApiKey:()=>string,
@@ -120,6 +121,7 @@ export function createNavigation(ctx) {
     search: $('#nav-search'),
     voice: $('#btn-nav-voice'),
     alt: $('#btn-nav-alt'),
+    report: $('#btn-nav-report'), // phase 3a : un seul appui, sans choix ni saisie
     overview: $('#btn-nav-overview'),
     layer: $('#btn-nav-layer'),
     road: $('#nav-road'),
@@ -153,6 +155,7 @@ export function createNavigation(ctx) {
   ui.recenter.append(symbolSvg('recenter'));
   ui.searchBtn.append(symbolSvg('search'));
   ui.alt.append(symbolSvg('altRoute'));
+  ui.report.append(symbolSvg('flag'));
   ui.stop.append(symbolSvg('close'));
   ui.overview.append(symbolSvg('overview'));
 
@@ -955,7 +958,7 @@ export function createNavigation(ctx) {
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
     driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
-    places = null, lanes = null, resume = null, carry = null, tripFrom = '',
+    places = null, lanes = null, resume = null, carry = null, tripFrom = '', reports = null,
   }) {
     if (s) stop();
     const now = Date.now();
@@ -964,6 +967,7 @@ export function createNavigation(ctx) {
       driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions, places, lanes,
       stops: params.stops ?? [], // v55
       carry: simulate ? null : carry, tripFrom, // v56 : historique
+      reports, // phase 3a : { list, voice }
     });
     s = {
       // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
@@ -1143,6 +1147,19 @@ export function createNavigation(ctx) {
     renderVoice();
     if (on) ctx.voice.speak('Voix activée.', { interrupt: true });
   });
+  // Phase 3a : « Signaler » — un seul appui, à toutes les vitesses, sans choix ni saisie (R412-6-2) : le moteur pose
+  // un repère à la dernière position reçue ; type et note se règlent ensuite, à l'arrêt seulement.
+  ui.report.addEventListener('click', () => {
+    if (!s) return;
+    const r = markReport(s.state, ctx.getReports?.() ?? [], { now: new Date() });
+    s.state = r.state;
+    if (r.report) {
+      ctx.setReports?.(r.list);
+      toast(REPORT_MARKED_TEXT);
+    } else {
+      toast(r.reason === 'duplicate' ? REPORT_DUPLICATE_TEXT : r.reason === 'full' ? `${REPORT.MAX_COUNT} signalements au plus.` : REPORT_NO_FIX_TEXT);
+    }
+  });
   // Autres itinéraires (v44) : à l'arrêt seulement (parkedState, vitesse inconnue = en mouvement) ; vue d'ensemble,
   // puis recalcul depuis la position reçue vers l'arrivée (app.js, mêmes règles que le calcul de départ).
   ui.alt.addEventListener('click', () => {
@@ -1276,6 +1293,11 @@ export function createNavigation(ctx) {
     setSpeeds(data) {
       if (!s) return;
       s.state = setNavigationSpeeds(s.state, data);
+    },
+    /** Phase 3a : liste de mes signalements changée (fiche, Réglages) : le moteur la replace sur le tracé. */
+    setReports(list) {
+      if (!s) return;
+      s.state = setNavigationReports(s.state, list);
     },
     /** Fichiers des pays voisins arrivés après « Démarrer » (phase 5c) : le moteur replace les frontières. */
     setCountries(countries) {

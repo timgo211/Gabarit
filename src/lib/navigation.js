@@ -26,6 +26,7 @@ import { speedLimitsAlongRoute, limitAt } from './speed-limit.js';
 import { directionsForManeuvers, withDirections } from './directions.js';
 import { placesForManeuvers, withPlaces } from './places.js';
 import { lanesForManeuvers, withLanes } from './lanes.js';
+import { placeReports, guidanceReport, addMark } from './reports.js';
 
 export const NAV = Object.freeze({
   /** Inclinaison de la carte en guidage (MapLibre accepte 0 à 60° par défaut). */
@@ -264,7 +265,7 @@ function placeSpeeds(ctx, rules, route) {
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
   driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null, directions = null,
-  places = null, lanes = null, stops = [], carry = null, tripFrom = '',
+  places = null, lanes = null, stops = [], carry = null, tripFrom = '', reports = null,
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
   const prepared = prepareRoute(route, directions, places, lanes);
@@ -311,6 +312,11 @@ export function startNavigation(route, {
     areas: placeAreas(areas, route),
     areasAnnounced: {},
     announceAreas: announceAreas === true,
+    // Phase 3a : mes signalements placés sur le tracé ; voix seulement si le réglage est activé (désactivé par défaut).
+    reportPool: Array.isArray(reports?.list) ? reports.list : [],
+    reports: placeReports(reports?.list, route),
+    reportsAnnounced: {},
+    reportVoice: reports?.voice === true,
     destination: Array.isArray(destination) && destination.every(isNum) ? destination : null,
     segIndex: null,
     along: 0,
@@ -501,6 +507,16 @@ export function updateNavigation(state, fix) {
     }
   }
 
+  // Mes signalements (phase 3a) : encart sous 1 km ; voix une fois par signalement et par passage, seulement à moi et
+  // confirmé, réglage activé. Rien à toucher.
+  let reportView = null;
+  if (!s.arrived && onRoute && !s.rerouting) {
+    const rp = guidanceReport(s.reports, loc.along, s.reportsAnnounced ?? {}, { voice: s.reportVoice });
+    s.reportsAnnounced = rp.announced;
+    reportView = rp.view;
+    if (rp.speak) events.push({ type: 'speak', text: rp.speak });
+  }
+
   // Réglementation (phase 5) : ZFE interdite devant, interdiction PL qui commence avant l'arrivée. Affichage et voix
   // seulement, rien à toucher.
   const rules = { zfe: null, ban: null, wind: null, tunnel: null, border: null, access: null };
@@ -630,6 +646,8 @@ export function updateNavigation(state, fix) {
      * border:{ code, name, distance, text }|null (phase 5c), access:{ distance, text }|null (phase 5d) }.
      */
     rules,
+    /** Phase 3a : prochain de mes signalements à 1 km au plus { id, distance, text }, sinon null. */
+    report: reportView,
     /** Temps de conduite (drivingView) : lignes du bandeau, niveau, bouton « Pas une pause (travail) ». */
     driving: drivingView(s.driving, t, speed * 3.6),
   };
@@ -797,6 +815,26 @@ export function setNavigationLanes(state, data) {
   return { ...state, lanesData: data ?? null, route: { ...state.route, maneuvers: route.maneuvers } };
 }
 
+/** Phase 3a : liste de mes signalements changée (repère posé, modifié à l'arrêt) : replacée sur le tracé suivi. */
+export function setNavigationReports(state, list) {
+  if (!state) return state;
+  const pool = Array.isArray(list) ? list : [];
+  return { ...state, reportPool: pool, reports: placeReports(pool, state.source) };
+}
+
+/**
+ * Phase 3a : appui sur « Signaler » (un seul appui, sans choix ni saisie, à toutes les vitesses, R412-6-2) : repère à
+ * la dernière position reçue, cap du moment (sens de circulation). Jamais annoncé pendant ce guidage.
+ * @returns {{ state:object, list:object[], report:object|null, reason:string }}
+ */
+export function markReport(state, list, { now = new Date(), makeId } = {}) {
+  const at = state?.lastFix ? { lon: state.lastFix[0], lat: state.lastFix[1], heading: isNum(state.bearing) ? state.bearing : null } : null;
+  const r = addMark(list, at, makeId ? { now, makeId } : { now });
+  if (!r.report) return { state, ...r };
+  const s = setNavigationReports(state, r.list);
+  return { state: { ...s, reportsAnnounced: { ...(state.reportsAnnounced ?? {}), [r.report.id]: true } }, ...r };
+}
+
 /** Prévisions de vent arrivées après « Démarrer » (requête Open-Meteo plus lente) : placées sur le tracé suivi. */
 export function setNavigationWind(state, forecast) {
   if (!state) return state;
@@ -827,6 +865,7 @@ export function rerouteDone(state, route, stops = null) {
     route: prepared,
     source: route,
     areas: placeAreas(state.areaPool, route),
+    reports: placeReports(state.reportPool, route), // phase 3a ; déjà dits : gardés (une fois par passage)
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),
     tunnels: placeTunnels(state.rules, route),
     borders: placeBorders(state.rules, route),

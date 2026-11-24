@@ -22,6 +22,8 @@ import { createDirections } from './ui/directions.js';
 import { createPlaces } from './ui/places.js';
 import { createLanes } from './ui/lanes.js';
 import { createRestrictions } from './ui/restrictions.js';
+import { createReports } from './ui/reports.js';
+import { reportLabel, reportStatus } from './lib/reports.js';
 import { restrictionsForTrip, restrictionLines, mergeAvoid } from './lib/restrictions.js';
 import { createWinter } from './ui/winter.js';
 import { TOLLS, parseTollData } from './lib/hgv-tolls.js';
@@ -102,6 +104,7 @@ function errorText(err) {
 // Thème + carte
 let map = null;
 let navigation = null;
+let reportsUi = null; // phase 3a (créé plus bas, après la carte)
 /** Couleur de la flèche du camion (phase 7c) : choix de Réglages, « auto » selon le thème. */
 function applyArrowColor(t = theme?.theme) {
   const c = arrowColors(data.settings.arrowColor, t);
@@ -185,7 +188,13 @@ navigation = createNavigation({
   onQuit: () => forgetRoute(),
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
   onAlternatives: (from) => openAlternatives(from),
-  onParkChange: (parked) => { if (!parked) { closeAlternatives('moving'); closeFuel('moving'); } },
+  onParkChange: (parked) => {
+    if (!parked) { closeAlternatives('moving'); closeFuel('moving'); reportsUi?.close(); } // phase 3a : fiche fermée en roulant
+    reportsUi?.render();
+  },
+  // Phase 3a : « Signaler » (un appui) ; le moteur pose le repère, la liste est gardée sur l'appareil.
+  getReports: () => data.reports ?? [],
+  setReports: (list) => saveReports(list, { fromGuidance: true }),
   onFuel: (from) => openFuel(from), // phase 4 : à l'arrêt seulement
   // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
   onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
@@ -194,6 +203,7 @@ navigation = createNavigation({
   onEnd: (message) => {
     saveRoute({ force: true }); // v53 : arrêt sans arrivée ni « Quitter » (GPS absent…) : itinéraire gardé en préparation
     closeAlternatives(); // v44
+    reportsUi?.close(); // phase 3a
     map.setLayer(data.settings.mapLayer); // le satellite du guidage n'est pas mémorisé
     if (choice) map.showRoutes(choice.options.map((o) => o.route), choice.selected);
     map.showStops(choice ? stopPoints(choice.stops) : []);
@@ -317,6 +327,35 @@ const restrictionsUi = createRestrictions({
   getCenter: () => map.center(),
   getDrive: () => ({ navigating: navigation.active, parked: navigation.parked }),
 });
+// ───────── Phase 3a : mes signalements (fiche du repère, Réglages, repères sur la carte) ─────────
+// Modification à l'arrêt confirmé seulement : en guidage parkedState du moteur, hors guidage relevés GPS (plan-park.js)
+// tant que la fiche ou Réglages est ouvert ; vitesse inconnue, GPS refusé = en mouvement (boutons grisés).
+let settingsOpen = false;
+const reportPark = createPlanPark({ onChange: () => reportsUi?.render() });
+function syncReportPark() { reportPark.watch(!navigation.active && (settingsOpen || !!reportsUi?.isOpen)); }
+function showReportMarkers() {
+  map.showReports((data.reports ?? []).map((r) => ({
+    id: r.id, lonlat: [r.lon, r.lat], confirmed: r.confirmed === true, label: `Signalement : ${reportLabel(r)} (${reportStatus(r)})`,
+  })));
+}
+function saveReports(list, { fromGuidance = false } = {}) {
+  update((d) => ({ ...d, reports: list }));
+  if (!fromGuidance && navigation.active) navigation.setReports(data.reports);
+  showReportMarkers();
+  reportsUi?.render();
+}
+reportsUi = createReports({
+  getList: () => data.reports ?? [],
+  setList: (list) => saveReports(list),
+  getParked: () => (navigation.active ? navigation.parked : reportPark.parked),
+  onOpenChange: () => syncReportPark(),
+});
+// Repère touché : fiche (en guidage, seulement à l'arrêt ; en roulant, un message bref).
+map.onReportPick((id) => {
+  if (navigation.active && !navigation.parked) { navigation.notify('Disponible à l\'arrêt'); return; }
+  reportsUi.open(id);
+});
+showReportMarkers();
 const bridgeKey = (it) => `${it.id}@${Math.round(it.along)}`;
 const weightKey = (it) => `w${it.id}@${Math.round(it.along)}`;
 
@@ -644,6 +683,8 @@ function startGuidance(simulate = null, resume = null, carry = null) {
   showMessage(messageNode, '');
   restrictionsUi.closeBridge(); // phase 12b : aucune saisie pendant le guidage
   planPark.watch(false); // v48 : plus de relevés hors guidage
+  reportsUi.close(); // phase 3a : fiche fermée au départ (rouverte à l'arrêt seulement)
+  syncReportPark();
   closeFuel();
   fuelBtn.hidden = true;
   navigation.start({
@@ -675,6 +716,8 @@ function startGuidance(simulate = null, resume = null, carry = null) {
     lanes: lanes.state.status === 'ok' ? lanes.state.data : null,
     resume, // v53 : reprise d'un guidage sauvegardé
     carry, tripFrom: choice.fromLabel ?? '', // v56 : historique
+    // Phase 3a : mes signalements ; voix seulement si le réglage est activé (désactivé par défaut), confirmés à moi.
+    reports: { list: data.reports ?? [], voice: data.settings.reportVoice === true },
   });
   saveRoute({ force: true });
   return null;
@@ -900,10 +943,12 @@ const settings = createSettings({
   onRuleVoiceChange: (on) => setSetting({ ruleVoice: on }),
   onDriveVoiceChange: (on) => setSetting({ driveVoice: on }),
   onWindVoiceChange: (on) => setSetting({ windVoice: on }),
+  onReportVoiceChange: (on) => setSetting({ reportVoice: on }), // phase 3a : désactivé par défaut
   onSpeedVoiceChange: (on) => setSetting({ speedVoice: on }), // phase 11a : « Limite X » au dépassement, désactivé par défaut
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
   onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
-  onOpen: () => { restrictionsUi.render(); historyPanel.refresh(); }, // v56 : historique relu
+  onClose: () => { settingsOpen = false; syncReportPark(); }, // phase 3a
+  onOpen: () => { restrictionsUi.render(); historyPanel.refresh(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu
   getHistory: () => historyStore.list(),
   onHistoryImported: async (list) => { await historyStore.merge(list); await historyPanel.refresh(); },
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },

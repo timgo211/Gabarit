@@ -15,6 +15,7 @@ import { sanitizeFuelStations } from './fuel-stations.js';
 import { sanitizeAreaNotes } from './area-notes.js';
 import { sanitizeHistory } from './trip-history.js';
 import { sanitizeRecent } from './recent-places.js';
+import { sanitizeReports } from './reports.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -62,6 +63,7 @@ export function emptyData() {
       arrowColor: DEFAULT_ARROW_COLOR, vehicleIcon: DEFAULT_VEHICLE_ICON, voiceName: '', voiceRate: VOICE_RATE.default, voiceVolume: VOICE_VOLUME.default,
       areaVoice: false,
       speedVoice: false,
+      reportVoice: false,
       ruleVoice: true,
       driveVoice: true,
       windVoice: true,
@@ -103,7 +105,7 @@ export function sanitizeData(raw) {
     vehicles,
     activeVehicleId,
     places: arr(raw.places),
-    reports: arr(raw.reports),
+    reports: sanitizeReports(raw.reports), // mes signalements (phase 3a) : champs connus seulement, 500 au plus
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)
     restrictions: sanitizeRestrictions(raw.restrictions).list, // Mes restrictions (phase 12b) : invalides et doublons écartés
@@ -125,6 +127,7 @@ export function sanitizeData(raw) {
       voiceVolume: sanitizeVoiceVolume(s.voiceVolume),
       areaVoice: s.areaVoice === true, // annonce vocale des aires PL (phase 9), désactivée par défaut
       speedVoice: s.speedVoice === true, // « Limite X » au dépassement (phase 11a), désactivé par défaut
+      reportVoice: s.reportVoice === true, // mes signalements confirmés dits à l'approche (phase 3a), désactivé par défaut
       ruleVoice: s.ruleVoice !== false, // alertes vocales ZFE et interdictions PL (phase 5), activées par défaut
       driveVoice: s.driveVoice !== false, // annonces des pauses (temps de conduite, phase 5), activées par défaut
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut

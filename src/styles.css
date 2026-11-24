@@ -1010,3 +1010,24 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   #history-print th, #history-print td { border: 1px solid black; padding: 3pt 5pt; text-align: left; vertical-align: top; }
   #history-print tr { break-inside: avoid; }
 }
+
+/* Phase 3a : mes signalements. Fiche (même cadre que le carburant), repères sur la carte, bouton drapeau. Palette seulement. */
+.report-panel {
+  position: fixed; inset: 12px; z-index: 45; overflow-y: auto; overscroll-behavior: contain; min-width: 0;
+  display: grid; align-content: start; gap: 10px; padding: 12px; border-radius: 20px;
+  background: var(--bg); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+.report-panel[hidden] { display: none; }
+.report-panel .fuel-head .btn, .report-panel .row .btn { min-height: var(--tap); }
+.report-panel input[type="text"] { min-width: 0; }
+.report-types { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; min-width: 0; }
+.report-types .btn { min-height: var(--tap); flex: 1 1 140px; }
+.report-types .btn[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+.report-panel .btn:disabled, .reports-card-btn:disabled { background: var(--nav-off-bg, var(--panel)); color: var(--nav-off-fg, var(--muted)); border-color: var(--nav-off-border, var(--border)); }
+.report-marker {
+  width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
+  background: var(--card); color: var(--fg); border: 3px dashed var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+.report-marker.confirmed { border-style: solid; background: var(--accent); color: var(--accent-fg); }
+.report-marker svg { width: 20px; height: 20px; fill: currentColor; }
+.maplibregl-marker.report-marker { z-index: 3; }
