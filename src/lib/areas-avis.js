@@ -62,7 +62,8 @@ export function addAreaReport(list, area, status, now = new Date()) {
   return sanitizeAreaReports([r, ...(Array.isArray(list) ? list : [])]);
 }
 
-function matches(r, area) {
+/** L'avis (ou la note, phase 6) `r` concerne-t-il cette aire ? Même identifiant, ou à moins de 150 m. */
+export function matches(r, area) {
   const ids = new Set(area.ids ?? [area.id]);
   if (r.ids.some((x) => ids.has(x)) || ids.has(r.areaId)) return true;
   return isNum(r.lon) && isNum(r.lat) && isNum(area.lon) && isNum(area.lat)

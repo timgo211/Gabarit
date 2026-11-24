@@ -104,6 +104,14 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     exporté), `showStops` de `map.js` (`.stop-marker`), « Ajouter comme étape » de `fuel.js` (`onAddStop`), champ
     `#alts-stop-input` de « Autres itinéraires » ; tests `tests/stops.test.js`, fixture `ors-directions-etapes.json`
     (itinéraire de `ors-directions-nav.json` coupé en deux tronçons, way_points [0, 14, 33]) ; ui-check `etapes`
+  - phase 6 (v56) : `trip-history.js` (historique : `buildTrip` à l'arrivée seulement, jamais en simulation, aucune
+    coordonnée (`safeLabel`), `sanitizeHistory` (1 000 au plus), `mergeHistory`, `monthlyStats`, `describeTrip`),
+    IndexedDB `src/ui/trip-history.js` (base `gabarit-history`, magasin `trips`, clé `list`, jamais bloquant),
+    Réglages › Historique `src/ui/history.js` (`#history-card`, relevé `#history-print` + `@media print`,
+    `body.printing-history`) ; km et début du trajet dans l'état du guidage (`drivenBefore`, `tripStartedAt`,
+    `stopsDone`, `tripSoFar`, `carry` de « Autres itinéraires ») ; export `exportData(data, now, history)` /
+    `readExport` (`store.js`) ; `area-notes.js` (notes d'aires, `areaNotes`) ; tests `tests/trip-history.test.js` ;
+    ui-check `historique`
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

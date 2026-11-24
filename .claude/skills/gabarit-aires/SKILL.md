@@ -1,6 +1,6 @@
 ---
 name: gabarit-aires
-description: Règles des aires et parkings PL (phases 9 et 9b) : Overpass, copie data/aires-osm, jeu officiel Bison Futé, placement sur le tracé, annonces, « Mon avis ». À utiliser avant de toucher aux aires.
+description: Règles des aires et parkings PL (phases 9 et 9b) : Overpass, copie data/aires-osm, jeu officiel Bison Futé, placement sur le tracé, annonces, « Mon avis », notes perso (phase 6). À utiliser avant de toucher aux aires.
 ---
 
 # Aires et parkings PL
@@ -51,4 +51,9 @@ description: Règles des aires et parkings PL (phases 9 et 9b) : Overpass, copie
   renvoie aussi `official` (`isOfficial` : fiche officielle seule ou fusionnée) et `lonlat`. Fiche courte : services et
   accès (`areas.shortFacts`) ; « Fiche complète » (dialogue) seulement à l'arrêt. `AREAS.NEXT_COUNT` (3) reste le
   défaut pour les détails du trajet.
-
+- Notes perso (phase 6, v56, `area-notes.js`) : champ `areaNotes` de `gabarit.data` (exporté), une note par aire
+  (correspondance `matches` d'`areas-avis.js` : identifiant ou 150 m), sécurité (bonne / moyenne / mauvaise), douches
+  (oui / payantes / non), propreté (bonne / moyenne / mauvaise), remarque ≤ 280 caractères ; tout vide → retirée ;
+  500 au plus. Saisie dans la fiche (`#area-note-card`) **à l'arrêt seulement** (`getDrive().parked` : `parkedState` en
+  guidage, `createPlanPark` hors guidage ; vitesse inconnue = en mouvement), plus strict que « Mon avis ». Affichée au
+  prochain passage : fiche, liste des aires (`.area-row-note`), fiche courte du guidage (`shortFacts`). Jamais dite.

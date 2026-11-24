@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v55';
+const VERSION = 'v56';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -78,6 +78,8 @@ const APP_FILES = [
   './src/lib/fuel-stations.js',
   './src/lib/route-save.js',
   './src/lib/stops.js',
+  './src/lib/trip-history.js',
+  './src/lib/area-notes.js',
   './src/lib/route-options.js',
   './src/lib/road-class.js',
   './src/lib/route-rules.js',
@@ -117,6 +119,8 @@ const APP_FILES = [
   './src/ui/vehicle-icon.js',
   './src/ui/route-arrows.js',
   './src/ui/route-save.js',
+  './src/ui/trip-history.js',
+  './src/ui/history.js',
   './src/ui/navigation.js',
   './src/ui/plan-park.js',
   './src/ui/route-form.js',

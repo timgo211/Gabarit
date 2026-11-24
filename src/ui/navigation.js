@@ -33,7 +33,7 @@ import { symbolSvg } from './nav-symbols.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
-  remainingStops,
+  remainingStops, tripSoFar,
   setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, markStopAsWork, NAV,
   resumeNavigation,
 } from '../lib/navigation.js';
@@ -714,7 +714,8 @@ export function createNavigation(ctx) {
         ctx.onStopReached?.(remainingStops(s.state));
       }
       else if (e.type === 'arrived') {
-        ctx.onArrived?.(); // v53 : sauvegarde de l'itinéraire effacée
+        // v53 : sauvegarde de l'itinéraire effacée ; v56 : trajet terminé pour l'historique (jamais en simulation).
+        ctx.onArrived?.({ ...tripSoFar(s.state), simulating: !!s.sim });
         clearTimeout(s.releaseTimer);
         s.releaseTimer = setTimeout(() => ctx.wakeLock.disable(), RELEASE_SCREEN_AFTER_ARRIVAL_MS);
       }
@@ -921,7 +922,7 @@ export function createNavigation(ctx) {
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
     driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
-    resume = null,
+    resume = null, carry = null, tripFrom = '',
   }) {
     if (s) stop();
     const now = Date.now();
@@ -929,6 +930,7 @@ export function createNavigation(ctx) {
       destination: params.end, now, areas, announceAreas, rules,
       driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
       stops: params.stops ?? [], // v55
+      carry: simulate ? null : carry, tripFrom, // v56 : historique
     });
     s = {
       // Simulation : fausse position, le vrai décompte de conduite n'est ni lu ni modifié.
@@ -1152,7 +1154,13 @@ export function createNavigation(ctx) {
     get progress() {
       return s ? {
         along: s.state.along, segIndex: s.state.segIndex, arrived: !!s.state.arrived, nextStop: s.state.nextStop ?? 0,
+        // v56 : historique repris après une mise en arrière-plan.
+        drivenBefore: s.state.drivenBefore ?? 0, tripStartedAt: s.state.tripStartedAt ?? null, stopsDone: s.state.stopsDone ?? [],
       } : null;
+    },
+    /** v56 : trajet en cours (km faits, début, étapes faites, départ), pour un guidage repris par « Autres itinéraires ». */
+    get tripCarry() {
+      return s && !s.sim ? tripSoFar(s.state) : null;
     },
     /** v55 : dernière position reçue [lon, lat] (étape ajoutée depuis la fiche carburant), null sinon. */
     get lastFix() {

@@ -15,6 +15,7 @@ import {
 } from '../lib/areas-route.js';
 import { AVIS, AVIS_RULES, canReport, latestReport, reportText, addAreaReport } from '../lib/areas-avis.js';
 import { createAreasCache, routeKey } from '../lib/areas-cache.js';
+import { NOTE_CHOICES, AREA_NOTES, noteFor, setAreaNote, noteShort } from '../lib/area-notes.js';
 import { AREAS_DATA, parseIndex, parseTile, routePlan, tilePath, mergeOsmSources, copyDateText } from '../lib/areas-osm-data.js';
 import { formatArrival } from '../lib/format.js';
 
@@ -142,6 +143,8 @@ export function createAreas(ctx) {
         d.services || d.badges.length
           ? el('span', { class: 'area-row-services', text: [d.services, ...d.badges].filter(Boolean).join(' · ') }) : null,
         last ? el('span', { class: `area-row-avis avis-${last.status}`, text: reportText(last) }) : null,
+        // Phase 6 : ma note, au prochain passage.
+        noteShort(noteFor(ctx.getData().areaNotes ?? [], a)) ? el('span', { class: 'area-row-note', text: noteShort(noteFor(ctx.getData().areaNotes ?? [], a)) }) : null,
       ])]);
     });
     list.replaceChildren(...items);
@@ -262,6 +265,45 @@ export function createAreas(ctx) {
     else if (hint.textContent === AREAS_TEXT.avisStopped) hint.textContent = '';
   }
 
+  // ───────── Ma note (phase 6) : à l'arrêt seulement (parkedState ; vitesse inconnue = en mouvement), jamais dite ─────────
+  let noteDraft = null;
+  const notes = () => ctx.getData().areaNotes ?? [];
+  const noteParked = () => ctx.getDrive().parked === true;
+
+  function renderNote(area) {
+    const allowed = noteParked();
+    const saved = noteFor(notes(), area);
+    noteDraft ??= { security: saved?.security ?? null, showers: saved?.showers ?? null, clean: saved?.clean ?? null };
+    $('#area-note-last').textContent = saved ? noteShort(saved) || 'Ma note : remarque seulement.' : 'Pas encore de note sur cette aire.';
+    $('#area-note-fields').replaceChildren(...Object.entries(NOTE_CHOICES).map(([key, def]) => el('div', { class: 'area-note-group', role: 'group', 'aria-label': def.label }, [
+      el('span', { class: 'area-note-label', text: def.label }),
+      el('div', { class: 'area-note-choices' }, Object.entries(def.values).map(([v, label]) => el('button', {
+        type: 'button', class: 'btn', text: label, 'aria-pressed': String(noteDraft[key] === v), disabled: !allowed || null,
+        onclick: () => {
+          if (!noteParked()) { renderNote(area); return; }
+          noteDraft = { ...noteDraft, [key]: noteDraft[key] === v ? null : v };
+          renderNote(area);
+        },
+      }))),
+    ])));
+    const text = $('#area-note-text');
+    if (!text.dataset.area || text.dataset.area !== area.id) { text.value = saved?.text ?? ''; text.dataset.area = area.id; }
+    text.disabled = !allowed;
+    $('#btn-area-note-save').disabled = !allowed;
+    const hint = $('#area-note-hint');
+    if (!allowed) hint.textContent = AREA_NOTES.PARKED_TEXT;
+    else if (hint.textContent === AREA_NOTES.PARKED_TEXT) hint.textContent = '';
+  }
+
+  $('#btn-area-note-save').addEventListener('click', () => {
+    const a = findArea(openId);
+    if (!a || !noteParked()) { if (a) renderNote(a); return; }
+    ctx.update((d) => ({ ...d, areaNotes: setAreaNote(d.areaNotes, a, { ...noteDraft, text: $('#area-note-text').value }) }));
+    $('#area-note-hint').textContent = AREA_NOTES.SAVED_TEXT;
+    renderNote(a);
+    if (placed.length) renderList();
+  });
+
   function openSheet(id) {
     const a = findArea(id);
     if (!a) return;
@@ -286,6 +328,10 @@ export function createAreas(ctx) {
     $('#area-sources').textContent = `Sources : ${sourcesText(a)}.`;
     $('#area-avis-hint').textContent = '';
     renderAvis(a);
+    noteDraft = null;
+    $('#area-note-text').dataset.area = '';
+    $('#area-note-hint').textContent = '';
+    renderNote(a);
     if (!dlg.open) dlg.showModal();
   }
 
@@ -299,7 +345,7 @@ export function createAreas(ctx) {
       if (placed.length) renderList();
     });
   }
-  dlg.addEventListener('close', () => { openId = null; });
+  dlg.addEventListener('close', () => { openId = null; noteDraft = null; });
   // Repère touché : en guidage, liste et fiche courte (fiche complète seulement à l'arrêt, R412-6-2) ; sinon la fiche.
   ctx.map.onAreaPick((id) => {
     if (ctx.getDrive().navigating && ctx.onNavPick) ctx.onNavPick(id);
@@ -323,13 +369,15 @@ export function createAreas(ctx) {
     shortFacts(id) {
       const a = findArea(id);
       if (!a) return '';
-      return [servicesText(a.services), [...statusBadges(a), a.price].filter(Boolean).join(' · ')].filter(Boolean).join(' · ');
+      // Phase 6 : ma note affichée au prochain passage (visuel seulement, jamais dite).
+      const mine = noteShort(noteFor(ctx.getData().areaNotes ?? [], a));
+      return [servicesText(a.services), [...statusBadges(a), a.price].filter(Boolean).join(' · '), mine].filter(Boolean).join(' · ');
     },
     /** Vitesse du guidage changée : boutons « Mon avis » de la fiche ouverte mis à jour. */
     refreshDrive() {
-      if (!dlg.open || !openId) return;
+      if (!dlg?.open || !openId) return;
       const a = findArea(openId);
-      if (a) renderAvis(a);
+      if (a) { renderAvis(a); renderNote(a); }
     },
     get pool() {
       return pool;
