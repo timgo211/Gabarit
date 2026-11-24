@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   STOPS, cleanStop, sanitizeStops, moveStop, removeStop, appendStop, insertStopByRoute, crowPath, tripPoints, legLines,
   nextStopLine,
+  nextStopParts,
 } from '../src/lib/stops.js';
 import { formatArrival } from '../src/lib/format.js';
 import { parseDirections, haversine } from '../src/lib/ors-response.js';
@@ -359,4 +360,14 @@ test('guidage : « Étape k/n : durée · km » le long du tracé, jamais à vol
   assert.ok(haversine(pointAt(line, seen[1].a).point, C2[37]) < 6000, 'à vol d\'oiseau : environ 5 km');
   assert.match(seen[1].full, /^Étape 2\/2 : 1 h 0\d · (7\d|80),\d km$/);
   assert.equal(said.filter((t) => t === STOP_REACHED_TEXT).length, 2, '« Étape atteinte. » à chaque étape');
+});
+
+test('v70 : ligne d\'étape en morceaux insécables, même texte que nextStopLine', () => {
+  assert.equal(nextStopParts(null), null);
+  assert.equal(nextStopParts({ index: 1, count: 1, distance: 0, duration: 0 }), null);
+  const next = { index: 0, count: 1, distance: 148_000, duration: 117 * 60 };
+  assert.deepEqual(nextStopParts(next), { label: 'Étape 1/1 :', duration: '1 h 57', distance: '148 km' });
+  assert.equal(nextStopLine(next), 'Étape 1/1 : 1 h 57 · 148 km');
+  const p = nextStopParts({ index: 9, count: 10, distance: -5, duration: Number.NaN });
+  assert.deepEqual(p, { label: 'Étape 10/10 :', duration: '0 min', distance: '0 m' });
 });

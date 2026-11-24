@@ -665,6 +665,7 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-sheet-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .nav-summary {
   min-width: 0; min-height: 64px; padding: 2px 0 4px; display: grid; justify-items: center; gap: 2px; cursor: pointer;
+  grid-template-columns: minmax(0, 1fr); /* v70 : colonne bornée à la largeur du bouton (ligne d'étape mesurable) */
   background: none; border: 0; color: inherit; font: inherit; touch-action: none;
 }
 .nav-grip { width: 44px; height: 5px; border-radius: 3px; background: var(--border); margin-bottom: 4px; }
@@ -672,8 +673,12 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-time .unit { font-size: .7em; margin-left: .1em; }
 .nav-sub { max-width: 100%; color: var(--muted); font-size: 1.05rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nav-sub .unit { margin-left: .1em; }
-/* v62 : ligne « Étape 1/2 : 1 h 12 · 95 km » sous le total (affichage seulement). */
-.nav-stopline { max-width: 100%; color: var(--fg); font-size: 1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+/* v62 : ligne « Étape 1/2 : 1 h 12 · 95 km » sous le total (affichage seulement).
+   v70 : jamais « … » ; une ligne (taille réduite au besoin, navigation.js), sinon retour à la ligne entre les
+   morceaux (« Étape 1/2 : », « 1 h 12 · », « 95 km ») : la durée et les km restent entiers. */
+.nav-stopline { max-width: 100%; color: var(--fg); font-size: 1rem; font-weight: 700; line-height: 1.2; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; }
+.nav-stopline.wrap { white-space: normal; }
+.nav-stopline-part { white-space: nowrap; }
 .nav-stopline[hidden] { display: none; }
 .nav-screen { margin: 0; font-weight: 700; font-size: .85rem; line-height: 1.2; color: var(--warn); text-align: center; }
 .nav-sim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

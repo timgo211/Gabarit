@@ -144,12 +144,21 @@ export function legLines(route, stops, now = new Date()) {
 }
 
 /**
- * Ligne du guidage jusqu'à la prochaine étape (v62) : « Étape 1/2 : 1 h 12 · 95 km ». `next` = view.nextStop du
- * moteur (distance le long du tracé, jamais à vol d'oiseau). Sans étape à venir : ''. Affichée seulement, jamais dite.
+ * Ligne du guidage jusqu'à la prochaine étape (v62), en morceaux (v70) : `label` « Étape 1/2 : », `duration`
+ * « 1 h 12 » et `distance` « 95 km ». L'écran peut passer à la ligne entre deux morceaux, jamais dans un morceau
+ * (durée et km jamais coupés).
+ * `next` = view.nextStop du moteur (distance le long du tracé, jamais à vol d'oiseau). Sans étape à venir : null.
+ * Affichée seulement, jamais dite.
  */
-export function nextStopLine(next) {
-  if (!next || !Number.isInteger(next.index) || !Number.isInteger(next.count) || next.index >= next.count) return '';
+export function nextStopParts(next) {
+  if (!next || !Number.isInteger(next.index) || !Number.isInteger(next.count) || next.index >= next.count) return null;
   const d = isNum(next.duration) ? Math.max(0, next.duration) : 0;
   const km = isNum(next.distance) ? Math.max(0, next.distance) : 0;
-  return `Étape ${next.index + 1}/${next.count} : ${formatDuration(d)} · ${formatDistance(km)}`;
+  return { label: `Étape ${next.index + 1}/${next.count} :`, duration: formatDuration(d), distance: formatDistance(km) };
+}
+
+/** Même ligne en un seul texte : « Étape 1/2 : 1 h 12 · 95 km » ; sans étape à venir : ''. */
+export function nextStopLine(next) {
+  const parts = nextStopParts(next);
+  return parts ? `${parts.label} ${parts.duration} · ${parts.distance}` : '';
 }
