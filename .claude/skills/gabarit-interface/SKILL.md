@@ -268,3 +268,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
     `navigation.parked`, hors guidage `reportPark` = `createPlanPark` relevé tant que la fiche ou Réglages est ouvert) ;
     fiche fermée en roulant (`onParkChange`) et au départ du guidage ; textes en textContent ;
   - encart d'alerte : `view.report` → `guidanceAlerts` kind `report` (rang entre frontière et vent, carte `#nav-rule`).
+- Phase 3b (v67), mes lieux (`src/lib/saved-places.js`, `src/ui/saved-places.js`, carte `#places-card` de Réglages) :
+  - `suggestionRows({ …, saved })` : titre « Mes lieux » (dans la barre du ✕) + lignes `li.suggest-saved` (nom, puis
+    « Dépôt · libellé » en `--muted`, aucun ✕), puis second titre `li.suggest-title-row` « Recherches récentes » et
+    les récents qui ne sont pas des lieux enregistrés, puis ORS sans doublon ; source `setSavedPlaces` (app.js) ;
+  - un toucher = `choose(savedToPick(p))` (comme une suggestion) ; Entrée prend la première ligne choisissable ;
+  - ajout depuis `form.getPlace('to')` (arrivée choisie dans la liste) ou le centre de la carte (nom obligatoire) ;
+    boutons grisés en guidage hors de l'arrêt (`recentEditAllowed`).

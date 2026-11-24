@@ -263,6 +263,9 @@ input, select, textarea { min-width: 0; }
 .suggest-head .suggest-title {
   flex: 1 1 auto; align-self: center; padding: 0 14px; color: var(--muted); font-size: .9rem; font-weight: 700;
 }
+/* Phase 3b : second titre (« Recherches récentes » sous « Mes lieux »), non choisissable. */
+.suggestions .suggest-title-row { cursor: default; min-height: 0; padding: 8px 14px 4px; color: var(--muted); font-size: .9rem; font-weight: 700; }
+.suggestions .suggest-title-row:active { background: none; color: var(--muted); }
 .suggestions .suggest-recent { display: flex; align-items: center; gap: 8px; padding-right: 0; }
 .suggest-recent .suggest-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
 .suggest-remove {

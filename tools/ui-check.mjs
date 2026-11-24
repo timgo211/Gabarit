@@ -5159,6 +5159,57 @@ async function reportsCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 3b (v67) : mes lieux. 412×900 jour, 900×412 nuit, 1280×800 jour : Réglages › Mes lieux (phrase « données
+ * personnelles »), arrivée choisie enregistrée en Dépôt, centre de la carte en Client ; champ vide → « Mes lieux » en
+ * tête, aucun appel ; lieu touché → arrivée remplie ; gardé au rechargement ; jamais dans les recherches récentes en double.
+ */
+async function savedPlacesCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, { width, height, theme, overpass: () => ({ elements: [] }), directions: () => nav });
+    await computeRoute(page);
+    await page.click('#btn-settings');
+    await page.waitForSelector('#places-card');
+    check(/Données personnelles/.test(await page.textContent('#places-privacy')), `${tag} : phrase « données personnelles »`);
+    await page.selectOption('#place-kind', 'depot');
+    await page.fill('#place-name', 'Dépôt Test');
+    await page.click('#btn-place-to');
+    await page.selectOption('#place-kind', 'client');
+    await page.fill('#place-name', 'Client Test');
+    await page.click('#btn-place-center');
+    const rowsN = await page.locator('#places-list li.restr-item').count();
+    check(rowsN === 2, `${tag} : 2 lieux enregistrés (arrivée choisie, centre de la carte)`, await page.textContent('#places-status'));
+    await noHorizontalScroll(page, `${tag} Réglages › Mes lieux`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-mes-lieux.png`) });
+    await page.click('#dlg-settings [data-close]');
+    const calls = stats.pelias;
+    await page.fill('#to-input', '');
+    await page.locator('#to-input').blur();
+    await page.focus('#to-input');
+    await page.waitForSelector('#to-list li.suggest-saved', { timeout: 3000 }).catch(() => {});
+    const head = await page.textContent('#to-list .suggest-head');
+    const saved = await page.locator('#to-list li.suggest-saved').count();
+    const heights = await page.$$eval('#to-list li.suggest-saved', (n) => n.map((x) => x.getBoundingClientRect().height));
+    check(/Mes lieux/.test(head) && saved === 2 && heights.every((h) => h >= 48) && stats.pelias === calls,
+      `${tag} : champ vide → « Mes lieux » en tête, 2 lignes ≥ 48 px, aucun appel`, `${head} / ${saved} / ${heights}`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-mes-lieux-liste.png`) });
+    await page.locator('#to-list li.suggest-saved').first().click();
+    const value = await page.inputValue('#to-input');
+    check(value.length > 0 && await page.isHidden('#to-list'), `${tag} : lieu touché → arrivée remplie`, value);
+    await page.fill('#to-input', 'dep');
+    await page.waitForTimeout(600);
+    check(await page.locator('#to-list li.suggest-saved').count() === 1, `${tag} : « dep » → le dépôt seulement`);
+    await page.reload();
+    await page.waitForTimeout(800);
+    const keptN = await page.evaluate(() => (JSON.parse(localStorage.getItem('gabarit.data')).places ?? []).length);
+    check(keptN === 2, `${tag} : gardés au rechargement`, String(keptN));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5169,7 +5220,7 @@ try {
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck,
-    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck };
+    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

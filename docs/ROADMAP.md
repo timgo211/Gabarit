@@ -627,7 +627,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     désactivé par défaut) une fois par signalement et par passage, entre 500 et 50 m, phrase fixe, seulement pour un
     signalement à moi et confirmé ; jamais pour un repère à vérifier ni importé. 500 au plus, champs connus seulement
     (`sanitizeReports`), export complet. Seul le point marqué volontairement est gardé (aucune trace GPS).
-  - [ ] **Phase 3b — Lieux enregistrés** (domicile, dépôt, clients ; locaux, export complet seulement).
+  - [x] **Phase 3b — Lieux enregistrés** (v67, `saved-places.js`) : Réglages › Mes lieux (catégorie Domicile, Dépôt,
+    Client ; nom ; « Enregistrer l'arrivée choisie » ou « Ajouter au centre de la carte » ; renommer, supprimer) ; 50 au
+    plus, doublon de même catégorie à moins de 30 m refusé, coordonnées refusées comme nom. Suggestions : « Mes lieux »
+    en tête (champ vide : domicile, dépôts, clients ; en tapant : filtre local sans accents), puis les récents et ORS sans
+    doublon ; un toucher = le lieu ; aucun appel. Données personnelles : sur l'appareil (`places` de `gabarit.data`),
+    export complet seulement, jamais dans le fichier de la 3c. Modification : hors guidage, ou à l'arrêt en guidage.
   - [ ] **Phase 3c — Signalements pour un ami** (fichier sans mes lieux ni notes par défaut, import validé et marqué).
 
 ## Rouges connus des vérifications

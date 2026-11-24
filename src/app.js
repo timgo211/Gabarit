@@ -4,7 +4,8 @@ import { $, el, showMessage } from './ui/dom.js';
 import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.js';
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
-import { createRouteForm, attachAutocomplete, recentPlaces, setRecentEditGuard } from './ui/route-form.js';
+import { createRouteForm, attachAutocomplete, recentPlaces, setRecentEditGuard, setSavedPlaces } from './ui/route-form.js';
+import { createSavedPlaces } from './ui/saved-places.js';
 import { recentEditAllowed } from './lib/recent-places.js';
 import { stopPoints, insertStopByRoute } from './lib/stops.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
@@ -948,7 +949,7 @@ const settings = createSettings({
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
   onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
   onClose: () => { settingsOpen = false; syncReportPark(); }, // phase 3a
-  onOpen: () => { restrictionsUi.render(); historyPanel.refresh(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu
+  onOpen: () => { placesUi?.render(); restrictionsUi.render(); historyPanel.refresh(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu
   getHistory: () => historyStore.list(),
   onHistoryImported: async (list) => { await historyStore.merge(list); await historyPanel.refresh(); },
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
@@ -963,6 +964,9 @@ const settings = createSettings({
 function recentAllowed() { return recentEditAllowed({ navigating: !!navigation?.active, parked: navigation?.parked === true }); }
 setRecentEditGuard(recentAllowed);
 createVehicles({ getData: () => data, update });
+// Phase 3b : mes lieux (domicile, dépôt, clients) en tête des suggestions, sans appel ; Réglages › Mes lieux.
+setSavedPlaces(() => data.places ?? []);
+let placesUi = null;
 
 const form = createRouteForm({
   getApiKey: () => store.getApiKey(),
@@ -1037,6 +1041,13 @@ const form = createRouteForm({
       form.setBusy(false);
     }
   },
+});
+placesUi = createSavedPlaces({
+  getList: () => data.places ?? [],
+  setList: (list) => update((d) => ({ ...d, places: list })),
+  getArrival: () => form.getPlace('to'),
+  getCenter: () => map.center(),
+  getDrive: () => ({ navigating: navigation.active, parked: navigation.parked }),
 });
 
 createShare({ getChoice: () => choice, getMyPosition: () => myPosition });
