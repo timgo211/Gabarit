@@ -16,6 +16,11 @@
 // sont gardées. Ignorées, avec un compteur par motif dans le journal : rond-point (`junction=roundabout|circular`),
 // `oneway=-1` ou autre sens particulier, `turn:lanes` sans suffixe sur une voie à double sens, nombre de voies absent
 // ou illisible, nombre différent, valeur `none` ou vide (compteur à part pour juger la couverture), valeur inconnue.
+// v62 (décision du 24/11/2026) : sur `highway=motorway` et `motorway_link` seulement, une voie `none` (ou vide) est
+// gardée comme voie SANS flèche (valeur « none » : pictogramme neutre, toujours grisée, jamais une voie à prendre) ;
+// rangée entièrement sans flèche → ignorée (motif « allnone »). Ailleurs, `none` reste ignorée (« none hors
+// autoroute »). Journal : lignes gardées et ignorées avant (règle v59) et après (règle v62). Un lecteur d'avant (v61)
+// ne connaît pas « none » : il ignore ces lignes (aucune voie inventée).
 //
 // Format (lu par parseLaneTile, src/lib/lanes.js, PR C) : index.json (source, license, updated, countries, count,
 // grid, tolerance, tiles) + une case E_N.json par degré : { t:[textes turn:lanes…], v:[[i_turn, n, x0, y0, dx, dy,
@@ -46,6 +51,9 @@ export const LANES = Object.freeze({
     'left', 'slight_left', 'sharp_left', 'through', 'right', 'slight_right', 'sharp_right', 'reverse',
     'merge_to_left', 'merge_to_right',
   ])),
+  /** Voie sans flèche (v62) : gardée seulement sur ces types de voie. */
+  NONE: 'none',
+  NONE_HIGHWAYS: Object.freeze(new Set(['motorway', 'motorway_link'])),
   /** Longueur gardée avant le carrefour (m). */
   KEEP_M: 200,
   MAX_LANES: 16,
@@ -60,7 +68,8 @@ export const LANE_SKIPS = Object.freeze({
   nosuffix: 'turn:lanes sans suffixe à double sens',
   lanes: 'nombre de voies absent ou illisible',
   count: 'nombre de valeurs différent du nombre de voies',
-  none: 'valeur none ou vide',
+  none: 'none hors autoroute',
+  allnone: 'none sur autoroute, toutes les voies sans flèche',
   value: 'valeur inconnue',
   geometry: 'géométrie illisible',
 });
@@ -81,21 +90,30 @@ export function laneCount(text) {
 }
 
 /**
- * Texte turn:lanes + nombre de voies → { ok:true, text, lanes:[[valeurs]] } ou { ok:false, reason } (LANE_SKIPS).
+ * Texte turn:lanes + nombre de voies → { ok:true, text, lanes:[[valeurs]], none } ou { ok:false, reason } (LANE_SKIPS).
+ * `allowNone` (autoroute, v62) : voie `none` ou vide → « none » (sans flèche) ; `none` mêlé à des flèches dans une même
+ * voie → valeur inconnue ; toutes les voies sans flèche → « allnone ». `none` : nombre de voies sans flèche.
  * @param {string} text
  * @param {number|null} n
+ * @param {{ allowNone?:boolean }} [opts]
  */
-export function parseTurnLanes(text, n) {
+export function parseTurnLanes(text, n, { allowNone = false } = {}) {
   if (typeof text !== 'string') return { ok: false, reason: 'value' };
   if (!Number.isInteger(n)) return { ok: false, reason: 'lanes' };
   const raw = text.split('|');
   if (raw.length !== n) return { ok: false, reason: 'count' };
   const lanes = raw.map((l) => l.split(';').map((p) => p.trim()));
-  if (lanes.some((l) => l.some((p) => p === '' || p === 'none'))) return { ok: false, reason: 'none' };
-  if (lanes.some((l) => l.some((p) => !LANES.VALUES.has(p)))) return { ok: false, reason: 'value' };
-  const out = lanes.map((l) => l.join(';')).join('|');
+  const isNone = (p) => p === '' || p === LANES.NONE;
+  if (lanes.some((l) => l.some(isNone))) {
+    if (!allowNone) return { ok: false, reason: 'none' };
+    if (lanes.some((l) => l.length > 1 && l.some(isNone))) return { ok: false, reason: 'value' };
+    if (lanes.every((l) => isNone(l[0]))) return { ok: false, reason: 'allnone' };
+  }
+  const clean = lanes.map((l) => (isNone(l[0]) ? [LANES.NONE] : l));
+  if (clean.some((l) => l.some((p) => p !== LANES.NONE && !LANES.VALUES.has(p)))) return { ok: false, reason: 'value' };
+  const out = clean.map((l) => l.join(';')).join('|');
   if (out.length > LANES.MAX_TEXT) return { ok: false, reason: 'value' };
-  return { ok: true, text: out, lanes };
+  return { ok: true, text: out, lanes: clean, none: clean.filter((l) => l[0] === LANES.NONE).length };
 }
 
 /** Derniers LANES.KEEP_M mètres d'une ligne (le carrefour est à sa fin). */
@@ -111,8 +129,8 @@ function tailPart(coords) {
 }
 
 /**
- * Objet GeoJSON exporté par osmium → { lines:[{ kind:'oneway'|'forward'|'backward', turn, n, coords }],
- * skips:[motif…] } ; null si ce n'est pas une voie portant turn:lanes, turn:lanes:forward ou turn:lanes:backward.
+ * Objet GeoJSON exporté par osmium → { lines:[{ kind:'oneway'|'forward'|'backward', turn, n, none, coords }],
+ * skips:[motif…] } (none : nombre de voies sans flèche gardées, autoroute seulement, v62) ; null si ce n'est pas une voie portant turn:lanes, turn:lanes:forward ou turn:lanes:backward.
  */
 export function lanesFromFeature(f) {
   const t = f?.properties && typeof f.properties === 'object' ? f.properties : null;
@@ -134,9 +152,9 @@ export function lanesFromFeature(f) {
   const lines = []; const skips = [];
   const add = (kind, key, countKey, line) => {
     if (typeof t[key] !== 'string') return;
-    const res = parseTurnLanes(t[key], laneCount(t[countKey]));
+    const res = parseTurnLanes(t[key], laneCount(t[countKey]), { allowNone: LANES.NONE_HIGHWAYS.has(t.highway) });
     if (!res.ok) { skips.push(res.reason); return; }
-    lines.push({ kind, turn: res.text, n: res.lanes.length, coords: tailPart(line) });
+    lines.push({ kind, turn: res.text, n: res.lanes.length, none: res.none, coords: tailPart(line) });
   };
   if (oneway) {
     add('oneway', 'turn:lanes', 'lanes', coords);
@@ -155,14 +173,26 @@ export function emptyLaneSkips() {
   return Object.fromEntries(Object.keys(LANE_SKIPS).map((k) => [k, 0]));
 }
 
-/** Lignes du journal : volume lu dans l'export et motifs de refus (compteur « none » à part). */
-export function laneSkipLog(skips) {
+/**
+ * Lignes du journal : motifs de refus (« none » hors autoroute et sur autoroute à part) et, avec `kept` (lignes
+ * gardées, chacune avec `none`), lignes gardées et ignorées avant (règle v59 : tout « none » ignoré) et après (v62).
+ */
+export function laneSkipLog(skips, kept = null) {
   const s = { ...emptyLaneSkips(), ...(skips ?? {}) };
-  const others = Object.entries(LANE_SKIPS).filter(([k]) => k !== 'none' && s[k]).map(([k, label]) => `${label} ${s[k]}`);
-  return [
-    `Voies ignorées à cause de « none » ou d'une valeur vide : ${s.none}.`,
+  const NONES = ['none', 'allnone'];
+  const others = Object.entries(LANE_SKIPS).filter(([k]) => !NONES.includes(k) && s[k]).map(([k, label]) => `${label} ${s[k]}`);
+  const out = [
+    `Voies ignorées à cause de « none » hors autoroute : ${s.none}.`,
+    `Voies ignorées à cause de « none » sur autoroute (toutes les voies sans flèche) : ${s.allnone}.`,
     `Voies ignorées pour un autre motif : ${others.length ? others.join(', ') : 'aucune'}.`,
   ];
+  if (Array.isArray(kept)) {
+    const withNone = kept.filter((l) => l.none > 0).length;
+    const other = Object.keys(LANE_SKIPS).filter((k) => !NONES.includes(k)).reduce((a, k) => a + s[k], 0);
+    out.push(`Avant (règle v59, tout « none » ignoré) : ${kept.length - withNone} lignes gardées ; ignorées : none ${s.none + s.allnone + withNone}, autres motifs ${other}.`);
+    out.push(`Après (règle v62, « none » gardé sur autoroute) : ${kept.length} lignes gardées (dont ${withNone} avec une voie sans flèche) ; ignorées : none hors autoroute ${s.none}, none sur autoroute ${s.allnone}, autres motifs ${other}.`);
+  }
+  return out;
 }
 
 /** Volume lu dans l'export au-delà du plafond ? Sinon null. */
@@ -216,7 +246,8 @@ export function laneSizeProblem(sizes, maxTotal = LANES.MAX_TOTAL_BYTES) {
  */
 export function convertLanes(list, { updated = null, grid = null, countries = [], maxTotal = LANES.MAX_TOTAL_BYTES } = {}) {
   const by = (k) => list.filter((w) => w.kind === k).length;
-  const log = [`Voies : ${list.length} lignes gardées (${by('oneway')} sens unique, ${by('forward')} forward, ${by('backward')} backward).`];
+  const log = [`Voies : ${list.length} lignes gardées (${by('oneway')} sens unique, ${by('forward')} forward, ${by('backward')} backward ; `
+    + `${list.filter((w) => w.none > 0).length} avec une voie sans flèche).`];
   let problem = null;
   for (const tol of LANES.TOLERANCES_M) {
     const res = build(list, tol);
@@ -225,7 +256,7 @@ export function convertLanes(list, { updated = null, grid = null, countries = []
       + `(${(res.sizes.biggest[1] / 1024).toFixed(0)} Ko)${problem ? ` — ${problem}` : ''}.`);
     if (!problem) {
       const index = {
-        source: 'OpenStreetMap (extraits Geofabrik) : voies avec turn:lanes (+ lanes), turn:lanes:forward (+ lanes:forward) ou turn:lanes:backward (+ lanes:backward), hors ronds-points',
+        source: 'OpenStreetMap (extraits Geofabrik) : voies avec turn:lanes (+ lanes), turn:lanes:forward (+ lanes:forward) ou turn:lanes:backward (+ lanes:backward), hors ronds-points ; « none » (voie sans flèche) sur motorway / motorway_link seulement',
         license: 'ODbL, © contributeurs OpenStreetMap',
         updated,
         countries,

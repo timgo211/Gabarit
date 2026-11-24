@@ -243,6 +243,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       - [x] Interface (PR C, v61) : `lanes.js` (ligne qui arrive au point de manœuvre, une seule ou plusieurs aux
         flèches identiques ; voies valides selon le type ORS), rangée `#nav-lanes` sous « Puis » à 1 km au plus
         (pictogrammes maison `lane-icons.js`, cachée en `nav-tight` comme « Puis »), jamais dite.
+      - [x] v62 (décision du 24/11/2026) : « none » (ou vide) gardé sur `motorway` / `motorway_link` seulement, comme
+        voie sans flèche (pictogramme neutre, grisée, jamais à prendre) ; rangée toute sans flèche ignorée ; ailleurs
+        « none » ignoré comme avant. Journal : lignes gardées / ignorées avant et après, « none hors autoroute » et
+        « none sur autoroute » séparés. Données : à la copie suivante (run lancé par la PR).
   - [x] Étapes (v55) : jusqu'à 10 arrêts entre le départ et l'arrivée (même recherche que l'arrivée, ↑ ↓ ✕), un
     seul calcul ORS avec tous les points (budget de 3, sans `alternative_routes` : variantes de la phase 2b), heure
     d'arrivée et durée par étape sur la fiche, repères numérotés ; ajout en route à l'arrêt seulement (fiche carburant

@@ -1,7 +1,9 @@
 // Copie des voies à flèches au sol (phase 11d) : conversion côté Action vers data/voies-osm/. Fixture SYNTHÉTIQUE
 // osm-voies.geojsonseq : autoroute à sens unique vers le carrefour de ors-directions-sortie.json (point 20), voie à
 // double sens forward / backward, refus (nombre ≠, lanes absent, none, vide, rond-point, oneway=-1, valeur inconnue,
-// turn:lanes sans suffixe à double sens, chemin piéton) et voie de 1,1 km coupée aux 200 derniers mètres.
+// turn:lanes sans suffixe à double sens, chemin piéton) et voie de 1,1 km coupée aux 200 derniers mètres ; v62 :
+// « none » gardé sur motorway_link (w7014) et motorway (w7018, valeur vide), ignoré sur residential (w7016), rangée
+// toute en « none » ignorée (w7015), « none » mêlé à une flèche refusé (w7017).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -39,7 +41,7 @@ test('nombre de voies : entier de 1 à 16, sinon null', () => {
 });
 
 test('turn:lanes : nombre égal exigé, none et vide à part, valeur inconnue refusée', () => {
-  assert.deepEqual(parseTurnLanes('left|through;right', 2), { ok: true, text: 'left|through;right', lanes: [['left'], ['through', 'right']] });
+  assert.deepEqual(parseTurnLanes('left|through;right', 2), { ok: true, text: 'left|through;right', lanes: [['left'], ['through', 'right']], none: 0 });
   assert.equal(parseTurnLanes(' left | through ', 2).text, 'left|through');
   assert.deepEqual(parseTurnLanes('left|through', 3), { ok: false, reason: 'count' });
   assert.deepEqual(parseTurnLanes('left|through', null), { ok: false, reason: 'lanes' });
@@ -47,6 +49,31 @@ test('turn:lanes : nombre égal exigé, none et vide à part, valeur inconnue re
   assert.deepEqual(parseTurnLanes('left||right', 3), { ok: false, reason: 'none' });
   assert.deepEqual(parseTurnLanes('left|foo', 2), { ok: false, reason: 'value' });
   assert.deepEqual(parseTurnLanes(null, 2), { ok: false, reason: 'value' });
+});
+
+test('v62 : « none » sur autoroute = voie sans flèche ; toute la rangée sans flèche → ignorée', () => {
+  const opt = { allowNone: true };
+  assert.deepEqual(parseTurnLanes('through|none|slight_right', 3, opt),
+    { ok: true, text: 'through|none|slight_right', lanes: [['through'], ['none'], ['slight_right']], none: 1 });
+  assert.equal(parseTurnLanes('|through', 2, opt).text, 'none|through');
+  assert.deepEqual(parseTurnLanes('none|none', 2, opt), { ok: false, reason: 'allnone' });
+  assert.deepEqual(parseTurnLanes('||', 3, opt), { ok: false, reason: 'allnone' });
+  assert.deepEqual(parseTurnLanes('none;left|right', 2, opt), { ok: false, reason: 'value' });
+  assert.deepEqual(parseTurnLanes('left|none', 3, opt), { ok: false, reason: 'count' });
+  assert.equal(parseTurnLanes('left|through', 2, opt).none, 0);
+});
+
+test('v62 : « none » gardé sur motorway_link et motorway, ignoré sur residential', () => {
+  const kept = lanesFromFeature(byId('w7014'));
+  assert.deepEqual(kept.skips, []);
+  assert.equal(kept.lines[0].turn, 'through|none|slight_right');
+  assert.equal(kept.lines[0].none, 1);
+  assert.equal(lanesFromFeature(byId('w7018')).lines[0].turn, 'none|through');
+  assert.deepEqual(lanesFromFeature(byId('w7016')), { lines: [], skips: ['none'] });
+  assert.deepEqual(lanesFromFeature(byId('w7015')), { lines: [], skips: ['allnone'] });
+  assert.deepEqual(lanesFromFeature(byId('w7017')), { lines: [], skips: ['value'] });
+  // Primaire : « none » toujours ignoré (w7005, w7012).
+  assert.deepEqual(lanesFromFeature(byId('w7005')).skips, ['none']);
 });
 
 test('sens unique implicite (autoroute) : une ligne qui finit au carrefour', () => {
@@ -96,10 +123,10 @@ test('voie longue : seuls les 200 derniers mètres sont gardés', () => {
 
 test('conversion : cases, textes indexés, lignes relues à l’identique, index', () => {
   const list = features.map(lanesFromFeature).filter(Boolean).flatMap((r) => r.lines);
-  assert.equal(list.length, 4); // w7001, w7002 ×2, w7011
+  assert.equal(list.length, 6); // w7001, w7002 ×2, w7011, w7014, w7018
   const conv = convertLanes(list, { updated: '2026-12-01', countries: ['france'] });
   assert.equal(conv.problem, null);
-  assert.equal(conv.index.count, 4);
+  assert.equal(conv.index.count, 6);
   assert.equal(conv.index.tolerance, 3);
   assert.equal(conv.index.license, 'ODbL, © contributeurs OpenStreetMap');
   assert.deepEqual(Object.keys(conv.index.tiles), ['6_49']);
@@ -109,7 +136,8 @@ test('conversion : cases, textes indexés, lignes relues à l’identique, index
   assert.equal(row[1], 3);
   assert.deepEqual(decode(row).at(-1), [6.1, 49.02]);
   for (const r of tile.v) assert.equal(tile.t[r[0]].split('|').length, r[1]);
-  assert.match(conv.log[0], /4 lignes gardées \(2 sens unique, 1 forward, 1 backward\)/);
+  assert.match(conv.log[0], /6 lignes gardées \(4 sens unique, 1 forward, 1 backward ; 2 avec une voie sans flèche\)/);
+  assert.ok(tile.t.includes('through|none|slight_right'));
 });
 
 test('plafonds : trop gros → rien, journal clair', () => {
@@ -124,12 +152,21 @@ test('plafonds : trop gros → rien, journal clair', () => {
   assert.match(laneSourceProblem(200 * 1024 * 1024, 100 * 1024 * 1024), /200 Mo \(plus de 100 Mo\)/);
 });
 
-test('journal : compteur « none » à part', () => {
+test('journal : « none » hors autoroute et sur autoroute à part, avant / après', () => {
   const skips = emptyLaneSkips();
-  for (const r of features.map(lanesFromFeature).filter(Boolean)) for (const k of r.skips) skips[k] += 1;
-  const log = laneSkipLog(skips);
-  assert.equal(log[0], 'Voies ignorées à cause de « none » ou d\'une valeur vide : 2.');
-  assert.match(log[1], /rond-point 1/);
-  assert.doesNotMatch(log[1], /none/);
-  assert.equal(laneSkipLog(emptyLaneSkips())[1], 'Voies ignorées pour un autre motif : aucune.');
+  const rs = features.map(lanesFromFeature).filter(Boolean);
+  for (const r of rs) for (const k of r.skips) skips[k] += 1;
+  const kept = rs.flatMap((r) => r.lines);
+  const log = laneSkipLog(skips, kept);
+  assert.equal(log[0], 'Voies ignorées à cause de « none » hors autoroute : 3.'); // w7005, w7012, w7016
+  assert.equal(log[1], 'Voies ignorées à cause de « none » sur autoroute (toutes les voies sans flèche) : 1.'); // w7015
+  assert.match(log[2], /rond-point 1/);
+  assert.doesNotMatch(log[2], /none/);
+  // Avant : 4 gardées (sans w7014 ni w7018), none 3 + 1 + 2 = 6 ; après : 6 gardées, none 3 et 1.
+  assert.match(log[3], /^Avant \(règle v59, tout « none » ignoré\) : 4 lignes gardées ; ignorées : none 6, autres motifs \d+\.$/);
+  assert.match(log[4], /^Après \(règle v62, « none » gardé sur autoroute\) : 6 lignes gardées \(dont 2 avec une voie sans flèche\) ; ignorées : none hors autoroute 3, none sur autoroute 1, autres motifs \d+\.$/);
+  const other = Number(log[3].match(/autres motifs (\d+)/)[1]);
+  assert.equal(other, Number(log[4].match(/autres motifs (\d+)/)[1]));
+  assert.equal(laneSkipLog(emptyLaneSkips())[2], 'Voies ignorées pour un autre motif : aucune.');
+  assert.equal(laneSkipLog(emptyLaneSkips()).length, 3);
 });

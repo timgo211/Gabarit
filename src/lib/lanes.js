@@ -10,6 +10,8 @@
 // Voies valides : celles dont une flèche correspond au type de manœuvre ORS (VALID_TURNS) ; aucune voie valide : rien
 // (jamais de voie inventée). Affichage seulement (pictogrammes, voies valides en clair, les autres grisées), jamais
 // dit ; la signalisation fait foi.
+// v62 : voie « none » (sans flèche, gardée sur autoroute et bretelle d'autoroute seulement par lanes-convert.js) :
+// jamais valide, toujours grisée, pictogramme neutre ; une rangée entièrement sans flèche n'est jamais affichée.
 // Types ORS : docs/api-reference/endpoints/directions/instruction-types.md (GIScience/openrouteservice) ; valeurs
 // turn:lanes : wiki OSM Key:turn (lu le 24/11/2026).
 
@@ -53,12 +55,17 @@ function decodeLine(arr, start) {
   return out.length >= 2 ? out : null;
 }
 
-/** « left|through;right » → [['left'], ['through','right']] si n valeurs reconnues, sinon null. */
+/**
+ * « left|through;right » → [['left'], ['through','right']] si n valeurs reconnues, sinon null. « none » (v62) : seul
+ * dans sa voie ; toutes les voies « none » → null.
+ */
 export function splitTurnLanes(text, n) {
   if (typeof text !== 'string' || !Number.isInteger(n) || n < 1) return null;
   const lanes = text.split('|').map((l) => l.split(';'));
   if (lanes.length !== n) return null;
-  if (lanes.some((l) => l.some((v) => !LANES.VALUES.has(v)))) return null;
+  const none = (l) => l.length === 1 && l[0] === LANES.NONE;
+  if (lanes.some((l) => !none(l) && l.some((v) => !LANES.VALUES.has(v)))) return null;
+  if (lanes.every(none)) return null;
   return lanes;
 }
 
@@ -84,7 +91,10 @@ export function mergeLaneTiles(tiles) {
   return { lines: [...m.values()] };
 }
 
-/** Voies d'une ligne pour un type de manœuvre : [{ values, ok }] ; null si aucune voie valide ou type ignoré. */
+/**
+ * Voies d'une ligne pour un type de manœuvre : [{ values, ok }] ; null si aucune voie valide ou type ignoré. Voie
+ * « none » : jamais valide (VALID_TURNS ne la cite jamais).
+ */
 export function lanesFor(values, type) {
   const valid = VALID_TURNS[type];
   if (!valid || !Array.isArray(values)) return null;
