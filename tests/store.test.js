@@ -127,3 +127,13 @@ test('phase 5 : alertes vocales réglementation activées par défaut, coupables
   assert.equal(sanitizeData({ ...d, settings: { ...d.settings, ruleVoice: false } }).settings.ruleVoice, false);
   assert.equal(sanitizeData({ ...d, settings: {} }).settings.ruleVoice, true);
 });
+
+test('v62 : panneau de préparation replié gardé (booléen), déplié par défaut, exporté', () => {
+  assert.equal(emptyData().settings.panelCollapsed, false);
+  assert.equal(sanitizeData({ vehicles: [], settings: { panelCollapsed: true } }).settings.panelCollapsed, true);
+  assert.equal(sanitizeData({ vehicles: [], settings: { panelCollapsed: 'oui' } }).settings.panelCollapsed, false);
+  assert.equal(sanitizeData({ vehicles: [], settings: {} }).settings.panelCollapsed, false, 'ancien fichier');
+  const d = emptyData();
+  d.settings.panelCollapsed = true;
+  assert.equal(JSON.parse(exportData(d)).settings.panelCollapsed, true);
+});

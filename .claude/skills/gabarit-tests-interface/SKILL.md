@@ -18,7 +18,7 @@ npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_mod
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
-                                   #   | carburant | etapes | historique | limites
+                                   #   | carburant | etapes | historique | limites | preparation | suggestions
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -151,3 +151,21 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   de la sortie : bandeau « Restez à droite, direction Metz, Nancy (A 31) » entier, dit à voix haute ; 'proche' :
   affiché, pas dit ; 'ambigu' et copie absente : consigne inchangée. 412×900 jour, 900×412 nuit, 360×760 nuit,
   1280×800 jour.
+- v62 : lignes de suggestions = `li.suggest-row` (la première `li` est le ✕), choisies par `click` (plus
+  `pointerdown`) ; option `pelias(url, kind)` d'`open` (JSON ou null = réseau coupé ; `stats.pelias` compte
+  /autocomplete, `stats.peliasSearch` /search). Échap vide nativement un champ `type=search` : fermer par le ✕.
+- `etapes` (v62) : tronçons « Tronçon 1 : Départ → Étape 1 » / « … → Arrivée » (détail gris, arrivée du dernier =
+  arrivée de la fiche), `#nav-stop` « Étape 1/1 : … » visible sans chevauchement, caché après l'étape, jamais dit ;
+  champ `#alts-stop-input` absent en roulant.
+- `preparation` (v62) : 412×900 jour, 900×412 nuit, 1280×800 jour : étape tapée en coordonnées sur un P → repère
+  d'étape au-dessus (z-index) ; zoom 7 aucun P, 9,5 groupes « P n », 12 tous, groupe touché → zoom + 2 ; poignée
+  ≥ 48 px, repliée = carte seule (carte agrandie de 200 px au moins), gardée au rechargement, dépliée ; guidage : aucun
+  P recréé en suivant le véhicule (MutationObserver).
+- `suggestions` (v62) : 412×900 jour, 360×760 nuit, 1280×800 jour : 2 caractères → 0 appel ; « Clermont-Ferrand » à
+  4 car./s → 1 appel, rien avant 400 ms ; 5 lignes ≥ 48 px, nom puis commune et pays en `--muted`, ✕ ≥ 48 px, ✕ et
+  toucher dehors ferment ; « Aucun résultat », « Pas de connexion » ; choix ; même texte → cache (0 appel, rien sur
+  disque) ; étape et départ : même liste ; clavier simulé (`visualViewport` remplacé, `__keyboard(px)`) : `.kbd-open`,
+  liste au-dessus du clavier ; homonymes (`pelias-homonymes.json` : 3 Sainte-Colombe aux codes postaux différents ;
+  `pelias-sans-code.json` : Saint-Martin des Hautes-Alpes séparés par l'arrondissement, Gers, Bruyères 88600) ;
+  validé sans choix → /search (plusieurs → liste, un → calcul) ; plafond du jour → ligne,
+  0 appel, validation toujours possible ; mesure : 2 car./s → 14 appels.

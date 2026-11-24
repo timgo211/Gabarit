@@ -76,8 +76,11 @@ function card(d, { checked, onSelect, rules }) {
       el('span', { class: 'route-card-time', text: d.duration }),
     ]),
     el('span', { class: 'route-card-facts', text: facts.join(' · ') }),
-    // v55 : une ligne par étape (heure d'arrivée, durée du tronçon).
-    ...(d.legs ?? []).map((t) => el('span', { class: 'route-card-leg legs', text: t })),
+    // v62 : une ligne par tronçon (titre, puis nom de l'étape, durée, km, heure d'arrivée en gris).
+    ...(d.legs ?? []).map((l) => el('span', { class: 'route-card-leg legs' }, [
+      el('span', { class: 'route-card-leg-title', text: l.title }),
+      el('span', { class: 'route-card-leg-detail', text: l.detail }),
+    ])),
     d.an ? el('span', { class: 'route-card-an', text: d.an }) : null,
     rules?.speedLimits?.card ? el('span', { class: 'route-card-speed', text: rules.speedLimits.card }) : null,
     d.delta ? el('span', { class: 'route-card-delta', text: d.delta }) : null,

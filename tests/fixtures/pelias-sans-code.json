@@ -1,0 +1,101 @@
+{
+ "geocoding": {
+  "version": "0.2",
+  "query": {
+   "text": "Saint-Martin",
+   "size": 5
+  }
+ },
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.1,
+     44.56
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Saint-Martin",
+    "locality": "Saint-Martin",
+    "region": "Hautes-Alpes",
+    "macroregion": "Provence-Alpes-Côte d’Azur",
+    "county": "Gap",
+    "label": "Saint-Martin, Hautes-Alpes, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.6,
+     44.9
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Saint-Martin",
+    "locality": "Saint-Martin",
+    "region": "Hautes-Alpes",
+    "macroregion": "Provence-Alpes-Côte d’Azur",
+    "county": "Briançon",
+    "label": "Saint-Martin, Hautes-Alpes, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     0.34,
+     43.52
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Saint-Martin",
+    "locality": "Saint-Martin",
+    "region": "Gers",
+    "county": "Mirande",
+    "label": "Saint-Martin, Gers, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.719,
+     48.208
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Bruyères",
+    "locality": "Bruyères",
+    "postalcode": "88600",
+    "region": "Vosges",
+    "county": "Épinal",
+    "label": "Bruyères, Vosges, France"
+   }
+  }
+ ],
+ "bbox": [
+  0.3,
+  43.5,
+  6.8,
+  48.3
+ ]
+}

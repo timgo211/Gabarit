@@ -1,0 +1,129 @@
+{
+ "geocoding": {
+  "version": "0.2",
+  "query": {
+   "text": "Sainte-Colombe",
+   "size": 5
+  }
+ },
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     4.8655,
+     45.526
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Sainte-Colombe",
+    "locality": "Sainte-Colombe",
+    "postalcode": "69560",
+    "region": "Rhône",
+    "macroregion": "Auvergne-Rhône-Alpes",
+    "county": "Lyon",
+    "label": "Sainte-Colombe, Rhône, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3.256,
+     48.531
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Sainte-Colombe",
+    "locality": "Sainte-Colombe",
+    "postalcode": "77650",
+    "region": "Seine-et-Marne",
+    "macroregion": "Ile-of-France",
+    "county": "Provins",
+    "label": "Sainte-Colombe, Seine-et-Marne, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -0.056,
+     44.879
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "locality",
+    "name": "Sainte-Colombe",
+    "locality": "Sainte-Colombe",
+    "postalcode": "33350",
+    "region": "Gironde",
+    "macroregion": "Nouvelle-Aquitaine",
+    "county": "Libourne",
+    "label": "Sainte-Colombe, Gironde, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.719,
+     48.208
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "street",
+    "name": "Rue de la Gare",
+    "street": "Rue de la Gare",
+    "locality": "Bruyères",
+    "postalcode": "88600",
+    "region": "Vosges",
+    "county": "Épinal",
+    "label": "Rue de la Gare, Bruyères, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.7195,
+     48.2082
+    ]
+   },
+   "properties": {
+    "country": "France",
+    "country_a": "FRA",
+    "layer": "address",
+    "name": "2 Rue de la Gare",
+    "housenumber": "2",
+    "street": "Rue de la Gare",
+    "locality": "Bruyères",
+    "postalcode": "88600",
+    "region": "Vosges",
+    "county": "Épinal",
+    "label": "2 Rue de la Gare, Bruyères, France"
+   }
+  }
+ ],
+ "bbox": [
+  -0.06,
+  44.8,
+  6.8,
+  48.6
+ ]
+}

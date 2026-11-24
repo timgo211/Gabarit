@@ -126,6 +126,24 @@ map = createMap($('#map'), $('#map-fallback'), theme.theme, {
 });
 window.addEventListener('resize', () => map.resize());
 
+// v62 : panneau de préparation repliable par sa poignée (carte seule) ; état gardé dans les réglages. Un champ qui
+// prend le focus (message « Choisis l'arrivée… ») le rouvre.
+const panelGrip = $('#btn-panel-grip');
+function applyPanel(collapsed) {
+  $('.app').classList.toggle('panel-collapsed', collapsed);
+  panelGrip.setAttribute('aria-expanded', String(!collapsed));
+  $('#panel-grip-text').textContent = collapsed ? "Afficher l'itinéraire" : "Masquer l'itinéraire";
+  requestAnimationFrame(() => map.resize());
+}
+function setPanelCollapsed(collapsed) {
+  if (collapsed === data.settings.panelCollapsed) return;
+  setSetting({ panelCollapsed: collapsed });
+  applyPanel(collapsed);
+}
+panelGrip.addEventListener('click', () => setPanelCollapsed(!data.settings.panelCollapsed));
+$('#panel-body').addEventListener('focusin', () => setPanelCollapsed(false));
+applyPanel(data.settings.panelCollapsed);
+
 // Guidage : voix, écran allumé, navigation (GPS réel ou simulation)
 const voice = createVoice({
   enabled: data.settings.voice, name: data.settings.voiceName, rate: data.settings.voiceRate, volume: data.settings.voiceVolume,

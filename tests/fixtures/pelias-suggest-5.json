@@ -1,0 +1,147 @@
+{
+ "geocoding": {
+  "version": "0.2",
+  "query": {
+   "text": "Clermont",
+   "size": 5,
+   "lang": {
+    "iso6391": "fr"
+   }
+  }
+ },
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3.08682,
+     45.77722
+    ]
+   },
+   "properties": {
+    "layer": "locality",
+    "name": "Clermont-Ferrand",
+    "locality": "Clermont-Ferrand",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Clermont-Ferrand, Clermont-Ferrand, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     2.41249,
+     49.37912
+    ]
+   },
+   "properties": {
+    "layer": "locality",
+    "name": "Clermont",
+    "locality": "Clermont",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Clermont, Clermont, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3.14533,
+     45.82108
+    ]
+   },
+   "properties": {
+    "layer": "venue",
+    "name": "Aire de Clermont-Ferrand Nord",
+    "locality": "Gerzat",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Aire de Clermont-Ferrand Nord, Gerzat, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3.11402,
+     45.89223
+    ]
+   },
+   "properties": {
+    "layer": "street",
+    "name": "Rue de Clermont",
+    "locality": "Riom",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Rue de Clermont, Riom, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     3.43196,
+     43.62755
+    ]
+   },
+   "properties": {
+    "layer": "locality",
+    "name": "Clermont-l’Hérault",
+    "locality": "Clermont-l’Hérault",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Clermont-l’Hérault, Clermont-l’Hérault, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     5.07222,
+     49.10667
+    ]
+   },
+   "properties": {
+    "layer": "locality",
+    "name": "Clermont-en-Argonne",
+    "locality": "Clermont-en-Argonne",
+    "country": "France",
+    "country_a": "FRA",
+    "label": "Clermont-en-Argonne, Clermont-en-Argonne, France"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     6.5,
+     46.6
+    ]
+   },
+   "properties": {
+    "layer": "locality",
+    "name": "Clermont",
+    "locality": "Clermont",
+    "country": "Suisse",
+    "country_a": "CHE",
+    "label": "Clermont, Clermont, Suisse"
+   }
+  }
+ ],
+ "bbox": [
+  2.4,
+  43.6,
+  6.5,
+  49.4
+ ]
+}

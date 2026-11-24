@@ -124,9 +124,9 @@ export async function fetchAvoidRoute({
 // typiquement CORS), on retente une fois avec la clé dans l'URL et on retient la méthode qui marche.
 let peliasKeyInQuery = false;
 
-async function pelias({ apiKey, text, focus, size, signal }) {
+async function pelias({ apiKey, text, focus, size, signal, endpoint }) {
   const send = (keyInQuery) => request(
-    buildAutocompleteUrl({ apiKey, keyInQuery, text, focus, size }),
+    buildAutocompleteUrl({ apiKey, keyInQuery, text, focus, size, endpoint }),
     { method: 'GET', headers: keyInQuery ? { Accept: 'application/json' } : peliasHeaders(apiKey), signal },
     15000,
   );
@@ -140,10 +140,10 @@ async function pelias({ apiKey, text, focus, size, signal }) {
   }
 }
 
-/** Suggestions d'adresses. */
-export async function fetchSuggestions({ apiKey, text, focus, signal }) {
+/** Suggestions d'adresses (/autocomplete) ; v62 : endpoint 'search' pour un texte validé sans choix. */
+export async function fetchSuggestions({ apiKey, text, focus, signal, endpoint = 'autocomplete' }) {
   requireKey(apiKey);
-  return parseAutocomplete(await pelias({ apiKey, text, focus, signal }));
+  return parseAutocomplete(await pelias({ apiKey, text, focus, signal, endpoint }));
 }
 
 function outcome(err) {

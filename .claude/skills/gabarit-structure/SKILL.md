@@ -125,6 +125,17 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     exporté), `showStops` de `map.js` (`.stop-marker`), « Ajouter comme étape » de `fuel.js` (`onAddStop`), champ
     `#alts-stop-input` de « Autres itinéraires » ; tests `tests/stops.test.js`, fixture `ors-directions-etapes.json`
     (itinéraire de `ors-directions-nav.json` coupé en deux tronçons, way_points [0, 14, 33]) ; ui-check `etapes`
+  - v62 : `legLines` → une ligne `{ title, detail }` par tronçon, `nextStopLine` (ligne `#nav-stop` du guidage) dans
+    `stops.js` ; `area-cluster.js` (P selon le zoom, `clusterAreas`, `drawAreas` de `map.js` sur `moveend`,
+    `areaDrawCount`) ; `suggest.js` (`createSuggester` : 400 ms, annulation, lignes, états « Aucun résultat » /
+    « Pas de connexion » / plafond), `geocode-quota.js` (`createGeocodeBudget` : `gabarit.geocodeCount`, minute en
+    mémoire ; `createTextCache` : 20 textes en mémoire), `place-resolve.js` (texte validé sans choix → `/search`) ;
+    `attachAutocomplete` de `route-form.js` renvoie `{ resolve }`, `keyboardState` (classe `.app.kbd-open`, `--vvh`) ;
+    poignée `#btn-panel-grip` / `#panel-body` (app.js, `settings.panelCollapsed`) ; `parseAutocomplete` → `name`,
+    `place` ; `buildAutocompleteUrl({ endpoint: 'search' })` ; tests `tests/area-cluster.test.js`,
+    `tests/suggest.test.js`, fixtures `ors-directions-2-etapes.json` (254 km, épingle de 80 km, 100 km),
+    `pelias-suggest-5.json`, `pelias-suggest-vide.json`, `pelias-homonymes.json`, `pelias-sans-code.json` (valeurs
+    synthétiques, champs de la doc Pelias) ; `homonymDetails` (`suggest.js`) ; ui-check `preparation`, `suggestions`
   - phase 6 (v56) : `trip-history.js` (historique : `buildTrip` à l'arrivée seulement, jamais en simulation, aucune
     coordonnée (`safeLabel`), `sanitizeHistory` (1 000 au plus), `mergeHistory`, `monthlyStats`, `describeTrip`),
     IndexedDB `src/ui/trip-history.js` (base `gabarit-history`, magasin `trips`, clé `list`, jamais bloquant),

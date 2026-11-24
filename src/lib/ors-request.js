@@ -116,7 +116,9 @@ export function directionsHeaders(apiKey) {
  * dans certains cas. keyInQuery=true n'est qu'un repli si le navigateur bloque l'en-tête (CORS).
  * @param {{ text:string, apiKey?:string, keyInQuery?:boolean, focus?:[number,number], countries?:string[], size?:number }} p
  */
-export function buildAutocompleteUrl({ text, apiKey, keyInQuery = false, focus, countries = GEOCODE_COUNTRIES, size = 6 }) {
+export function buildAutocompleteUrl({
+  text, apiKey, keyInQuery = false, focus, countries = GEOCODE_COUNTRIES, size = SUGGEST_MAX, endpoint = 'autocomplete',
+}) {
   const params = new URLSearchParams();
   if (keyInQuery) params.set('api_key', apiKey ?? '');
   params.set('text', String(text ?? '').trim());
@@ -127,8 +129,12 @@ export function buildAutocompleteUrl({ text, apiKey, keyInQuery = false, focus, 
     params.set('focus.point.lon', focus[0].toFixed(5));
     params.set('focus.point.lat', focus[1].toFixed(5));
   }
-  return `${PELIAS_BASE}/autocomplete?${params.toString()}`;
+  // v62 : « search » = recherche d'un texte validé sans choix dans la liste (mêmes paramètres, quota à part).
+  return `${PELIAS_BASE}/${endpoint === 'search' ? 'search' : 'autocomplete'}?${params.toString()}`;
 }
+
+/** v62 : 5 suggestions au plus sous un champ. */
+export const SUGGEST_MAX = 5;
 
 /** En-têtes de l'autocomplétion Pelias (clé dans Authorization). */
 export function peliasHeaders(apiKey) {
@@ -140,14 +146,37 @@ export function buildKeyTestRequest() {
   return buildDirectionsRequest({ start: [4.8357, 45.7640], end: [4.8467, 45.7597], vehicle: {} });
 }
 
-/** Lit une réponse Pelias (GeoJSON) en suggestions simples. */
+/**
+ * Lit une réponse Pelias (GeoJSON) en suggestions (5 au plus, v62) :
+ *   { label, name, place, postalcode, area, details:{ street, county, localadmin }, lon, lat }.
+ * name = nom du lieu ; place = ligne grise « 88600 Bruyères · Vosges, France » : code postal et commune, puis
+ * département et pays ; sans code postal (cas des communes, couche locality de Who's On First) : « Vosges, France ».
+ * En France, Pelias range le département dans `region` (Who's On First : region = département, macroregion = région,
+ * county = arrondissement ; fiche de Paris 101751119 lue le 24/11/2026) ; sinon `county`. details : ce qui sépare deux
+ * homonymes (suggest.js), jamais un appel de plus.
+ */
 export function parseAutocomplete(json) {
   const features = Array.isArray(json?.features) ? json.features : [];
+  const str = (x) => (typeof x === 'string' && x.trim() && x.trim() !== '-' ? x.trim() : '');
   return features
     .filter((f) => isLonLat(f?.geometry?.coordinates))
-    .map((f) => ({
-      label: f.properties?.label || f.properties?.name || 'Lieu sans nom',
-      lon: f.geometry.coordinates[0],
-      lat: f.geometry.coordinates[1],
-    }));
+    .slice(0, SUGGEST_MAX)
+    .map((f) => {
+      const p = f.properties ?? {};
+      const label = str(p.label) || str(p.name) || 'Lieu sans nom';
+      const name = str(p.name) || label.split(',')[0].trim() || label;
+      const postalcode = str(p.postalcode);
+      const town = str(p.locality) || str(p.localadmin);
+      const area = str(p.region) || str(p.county);
+      const left = postalcode ? `${postalcode} ${town}`.trim() : (town && town !== name ? town : '');
+      const right = [area, str(p.country)].filter((x, i, a) => x && x !== name && x !== town && a.indexOf(x) === i).join(', ');
+      const fields = [left, right].filter(Boolean).join(' · ');
+      // Sans champs séparés : la suite du libellé Pelias (« Port Édouard Herriot, Lyon, France » → « Lyon, France »).
+      const rest = label.startsWith(name) ? label.slice(name.length).replace(/^\s*,\s*/, '').trim() : '';
+      return {
+        label, name, place: fields || rest, postalcode, area,
+        details: { street: str(p.street), county: str(p.county) !== area ? str(p.county) : '', localadmin: str(p.localadmin) },
+        lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
+      };
+    });
 }

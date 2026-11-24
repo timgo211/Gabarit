@@ -57,3 +57,8 @@ description: Règles des aires et parkings PL (phases 9 et 9b) : Overpass, copie
   500 au plus. Saisie dans la fiche (`#area-note-card`) **à l'arrêt seulement** (`getDrive().parked` : `parkedState` en
   guidage, `createPlanPark` hors guidage ; vitesse inconnue = en mouvement), plus strict que « Mon avis ». Affichée au
   prochain passage : fiche, liste des aires (`.area-row-note`), fiche courte du guidage (`shortFacts`). Jamais dite.
+- Repères P selon le zoom (v62, `area-cluster.js`, `drawAreas` de `map.js`) : zoom < 8 aucun P ; 8 ≤ zoom < 11 P
+  d'une même case de 64 px regroupés en pastille « P n » (`.area-group`, toucher = zoom + 2, centre du groupe), aire
+  seule gardée ; zoom ≥ 11 tous ; aire choisie (`highlightArea`) jamais cachée ni regroupée ; à zoom < 11 un P seul à
+  moins de 24 px d'une étape masqué. Recalcul sur `moveend` seulement ; mêmes repères (clé) → rien recréé (suivi du
+  véhicule : 0 repère recréé, ui-check `preparation`). Repères d'étapes toujours au-dessus (z-index).

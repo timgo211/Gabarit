@@ -32,6 +32,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { symbolSvg } from './nav-symbols.js';
 import { laneSvg } from './lane-icons.js';
 import { lanesRow } from '../lib/lanes.js';
+import { nextStopLine } from '../lib/stops.js';
 import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
@@ -104,6 +105,7 @@ export function createNavigation(ctx) {
     remaining: $('#nav-remaining'),
     time: $('#nav-time'),
     eta: $('#nav-eta'),
+    stopLine: $('#nav-stop'),
     speedo: $('#nav-speedo'),
     speed: $('#nav-speed'),
     limit: $('#nav-limit'),
@@ -538,6 +540,10 @@ export function createNavigation(ctx) {
     setStat(ui.remaining, formatDistance(view.remainingDistance));
     setStat(ui.time, formatDuration(view.remainingDuration));
     setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
+    // v62 : « Étape 1/n : durée · km » jusqu'à la prochaine étape, le long du tracé ; total gardé au-dessus. Jamais dit.
+    const stopText = nextStopLine(view.nextStop);
+    if (ui.stopLine.textContent !== stopText) ui.stopLine.textContent = stopText;
+    ui.stopLine.hidden = !stopText;
     const sp = speedStatus(view.speedKmh, view.speedLimit ?? null, view.speedLimitSource ?? null, view.speedLimitAmbiguous === true);
     if (ui.speed.textContent !== sp.value) ui.speed.textContent = sp.value;
     ui.limit.hidden = sp.limit === null;
@@ -1009,6 +1015,8 @@ export function createNavigation(ctx) {
     ui.dist.textContent = '';
     setInstruction(s.sim ? 'Simulation…' : 'Recherche du signal GPS…');
     for (const n of [ui.remaining, ui.time, ui.eta, ui.speed]) n.textContent = '—';
+    ui.stopLine.textContent = '';
+    ui.stopLine.hidden = true;
     renderFacts(null);
     renderVoice();
     ctx.map.setNavigating(true);
