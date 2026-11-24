@@ -3617,7 +3617,7 @@ async function guidanceCheck(browser, base) {
     check(m.route && m.doneLayers && m.done >= 2 && m.width === 12, `${label} : tracé épais et partie parcourue (grise)`, JSON.stringify(m));
     check(m.bubble === 'gabarit-bubble' && m.bubbleFit === 'both' && m.bubbleImage, `${label} : noms des rues en bulles`, `${m.bubble} ${m.bubbleFit} ${m.bubbleImage}`);
     check(m.marker && m.disclaimer, `${label} : marqueur et « la signalisation fait foi » visibles`);
-    if (mode === 'satellite') check(m.brightness === SATELLITE_NIGHT_BRIGHTNESS.normal, `${label} : photos IGN assombries la nuit (Normal : 0,8)`, String(m.brightness));
+    if (mode === 'satellite') check(m.brightness === SATELLITE_NIGHT_BRIGHTNESS.normal, `${label} : photos IGN assombries la nuit (Normal : 0,85, v65)`, String(m.brightness));
     let foot = await footOverlaps(page);
     check(foot.out.length === 0, `${label} : en roulant, rien ne se chevauche`, foot.out.join(' ; '));
     check(foot.sizes.length >= 4 && foot.sizes.every((x) => x >= 40), `${label} : boutons ronds d'au moins 40 px (v53)`, foot.sizes.join(', '));
