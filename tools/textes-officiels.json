@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles).",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles). 6e lecture (phase 10, trafic) : flux Bison Futé/DIR, DiaLog, CITA, Autobahn, Flandre, DGT, Suisse, Italie ; conditions HERE et TomTom.",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -1080,11 +1080,268 @@
       "head": 0,
       "ocr": "deu",
       "follow": "(lizenz|nutzungsbedingung|opendata|open-data|dl-de)"
+    },
+    {
+      "id": "traf10-fr-flux",
+      "title": "Phase 10 — flux Bison Futé / DIR (tipi) : statut, CORS, taille, fraîcheur, https",
+      "headers": [
+        {
+          "label": "RRN événements content.xml (https)",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/Evenementiel-DIR/grt/RRN/content.xml",
+          "head": 2500
+        },
+        {
+          "label": "RRN événements content.xml (http)",
+          "url": "http://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/Evenementiel-DIR/grt/RRN/content.xml",
+          "head": 400
+        },
+        {
+          "label": "RRN dossier (https)",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/Evenementiel-DIR/grt/RRN/",
+          "head": 1500
+        },
+        {
+          "label": "bouchons HTML",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/Evenementiel-DIR/cnir/RecapBouchonsFranceEntiere.html",
+          "head": 1500
+        },
+        {
+          "label": "TRAFICOLOR dossier",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/TRAFICOLOR-DIR/",
+          "head": 1500
+        },
+        {
+          "label": "QTV qtvDir.xml",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/QTV-DIR/qtvDir.xml",
+          "head": 800
+        },
+        {
+          "label": "DiaLog API datex",
+          "url": "https://dialog.beta.gouv.fr/api/regulations/datex",
+          "head": 2000
+        }
+      ]
+    },
+    {
+      "id": "traf10-fr-lic",
+      "title": "Phase 10 — licences Bison Futé (réutilisation, RRN non concédé, réseau concédé)",
+      "urls": [
+        "https://www.bison-fute.gouv.fr/donnees-sur-le-rrn.html",
+        "https://www.bison-fute.gouv.fr/licence-de-reutilisation-des-donnees.html",
+        "https://www.bison-fute.gouv.fr/data-re-use-licence.html",
+        "https://www.bison-fute.gouv.fr/IMG/pdf/Licence_reutilisation_donnees_action_c_-_vdef-3-3.pdf",
+        "https://www.bison-fute.gouv.fr/IMG/pdf/Licence_reutilisation_donnees_action_b_-_v8.pdf",
+        "https://www.bison-fute.gouv.fr/point-d-acces-national-aux-donnees.html"
+      ],
+      "follow": "(licence|donnees-sur|concede|concéd|acces-national|IMG/pdf/Licence)",
+      "keywords": [
+        "opendata\\.fr|Licence Ouverte|licence ouverte|Etalab",
+        "non concédé|concédé|sociétés d.autoroutes|concessionnaire",
+        "sans restriction|identifiant|mot de passe|inscription|convention",
+        "mise à jour|fréquence|toutes les \\d+ ?min",
+        "redevance|gratuit|payant",
+        "Datex|DATEX"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 8
+    },
+    {
+      "id": "traf10-lu",
+      "title": "Phase 10 — Luxembourg CITA (data.public.lu) : licence, ressources, CORS",
+      "headers": [
+        {
+          "label": "API dataset événements v3.6",
+          "url": "https://data.public.lu/api/1/datasets/cita-evenements-trafic-en-datex-ii-v3-6/",
+          "head": 6000
+        },
+        {
+          "label": "API dataset événements",
+          "url": "https://data.public.lu/api/1/datasets/cita-evenements-trafic-en-datex-ii/",
+          "head": 6000
+        }
+      ],
+      "urls": [
+        "https://data.public.lu/fr/datasets/cita-evenements-trafic-en-datex-ii-v3-6/"
+      ],
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "fréquence|frequency|temps réel|real time"
+      ],
+      "span": 400,
+      "max": 3,
+      "maxDocs": 2
+    },
+    {
+      "id": "traf10-de",
+      "title": "Phase 10 — Allemagne API Autobahn GmbH (verkehr.autobahn.de) : CORS, contenu, conditions",
+      "headers": [
+        {
+          "label": "A6 closure",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A6/services/closure",
+          "head": 2500
+        },
+        {
+          "label": "A6 warning",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A6/services/warning",
+          "head": 1500
+        },
+        {
+          "label": "A6 roadworks",
+          "url": "https://verkehr.autobahn.de/o/autobahn/A6/services/roadworks",
+          "head": 800
+        }
+      ],
+      "urls": [
+        "https://www.autobahn.de/impressum",
+        "https://www.autobahn.de/nutzungsbedingungen",
+        "https://mobilithek.info/offers/-6901989592576801458",
+        "https://www.govdata.de/suche?q=autobahn%20app%20api"
+      ],
+      "follow": "(nutzungsbedingungen|impressum|lizenz|datenlizenz|open-data|opendata)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "Verkehrsdaten|Baustellen|Sperrung|API",
+        "Gewähr|Haftung|keine Garantie"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 6
+    },
+    {
+      "id": "traf10-be",
+      "title": "Phase 10 — Flandre Verkeerscentrum DATEX2 : licence, adresse, CORS",
+      "urls": [
+        "https://transportdata.be/dataset/249ddb42-3b9a-44fc-b965-8e7dc8325fb2",
+        "https://www.vlaanderen.be/datavindplaats/catalogus/datex2-feed-verkeerscentrum-vlaanderen",
+        "https://www.vlaanderen.be/datavindplaats/catalogus/datex2-feed-verkeerscentrum-vlaanderen-full-version"
+      ],
+      "follow": "(datex|DATEX|licentie|licence|voorwaarden|verkeerscentrum\\.be)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "https?://[^ ]*(datex|Datex|DATEX)[^ ]*",
+        "interne|garantie|geschikt"
+      ],
+      "span": 500,
+      "max": 4,
+      "maxDocs": 6
+    },
+    {
+      "id": "traf10-es",
+      "title": "Phase 10 — Espagne DGT NAP DATEX II v3.6 : licence, CORS",
+      "headers": [
+        {
+          "label": "DGT datex2_v36.xml",
+          "url": "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v36.xml",
+          "head": 1500
+        }
+      ],
+      "urls": [
+        "https://nap.dgt.es/en/dataset/incidencias-dgt-datex2-v3-6",
+        "https://nap.dgt.es/dataset/incidencias-dgt-datex2-v3-6",
+        "https://www.dgt.es/aviso-legal/"
+      ],
+      "follow": "(aviso-legal|licen|condiciones)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "aviso legal|Aviso legal|reutiliza|Real Decreto|Ley 37/2007",
+        "frecuencia|minutos|frequency"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 5
+    },
+    {
+      "id": "traf10-ch",
+      "title": "Phase 10 — Suisse opentransportdata.swiss (situations de trafic) : conditions, clé",
+      "urls": [
+        "https://opentransportdata.swiss/en/terms-of-use/",
+        "https://opentransportdata.swiss/de/terms-of-use/",
+        "https://opentransportdata.swiss/en/cookbook/road-traffic/",
+        "https://opentransportdata.swiss/en/limits-and-costs/"
+      ],
+      "follow": "(terms-of-use|nutzungsbedingungen|traffic-situation|road-traffic|strassenverkehr|limits)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "API[ -]?key|token|Schlüssel|registr",
+        "requests? per|Anfragen|limit|Kontingent",
+        "traffic situation|Verkehrsmeldung|Verkehrslage|DATEX"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 6
+    },
+    {
+      "id": "traf10-it",
+      "title": "Phase 10 — Italie CCISS / NAP : données trafic ouvertes ?",
+      "urls": [
+        "https://www.cciss.it/",
+        "https://www.mit.gov.it/nap",
+        "https://www.mit.gov.it/node/16669"
+      ],
+      "follow": "(open|nap|datex|DATEX|licenz)",
+      "keywords": [
+        "licen[cs]e|Lizenz|licentie|licencia|conditions|Nutzungsbedingung|CC[ -]?BY|CC0|dl-de|Licence Ouverte|Etalab|ODbL|attribution|redistribu|commercial|gratuit|free of charge|kostenfrei|gratis",
+        "licenza|open data|DATEX|riuso"
+      ],
+      "span": 400,
+      "max": 3,
+      "maxDocs": 5
+    },
+    {
+      "id": "traf10-here",
+      "title": "Phase 10 — HERE : conditions (trafic seul, Freemium/Base, mélange avec autre carte, stockage)",
+      "urls": [
+        "https://legal.here.com/en/terms/here-platform",
+        "https://legal.here.com/acceptable-use-policy",
+        "https://developers.here.com/terms-and-conditions",
+        "https://www.here.com/get-started/pricing/base-plan-restrictions"
+      ],
+      "follow": "(acceptable-use|service-terms|base-plan|freemium|documentation-license)",
+      "keywords": [
+        "non-HERE|third[- ]party map|other map|competing|Competitive",
+        "cach|stor(e|age)|retain",
+        "layer",
+        "Freemium|Base Plan|free",
+        "traffic|Traffic",
+        "credit card|payment"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 7
+    },
+    {
+      "id": "traf10-tomtom",
+      "title": "Phase 10 — TomTom : conditions (trafic seul, Freemium, mélange avec autre carte, stockage)",
+      "urls": [
+        "https://developer.tomtom.com/terms-and-conditions",
+        "https://developer.tomtom.com/knowledgebase/apis/faq/traffic/are-there-any-limitations-or-usage-restrictions-for-the-traffic-api/",
+        "https://developer.tomtom.com/pricing"
+      ],
+      "follow": "(terms|eula|license|pricing|limitations)",
+      "keywords": [
+        "Evaluation Use|evaluation",
+        "non-TomTom|third[- ]party map|other map|competing|Google",
+        "cach|stor(e|age)|retain",
+        "Freemium|free|2,?500|transactions per day",
+        "traffic|Traffic",
+        "display"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 6
     }
   ],
   "run": [
-    "sat7d-lic2-vl",
-    "sat7d-lic2-wa",
-    "sat7d-lic2-sl"
+    "traf10-fr-flux",
+    "traf10-fr-lic",
+    "traf10-lu",
+    "traf10-de",
+    "traf10-be",
+    "traf10-es",
+    "traf10-ch",
+    "traf10-it",
+    "traf10-here",
+    "traf10-tomtom"
   ]
 }
