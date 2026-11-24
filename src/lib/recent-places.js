@@ -1,4 +1,4 @@
-// Recherches récentes (v63) : derniers lieux choisis dans la liste de suggestions (départ, arrivée, étapes et
+// Recherches récentes (v64) : derniers lieux choisis dans la liste de suggestions (départ, arrivée, étapes et
 // « Ajouter une étape » d'Autres itinéraires : une seule liste). Logique pure, sans DOM ni localStorage
 // (src/ui/recent-places.js).
 //
@@ -9,6 +9,7 @@
 //   remonte en tête ; 20 lieux au plus ;
 // - champ vide : titre « Recherches récentes » puis les 5 derniers ; en tapant : les récents qui correspondent (filtre
 //   local) passent avant les suggestions d'ORS, doublons retirés ; aucun appel réseau, rien compté dans le plafond ;
+// - ✕ d'une ligne et effacement : en guidage, à l'arrêt seulement (recentEditAllowed, R412-6-2) ;
 // - gardé seulement sur l'appareil (clé localStorage à part), inclus dans l'export (champ `recentPlaces`), fusionné à
 //   l'import ; un ancien export sans ce champ s'importe sans erreur.
 
@@ -24,6 +25,7 @@ export const RECENT = Object.freeze({
   CLEAR_CONFIRM: 'Effacer les recherches récentes de cet appareil ?',
   CLEARED_TEXT: 'Recherches récentes effacées.',
   EMPTY_TEXT: 'Aucune recherche récente.',
+  MOVING_TEXT: "À l'arrêt seulement.",
   REMOVE_LABEL: (name) => `Retirer ${name} des recherches récentes`,
 });
 
@@ -98,6 +100,15 @@ export function matchRecent(list, text) {
     const hay = normalizeText(`${p.label} ${p.name} ${p.place}`);
     return words.every((w) => hay.includes(w));
   }).slice(0, RECENT.SHOW);
+}
+
+/**
+ * ✕ d'une ligne et « Effacer les recherches récentes » permis ? Hors guidage : oui (écran d'avant le départ) ; en
+ * guidage : seulement à l'arrêt (parkedState, vitesse inconnue = en mouvement). Code de la route art. R412-6-2 :
+ * aucune saisie en roulant.
+ */
+export function recentEditAllowed({ navigating = false, parked = false } = {}) {
+  return !navigating || parked === true;
 }
 
 /** Suggestions d'ORS sans les lieux déjà proposés en récents. */

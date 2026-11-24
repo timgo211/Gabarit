@@ -266,7 +266,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     homonymes : « 88600 Bruyères · Vosges, France », département sans code postal, détail qui sépare deux lignes
     identiques (rue, arrondissement). À vérifier sur la tablette avec la vraie clé : champs renvoyés par HeiGIT
     (commune, adresse, « Saint-Martin ») et saisie « 88600 ».
-  - [x] Recherches récentes (v63, `recent-places.js`) : champ vide au focus → « Recherches récentes » puis les 5
+  - [x] Recherches récentes (v64, `recent-places.js`) : champ vide au focus → « Recherches récentes » puis les 5
     derniers lieux ; en tapant, récents filtrés (sans accents ni majuscules) avant les suggestions d'ORS, doublons
     retirés ; aucun appel, rien dans le plafond ; enregistré seulement un lieu choisi dans la liste (jamais le texte
     tapé, « Ma position » ni des coordonnées), doublon remonté en tête, 20 au plus, ✕ par ligne ; clé localStorage

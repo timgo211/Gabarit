@@ -2085,7 +2085,7 @@ async function winterCheck(browser, base) {
         '360 px : après rechargement, consigne « avec remorque » seule');
       // Crédits de Réglages : liste du 22/10/2022, contours ODbL.
       await page.click('#btn-settings');
-      await openCredits(page); // v63 : section repliée par défaut
+      await openCredits(page); // v64 : section repliée par défaut
       const credit = await page.textContent('#winter-credit');
       check(/22\/10\/2022/.test(credit) && /Contours administratifs/.test(credit) && /ODbL/.test(credit), '360 px : crédits ODbL des contours et date de la liste', credit);
       await page.click('#dlg-settings [data-close]');
@@ -4416,11 +4416,11 @@ async function preparationCheck(browser, base) {
  * 5 lignes (nom, commune et pays en gris, ≥ 48 px), « Aucun résultat », « Pas de connexion », ✕, toucher dehors, choix,
  * clavier ouvert (visualViewport simulé : liste au-dessus du clavier), plafond du jour (aucun appel, ligne), texte validé
  * sans choix (/search : un lieu → calcul ; plusieurs → liste). Compte les appels de géocodage (chiffre de la PR).
- * v63 : recherches récentes (focus champ vide, filtre sans accents, récent avant ORS sans doublon, ✕, choix qui remonte,
+ * v64 : recherches récentes (focus champ vide, filtre sans accents, récent avant ORS sans doublon, ✕, choix qui remonte,
  * effacement avec confirmation) ; « Sources et licences » repliée au premier affichage, dépliée gardée au rechargement.
  * 412×900 jour, 360×760 nuit, 1280×800 jour.
  */
-/** v63 : ouvre « Sources et licences » de Réglages (repliée par défaut) avant de lire les crédits. */
+/** v64 : ouvre « Sources et licences » de Réglages (repliée par défaut) avant de lire les crédits. */
 async function openCredits(page) {
   if (await page.getAttribute('#btn-credits', 'aria-expanded') !== 'true') await page.click('#btn-credits');
   await page.waitForSelector('#winter-credit', { state: 'visible', timeout: 5000 });
@@ -4534,7 +4534,7 @@ async function suggestionsCheck(browser, base) {
     await closeLists(page);
     // Étape : même composant.
     await page.click('#btn-add-stop');
-    // v63 : le récent « Clermont » s'affiche tout de suite ; les lignes d'ORS (sans lui : doublon) arrivent après.
+    // v64 : le récent « Clermont » s'affiche tout de suite ; les lignes d'ORS (sans lui : doublon) arrivent après.
     const orsRows = (id) => page.waitForFunction((sel) => document.querySelectorAll(`${sel} li.suggest-row:not(.suggest-recent)`).length > 0, id, { timeout: 5000 }).catch(() => {});
     const rowKinds = (id) => page.$$eval(`${id} li.suggest-row`, (ls) => ls.map((l) => (l.classList.contains('suggest-recent') ? 'R' : 'O')).join(''));
     await page.fill('#stop-input-0', 'Clermont');
@@ -4549,7 +4549,7 @@ async function suggestionsCheck(browser, base) {
     check(fromKinds === 'RROOO', `${tag} : départ, même liste (2 récents puis ORS sans doublon)`, fromKinds);
     await closeLists(page);
     await page.fill('#from-input', '');
-    await closeLists(page); // v63 : champ vidé → liste des récents (voulu), fermée ici
+    await closeLists(page); // v64 : champ vidé → liste des récents (voulu), fermée ici
     // Clavier ouvert : l'appli tient dans la partie visible, la liste reste au-dessus du clavier.
     if (width < 700) {
       await page.click('#to-input');
@@ -4590,7 +4590,7 @@ async function suggestionsCheck(browser, base) {
     await page.waitForSelector('.route-card', { timeout: 10000 }).catch(() => {});
     check(stats.peliasSearch === s0 + 1 && stats.directions > d0 && await page.inputValue('#to-input') === 'Clermont-Ferrand, Clermont-Ferrand, France',
       `${tag} : validé sans choix, un lieu → pris, calcul`, `${stats.peliasSearch - s0} / ${stats.directions - d0} / ${await page.inputValue('#to-input')}`);
-    // v63 : recherches récentes. Choix dans la liste gardé (Clermont), texte validé sans choix jamais (Clermont-Ferrand).
+    // v64 : recherches récentes. Choix dans la liste gardé (Clermont), texte validé sans choix jamais (Clermont-Ferrand).
     const recentSaved = async () => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.recentPlaces') ?? '[]'));
     let rec = await recentSaved();
     check(rec.map((p) => p.label).join(' / ') === 'Aire de Clermont-Ferrand Nord, Gerzat, France / Clermont, Clermont, France'

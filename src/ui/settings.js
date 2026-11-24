@@ -38,7 +38,7 @@ function setStatus(node, text, ok) {
  *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void,
  *   onDriveVoiceChange?:(on:boolean)=>void, onWindVoiceChange?:(on:boolean)=>void, onWindGustChange?:(g:number)=>void,
  *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void, onCreditsToggle?:(open:boolean)=>void,
- *   recent?:{ list:()=>object[], clear:()=>void, merge:(l:object[])=>void } }} ctx
+ *   recent?:{ list:()=>object[], clear:()=>void, merge:(l:object[])=>void }, recentEditAllowed?:()=>boolean }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
 /** Phase 7d : crédits des photos aériennes (texte seulement, lien vers la licence). */
@@ -122,7 +122,7 @@ export function createSettings(ctx) {
     $('#voice-volume-out').textContent = volumeText(sanitizeVoiceVolume(voiceVolume.value));
   }
 
-  // v63 : « Sources et licences » repliable, repliée par défaut (settings.creditsOpen) ; contenu inchangé.
+  // v64 : « Sources et licences » repliable, repliée par défaut (settings.creditsOpen) ; contenu inchangé.
   const creditsBtn = $('#btn-credits');
   const creditsBody = $('#credits-body');
   function applyCredits(open) {
@@ -135,13 +135,15 @@ export function createSettings(ctx) {
     ctx.onCreditsToggle?.(open);
   });
 
-  // v63 : recherches récentes (src/lib/recent-places.js), effacées après confirmation.
+  // v64 : recherches récentes (src/lib/recent-places.js), effacées après confirmation.
   const recentStatus = $('#recent-status');
   const recentClear = $('#btn-recent-clear');
   function syncRecent() {
-    recentClear.disabled = !(ctx.recent?.list().length);
+    recentClear.disabled = !(ctx.recent?.list().length) || ctx.recentEditAllowed?.() === false;
   }
   recentClear.addEventListener('click', () => {
+    // En guidage : à l'arrêt seulement (R412-6-2, vitesse inconnue = en mouvement).
+    if (ctx.recentEditAllowed?.() === false) { syncRecent(); setStatus(recentStatus, RECENT.MOVING_TEXT, false); return; }
     if (!ctx.recent?.list().length || !window.confirm(RECENT.CLEAR_CONFIRM)) return;
     ctx.recent.clear();
     syncRecent();
@@ -330,7 +332,7 @@ export function createSettings(ctx) {
     try {
       // Phase 6 : historique des trajets (IndexedDB) inclus ; indisponible → export sans lui, dit dans le message.
       const history = (await ctx.getHistory?.()) ?? null;
-      // v63 : recherches récentes incluses (champ recentPlaces).
+      // v64 : recherches récentes incluses (champ recentPlaces).
       const json = exportData(ctx.getData(), new Date(), history, ctx.recent?.list() ?? null);
       const blob = new Blob([json], { type: 'application/json' });
       const a = document.createElement('a');
@@ -355,7 +357,7 @@ export function createSettings(ctx) {
       if (!window.confirm(`Remplacer les données actuelles par celles du fichier (${data.vehicles.length} véhicule(s)) ?`)) return;
       ctx.onDataReplaced(data);
       if (history.length) await ctx.onHistoryImported?.(history); // phase 6 : ajouté à l'historique de l'appareil
-      if (recentPlaces.length) ctx.recent?.merge(recentPlaces); // v63 : ajoutées après celles de l'appareil
+      if (recentPlaces.length) ctx.recent?.merge(recentPlaces); // v64 : ajoutées après celles de l'appareil
       setStatus(dataStatus, 'Données importées.', true);
       syncChoices(data.settings);
     } catch (err) {

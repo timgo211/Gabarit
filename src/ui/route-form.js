@@ -16,10 +16,13 @@ function safeStorage() {
 const geocodeBudget = createGeocodeBudget({ storage: safeStorage(), now: () => Date.now() });
 const textCache = createTextCache();
 /**
- * v63 : recherches récentes, une seule liste pour tous les champs (clé localStorage à part, jamais bloquante :
+ * v64 : recherches récentes, une seule liste pour tous les champs (clé localStorage à part, jamais bloquante :
  * src/lib/recent-places.js). Réglages (effacer) et export / import passent par cet objet.
  */
 export const recentPlaces = createRecentStore(safeStorage());
+/** ✕ d'une ligne récente permis (app.js : recentEditAllowed, à l'arrêt seulement en guidage). */
+let recentEditOk = () => true;
+export function setRecentEditGuard(fn) { recentEditOk = typeof fn === 'function' ? fn : () => true; }
 /** Appels de géocodage du jour (contrôle d'ui-check, chiffre de la PR). */
 export const geocodeCount = (kind) => geocodeBudget.count(kind);
 
@@ -76,7 +79,7 @@ if (window.visualViewport) {
  * Liste déroulante de suggestions attachée à un champ : un seul composant pour départ, arrivée, étapes et « Ajouter une
  * étape » du guidage (v55). v62 : 400 ms, 5 lignes (nom + commune et pays en gris, 48 px au moins), « Aucun résultat »,
  * « Pas de connexion », ✕, fermeture au choix, au ✕ et au toucher dehors, visible clavier ouvert.
- * v63 : recherches récentes en tête (titre gris, ✕ par ligne), au focus d'un champ vide et en tapant (filtre local) ;
+ * v64 : recherches récentes en tête (titre gris, ✕ par ligne), au focus d'un champ vide et en tapant (filtre local) ;
  * enregistrées seulement au choix dans la liste.
  * Renvoie { resolve(what) } : texte validé sans choix → recherche (place-resolve.js).
  */
@@ -110,8 +113,13 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
       ]),
       el('button', {
         type: 'button', class: 'suggest-remove', 'aria-label': RECENT.REMOVE_LABEL(r.text), text: '✕',
+        disabled: !recentEditOk(),
         onpointerdown: keep,
-        onclick: (e) => { e.preventDefault(); e.stopPropagation(); recentPlaces.remove(p); show(last.status, last.items); },
+        onclick: (e) => {
+          e.preventDefault(); e.stopPropagation();
+          if (recentEditOk()) recentPlaces.remove(p); // en roulant : rien (R412-6-2)
+          show(last.status, last.items);
+        },
       }),
     ]);
   }
@@ -119,11 +127,11 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
   function show(status, list2 = []) {
     last = { status, items: list2 };
     items = status === 'results' ? list2 : [];
-    // v63 : récents qui correspondent au texte (tous les 5 derniers si le champ est vide), sans appel réseau.
+    // v64 : récents qui correspondent au texte (tous les 5 derniers si le champ est vide), sans appel réseau.
     recent = recentPlaces.match(input.value);
     rows = suggestionRows({ status, items, recent });
     if (!rows.length) { close(); return; }
-    // v63 : titre « Recherches récentes » dans la barre du ✕ (collée en haut) : une ligne de gagnée, clavier ouvert.
+    // v64 : titre « Recherches récentes » dans la barre du ✕ (collée en haut) : une ligne de gagnée, clavier ouvert.
     const title = rows[0]?.kind === 'title' ? rows[0].text : '';
     const closeBtn = el('li', { class: 'suggest-head', role: 'presentation' }, [
       title ? el('span', { class: 'suggest-title', text: title }) : null,
@@ -195,7 +203,7 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
   });
   // Clavier ouvert : le champ remonte en haut du panneau, la liste garde la place visible dessous.
   input.addEventListener('focus', () => {
-    // v63 : champ vide → « Recherches récentes » (aucun appel).
+    // v64 : champ vide → « Recherches récentes » (aucun appel).
     if (!input.value.trim() && list.hidden) show('idle');
     setTimeout(() => {
       if (document.activeElement !== input) return;

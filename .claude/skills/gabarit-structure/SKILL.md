@@ -138,7 +138,7 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     `tests/suggest.test.js`, fixtures `ors-directions-2-etapes.json` (254 km, épingle de 80 km, 100 km),
     `pelias-suggest-5.json`, `pelias-suggest-vide.json`, `pelias-homonymes.json`, `pelias-sans-code.json` (valeurs
     synthétiques, champs de la doc Pelias) ; `homonymDetails` (`suggest.js`) ; ui-check `preparation`, `suggestions`
-  - v63 : `recent-places.js` (recherches récentes : `addRecent`, `matchRecent`, `samePlace`, `createRecentStore`
+  - v64 : `recent-places.js` (recherches récentes : `addRecent`, `matchRecent`, `samePlace`, `createRecentStore`
     sur la clé localStorage `gabarit.recentPlaces`, jamais bloquant) ; tests `tests/recent-places.test.js`.
   - phase 6 (v56) : `trip-history.js` (historique : `buildTrip` à l'arrivée seulement, jamais en simulation, aucune
     coordonnée (`safeLabel`), `sanitizeHistory` (1 000 au plus), `mergeHistory`, `monthlyStats`, `describeTrip`),

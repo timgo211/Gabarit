@@ -88,7 +88,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Historique (phase 6, v56, `trip-history.js`) : trajet gardé à l'arrivée seulement (jamais en simulation), IndexedDB
   `gabarit-history` jamais bloquant, aucune coordonnée, inclus dans l'export (`history`) ; notes d'aires (`areaNotes`)
   saisies à l'arrêt seulement, jamais dites ; relevé PDF par `@media print`.
-- Recherches récentes (v63, `recent-places.js`) : clé `gabarit.recentPlaces` hors de `gabarit.data`, jamais bloquante,
+- Recherches récentes (v64, `recent-places.js`) : clé `gabarit.recentPlaces` hors de `gabarit.data`, jamais bloquante,
   exportée (`recentPlaces`) ; seulement un lieu choisi dans la liste ; aucun appel. Détail : skill `gabarit-interface`.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).

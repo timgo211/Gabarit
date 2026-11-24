@@ -9,7 +9,7 @@
 // - aucune suggestion → ligne « Aucun résultat » ; pas de réseau → ligne « Pas de connexion » ; plafond de géocodage
 //   atteint → ligne qui renvoie à la validation (recherche à part, place-resolve.js) : jamais une impasse ;
 // - clé absente, refusée, quota d'ORS (403 / 429) : message habituel (onError), liste fermée ;
-// - v63 : recherches récentes (recent-places.js) en tête, sans appel réseau ni place dans le plafond.
+// - v64 : recherches récentes (recent-places.js) en tête, sans appel réseau ni place dans le plafond.
 
 import { suggestionPlan } from './coords.js';
 import { SUGGEST_MAX } from './ors-request.js';
@@ -62,7 +62,7 @@ export function homonymDetails(items) {
 }
 
 /**
- * Lignes de la liste. v63 : recherches récentes (recent, déjà filtrées : recent-places.js) d'abord, sous le titre gris
+ * Lignes de la liste. v64 : recherches récentes (recent, déjà filtrées : recent-places.js) d'abord, sous le titre gris
  * « Recherches récentes », puis les suggestions d'ORS sans les lieux déjà proposés ; « Aucun résultat » omis quand un
  * récent correspond.
  * @param {{ items?:object[], recent?:object[], status:'idle'|'results'|'empty'|'offline'|'exhausted' }} st

@@ -259,7 +259,7 @@ input, select, textarea { min-width: 0; }
   font-weight: 800; cursor: pointer;
 }
 
-/* v63 : recherches récentes (titre gris, ligne + ✕ de 48 px qui retire le lieu). */
+/* v64 : recherches récentes (titre gris, ligne + ✕ de 48 px qui retire le lieu). */
 .suggest-head .suggest-title {
   flex: 1 1 auto; align-self: center; padding: 0 14px; color: var(--muted); font-size: .9rem; font-weight: 700;
 }
@@ -270,7 +270,7 @@ input, select, textarea { min-width: 0; }
   font-size: 1.1rem; font-weight: 800; cursor: pointer;
 }
 .suggestions li:active .suggest-remove { color: inherit; }
-/* v63 : section de Réglages repliable (titre = bouton ≥ 48 px, chevron selon aria-expanded). */
+/* v64 : section de Réglages repliable (titre = bouton ≥ 48 px, chevron selon aria-expanded). */
 .section-toggle {
   display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 48px;
   padding: 0; border: 0; background: none; color: var(--fg); font: inherit; font-weight: 700; text-align: left;

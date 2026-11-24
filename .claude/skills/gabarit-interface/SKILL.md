@@ -235,7 +235,7 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   - texte validé sans choix : une requête `/search` par champ (`place-resolve.js`) ; 1 lieu pris, plusieurs → liste,
     rien de deviné ; plafond de recherche : appui long ou coordonnées. Champ « Ajouter une étape » du guidage :
     toujours seulement à l'arrêt.
-- v63, recherches récentes (`src/lib/recent-places.js`, objet `recentPlaces` exporté par `route-form.js`, une seule
+- v64, recherches récentes (`src/lib/recent-places.js`, objet `recentPlaces` exporté par `route-form.js`, une seule
   liste pour départ, arrivée, étapes et « Ajouter une étape » d'Autres itinéraires) :
   - `suggestionRows({ status, items, recent })` : titre `.suggest-title` (`--muted`) « Recherches récentes » dans la barre du ✕ (`.suggest-head`, une ligne
     de gagnée clavier ouvert), lignes
@@ -247,8 +247,10 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   - stockage `gabarit.recentPlaces` (`createRecentStore`, injectable) : lecture ou écriture refusée, plein, JSON
     abîmé → liste en mémoire pour la session, aucune erreur ; export `recentPlaces` (`exportData(…, recent)`),
     `readExport` → `recentPlaces` ([] si absent), fusion `mergeRecent` (mes lieux d'abord) ;
+  - ✕ d'une ligne et « Effacer » : en guidage, à l'arrêt seulement (`recentEditAllowed`, comme
+    `canEditRestrictions` ; vitesse inconnue = en mouvement, R412-6-2) ; garde `setRecentEditGuard` posée par app.js ;
   - Réglages : carte `#recent-card` (phrase « Gardé seulement sur cet appareil. Inclus dans l'export. »,
     `#btn-recent-clear` + `window.confirm`, grisé si vide).
-- v63, « Sources et licences » : titre = `button#btn-credits.section-toggle` (≥ 48 px, chevron CSS selon
+- v64, « Sources et licences » : titre = `button#btn-credits.section-toggle` (≥ 48 px, chevron CSS selon
   `aria-expanded`), contenu `#credits-body` (hidden si replié) inchangé ; `settings.creditsOpen` (false par défaut,
   exporté). ui-check : `openCredits(page)` avant de lire un crédit.

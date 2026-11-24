@@ -1,9 +1,9 @@
-// v63 : recherches récentes (src/lib/recent-places.js), menu de suggestions (suggest.js) et export / import (store.js).
+// v64 : recherches récentes (src/lib/recent-places.js), menu de suggestions (suggest.js) et export / import (store.js).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   RECENT, normalizeText, recentEntry, addRecent, removeRecent, sanitizeRecent, mergeRecent, matchRecent, samePlace,
-  createRecentStore,
+  createRecentStore, recentEditAllowed,
 } from '../src/lib/recent-places.js';
 import { suggestionRows } from '../src/lib/suggest.js';
 import { emptyData, exportData, readExport, memoryStorage, sanitizeData, createStore, DATA_KEY } from '../src/lib/store.js';
@@ -142,4 +142,12 @@ test('« Sources et licences » : repliée par défaut, état gardé et exporté
   d.settings.creditsOpen = true;
   assert.equal(readExport(exportData(d)).data.settings.creditsOpen, true);
   assert.equal(sanitizeData({ vehicles: [], settings: { creditsOpen: 'oui' } }).settings.creditsOpen, false);
+});
+
+test('✕ et « Effacer » : en guidage, à l\'arrêt seulement (R412-6-2, vitesse inconnue = en mouvement)', () => {
+  assert.equal(recentEditAllowed({ navigating: false }), true); // écran d'avant le départ
+  assert.equal(recentEditAllowed({ navigating: true, parked: true }), true);
+  assert.equal(recentEditAllowed({ navigating: true, parked: false }), false);
+  assert.equal(recentEditAllowed({ navigating: true }), false); // vitesse inconnue
+  assert.equal(recentEditAllowed({ navigating: true, parked: 'oui' }), false);
 });

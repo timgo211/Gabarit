@@ -132,7 +132,7 @@ export function sanitizeData(raw) {
       bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
       weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
       panelCollapsed: s.panelCollapsed === true, // v62 : panneau de préparation replié (carte seule), déplié par défaut
-      creditsOpen: s.creditsOpen === true, // v63 : « Sources et licences » de Réglages dépliée ; repliée par défaut
+      creditsOpen: s.creditsOpen === true, // v64 : « Sources et licences » de Réglages dépliée ; repliée par défaut
       // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
       adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },
@@ -142,7 +142,7 @@ export function sanitizeData(raw) {
 /**
  * JSON d'export : toutes les données, jamais la clé ORS. history (phase 6) : trajets terminés lus dans IndexedDB
  * (src/ui/trip-history.js), sans coordonnées ; null → champ absent (historique indisponible).
- * recent (v63) : recherches récentes (clé gabarit.recentPlaces, src/lib/recent-places.js) ; null → champ absent.
+ * recent (v64) : recherches récentes (clé gabarit.recentPlaces, src/lib/recent-places.js) ; null → champ absent.
  */
 export function exportData(data, now = new Date(), history = null, recent = null) {
   const clean = sanitizeData(data);
@@ -153,7 +153,7 @@ export function exportData(data, now = new Date(), history = null, recent = null
 
 /**
  * Phase 6 : lit un export complet → { data (gabarit.data), history (trajets, [] si absent : ancien export),
- * recentPlaces (v63, [] si absent) }. Ni l'un ni l'autre n'entre dans gabarit.data.
+ * recentPlaces (v64, [] si absent) }. Ni l'un ni l'autre n'entre dans gabarit.data.
  */
 export function readExport(text) {
   let raw;
