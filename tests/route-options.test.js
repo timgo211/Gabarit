@@ -254,7 +254,7 @@ test('fiche : durée, distance, arrivée, péage, gazole (litres et coût), éca
   assert.deepEqual(options.map((o) => o.key), ['recommended', 'shortest', 'no-toll']);
   assert.deepEqual(describeOption(rec, rec, { vehicle, dieselPrice: 1.85, now }), {
     name: 'Recommandé', also: '', note: '', duration: '9 min', distance: '5,2 km', arrival: 'Arrivée : 08:08',
-    toll: 'Péage : 3,5 km', fuel: 'Gazole : ≈ 2 L · ≈ 3,1 €', delta: '', an: 'Autoroute et nationale : inconnue',
+    toll: 'Péage : 3,5 km', fuel: 'Gazole : ≈ 2 L · ≈ 3,1 €', delta: '', an: 'Autoroute et nationale : inconnue', legs: [],
   });
   const shortest = options.find((o) => o.key === 'shortest');
   const d = describeOption(shortest, rec, { vehicle, dieselPrice: null, now });
@@ -278,7 +278,7 @@ test('guidage : le recalcul garde les réglages de la variante choisie', () => {
   const base = { start: LYON, end: CLERMONT, avoidFerries: true };
   const opt = (variant, avoidTolls = false) => ({ request: requestFor(variant, avoidTolls) });
   assert.deepEqual(guidanceParams(opt(VARIANTS.recommended), base),
-    { start: LYON, end: CLERMONT, avoidFerries: true, avoidTolls: false, preference: null, avoidPolygons: null });
+    { start: LYON, end: CLERMONT, avoidFerries: true, avoidTolls: false, preference: null, avoidPolygons: null, stops: [] });
   assert.equal(guidanceParams(opt(VARIANTS.shortest), base).preference, 'shortest');
   assert.equal(guidanceParams(opt(VARIANTS.noToll), base).avoidTolls, true);
   assert.equal(guidanceParams(opt(VARIANTS.fastest, true), base).avoidTolls, true);

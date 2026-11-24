@@ -95,6 +95,15 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     hors `APP_FILES` : `LAZY_APP_FILES` de `sw-routing.js`, bypass) ; boutons `#btn-fuel` (fiche) et `#btn-nav-fuel`
     (rangée de la loupe) ; tests `tests/fuel-stations.test.js`, fixture `carburants-v2.json` (forme réelle de l'export
     lue par l'Action « Textes officiels » le 23/11/2026, valeurs **synthétiques**) ; ui-check `carburant`
+  - v55 (étapes, reste de la phase 8) : `stops.js` (`STOPS.MAX` = 10, `sanitizeStops`, `moveStop`, `removeStop`,
+    `insertStopByRoute` (rang selon la projection sur le tracé), `crowPath` (somme des distances à vol d'oiseau, mesure
+    d'ORS), `legLines` (fiche)) ; `route.legs` / `route.wayPoints` lus par `ors-response.js` ; `via` de
+    `computeRouteOptions` / `computeAvoidRoute` / `fetchRoute` ; `diagnoseWithStops` (2009) ; `placeStops`,
+    `remainingStops`, `STOP_REACHED_TEXT` (navigation) ; `pathCrow` (`zfe.js`) pour les 150 km ; champs `choice.stops`
+    et `progress.nextStop` de `route-save.js` ; UI : lignes `#stops-list` de `route-form.js` (`attachAutocomplete`
+    exporté), `showStops` de `map.js` (`.stop-marker`), « Ajouter comme étape » de `fuel.js` (`onAddStop`), champ
+    `#alts-stop-input` de « Autres itinéraires » ; tests `tests/stops.test.js`, fixture `ors-directions-etapes.json`
+    (itinéraire de `ors-directions-nav.json` coupé en deux tronçons, way_points [0, 14, 33]) ; ui-check `etapes`
   - phase 5h bis : `route-diagnostic.js` (texte de diagnostic du trajet à copier depuis la fiche)
   - phase 5h ter : `hgv-tolls-geo.js` (réseau des taxes PL en géométrie : périmètre, copie `data/taxes-pl-osm.json`,
     comparaison au tracé), `hgv-tolls-convert.js` (voies OSM → `data/taxes-pl-osm.json`, journal par référence)

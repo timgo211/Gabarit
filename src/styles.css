@@ -210,6 +210,15 @@ input, select, textarea { min-width: 0; }
 .suggestions li:last-child { border-bottom: 0; }
 .suggestions li[aria-selected="true"], .suggestions li:active { background: var(--accent); color: var(--accent-fg); }
 
+/* v55 : étapes entre le départ et l'arrivée (↑ ↓ ✕ : 48 px). */
+.stops-box { display: grid; gap: 8px; }
+.stops-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.stop-row { position: relative; min-width: 0; }
+.stop-row > label { display: block; margin-bottom: 4px; }
+.stop-row .combo { gap: 6px; }
+.stop-row .btn-stop { flex: 0 0 48px; width: 48px; min-height: 48px; padding: 0; font-size: 1.2rem; }
+.btn-add-stop { justify-self: start; min-height: var(--tap); }
+.legs { display: block; font-size: .95rem; }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
 .toggle {
   flex: 1 1 140px; min-width: 0; min-height: var(--tap); display: flex; align-items: center; gap: 10px;
@@ -607,6 +616,9 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-alts-head h2 { margin: 0; font-size: 1.3rem; overflow-wrap: anywhere; }
 .nav-alts-head .btn, .nav-alts-go { min-height: 56px; }
 .nav-alts .status:empty { display: none; }
+/* v55 : « Ajouter une étape » dans « Autres itinéraires » (à l'arrêt seulement). */
+.alts-stop { position: relative; min-width: 0; }
+.alts-stop > label { display: block; margin-bottom: 4px; }
 .nav-confirm-title { margin: 0; font-size: 1.3rem; font-weight: 800; text-align: center; }
 .nav-confirm-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .nav-confirm-buttons .btn { min-height: 64px; font-size: 1.15rem; }
@@ -723,6 +735,12 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   font-size: 18px; line-height: 1; font-weight: 800; border: 3px solid var(--text); background: var(--bg); color: var(--danger);
 }
 .bridge-marker.medium { color: var(--warn); }
+/* v55 : étapes numérotées (couleurs d'accent, contraste vérifié par contrast.test.js). */
+.stop-marker {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+  font-size: 15px; font-weight: 800; line-height: 1; background: var(--accent); color: var(--accent-fg); border: 2px solid var(--bg);
+  box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
 /* Limites de poids d'OSM (phase 12a bis) : même repère, valeur écrite (« 3,5 t »), à l'arrêt seulement. */
 .bridge-marker.weight-marker { width: auto; min-width: 44px; height: 32px; border-radius: 16px; padding: 0 8px; font-size: 14px; white-space: nowrap; }
 .area-marker {
@@ -856,3 +874,6 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .fuel-facts, .fuel-updated { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
 .fuel-star { min-width: var(--tap); min-height: var(--tap); font-size: 1.5rem; padding: 0 10px; }
 .fuel-star[aria-pressed="true"] { color: var(--warn); }
+/* v55 : « Ajouter comme étape » (à l'arrêt seulement, grisé sinon). */
+.fuel-add-stop { flex: 0 0 auto; max-width: 96px; min-height: var(--tap); padding: 0 8px; font-size: .85rem; line-height: 1.15; white-space: normal; }
+.fuel-add-stop[aria-disabled="true"] { opacity: .5; }

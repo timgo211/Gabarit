@@ -87,7 +87,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     créer sa clé gratuite, la coller dans Réglages).
 
 - [x] **Phase 8 — Destinations et étapes** (reste déplacé dans le Bloc Guidage)
-  - Étapes : déplacé dans le Bloc Guidage.
+  - Étapes : déplacé dans le Bloc Guidage (fait en v55).
   - [x] Destination (ou départ) par appui long sur la carte, hors guidage : « Aller ici » / « Partir d'ici ».
   - [x] Coordonnées GPS dans le champ départ ou arrivée : décimal (48.6921, 6.1844) et degrés-minutes-secondes
     (48°41'31.6"N 6°11'03.8"E), aussi degrés-minutes décimales.
@@ -225,11 +225,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       `directions.js` : « …, direction Metz » seulement si une seule bretelle à 60 m du point de manœuvre avec un cap
       cohérent, dit seulement sans ambiguïté, calculé une fois par itinéraire. Reste à faire : repli « commune la plus
       proche » (demande un jeu de données de lieux, trop volumineux pour la copie actuelle).
-  - [ ] Étapes : plusieurs arrêts dans l'ordre, ajout d'une étape en route (à l'arrêt). Avec des étapes,
-    `alternative_routes` n'est pas possible (2 points seulement) : garder les variantes de la phase 2b. (Reprend la
-    tournée multi-arrêts de la phase 3.) (Reste de la phase 8.)
-    **À faire en dernier dans le bloc, en mode plan obligatoire** : touche à la logique (trajet par tronçons, recalcul,
-    quota ORS).
+  - [x] Étapes (v55) : jusqu'à 10 arrêts entre le départ et l'arrivée (même recherche que l'arrivée, ↑ ↓ ✕), un
+    seul calcul ORS avec tous les points (budget de 3, sans `alternative_routes` : variantes de la phase 2b), heure
+    d'arrivée et durée par étape sur la fiche, repères numérotés ; ajout en route à l'arrêt seulement (fiche carburant
+    « Ajouter comme étape », champ de « Autres itinéraires ») ; « Étape atteinte. » (phrase fixe) puis la suite ;
+    recalcul, « Autres itinéraires » et mémoire de l'itinéraire avec les étapes restantes ; 150 km des zones évitées
+    mesurés comme ORS (somme des tronçons à vol d'oiseau) ; 2009 : tronçon en échec nommé. (Reste de la phase 8.)
 
 ## Bloc 3 — Réglementation
 

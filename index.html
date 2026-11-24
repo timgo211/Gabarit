@@ -143,6 +143,9 @@
             <h2 id="nav-alts-title">Autres itinéraires</h2>
             <button type="button" id="btn-alts-close" class="btn">Fermer</button>
           </div>
+          <!-- v55 : étape ajoutée en route, à l'arrêt seulement : champ créé à l'ouverture du panneau (à l'arrêt) et
+               retiré à sa fermeture (dès que le véhicule roule) ; jamais de champ de saisie en roulant. -->
+          <div id="alts-stop" class="alts-stop" hidden></div>
           <p id="nav-alts-status" class="status" role="status"></p>
           <div id="nav-alts-summary" class="summary" hidden></div>
           <button type="button" id="btn-alts-go" class="btn btn-primary nav-alts-go" hidden>Guider par cet itinéraire</button>
@@ -185,6 +188,11 @@
             <button type="button" id="btn-gps" class="btn btn-icon" aria-label="Utiliser ma position">📍</button>
           </div>
           <ul id="from-list" class="suggestions" role="listbox" hidden></ul>
+        </div>
+        <!-- v55 : étapes entre le départ et l'arrivée (10 au plus), même recherche que l'arrivée. -->
+        <div id="stops-box" class="stops-box">
+          <ol id="stops-list" class="stops-list" aria-label="Étapes"></ol>
+          <button type="button" id="btn-add-stop" class="btn btn-add-stop">+ Ajouter une étape</button>
         </div>
         <div class="field">
           <label for="to-input">Arrivée</label>

@@ -11,7 +11,7 @@ import {
  * @param {{ root:HTMLElement, getOk:()=>object[], onToggleOk:(station:object)=>void, isParked:()=>boolean,
  *   fetchImpl?:typeof fetch }} ctx
  */
-export function createFuelPanel({ root, getOk, onToggleOk, isParked, fetchImpl = (...a) => fetch(...a) }) {
+export function createFuelPanel({ root, getOk, onToggleOk, isParked, onAddStop = null, fetchImpl = (...a) => fetch(...a) }) {
   const $ = (sel) => root.querySelector(sel);
   const ui = {
     status: $('#fuel-status'), note: $('#fuel-note'), filters: $('#fuel-filters'), hgv: $('#btn-fuel-hgv'),
@@ -111,6 +111,19 @@ export function createFuelPanel({ root, getOk, onToggleOk, isParked, fetchImpl =
       render();
     });
     li.append(pick, star);
+    // v55 : « Ajouter comme étape », à l'arrêt seulement (R412-6-2 ; vitesse inconnue = en mouvement), grisé sinon.
+    if (onAddStop) {
+      const add = document.createElement('button');
+      add.type = 'button';
+      add.className = 'btn fuel-add-stop';
+      add.textContent = 'Ajouter comme étape';
+      add.setAttribute('aria-disabled', String(!isParked()));
+      add.addEventListener('click', () => {
+        if (!isParked()) { status(FUEL.PARKED_TEXT); return; }
+        onAddStop({ label: d.place || 'Station', lon: s.lon, lat: s.lat });
+      });
+      li.append(add);
+    }
     return li;
   }
 

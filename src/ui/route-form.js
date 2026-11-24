@@ -3,11 +3,12 @@
 import { $, el } from './dom.js';
 import { fetchSuggestions } from './api.js';
 import { suggestionPlan } from '../lib/coords.js';
+import { STOPS, moveStop, removeStop } from '../lib/stops.js';
 
 const DEBOUNCE_MS = 300;
 
-/** Liste déroulante de suggestions attachée à un champ. */
-function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
+/** Liste déroulante de suggestions attachée à un champ (aussi « Ajouter une étape » du guidage, v55). */
+export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
   let timer = null;
   let ctrl = null;
   let items = [];
@@ -83,6 +84,10 @@ export function createRouteForm(opts) {
   let myPosition = null; // [lon, lat]
   let from = null; // { label, lon, lat } ou null = ma position
   let to = null;
+  /** v55 : étapes { place:{label,lon,lat}|null, text:string } dans l'ordre (10 au plus). */
+  let stops = [];
+  const stopsList = $('#stops-list');
+  const addStopBtn = $('#btn-add-stop');
 
   avoidTolls.checked = !!opts.initial.avoidTolls;
   avoidFerries.checked = !!opts.initial.avoidFerries;
@@ -93,6 +98,45 @@ export function createRouteForm(opts) {
   const common = { getApiKey: opts.getApiKey, getFocus: () => myPosition, onError: opts.onError };
   attachAutocomplete(fromInput, $('#from-list'), { ...common, onPick: (s) => { from = s; }, onEdit: () => opts.onEdit?.('from') });
   attachAutocomplete(toInput, $('#to-list'), { ...common, onPick: (s) => { to = s; }, onEdit: () => opts.onEdit?.('to') });
+
+  /** Lignes des étapes : champ avec la même recherche que l'arrivée, ↑ ↓ ✕ (48 px). Redessinées à chaque changement. */
+  function renderStops() {
+    stopsList.replaceChildren(...stops.map((st, i) => {
+      const id = `stop-input-${i}`;
+      const input = el('input', {
+        id, type: 'search', placeholder: 'Ville, adresse, entreprise…', enterkeyhint: 'next', role: 'combobox',
+        'aria-autocomplete': 'list', 'aria-expanded': 'false', 'aria-controls': `stop-list-${i}`, class: 'stop-input',
+      });
+      input.value = st.place ? st.place.label : st.text;
+      const list = el('ul', { id: `stop-list-${i}`, class: 'suggestions', role: 'listbox', hidden: true });
+      attachAutocomplete(input, list, {
+        ...common,
+        onPick: (place) => { stops[i] = { place, text: input.value }; },
+      });
+      input.addEventListener('input', () => { stops[i] = { place: null, text: input.value }; });
+      const btn = (text, label, onclick, disabled = false) => el('button', {
+        type: 'button', class: 'btn btn-stop', text, 'aria-label': label, onclick, disabled: disabled || null,
+      });
+      return el('li', { class: 'stop-row' }, [
+        el('label', { for: id, text: `Étape ${i + 1}` }),
+        el('div', { class: 'combo' }, [
+          input,
+          btn('↑', `Monter l'étape ${i + 1}`, () => { stops = moveStop(stops, i, -1); renderStops(); }, i === 0),
+          btn('↓', `Descendre l'étape ${i + 1}`, () => { stops = moveStop(stops, i, 1); renderStops(); }, i === stops.length - 1),
+          btn('✕', `Retirer l'étape ${i + 1}`, () => { stops = removeStop(stops, i); renderStops(); }),
+        ]),
+        list,
+      ]);
+    }));
+    addStopBtn.disabled = stops.length >= STOPS.MAX;
+    addStopBtn.textContent = stops.length >= STOPS.MAX ? STOPS.FULL_TEXT : '+ Ajouter une étape';
+  }
+  addStopBtn.addEventListener('click', () => {
+    if (stops.length >= STOPS.MAX) return;
+    stops = [...stops, { place: null, text: '' }];
+    renderStops();
+    stopsList.querySelector(`#stop-input-${stops.length - 1}`)?.focus();
+  });
 
   /** Demande la position GPS ; résout [lon, lat] ou rejette avec un message en français. */
   function locate() {
@@ -131,6 +175,8 @@ export function createRouteForm(opts) {
     e.preventDefault();
     if (!to) { opts.onError("Choisis l'arrivée dans la liste de suggestions."); toInput.focus(); return; }
     if (fromInput.value.trim() && !from) { opts.onError('Choisis le départ dans la liste, ou touche 📍 pour ta position.'); return; }
+    const missing = stops.findIndex((st) => !st.place);
+    if (missing >= 0) { opts.onError(`Choisis l'étape ${missing + 1} dans la liste, ou retire-la (✕).`); return; }
     let start;
     let fromLabel;
     if (from) {
@@ -148,9 +194,11 @@ export function createRouteForm(opts) {
     opts.onSubmit({
       start, end: [to.lon, to.lat], fromLabel, toLabel: to.label, startIsMyPosition: !from,
       avoidTolls: avoidTolls.checked, avoidFerries: avoidFerries.checked,
+      stops: stops.map((st) => ({ label: st.place.label, lon: st.place.lon, lat: st.place.lat })),
     });
   });
 
+  renderStops();
   // Position au démarrage (sans message si refusée : on le dira au calcul).
   locate().catch(() => {});
 
@@ -166,6 +214,8 @@ export function createRouteForm(opts) {
       toInput.value = to.label;
       avoidTolls.checked = !!shared.avoidTolls;
       avoidFerries.checked = !!shared.avoidFerries;
+      stops = [];
+      renderStops();
     },
     /** Départ ou arrivée choisi sur la carte (appui long). Aucun calcul lancé. */
     setPlace(which, place) {
@@ -176,6 +226,15 @@ export function createRouteForm(opts) {
         to = { ...place };
         toInput.value = place.label;
       }
+    },
+    /** v55 : étapes choisies (reprise d'un itinéraire, étape ajoutée depuis la fiche carburant). */
+    setStops(list) {
+      stops = (Array.isArray(list) ? list : []).slice(0, STOPS.MAX).map((p) => ({ place: { ...p }, text: p.label }));
+      renderStops();
+    },
+    /** Étapes choisies, dans l'ordre ({ label, lon, lat } ; lignes non choisies ignorées). */
+    getStops() {
+      return stops.filter((st) => st.place).map((st) => ({ ...st.place }));
     },
     setBusy(busy) {
       const btn = $('#btn-route');

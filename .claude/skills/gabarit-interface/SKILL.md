@@ -168,6 +168,16 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   Fermé dès que le véhicule roule (`onParkChange`, `planPark.onChange`) et au démarrage du guidage. Module
   `src/ui/fuel.js` chargé à la demande (`lazyLoader`) : import refusé → « Pas de connexion : prix indisponibles. »
   (message de la fiche ou bref du guidage), jamais un bouton muet. Rien dans le bandeau ni à voix haute, rien sur la carte.
+- v55 : étapes (10 au plus) — préparation : bouton « + Ajouter une étape » (`#btn-add-stop`, entre départ et arrivée),
+  une ligne par étape (`.stop-row` : champ avec la recherche de l'arrivée, ↑ ↓ ✕ de 48 px), étape non choisie dans la
+  liste → message, pas de calcul. Fiche : `.route-card-leg` « Étape 1 · Metz — 14:35 (1 h 12) » puis « Arrivée »,
+  note « N étape(s) : Heures sans temps passé aux étapes. ». Carte : repères numérotés `.stop-marker` (accent), aussi
+  en guidage (étapes restantes). Guidage : « Vous arrivez à l'étape » (arrivée ORS type 10 au milieu), « Étape
+  atteinte. » (phrase fixe, sans nom) à 50 m de l'étape, puis la suite ; « Prochaine étape (k/n) : libellé · km · heure »
+  dans les détails (`#nav-facts`), jamais dit. Ajout en route à l'arrêt seulement (R412-6-2, `parkedState`) :
+  « Ajouter comme étape » de la fiche carburant (préparation : nouveau calcul ; guidage : « Autres itinéraires » avec
+  l'étape) et champ « Ajouter une étape » du panneau `#nav-alts` (fermé dès que le véhicule roule) ; étape rangée selon
+  sa place sur le tracé. Recalcul et « Autres itinéraires » : étapes non atteintes gardées.
 - Phase 11b : directions — bandeau : la consigne avec « direction X » (`maneuverText`, `spoken: false`) remplace le nom
   de rue (règle `bannerText` inchangée) ; voix (`announcementText`, `spoken: true`) : complément seulement si
   `m.direction.speak`. Copie absente ou ambiguë : rien de plus qu'avant. Aucune saisie, rien dans la fiche.

@@ -10,6 +10,7 @@
 
 import { haversine } from './nav-geo.js';
 import { ZFE } from './zfe.js';
+import { crowPath } from './stops.js';
 
 /** Rayon constant du polygone évité autour d'une restriction (m). */
 export const RESTR_RADIUS_M = 30;
@@ -158,22 +159,32 @@ function distToTrip(p, start, end) {
 /**
  * Restrictions à éviter pour ce calcul.
  * @param {object[]} list
- * @param {{ vehicle:object, start:number[], end:number[] }} trip start / end en [lon, lat]
+ * @param {{ vehicle:object, start:number[], end:number[], stops?:{lon:number,lat:number}[] }} trip start / end en
+ *   [lon, lat] ; stops (v55) : étapes, dans l'ordre. La limite de 150 km porte sur la somme des distances à vol
+ *   d'oiseau entre points successifs (mesure d'ORS, crowPath) ; zone du trajet autour de chaque tronçon ; une
+ *   restriction à 60 m d'une étape est comptée comme au départ ou à l'arrivée (non évitable).
  * @returns {{ applicable:object[], avoided:object[], atEnds:object[], tooFar:boolean, geometry:object|null }}
  *   applicable : concernent le véhicule et proches de la zone du trajet ; avoided : celles envoyées à ORS ;
  *   atEnds : au départ ou à l'arrivée (non évitables) ; tooFar : trajet > 150 km, aucun polygone envoyé
  */
-export function restrictionsForTrip(list, { vehicle, start, end }) {
+export function restrictionsForTrip(list, { vehicle, start, end, stops = [] }) {
   const out = { applicable: [], avoided: [], atEnds: [], tooFar: false, geometry: null };
   if (!Array.isArray(list) || !list.length || !Array.isArray(start) || !Array.isArray(end)) return out;
-  const crow = haversine(start, end);
+  const via = (Array.isArray(stops) ? stops : []).map((s) => [s.lon, s.lat]);
+  const pts = [start, ...via, end];
+  const crow = crowPath(pts);
   const zone = Math.max(RESTR.ZONE_MIN_M, RESTR.ZONE_SHARE * crow);
-  out.applicable = list.filter((r) => applies(r, vehicle) && distToTrip([r.lon, r.lat], start, end) <= zone);
+  const near = (p) => {
+    let best = Infinity;
+    for (let i = 1; i < pts.length; i += 1) best = Math.min(best, distToTrip(p, pts[i - 1], pts[i]));
+    return best;
+  };
+  out.applicable = list.filter((r) => applies(r, vehicle) && near([r.lon, r.lat]) <= zone);
   if (!out.applicable.length) return out;
   if (crow > RESTR.MAX_DISTANCE_M) { out.tooFar = true; return out; }
   for (const r of out.applicable) {
     const p = [r.lon, r.lat];
-    if (haversine(p, start) <= RESTR_RADIUS_M * 2 || haversine(p, end) <= RESTR_RADIUS_M * 2) out.atEnds.push(r);
+    if (pts.some((q) => haversine(p, q) <= RESTR_RADIUS_M * 2)) out.atEnds.push(r);
     else out.avoided.push(r);
   }
   if (out.avoided.length) {

@@ -18,7 +18,7 @@ npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_mod
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
-                                   #   | carburant
+                                   #   | carburant | etapes
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -94,6 +94,13 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   « Recommandé » en tête, notes, 2e fiche choisie → « Guider par cet itinéraire » → source `route` = 2e tracé ;
   panneau rouvert puis le véhicule roule → fermé ; 2009 → message du départ, aucune fiche ni bouton ; rien dit.
   412×900 jour, 900×412 nuit, 1280×800 jour. `guidage` : le bouton ouvre la vue d'ensemble et le panneau.
+- `etapes` (v55) : fixture `ors-directions-etapes.json` (requête à 3 points ou plus) et `ors-directions-nav.json`
+  (2 points). 412×900 jour, 1280×800 nuit, 360×760 et 800×1280 jour (saisie et fiche) : 2 étapes, ↓ puis ✕, boutons
+  ≥ 48 px ; 1 à 3 requêtes avec tous les points, jamais `alternative_routes` ; ligne « Étape 1 · … — hh:mm (n min) »,
+  note, repère `.stop-marker`. 412 et 1280 : fiche carburant à l'arrêt → « Ajouter comme étape » → nouveau calcul à 4
+  points ; guidage GPS émulé : « Prochaine étape (1/1) » dans les détails, sortie de route en roulant → recalcul à
+  3 points, « Étape atteinte. » dite une fois, jamais « Destination atteinte » ; à l'arrêt « Autres itinéraires » à
+  2 points, champ « Ajouter une étape » → calcul à 3 points ; le véhicule roule → panneau fermé.
 - `carburant` (phase 4) : réponse de data.economie.gouv.fr simulée (option `fuel` d'`open`, forme de
   `/exports/json`), stations placées près du tracé de `ors-directions-nav.json`. 412×900 jour, 900×412 nuit, 1280×800
   jour : préparation en roulant → grisé, message, aucune requête ; à l'arrêt → une requête (`in_bbox`, rien d'autre),

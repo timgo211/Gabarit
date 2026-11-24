@@ -39,6 +39,8 @@ export const THEN_MAX_GAP_M = 200;
 
 export const UTURN_SAFE_TEXT = 'Faites demi-tour dès que possible, en sécurité';
 export const ARRIVED_TEXT = 'Destination atteinte';
+/** v55 : phrase fixe à l'arrivée à une étape (aucun nom ni donnée non confirmée). */
+export const STOP_REACHED_TEXT = 'Étape atteinte.';
 
 /** Distances des trois paliers pour une vitesse en m/s. */
 export function announceDistances(speedMs) {
@@ -99,6 +101,11 @@ export function buildManeuvers(steps, cum) {
       duration: typeof s.duration === 'number' ? s.duration : 0,
     });
   });
+  // v55 : avec des étapes, ORS termine chaque tronçon par une arrivée (type 10) : seule la dernière est la destination,
+  // les autres sont des étapes (« Vous arrivez à l'étape », jamais « à destination »).
+  let lastGoal = -1;
+  out.forEach((m, k) => { if (m.type === STEP_TYPES.GOAL) lastGoal = k; });
+  out.forEach((m, k) => { if (m.type === STEP_TYPES.GOAL && k !== lastGoal) m.waypoint = true; });
   return out;
 }
 
@@ -117,11 +124,14 @@ export function nextManeuver(maneuvers, along) {
     if (isDepart(m, i)) continue;
     const isGoal = m.type === STEP_TYPES.GOAL;
     if (m.at > along + 0.5 || (isGoal && i === maneuvers.length - 1)) {
-      const nxt = maneuvers[i + 1];
+      // « Puis » : manœuvre suivante, sans le départ d'un nouveau tronçon après une étape (v55).
+      let j = i + 1;
+      while (j < maneuvers.length && maneuvers[j].type === STEP_TYPES.DEPART) j += 1;
+      const nxt = maneuvers[j];
       return {
         index: i,
         distance: Math.max(0, m.at - along),
-        then: nxt ? i + 1 : null,
+        then: nxt ? j : null,
         thenGap: nxt ? Math.max(0, nxt.at - m.at) : null,
       };
     }
@@ -164,7 +174,8 @@ export function maneuverText(m, { uturnSafe = false, spoken = false } = {}) {
   if (uturnSafe && m.type === STEP_TYPES.UTURN) return UTURN_SAFE_TEXT;
   if (m.type === STEP_TYPES.GOAL) {
     const side = arrivalSide(m.instruction);
-    return side ? `Vous arrivez à destination, ${side}` : 'Vous arrivez à destination';
+    const what = m.waypoint ? "Vous arrivez à l'étape" : 'Vous arrivez à destination';
+    return side ? `${what}, ${side}` : what;
   }
   const base = (m.instruction || '').trim() || 'Continuez';
   const d = m.direction;

@@ -9,7 +9,7 @@
 import { prepareLine, locateOnLine, segmentBearing, bearing as bearingTo, haversine, pointAt } from './nav-geo.js';
 import {
   buildManeuvers, nextManeuver, stageToAnnounce, announcementText, arrivedText, maneuverText, maneuverIcon,
-  firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName,
+  firstManeuverIndex, isDepart, STEP_TYPES, UTURN_SAFE_TEXT, THEN_MAX_GAP_M, currentRoadName, STOP_REACHED_TEXT,
 } from './nav-guidance.js';
 import { ERROR_KINDS } from './ors-errors.js';
 import { placeAlongRoute, nextAreas, areaToAnnounce, announceAreaText, AREAS } from './areas-route.js';
@@ -61,6 +61,8 @@ export const NAV = Object.freeze({
   NO_REROUTE_NEAR_DEST_M: 150,
   /** Évite une fausse arrivée quand l'itinéraire longe la destination avant d'y revenir (boucle). */
   ARRIVAL_MAX_REMAINING_M: 250,
+  /** v55 : étape dépassée sur le tracé de plus de 300 m sans être passée à 50 m : marquée passée, sans voix. */
+  STOP_PASSED_M: 300,
   /** Signal GPS perdu au bout de 10 s sans position. */
   GPS_LOST_MS: 10000,
   /** Lissage de la vitesse (moyenne exponentielle) pour le zoom et les annonces. */
@@ -137,7 +139,35 @@ export function remainingDuration(prepared, along) {
 }
 
 function goalOf(prepared) {
-  return prepared.maneuvers.find((m) => m.type === STEP_TYPES.GOAL) ?? null;
+  return prepared.maneuvers.findLast((m) => m.type === STEP_TYPES.GOAL) ?? null;
+}
+
+/**
+ * v55 : étapes du guidage placées sur le tracé. Distance d'une étape = celle de son point d'accroche ORS
+ * (route.wayPoints, dans l'ordre départ, étapes, arrivée) ; sinon projection du point saisi sur le tracé.
+ * @returns {{ label:string, point:number[], snap:number[], along:number }[]}
+ */
+export function placeStops(stops, route, line) {
+  const list = Array.isArray(stops) ? stops.filter((x) => x && isNum(x.lon) && isNum(x.lat)) : [];
+  if (!list.length) return [];
+  const wp = Array.isArray(route?.wayPoints) && route.wayPoints.length === list.length + 2 ? route.wayPoints : null;
+  let prev = 0;
+  return list.map((x, i) => {
+    const point = [x.lon, x.lat];
+    const hooked = wp && Number.isInteger(wp[i + 1]) && wp[i + 1] < line.cum.length;
+    let along = hooked ? line.cum[wp[i + 1]] : locateOnLine(line, point).along;
+    along = Math.max(prev, along);
+    prev = along;
+    // Point d'accroche : celui d'ORS seulement (là où le tracé passe à l'étape) ; sans lui, le point saisi.
+    const snap = hooked ? line.coords[wp[i + 1]] : point;
+    return { label: typeof x.label === 'string' ? x.label : '', lon: x.lon, lat: x.lat, point, snap, along };
+  });
+}
+
+/** Étapes pas encore atteintes (recalcul, « Autres itinéraires », sauvegarde) : { label, lon, lat }. */
+export function remainingStops(state) {
+  const list = state?.stops ?? [];
+  return list.slice(state?.nextStop ?? 0).map((x) => ({ label: x.label, lon: x.lon, lat: x.lat }));
 }
 
 /** Si la première manœuvre est un demi-tour : phrase prudente, dite une seule fois. */
@@ -212,9 +242,14 @@ function placeSpeeds(ctx, rules, route) {
 export function startNavigation(route, {
   destination = null, now = 0, areas = null, announceAreas = false, rules = null,
   driving = null, driveVoice = true, wind = null, windGust = undefined, windVoice = true, speeds = null, directions = null,
+  stops = [],
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
+  const prepared = prepareRoute(route, directions);
   return {
+    // v55 : étapes restantes, dans l'ordre du tracé ; nextStop = première non atteinte.
+    stops: placeStops(stops, route, prepared.line),
+    nextStop: 0,
     speedCtx,
     speedLimits: placeSpeeds(speedCtx, rules, route),
     speedCursor: 0,
@@ -240,7 +275,7 @@ export function startNavigation(route, {
     tunnelsAnnounced: {},
     bans: rules?.vehicle ? prepareGuidanceBans(rules.vehicle, now || Date.now()) : { windows: [], announced: {} },
     directionsData: directions ?? null,
-    route: prepareRoute(route, directions),
+    route: prepared,
     source: route,
     areaPool: Array.isArray(areas) ? areas : [],
     areas: placeAreas(areas, route),
@@ -282,7 +317,10 @@ export function resumeNavigation(state, progress) {
   state.route.maneuvers.forEach((m, i) => { if (isNum(m.at) && m.at <= along) announced[i] = 'now'; });
   const segIndex = Number.isInteger(progress?.segIndex) && progress.segIndex >= 0
     && progress.segIndex < state.route.line.coords.length - 1 ? progress.segIndex : null;
-  return { ...state, along, segIndex, announced, started: true, resumed: true };
+  // v55 : étapes déjà atteintes (sauvegarde sans étapes → 0).
+  const n = state.stops?.length ?? 0;
+  const nextStop = Number.isInteger(progress?.nextStop) ? Math.min(Math.max(0, progress.nextStop), n) : 0;
+  return { ...state, along, segIndex, announced, started: true, resumed: true, nextStop };
 }
 
 /**
@@ -347,10 +385,29 @@ export function updateNavigation(state, fix) {
     events.push({ type: 'speak', text: arrivedText(goalOf(s.route)), interrupt: true }, { type: 'arrived' });
   }
 
+  // v55 : étape atteinte (à 50 m du point saisi ou du point d'accroche, et 250 m au plus de tracé jusqu'à elle) :
+  // phrase fixe, puis le guidage continue sur le même tracé vers l'étape suivante. Étape dépassée sur le tracé sans
+  // passer à 50 m : marquée passée, sans voix (rien d'inventé).
+  if (!s.arrived && s.stops?.length) {
+    while (s.nextStop < s.stops.length) {
+      const st = s.stops[s.nextStop];
+      const toStop = Math.min(haversine(p, st.point), haversine(p, st.snap));
+      if (toStop <= NAV.ARRIVAL_RADIUS_M && (!onRoute || st.along - loc.along <= NAV.ARRIVAL_MAX_REMAINING_M)) {
+        s.nextStop += 1;
+        events.push({ type: 'speak', text: STOP_REACHED_TEXT, interrupt: true }, { type: 'stop-reached', index: s.nextStop - 1 });
+        break;
+      }
+      if (onRoute && loc.along > st.along + NAV.STOP_PASSED_M) { s.nextStop += 1; continue; }
+      break;
+    }
+  }
+  const nextStop = s.stops?.[s.nextStop] ?? null;
+  const toNextStop = nextStop ? Math.min(haversine(p, nextStop.point), haversine(p, nextStop.snap)) : Infinity;
+
   // Hors itinéraire → recalcul (jamais près de la destination ni après l'arrivée), seulement en roulant
   // (≥ 10 km/h) avec une position précise (≤ 30 m). À l'arrêt hors du tracé : proposition seulement.
   const rolling = speed >= NAV.OFF_ROUTE_MIN_SPEED;
-  const offCandidate = !s.arrived && toDest >= NAV.NO_REROUTE_NEAR_DEST_M && !onRoute;
+  const offCandidate = !s.arrived && toDest >= NAV.NO_REROUTE_NEAR_DEST_M && toNextStop >= NAV.NO_REROUTE_NEAR_DEST_M && !onRoute;
   s.stoppedOffCount = offCandidate && !rolling && reliable ? s.stoppedOffCount + 1 : 0;
   if (!offCandidate || !rolling || !precise) {
     s.offCount = 0;
@@ -510,6 +567,14 @@ export function updateNavigation(state, fix) {
     /** À l'arrêt hors du tracé : proposer « Recalculer d'ici » (bouton), sans rien changer tout seul. */
     offRouteStopped: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES,
     canRequestReroute: s.stoppedOffCount >= NAV.STOPPED_OFF_FIXES && canReroute(s, t),
+    /**
+     * v55 : prochaine étape (affichage seulement, jamais dite) : libellé, distance sur le tracé, temps (s), rang.
+     */
+    nextStop: nextStop && !s.arrived ? {
+      label: nextStop.label, index: s.nextStop, count: s.stops.length,
+      distance: Math.max(0, nextStop.along - loc.along),
+      duration: Math.max(0, remainingDuration(s.route, loc.along) - remainingDuration(s.route, nextStop.along)),
+    } : null,
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
     /**
@@ -687,10 +752,14 @@ export function markStopAsWork(state, now) {
 }
 
 /** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
-export function rerouteDone(state, route) {
+export function rerouteDone(state, route, stops = null) {
+  const prepared = prepareRoute(route, state.directionsData);
   const s = {
     ...state,
-    route: prepareRoute(route, state.directionsData),
+    // v55 : le recalcul a été demandé avec les étapes restantes (remainingStops) : replacées sur le nouveau tracé.
+    stops: placeStops(Array.isArray(stops) ? stops : remainingStops(state), route, prepared.line),
+    nextStop: 0,
+    route: prepared,
     source: route,
     areas: placeAreas(state.areaPool, route),
     zfe: placeZfe(state.rules, route, state.lastFixAt ?? state.startedAt),

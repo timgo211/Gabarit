@@ -13,6 +13,7 @@
 import { prepareLine, pointAt, haversine } from './nav-geo.js';
 import { timeAt } from './areas-route.js';
 import { squareAround } from './adr.js';
+import { pathCrow } from './zfe.js';
 
 export const LOCAL = Object.freeze({
   /** Desserte acceptée à moins de 3 km du départ ou de l'arrivée (à vol d'oiseau). */
@@ -115,13 +116,13 @@ export function describeLocalAccepted(p) {
  * de l'API publique d'ORS que pour les ZFE : départ et arrivée à 150 km au plus à vol d'oiseau.
  * @returns {{ ok:true, geometry:object }|{ ok:false, text:string }}
  */
-export function avoidLocalFor(passages, { start, end, existing = null, maxDistance = LOCAL.MAX_AVOID_M }) {
+export function avoidLocalFor(passages, { start, end, existing = null, stops = [], maxDistance = LOCAL.MAX_AVOID_M }) {
   const list = (passages ?? []).filter((p) => !p.accepted && isPoint(p.mid));
   if (!list.length) return { ok: false, text: 'Aucune route réservée à la desserte locale traversée sur cet itinéraire.' };
-  if (!isPoint(start) || !isPoint(end) || haversine(start, end) > maxDistance) {
+  if (!isPoint(start) || !isPoint(end) || pathCrow(start, stops, end) > maxDistance) {
     return {
       ok: false,
-      text: 'Éviter la desserte locale : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le départ et l\'arrivée sont à 150 km au plus à vol d\'oiseau. Choisis un autre itinéraire proposé ou ajoute une étape ; la signalisation fait foi.',
+      text: 'Éviter la desserte locale : impossible pour ce trajet. OpenRouteService (service gratuit) ne contourne une zone que si le trajet (départ, étapes, arrivée) fait 150 km au plus à vol d\'oiseau. Choisis un autre itinéraire proposé ; la signalisation fait foi.',
     };
   }
   const polygons = [];

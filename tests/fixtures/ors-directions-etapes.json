@@ -1,0 +1,325 @@
+{
+ "type": "FeatureCollection",
+ "bbox": [
+  4.95,
+  45.698547,
+  4.990316,
+  45.73
+ ],
+ "features": [
+  {
+   "bbox": [
+    4.95,
+    45.698547,
+    4.990316,
+    45.73
+   ],
+   "type": "Feature",
+   "properties": {
+    "segments": [
+     {
+      "distance": 3800,
+      "duration": 171,
+      "steps": [
+       {
+        "distance": 2000,
+        "duration": 90,
+        "type": 11,
+        "instruction": "Démarrez en direction de l’Est sur Route de Lyon",
+        "name": "Route de Lyon",
+        "way_points": [
+         0,
+         8
+        ]
+       },
+       {
+        "distance": 1800,
+        "duration": 81,
+        "type": 1,
+        "instruction": "Tournez à droite sur D 306",
+        "name": "D 306",
+        "way_points": [
+         8,
+         14
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivé à votre destination, sur la droite",
+        "name": "-",
+        "way_points": [
+         14,
+         14
+        ]
+       }
+      ]
+     },
+     {
+      "distance": 2212.1,
+      "duration": 185.7,
+      "steps": [
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 11,
+        "instruction": "Démarrez en direction du Nord sur Avenue des Frères Lumière",
+        "name": "Avenue des Frères Lumière",
+        "way_points": [
+         14,
+         14
+        ]
+       },
+       {
+        "distance": 1662.1,
+        "duration": 119.7,
+        "type": 7,
+        "instruction": "Entrez sur le rond-point et prenez la 2ème sortie sur Avenue des Frères Lumière",
+        "name": "Avenue des Frères Lumière",
+        "exit_number": 2,
+        "way_points": [
+         14,
+         28
+        ]
+       },
+       {
+        "distance": 150,
+        "duration": 18,
+        "type": 0,
+        "instruction": "Tournez à gauche sur Rue de l’Industrie",
+        "name": "Rue de l’Industrie",
+        "way_points": [
+         28,
+         29
+        ]
+       },
+       {
+        "distance": 400,
+        "duration": 48,
+        "type": 1,
+        "instruction": "Tournez à droite sur Chemin du Dépôt",
+        "name": "Chemin du Dépôt",
+        "way_points": [
+         29,
+         33
+        ]
+       },
+       {
+        "distance": 0,
+        "duration": 0,
+        "type": 10,
+        "instruction": "Arrivé à votre destination, sur la droite",
+        "name": "-",
+        "way_points": [
+         33,
+         33
+        ]
+       }
+      ]
+     }
+    ],
+    "extras": {
+     "tollways": {
+      "values": [
+       [
+        0,
+        33,
+        0
+       ]
+      ],
+      "summary": [
+       {
+        "value": 0,
+        "distance": 6012,
+        "amount": 100
+       }
+      ]
+     }
+    },
+    "summary": {
+     "distance": 6012,
+     "duration": 356.7
+    },
+    "way_points": [
+     0,
+     14,
+     33
+    ]
+   },
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      4.95,
+      45.73
+     ],
+     [
+      4.953221,
+      45.73
+     ],
+     [
+      4.956442,
+      45.73
+     ],
+     [
+      4.959663,
+      45.73
+     ],
+     [
+      4.962883,
+      45.729999
+     ],
+     [
+      4.966104,
+      45.729999
+     ],
+     [
+      4.969325,
+      45.729998
+     ],
+     [
+      4.972546,
+      45.729998
+     ],
+     [
+      4.975767,
+      45.729997
+     ],
+     [
+      4.975767,
+      45.727299
+     ],
+     [
+      4.975767,
+      45.724601
+     ],
+     [
+      4.975767,
+      45.721903
+     ],
+     [
+      4.975767,
+      45.719205
+     ],
+     [
+      4.975767,
+      45.716507
+     ],
+     [
+      4.975767,
+      45.713809
+     ],
+     [
+      4.975638,
+      45.713785
+     ],
+     [
+      4.975544,
+      45.713719
+     ],
+     [
+      4.975509,
+      45.713629
+     ],
+     [
+      4.975544,
+      45.71354
+     ],
+     [
+      4.975638,
+      45.713474
+     ],
+     [
+      4.975767,
+      45.71345
+     ],
+     [
+      4.977055,
+      45.711892
+     ],
+     [
+      4.978343,
+      45.710334
+     ],
+     [
+      4.979631,
+      45.708777
+     ],
+     [
+      4.980918,
+      45.707219
+     ],
+     [
+      4.982206,
+      45.705661
+     ],
+     [
+      4.983494,
+      45.704103
+     ],
+     [
+      4.984781,
+      45.702546
+     ],
+     [
+      4.986068,
+      45.700988
+     ],
+     [
+      4.987741,
+      45.701662
+     ],
+     [
+      4.988385,
+      45.700883
+     ],
+     [
+      4.989029,
+      45.700105
+     ],
+     [
+      4.989673,
+      45.699326
+     ],
+     [
+      4.990316,
+      45.698547
+     ]
+    ]
+   }
+  }
+ ],
+ "metadata": {
+  "attribution": "openrouteservice.org | OpenStreetMap contributors",
+  "service": "routing",
+  "timestamp": 1795075200000,
+  "query": {
+   "coordinates": [
+    [
+     4.95,
+     45.73
+    ],
+    [
+     4.975767,
+     45.713809
+    ],
+    [
+     4.990316,
+     45.698547
+    ]
+   ],
+   "profile": "driving-hgv",
+   "format": "geojson",
+   "units": "m",
+   "language": "fr",
+   "extra_info": [
+    "tollways"
+   ],
+   "maximum_speed": 90
+  },
+  "engine": {
+   "version": "9.0.0"
+  }
+ }
+}
