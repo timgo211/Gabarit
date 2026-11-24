@@ -602,6 +602,24 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     gebruikt », texte des conditions des données non lu en entier), Wallonie (pages du géoportail en 404, GetCapabilities
     sans licence), Sarre (« opendata », AccessConstraints « noLimitations », aucune licence ni mention écrite lisible).
     NGI : non essayé.
+  - [ ] Relecture du 24/11/2026 (Action « Textes officiels », runs 21 à 23, entrées `sat9-*`, `sat10-*`, `sat11-brut`) :
+    toujours rien codé (3 tours). Tuiles : Flandre WMS couche `Ortho` et WMTS `omwrgbmrvl` / GoogleMapsVL 200 image +
+    CORS `*` (l'ancienne couche WMS `OMWRGBMRVL` répond une erreur XML) ; Wallonie ORTHO_LAST 200 image + CORS ; Sarre
+    truedop (DOP20 2026) 200 image + CORS `*` ; NGI : WMS ortho (couches `orthoimage_coverage`, 2016 à 2023) CORS `*`,
+    tuile non essayée.
+    - Flandre : la fiche officielle du WMTS (metadata.vlaanderen.be, CSW) renvoie au « Gebruiksrecht geografische
+      webdiensten » (page déjà lue en partie, texte entier non lu) ; la Vlaamse Open Data licentie v1.2 n'est citée
+      que par un moteur de recherche. Licence non lue en toutes lettres : non codée.
+    - Wallonie : fiche SPW des Orthophotos 2021 lue (metawal) : « licence ouverte CC BY 4.0 … moyennant citation de la
+      source et mention explicite des modifications » ; mais les fiches des services ORTHO_LAST et ORTHO_2026_PRINTEMPS
+      renvoient à un autre texte, « Conditions d'accès et d'utilisation des services web géographiques de visualisation
+      du SPW » (geoportail.wallonie.be/files/documents/ConditionsSPW/LicServicesSPW.pdf), non lu. Non codée.
+    - Sarre : GetCapabilities « Fees : None », « AccessConstraints : noLimitations », aucune licence ; fiches INSPIRE
+      (DNS introuvable depuis l'Action), catalogue GDI-DE et govdata.de (délai dépassé) illisibles. Non codée.
+    - NGI : page « Politique d'ouverture et de réutilisation des données géographiques de l'IGN »
+      (ngi.be/fr/politique-douverture-et-de-reutilisation-des-donnees-geographiques-de-lign/) repérée, non lue ;
+      GetCapabilities « Fees / AccessConstraints : none ». Non codée.
+    Prochaine lecture possible : ces trois documents précis (LicServicesSPW.pdf, Gebruiksrecht complet, page NGI).
 
 - [x] **Phase 4 — Carburant** (v54 : fiche « Carburant sur le trajet » à l'arrêt, stations à ≤ 2 km, tri par prix du
   gazole, « ancien » > 48 h, filtre « Piste PL » (valeur lue dans la facette du jeu), détour à vol d'oiseau, mes
