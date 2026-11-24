@@ -80,6 +80,12 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     **synthétiques** `osm-voies.geojsonseq` (autoroute vers le point 20 de `ors-directions-sortie.json`),
     `osm-lieux.geojsonseq` ; tests `tests/lanes-convert.test.js`, `tests/places-convert.test.js`. Lecture dans
     l'appli : PR B (11c, « vers X », jamais dit) et PR C (11d, pictogrammes sous « Puis », jamais dits)
+  - phase 11c, appli (v60) : `places.js` (`parsePlaceTile`, `mergePlaceTiles`, `placesAlongRoute` — cases de 0,02°,
+    projection sur chaque segment —, `placesForManeuvers`, `withPlaces`) ; `prepareRoute(route, directions, places)`,
+    `setNavigationPlaces`, `placesData` de l'état ; `maneuverText` ajoute « , vers X » si `!spoken` ; `bannerText` :
+    consigne entière si `place` ; UI `src/ui/places.js` (`createTileCopy`) ; tests `tests/places.test.js`, fixture
+    **synthétique** `osm-lieux-sortie.geojsonseq` (lieux le long de `ors-directions-sortie.json`) ; ui-check
+    `directions` : cas lieux `fixture` / `egalite` / absente
   - v53 : `route-save.js` (mémoire de l'itinéraire : `buildSave`, `checkSave`, `shouldSave`, `restoredChoice`,
     `withoutSecrets`), UI `src/ui/route-save.js` (IndexedDB), `resumeNavigation` de `navigation.js` ; tests
     `tests/route-save.test.js`, `tests/route-store.test.js` (faux IndexedDB : absent, refusé, bloqué, plein) ; `src/ui/route-arrows.js` (chevrons et pastilles de manœuvre), `maneuverMarks`,

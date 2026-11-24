@@ -75,6 +75,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Directions (11b, `directions.js`, copie `data/directions-osm/` mêmes Action et cases, jamais précachée) : « direction X »
   seulement si UNE bretelle à 60 m du point de manœuvre au cap cohérent ; dit seulement sans autre bretelle à 60 m ;
   sinon consigne inchangée (jamais devinée). `maneuverText(m, { spoken })` : affiché ≠ dit.
+- « vers X » (11c, `places.js`, copie `data/lieux-osm/` mêmes Action et cases, jamais précachée) : sans direction 11b,
+  premier lieu OSM city/town/village à ≤ 1 km du tracé, 300 m à 15 km après la manœuvre (avant étape/arrivée) ; deux
+  lieux à < 300 m → rien. Affiché seulement, jamais dit ; jamais « direction ».
 - Écran de navigation v53 : boutons ronds de la colonne 48 px (zone tactile ≥ 40 px, ces boutons seulement), pastille
   de la rue sous le véhicule, ligne de sortie (règle 11b, jamais dite), mémoire de l'itinéraire en IndexedDB (question
   > 12 h seulement à l'arrêt). Détail : skill `gabarit-interface`.
