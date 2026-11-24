@@ -88,7 +88,10 @@ export function wayLimit(way, country, vehicle, countries = null, fr = undefined
   // (leur limite peut être plus basse que celle des autres PL).
   if (rule === null) return way.hgv && vehicle.hazmat !== true ? { kmh: way.limit, source: 'osm', cond: way.cond } : null;
   if (way.limit <= rule.kmh) return { kmh: way.limit, source: 'osm', cond: way.cond };
-  return { kmh: rule.kmh, source: 'rule', cond: way.cond };
+  // v57 : règle générale sur autoroute (classe 0 : 90 km/h, 80 ADR > 12 t, Code de la route art. R413-8) : sans
+  // ambiguïté ; ailleurs (80 des nationales, 60 articulé, selon le type de route qu'OSM ne confirme pas toujours) :
+  // ambiguë → compteur jamais rouge (nav-layout.js speedStatus). Visuel seulement.
+  return { kmh: rule.kmh, source: 'rule', cond: way.cond, ambiguous: way.cls !== 0 };
 }
 
 /** Voie retenue en un point : la plus proche (cap compatible), puis la plus basse à SPEED.TIE_M près. */
@@ -144,9 +147,10 @@ export function speedLimitsAlongRoute(route, data, { vehicle = null, countries =
       const vals = ways.map((w) => wayLimit(w, country, vehicle, countries, fr));
       // Une voie candidate de limite inconnue : le point reste inconnu (jamais la valeur d'une voisine plus haute).
       if (vals.every(Boolean)) lim = vals.reduce((a, b) => (b.kmh < a.kmh ? b : a));
-      if (lim) lim = { ...lim, cond: vals.some((v) => v.cond) };
+      if (lim) lim = { ...lim, cond: vals.some((v) => v.cond), ambiguous: lim.source === 'rule' && vals.some((v) => v.ambiguous) };
     }
-    const same = cur && lim && cur.kmh === lim.kmh && cur.source === lim.source && cur.cond === lim.cond;
+    const same = cur && lim && cur.kmh === lim.kmh && cur.source === lim.source && cur.cond === lim.cond
+      && !!cur.ambiguous === !!lim.ambiguous;
     if (same) { cur.to = Math.min(line.total, along + step / 2); continue; }
     if (cur) raw.push(cur);
     cur = lim ? { from: Math.max(0, along - step / 2), to: Math.min(line.total, along + step / 2), ...lim } : null;
@@ -172,7 +176,7 @@ export function limitAt(limits, along, cursor = 0) {
   while (i > 0 && along < list[i].from) i -= 1;
   while (i < list.length - 1 && along >= list[i].to) i += 1;
   const r = list[i];
-  const limit = along >= r.from && along < r.to ? { kmh: r.kmh, source: r.source, cond: r.cond } : null;
+  const limit = along >= r.from && along < r.to ? { kmh: r.kmh, source: r.source, cond: r.cond, ambiguous: !!r.ambiguous } : null;
   return { limit, cursor: i };
 }
 

@@ -189,3 +189,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - v51 : petit paysage (hauteur < 400 px, media query) : bouton « Pas une pause (travail) » sur deux lignes (7em) pour
   que l'alerte de conduite tienne au-dessus du panneau du bas ; panneau de limitation : mention « règle » (`#nav-limit-src`,
   `speedStatus(…).rule`) sous le panneau quand la limite vient d'une règle générale, couleur `--muted`, jamais dite.
+- v57 : règle générale **ambiguë** (`ambiguous` de `wayLimit` : source `rule` et classe ≠ 0 autoroute, porté par les
+  intervalles et `limitAt`, vue `speedLimitAmbiguous`) dépassée → `speedStatus(…).overRule`, classe `.over-rule` :
+  chiffres normaux, bord du compteur en pointillés `--fg` 3 px, jamais `--danger`. Règle d'autoroute (90, 80 ADR) ou
+  étiquette OSM (avec ou sans condition) dépassée → `.over` (rouge) comme avant. Panneau B14 jamais recoloré. Voix
+  inchangée (une règle n'est jamais dite).

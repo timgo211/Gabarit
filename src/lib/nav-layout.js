@@ -252,10 +252,15 @@ export function buttonColumn({ height, minTop = 0, maxBottom = null, count }) {
  * @param {number|null} limitKmh limite PL connue du tronçon
  * @param {'osm'|'rule'|null} source origine de la limite
  */
-export function speedStatus(kmh, limitKmh = null, source = null) {
+export function speedStatus(kmh, limitKmh = null, source = null, ambiguous = false) {
   const v = Number.isFinite(kmh) && kmh >= 0 ? Math.round(kmh) : null;
   const limit = Number.isFinite(limitKmh) && limitKmh > 0 ? Math.round(limitKmh) : null;
-  return { value: v === null ? '—' : String(v), limit, over: v !== null && limit !== null && v > limit, rule: limit !== null && source === 'rule' };
+  const rule = limit !== null && source === 'rule';
+  const above = v !== null && limit !== null && v > limit;
+  // v57 : limite d'une règle générale ambiguë (hors autoroute) dépassée → compteur jamais rouge (bord pointillé
+  // neutre, overRule) ; étiquette OSM (avec ou sans condition) ou règle d'autoroute → rouge comme avant (over).
+  const soft = rule && ambiguous === true;
+  return { value: v === null ? '—' : String(v), limit, over: above && !soft, overRule: above && soft, rule };
 }
 
 /**

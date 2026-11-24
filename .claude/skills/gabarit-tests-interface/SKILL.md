@@ -18,7 +18,7 @@ npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_mod
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
-                                   #   | carburant | etapes | historique
+                                   #   | carburant | etapes | historique | limites
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -106,6 +106,10 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   un trajet dans IndexedDB (`gabarit-history`), km plausibles, aucune coordonnée ; rien de la note dit ; Réglages :
   phrase de confidentialité, une ligne, statistiques du mois ; relevé (`emulateMedia print`, `window.print` remplacé) :
   seul `#history-print` visible, une ligne ; export avec `history` et `areaNotes`, sans la clé.
+- `limites` (v57) : semi 44 t sur Colombier (copie `vitesses-osm` de test), GPS émulé à 108 km/h, 412×900 jour,
+  1280×800 et 900×412 nuit : règle 60 hors autoroute → `.over-rule` (pointillés, aucune couleur `--danger`, mention
+  « règle »), 50 OSM et 90 règle d'autoroute → `.over` (rouge) ; panneau dans ses couleurs ; rien dit ; aucun
+  chevauchement.
 - `carburant` (phase 4) : réponse de data.economie.gouv.fr simulée (option `fuel` d'`open`, forme de
   `/exports/json`), stations placées près du tracé de `ors-directions-nav.json`. 412×900 jour, 900×412 nuit, 1280×800
   jour : préparation en roulant → grisé, message, aucune requête ; à l'arrêt → une requête (`in_bbox`, rien d'autre),

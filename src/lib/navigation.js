@@ -576,6 +576,8 @@ export function updateNavigation(state, fix) {
     /** Limitation de vitesse PL connue du tronçon (km/h) ou null (phase 11a) ; source 'osm' | 'rule'. */
     speedLimit: speedLimit?.kmh ?? null,
     speedLimitSource: speedLimit?.source ?? null,
+    /** v57 : limite d'une règle générale hors autoroute (ambiguë) : compteur jamais rouge. */
+    speedLimitAmbiguous: speedLimit?.ambiguous === true,
     /**
      * Vitesse pour les boutons réservés à l'arrêt (km/h) : vitesse du GPS, sinon déduite des deux dernières
      * positions (dérive sous max(précision, 5 m) = 0) ; null si inconnue (= en mouvement).

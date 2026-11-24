@@ -217,6 +217,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
       (Geofabrik France en 404 le 23/11/2026).
     - [x] v51 : limite venant d'une règle générale distinguée à l'écran (petite mention « règle » neutre sous le
       panneau, couleurs du panneau inchangées) ; voix, fiche et diagnostic inchangés.
+    - [x] v57 : règle générale hors autoroute (ambiguë : 80 des nationales, 60 articulé) dépassée → compteur jamais
+      rouge (bord pointillé neutre) ; règle d'autoroute (90, 80 ADR > 12 t) et étiquette OSM → rouge comme avant.
+      Visuel seulement, aucune voix.
   - [x] **Restes techniques (v51)** : test `app-version` (adresse unique par compteur, plus l'horloge ; 4 `node --test`
     en parallèle × 3 verts) ; ✘ 760×360 du scénario `guidage` (alerte de conduite sous le panneau du bas, depuis v37)
     corrigé : en petit paysage (hauteur < 400 px), bouton « Pas une pause (travail) » sur deux lignes.

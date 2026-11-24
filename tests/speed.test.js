@@ -234,7 +234,7 @@ test('règles françaises vérifiées (R413-8, R413-9) : lecture prudente', () =
   assert.equal(lim(0, { weight: 10, hazmat: true }), 90);
   assert.equal(lim(0, { weight: 3.5 }), null, '3,5 t : pas un PL');
   // Un 130 d'autoroute devient 90 pour un PL ; un 50 de traversée reste 50 (étiquette OSM).
-  assert.deepEqual(wayLimit({ limit: 130, hgv: false, cond: false, cls: 0 }, 'FR', { weight: 44 }), { kmh: 90, source: 'rule', cond: false });
+  assert.deepEqual(wayLimit({ limit: 130, hgv: false, cond: false, cls: 0 }, 'FR', { weight: 44 }), { kmh: 90, source: 'rule', cond: false, ambiguous: false });
   assert.deepEqual(wayLimit({ limit: 50, hgv: false, cond: false, cls: 3 }, 'FR', { weight: 44 }), { kmh: 50, source: 'osm', cond: false });
   assert.equal(reducedThreshold('FR', 0), 90);
   assert.equal(reducedThreshold('FR', 2), 80);
