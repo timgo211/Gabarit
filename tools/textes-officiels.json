@@ -1330,18 +1330,131 @@
       "span": 600,
       "max": 3,
       "maxDocs": 6
+    },
+    {
+      "id": "traf10b-lu",
+      "title": "Phase 10, 2e tour — CITA : ressources du jeu v3.6, flux (CORS)",
+      "headers": [
+        {
+          "label": "ressources v3.6 (API v2)",
+          "url": "https://data.public.lu/api/2/datasets/69804f9a9f5ca73c0e4af035/resources/",
+          "head": 5000
+        },
+        {
+          "label": "ancien flux situationrecord",
+          "url": "https://www.cita.lu/info_trafic/datex/situationrecord",
+          "head": 1200
+        }
+      ]
+    },
+    {
+      "id": "traf10b-be",
+      "title": "Phase 10, 2e tour — Flandre : licence (CKAN transportdata.be), flux datex2v3 (CORS)",
+      "headers": [
+        {
+          "label": "CKAN package_show",
+          "url": "https://transportdata.be/api/3/action/package_show?id=249ddb42-3b9a-44fc-b965-8e7dc8325fb2",
+          "head": 4000
+        },
+        {
+          "label": "flux datex2v3",
+          "url": "https://www.verkeerscentrum.be/uitwisseling/datex2v3",
+          "head": 800
+        }
+      ]
+    },
+    {
+      "id": "traf10b-es",
+      "title": "Phase 10, 2e tour — DGT : licence (CKAN), flux v3.7 (CORS)",
+      "headers": [
+        {
+          "label": "CKAN v3.7",
+          "url": "https://nap.dgt.es/api/3/action/package_show?id=incidencias-dgt-datex2-v3-7",
+          "head": 4000
+        },
+        {
+          "label": "flux v3.7",
+          "url": "https://nap.dgt.es/datex2/v3/dgt/SituationPublication/datex2_v37.xml",
+          "head": 600
+        }
+      ]
+    },
+    {
+      "id": "traf10b-de",
+      "title": "Phase 10, 2e tour — Autobahn GmbH : conditions de la Autobahn App / des données",
+      "urls": [
+        "https://www.autobahn.de/app",
+        "https://www.autobahn.de/betrieb-verkehr/verkehrsmeldungen",
+        "https://www.autobahn.de/datenschutz",
+        "https://verkehr.autobahn.de/"
+      ],
+      "follow": "(nutzungsbedingung|lizenz|open-?data|datenangebot|mobilithek|api)",
+      "keywords": [
+        "Nutzungsbedingung|Lizenz|Datenlizenz|dl-de|CC[ -]?BY|Open Data|Mobilithek|API|Weiterverwendung|weiterverwend"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 7
+    },
+    {
+      "id": "traf10b-here",
+      "title": "Phase 10, 2e tour — HERE : AUP et conditions de la plateforme (janvier 2022)",
+      "urls": [
+        "https://www.here.com/en-gb/terms/acceptable-use-policy-january-2022",
+        "https://www.here.com/en-gb/terms/here-platform-terms-january-2022",
+        "https://legal.here.com/acceptable-use-policy",
+        "https://www.here.com/en-gb/terms/other-terms-for-here-products-and-services"
+      ],
+      "keywords": [
+        "combin|layer|non-HERE|third[- ]party (map|content)|other map|competing|in conjunction|together with|alongside|cach|stor(e|ing|age)|retain|Evaluation Use|Permitted Use|Permitted Application|Subscription Plan|free|display",
+        "traffic|Traffic"
+      ],
+      "span": 500,
+      "max": 4,
+      "maxDocs": 4
+    },
+    {
+      "id": "traf10b-tomtom",
+      "title": "Phase 10, 2e tour — TomTom : conditions des Maps APIs",
+      "urls": [
+        "https://developer.tomtom.com/terms-and-conditions",
+        "https://www.tomtom.com/legal/maps-apis-terms-and-conditions/",
+        "https://developer.tomtom.com/documentation-assets/TomTom_SRTI_API_Terms_and_Conditions_Final_September_2022.pdf",
+        "https://www.tomtom.com/en-ca/legal/third-party-product-terms/"
+      ],
+      "follow": "(terms|conditions|eula|license|licence).*(pdf|maps|api)",
+      "keywords": [
+        "combin|layer|non-HERE|third[- ]party (map|content)|other map|competing|in conjunction|together with|alongside|cach|stor(e|ing|age)|retain|Evaluation Use|Permitted Use|Permitted Application|Subscription Plan|free|display",
+        "traffic|Traffic"
+      ],
+      "span": 500,
+      "max": 4,
+      "maxDocs": 7
+    },
+    {
+      "id": "traf10b-raw",
+      "title": "Phase 10, 2e tour — raw.githubusercontent.com (CORS pour une copie de données hors main) ; fraîcheur du flux DIR",
+      "headers": [
+        {
+          "label": "raw main docs/ROADMAP.md",
+          "url": "https://raw.githubusercontent.com/timgo211/Gabarit/main/docs/ROADMAP.md",
+          "head": 200
+        },
+        {
+          "label": "DIR content.xml (2e lecture, fraîcheur)",
+          "url": "https://tipi.bison-fute.gouv.fr/bison-fute-ouvert/publicationsDIR/Evenementiel-DIR/grt/RRN/content.xml",
+          "head": 200
+        }
+      ]
     }
   ],
   "run": [
-    "traf10-fr-flux",
-    "traf10-fr-lic",
-    "traf10-lu",
-    "traf10-de",
-    "traf10-be",
-    "traf10-es",
-    "traf10-ch",
-    "traf10-it",
-    "traf10-here",
-    "traf10-tomtom"
+    "traf10b-lu",
+    "traf10b-be",
+    "traf10b-es",
+    "traf10b-de",
+    "traf10b-here",
+    "traf10b-tomtom",
+    "traf10b-raw"
   ]
 }
