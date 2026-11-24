@@ -104,6 +104,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais
   `alternative_routes`) ; 150 km = somme des tronçons à vol d'oiseau (`crowPath`, mesure d'ORS) ; « Étape atteinte. »
   phrase fixe ; recalcul, « Autres itinéraires » et mémoire (`choice.stops`, optionnel) gardent les étapes restantes.
+  v70 : ligne « Étape k/n : durée · km » du guidage jamais « … » : réduite (80 %) puis coupée entre morceaux
+  insécables seulement (`nextStopParts`).
 - « Éviter le tunnel » (5b, v48 aussi classe Euro interdite 5g) : à l'arrêt seulement (`avoidTunnelAllowed`, relevés GPS
   hors guidage `plan-park.js`, vitesse inconnue = grisé), une requête dans le budget de 3 avec les diagnostics 2f
   (`computeAvoidRoute`), carré 80 m, 150 km à vol d'oiseau ; jamais dit, rien dans le guidage.
