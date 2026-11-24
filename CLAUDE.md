@@ -96,6 +96,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   « La signalisation fait foi. » ; voix (`settings.reportVoice`, non par défaut) une fois, confirmé et à moi seulement.
 - Mes lieux (3b, v67, `saved-places.js`, champ `places`) : données personnelles, sur l'appareil, export complet
   seulement, jamais dans un fichier partagé ; « Mes lieux » en tête des suggestions, aucun appel.
+- Signalements pour un ami (3c, v68, `reports-share.js`) : fichier = mes confirmés seulement, jour seulement, sans
+  lieux ni notes par défaut ; import vérifié (512 Ko, schéma, types), aperçu + confirmation, marqués importés, jamais dits.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais

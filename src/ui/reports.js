@@ -3,6 +3,8 @@
 // comme hors guidage ; vitesse inconnue = en mouvement, R412-6-2) : boutons grisés sinon. Textes en textContent.
 
 import { $, el } from './dom.js';
+import { pickShareMethod, shareResultText } from '../lib/share.js';
+import { SHARE, buildShareFile, shareFileName, parseShareFile, previewImport, previewText, mergeImported } from '../lib/reports-share.js';
 import {
   REPORT, canEditReports, updateReport, removeReport, reportLabel, reportStatus, MOVING_TEXT,
 } from '../lib/reports.js';
@@ -123,6 +125,63 @@ export function createReports(ctx) {
   });
   del.addEventListener('click', () => { if (openId) remove(openId, status); });
   $('#btn-report-close').addEventListener('click', close);
+
+  // Phase 3c : fichier pour un ami (partage Android si le navigateur accepte le fichier, sinon téléchargement).
+  const shareStatus = $('#reports-share-status');
+  $('#btn-reports-share').addEventListener('click', async () => {
+    let content;
+    try {
+      content = buildShareFile(ctx.getList(), { withNotes: $('#reports-share-notes').checked });
+    } catch (err) {
+      shareStatus.textContent = err.message;
+      return;
+    }
+    const name = shareFileName(new Date());
+    let file = null;
+    try { file = new File([content], name, { type: SHARE.MIME }); } catch { file = null; }
+    const method = pickShareMethod({
+      kind: 'file', hasShare: typeof navigator.share === 'function',
+      canShareFiles: !!file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }),
+    });
+    if (method === 'share') {
+      try {
+        await navigator.share({ files: [file], title: 'Signalements Gabarit' });
+        shareStatus.textContent = '';
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') { shareStatus.textContent = ''; return; }
+      }
+    }
+    try {
+      const href = URL.createObjectURL(new Blob([content], { type: SHARE.MIME }));
+      const a = Object.assign(document.createElement('a'), { href, download: name });
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(href), 10000);
+      shareStatus.textContent = shareResultText('download');
+    } catch {
+      shareStatus.textContent = shareResultText('download', { failed: true });
+    }
+  });
+  // Import : vérifié (taille, schéma, types), aperçu « N signalements à importer » puis confirmation avant fusion.
+  $('#reports-import-file').addEventListener('change', async (e) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > SHARE.MAX_BYTES) { shareStatus.textContent = 'Fichier trop gros (512 Ko au plus).'; return; }
+    let text = '';
+    try { text = await f.text(); } catch { shareStatus.textContent = 'Fichier illisible.'; return; }
+    const r = parseShareFile(text);
+    if (!r.ok) { shareStatus.textContent = r.error; return; }
+    const p = previewImport(ctx.getList(), r.reports);
+    if (!p.add) { shareStatus.textContent = 'Rien à importer : tous ces signalements sont déjà présents.'; return; }
+    const summary = previewText(p);
+    if (!window.confirm(`${summary}\n\nImporter ?`)) { shareStatus.textContent = 'Import annulé.'; return; }
+    ctx.setList(mergeImported(ctx.getList(), r.reports));
+    shareStatus.textContent = `Importé : ${summary}${r.dropped ? ` ${r.dropped} ligne(s) illisible(s) écartée(s).` : ''}`;
+    render();
+  });
 
   render();
   return {

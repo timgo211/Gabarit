@@ -19,6 +19,7 @@ node tools/ui-check.mjs            # ou un scénario : layout | long | satellite
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
                                    #   | carburant | etapes | historique | limites | preparation | suggestions
+                                   #   | signalements | lieux | ami
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -173,3 +174,13 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   ✕ ≥ 48 px retire sans fermer ; récent choisi remonte ; « Sources et licences » repliée au premier affichage
   (titre ≥ 48 px), effacer avec confirmation (refus → rien), dépliée gardée au rechargement.
 - Lire un crédit de Réglages (v64) : `openCredits(page)` d'abord (section repliée par défaut).
+- `signalements` (3a, v66) : `ors-directions-nav.json`, signalement confirmé à ≈ 900 m (option `reports` d'`open`),
+  GPS émulé à 90 km/h ; 412×900 jour (voix activée : dit une fois), 900×412 nuit et 1280×800 jour (jamais dit) ; encart
+  avec « La signalisation fait foi. », rien ne se chevauche ; « Signaler » en roulant → repère sans type, aucun champ ;
+  repère touché en roulant → « Disponible à l'arrêt » ; à l'arrêt : fiche, type, confirmation ; fermée en roulant ;
+  Réglages hors guidage : actif à l'arrêt, grisé en roulant (relevés GPS). Colonne de boutons ronds : 5 (drapeau).
+- `lieux` (3b, v67) : Réglages › Mes lieux, arrivée choisie (Dépôt) et centre de la carte (Client) ; champ vide →
+  « Mes lieux » en tête, lignes ≥ 48 px, aucun appel ; « dep » filtré ; gardés au rechargement.
+- `ami` (3c, v68) : fichier téléchargé (navigator.share retiré) = confirmés seulement, jour seulement, sans note ni
+  lieu ; fichier piégé (note HTML, champs inconnus, type inconnu, doublon) : aperçu, refus → rien, accepté → 2 importés
+  non confirmés, note en texte brut, aucun élément créé ; 412×900 jour, 1280×800 nuit.

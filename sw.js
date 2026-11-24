@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v67';
+const VERSION = 'v68';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -90,6 +90,7 @@ const APP_FILES = [
   './src/lib/trip-history.js',
   './src/lib/recent-places.js',
   './src/lib/reports.js',
+  './src/lib/reports-share.js',
   './src/lib/saved-places.js',
   './src/lib/area-notes.js',
   './src/lib/route-options.js',
