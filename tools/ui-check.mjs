@@ -4258,6 +4258,62 @@ async function bannerCheck(browser, base) {
  * dite une fois, prochaine étape dans les détails, recalcul hors itinéraire qui garde l'étape, « Autres itinéraires »
  * qui la garde ; fiche carburant « Ajouter comme étape » grisé en roulant, actif à l'arrêt. 360 / 412 / 800 / 1280 px.
  */
+// v70 : ligne « Étape 1/1 : 1 h 57 · 148 km » en guidage, jamais coupée par « … » (téléphone et tablette, portrait
+// et paysage, jour et nuit) : retour à la ligne seulement après « Étape 1/1 : », durée et km toujours entiers.
+async function stopLineCheck(browser, base) {
+  const withStop = fixture('ors-directions-etapes.json');
+  const nav = fixture('ors-directions-nav.json');
+  const line = withStop.features[0].geometry.coordinates;
+  const sizes = [[360, 760], [412, 900], [760, 360]];
+  for (const [width, height] of sizes) for (const theme of ['day', 'night']) {
+    const tag = `ligne d'étape ${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, overpass: () => ({ elements: [] }),
+      directions: (b) => (b.coordinates.length > 2 ? withStop : nav),
+    });
+    await page.click('#btn-add-stop');
+    await page.fill('#stop-input-0', 'Lyon');
+    await page.waitForSelector('#stop-list-0 li.suggest-row', { timeout: 5000 });
+    await page.dispatchEvent('#stop-list-0 li.suggest-row >> nth=0', 'click');
+    await computeRoute(page);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    for (let i = 1; i <= 4; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(700); }
+    const real = await page.textContent('#nav-stop');
+    const ov0 = await footOverlaps(page);
+    check(ov0.out.length === 0, `${tag} : rien ne se chevauche (ligne réelle)`, ov0.out.join(' | '));
+    check(/^Étape 1\/1 : \d+ (min|h \d\d) · [\d,]+ (km|m)$/.test(real), `${tag} : texte de la ligne inchangé`, real);
+    // Pire cas vu sur la tablette, et plus long encore : mêmes morceaux que navigation.js (textContent seulement),
+    // puis même ajustement (une ligne réduite à 80 % au plus, sinon retour à la ligne entre les morceaux).
+    for (const [label, dur, km] of [['Étape 1/1 :', '1 h 57', '148 km'], ['Étape 10/10 :', '12 h 57', '1 148 km']]) {
+      const m = await page.evaluate(([l, d, k]) => {
+        const box = document.querySelector('#nav-stop');
+        const part = (c, t) => { const n = document.createElement('span'); n.className = c; n.textContent = t; return n; };
+        box.replaceChildren(part('nav-stopline-part', l), ' ', part('nav-stopline-part nav-stopline-dur', `${d} ·`), ' ', part('nav-stopline-part nav-stopline-km', k));
+        box.classList.remove('wrap'); box.style.fontSize = '';
+        const base = parseFloat(getComputedStyle(box).fontSize);
+        for (let f = 1; f >= 0.8 - 1e-9 && box.scrollWidth > box.clientWidth; f -= 0.06) box.style.fontSize = `${base * f}px`;
+        if (box.scrollWidth > box.clientWidth) { box.style.fontSize = ''; box.classList.add('wrap'); }
+        dispatchEvent(new Event('resize')); // layoutGuidance, comme après chaque rendu du guidage
+        const s = document.querySelector('.nav-summary').getBoundingClientRect();
+        const parts = [...box.querySelectorAll('.nav-stopline-part')].map((n) => {
+          const r = n.getBoundingClientRect();
+          return { lines: n.getClientRects().length, inside: r.left >= s.left - 1 && r.right <= s.right + 1 && r.right <= innerWidth && r.bottom <= innerHeight };
+        });
+        return { parts, wrap: box.classList.contains('wrap'), ellipsis: getComputedStyle(box).textOverflow, px: Math.round(parseFloat(getComputedStyle(box).fontSize)) };
+      }, [label, dur, km]);
+      check(m.parts.length === 3 && m.parts.every((p) => p.lines === 1 && p.inside) && m.ellipsis !== 'ellipsis' && m.px >= 12,
+        `${tag} : « ${label} ${dur} · ${km} » entier, jamais « … »`, JSON.stringify(m));
+      const ovx = await footOverlaps(page);
+      check(ovx.out.length === 0, `${tag} : « ${dur} · ${km} », rien ne se chevauche`, ovx.out.join(' | '));
+    }
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-ligne-etape.png`) });
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function stopsCheck(browser, base) {
   const withStop = fixture('ors-directions-etapes.json');
   const nav = fixture('ors-directions-nav.json');
@@ -5301,7 +5357,7 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck,
+    carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;

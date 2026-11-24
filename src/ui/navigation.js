@@ -32,7 +32,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { symbolSvg } from './nav-symbols.js';
 import { laneSvg } from './lane-icons.js';
 import { lanesRow } from '../lib/lanes.js';
-import { nextStopLine } from '../lib/stops.js';
+import { nextStopLine, nextStopParts } from '../lib/stops.js';
 import { REPORT, MARKED_TEXT as REPORT_MARKED_TEXT, DUPLICATE_MARK_TEXT as REPORT_DUPLICATE_TEXT, NO_FIX_TEXT as REPORT_NO_FIX_TEXT } from '../lib/reports.js';
 import { fetchRoute } from './api.js';
 import {
@@ -149,6 +149,7 @@ export function createNavigation(ctx) {
     mapbtns: $('.nav-mapbtns'),
   };
   let s = null; // session de guidage en cours
+  let stopLineWidth = 0; // v70 : largeur de la ligne d'étape au dernier ajustement de taille
 
   // Pictogrammes (Material Symbols, src/ui/nav-symbols.js).
   ui.compass.append(symbolSvg('compass'));
@@ -178,6 +179,34 @@ export function createNavigation(ctx) {
     const { value, unit } = splitUnit(text);
     setValueUnit(node, value, unit);
     fitText(node);
+  }
+
+  /**
+   * v70 : ligne d'étape en morceaux insécables (textContent seulement) ; textContent du parent = nextStopLine.
+   * D'abord sur une ligne, taille réduite au besoin (jusqu'à 80 %) ; si elle ne tient toujours pas (paysage étroit),
+   * retour à la ligne entre les morceaux : jamais « … », la durée et les km restent entiers.
+   */
+  function renderStopLine(parts) {
+    if (!parts) { ui.stopLine.replaceChildren(); return; }
+    const chunk = (cls, text) => {
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      return span;
+    };
+    ui.stopLine.replaceChildren(chunk('nav-stopline-part', parts.label), ' ',
+      chunk('nav-stopline-part nav-stopline-dur', `${parts.duration} ·`), ' ', chunk('nav-stopline-part nav-stopline-km', parts.distance));
+    fitStopLine();
+  }
+
+  function fitStopLine() {
+    const node = ui.stopLine;
+    node.classList.remove('wrap');
+    fitText(node, 0.8);
+    if (node.scrollWidth > node.clientWidth) {
+      node.style.fontSize = '';
+      node.classList.add('wrap');
+    }
   }
 
   /** Écusson d'une référence de route (couleurs réglementaires de src/lib/road-badge.js, jamais la palette). */
@@ -544,9 +573,13 @@ export function createNavigation(ctx) {
     setStat(ui.time, formatDuration(view.remainingDuration));
     setStat(ui.eta, formatArrival(new Date(), view.remainingDuration));
     // v62 : « Étape 1/n : durée · km » jusqu'à la prochaine étape, le long du tracé ; total gardé au-dessus. Jamais dit.
+    // v70 : deux morceaux (textContent) pour passer à la ligne après « Étape 1/n : », jamais dans la durée ni les km.
     const stopText = nextStopLine(view.nextStop);
-    if (ui.stopLine.textContent !== stopText) ui.stopLine.textContent = stopText;
+    const wasHidden = ui.stopLine.hidden;
     ui.stopLine.hidden = !stopText;
+    if (ui.stopLine.textContent !== stopText) renderStopLine(nextStopParts(view.nextStop));
+    else if (stopText && (wasHidden || ui.stopLine.clientWidth !== stopLineWidth)) fitStopLine();
+    stopLineWidth = ui.stopLine.clientWidth;
     const sp = speedStatus(view.speedKmh, view.speedLimit ?? null, view.speedLimitSource ?? null, view.speedLimitAmbiguous === true);
     if (ui.speed.textContent !== sp.value) ui.speed.textContent = sp.value;
     ui.limit.hidden = sp.limit === null;
@@ -1019,7 +1052,7 @@ export function createNavigation(ctx) {
     ui.dist.textContent = '';
     setInstruction(s.sim ? 'Simulation…' : 'Recherche du signal GPS…');
     for (const n of [ui.remaining, ui.time, ui.eta, ui.speed]) n.textContent = '—';
-    ui.stopLine.textContent = '';
+    ui.stopLine.replaceChildren();
     ui.stopLine.hidden = true;
     renderFacts(null);
     renderVoice();
