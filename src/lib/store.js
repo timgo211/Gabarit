@@ -14,6 +14,7 @@ import { sanitizeRestrictions } from './restrictions.js';
 import { sanitizeFuelStations } from './fuel-stations.js';
 import { sanitizeAreaNotes } from './area-notes.js';
 import { sanitizeHistory } from './trip-history.js';
+import { sanitizeRecent } from './recent-places.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -68,6 +69,7 @@ export function emptyData() {
       bridgeWarnings: true,
       weightWarnings: true,
       panelCollapsed: false,
+      creditsOpen: false,
       adr: emptyAdrSettings(),
     },
   };
@@ -130,6 +132,7 @@ export function sanitizeData(raw) {
       bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
       weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
       panelCollapsed: s.panelCollapsed === true, // v62 : panneau de préparation replié (carte seule), déplié par défaut
+      creditsOpen: s.creditsOpen === true, // v64 : « Sources et licences » de Réglages dépliée ; repliée par défaut
       // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
       adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },
@@ -139,16 +142,18 @@ export function sanitizeData(raw) {
 /**
  * JSON d'export : toutes les données, jamais la clé ORS. history (phase 6) : trajets terminés lus dans IndexedDB
  * (src/ui/trip-history.js), sans coordonnées ; null → champ absent (historique indisponible).
+ * recent (v64) : recherches récentes (clé gabarit.recentPlaces, src/lib/recent-places.js) ; null → champ absent.
  */
-export function exportData(data, now = new Date(), history = null) {
+export function exportData(data, now = new Date(), history = null, recent = null) {
   const clean = sanitizeData(data);
   const extra = Array.isArray(history) ? { history: sanitizeHistory(history) } : {};
+  if (Array.isArray(recent)) extra.recentPlaces = sanitizeRecent(recent);
   return JSON.stringify({ app: 'gabarit', exportedAt: now.toISOString(), ...clean, ...extra }, null, 2);
 }
 
 /**
- * Phase 6 : lit un export complet → { data (gabarit.data), history (trajets, [] si absent : ancien export) }.
- * L'historique n'entre pas dans gabarit.data : il va dans IndexedDB.
+ * Phase 6 : lit un export complet → { data (gabarit.data), history (trajets, [] si absent : ancien export),
+ * recentPlaces (v64, [] si absent) }. Ni l'un ni l'autre n'entre dans gabarit.data.
  */
 export function readExport(text) {
   let raw;
@@ -157,7 +162,7 @@ export function readExport(text) {
   } catch {
     throw new Error("Fichier illisible : ce n'est pas du JSON valide.");
   }
-  return { data: sanitizeData(raw), history: sanitizeHistory(raw?.history) };
+  return { data: sanitizeData(raw), history: sanitizeHistory(raw?.history), recentPlaces: sanitizeRecent(raw?.recentPlaces) };
 }
 
 /** Lit un JSON d'export. Toute propriété inconnue (dont une éventuelle clé) est ignorée. */

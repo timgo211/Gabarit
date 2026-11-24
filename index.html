@@ -440,9 +440,19 @@
         <p id="history-status" class="status" role="status"></p>
       </section>
 
+      <!-- v64 : derniers lieux choisis dans les suggestions (src/lib/recent-places.js). -->
+      <section class="card" id="recent-card">
+        <h3>Recherches récentes</h3>
+        <p class="hint">Gardé seulement sur cet appareil. Inclus dans l'export.</p>
+        <div class="row">
+          <button type="button" id="btn-recent-clear" class="btn">Effacer les recherches récentes</button>
+        </div>
+        <p id="recent-status" class="status" role="status"></p>
+      </section>
+
       <section class="card">
         <h3>Mes données</h3>
-        <p class="hint">Véhicules, lieux, signalements, avis et notes sur les aires, historique des trajets. Exporte régulièrement une sauvegarde.</p>
+        <p class="hint">Véhicules, lieux, signalements, avis et notes sur les aires, historique des trajets, recherches récentes. Exporte régulièrement une sauvegarde.</p>
         <div class="row">
           <button type="button" id="btn-export" class="btn">Exporter (JSON)</button>
           <label class="btn" for="import-file">Importer…</label>
@@ -468,8 +478,10 @@
         <p id="sim-status" class="status" role="status"></p>
       </section>
 
+      <!-- v64 : section repliable (repliée par défaut, état dans settings.creditsOpen) ; contenu inchangé. -->
       <section class="card" id="credits">
-        <h3>Sources et licences</h3>
+        <h3><button type="button" id="btn-credits" class="section-toggle" aria-expanded="false" aria-controls="credits-body">Sources et licences</button></h3>
+        <div id="credits-body" hidden>
         <p class="hint" id="winter-credit">Équipements d'hiver (loi Montagne) : liste des communes de la
           <a href="https://www.securite-routiere.gouv.fr/equipements-hivernaux-departements-et-communes" target="_blank" rel="noopener noreferrer">Sécurité routière</a>
           du 22/10/2022 ; contours des communes :
@@ -500,6 +512,7 @@
         <p class="hint" id="symbols-credit">Pictogrammes des boutons du guidage :
           <a href="https://github.com/google/material-design-icons" target="_blank" rel="noopener noreferrer">Material Symbols</a>,
           <a href="https://www.apache.org/licenses/LICENSE-2.0" target="_blank" rel="noopener noreferrer">licence Apache 2.0</a>.</p>
+        </div>
       </section>
       <p id="app-version" class="app-version">version inconnue</p>
     </div>

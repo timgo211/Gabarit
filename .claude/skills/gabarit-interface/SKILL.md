@@ -235,3 +235,22 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   - texte validé sans choix : une requête `/search` par champ (`place-resolve.js`) ; 1 lieu pris, plusieurs → liste,
     rien de deviné ; plafond de recherche : appui long ou coordonnées. Champ « Ajouter une étape » du guidage :
     toujours seulement à l'arrêt.
+- v64, recherches récentes (`src/lib/recent-places.js`, objet `recentPlaces` exporté par `route-form.js`, une seule
+  liste pour départ, arrivée, étapes et « Ajouter une étape » d'Autres itinéraires) :
+  - `suggestionRows({ status, items, recent })` : titre `.suggest-title` (`--muted`) « Recherches récentes » dans la barre du ✕ (`.suggest-head`, une ligne
+    de gagnée clavier ouvert), lignes
+    `li.suggest-row.suggest-recent` (✕ `.suggest-remove` 48 px, retire sans fermer la liste), puis ORS sans les lieux
+    déjà proposés (`samePlace` : coordonnées à 4 décimales ou libellé normalisé) ; « Aucun résultat » omis si un
+    récent correspond ; focus champ vide → les 5 derniers ; filtre dès 1 caractère, tous les mots tapés présents ;
+  - ajout seulement dans `choose()` (choix dans la liste) ; jamais dans `resolve()` (texte validé), ni « Ma
+    position », ni des coordonnées tapées (`recentEntry` → null) ; 20 au plus ;
+  - stockage `gabarit.recentPlaces` (`createRecentStore`, injectable) : lecture ou écriture refusée, plein, JSON
+    abîmé → liste en mémoire pour la session, aucune erreur ; export `recentPlaces` (`exportData(…, recent)`),
+    `readExport` → `recentPlaces` ([] si absent), fusion `mergeRecent` (mes lieux d'abord) ;
+  - ✕ d'une ligne et « Effacer » : en guidage, à l'arrêt seulement (`recentEditAllowed`, comme
+    `canEditRestrictions` ; vitesse inconnue = en mouvement, R412-6-2) ; garde `setRecentEditGuard` posée par app.js ;
+  - Réglages : carte `#recent-card` (phrase « Gardé seulement sur cet appareil. Inclus dans l'export. »,
+    `#btn-recent-clear` + `window.confirm`, grisé si vide).
+- v64, « Sources et licences » : titre = `button#btn-credits.section-toggle` (≥ 48 px, chevron CSS selon
+  `aria-expanded`), contenu `#credits-body` (hidden si replié) inchangé ; `settings.creditsOpen` (false par défaut,
+  exporté). ui-check : `openCredits(page)` avant de lire un crédit.

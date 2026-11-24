@@ -2085,6 +2085,7 @@ async function winterCheck(browser, base) {
         '360 px : après rechargement, consigne « avec remorque » seule');
       // Crédits de Réglages : liste du 22/10/2022, contours ODbL.
       await page.click('#btn-settings');
+      await openCredits(page); // v64 : section repliée par défaut
       const credit = await page.textContent('#winter-credit');
       check(/22\/10\/2022/.test(credit) && /Contours administratifs/.test(credit) && /ODbL/.test(credit), '360 px : crédits ODbL des contours et date de la liste', credit);
       await page.click('#dlg-settings [data-close]');
@@ -4415,8 +4416,16 @@ async function preparationCheck(browser, base) {
  * 5 lignes (nom, commune et pays en gris, ≥ 48 px), « Aucun résultat », « Pas de connexion », ✕, toucher dehors, choix,
  * clavier ouvert (visualViewport simulé : liste au-dessus du clavier), plafond du jour (aucun appel, ligne), texte validé
  * sans choix (/search : un lieu → calcul ; plusieurs → liste). Compte les appels de géocodage (chiffre de la PR).
+ * v64 : recherches récentes (focus champ vide, filtre sans accents, récent avant ORS sans doublon, ✕, choix qui remonte,
+ * effacement avec confirmation) ; « Sources et licences » repliée au premier affichage, dépliée gardée au rechargement.
  * 412×900 jour, 360×760 nuit, 1280×800 jour.
  */
+/** v64 : ouvre « Sources et licences » de Réglages (repliée par défaut) avant de lire les crédits. */
+async function openCredits(page) {
+  if (await page.getAttribute('#btn-credits', 'aria-expanded') !== 'true') await page.click('#btn-credits');
+  await page.waitForSelector('#winter-credit', { state: 'visible', timeout: 5000 });
+}
+
 async function suggestionsCheck(browser, base) {
   // Échap viderait un champ type=search (comportement natif) : fermeture par le ✕ de chaque liste ouverte.
   const closeLists = (page) => page.evaluate(() => { for (const b of document.querySelectorAll('.suggestions:not([hidden]) .suggest-close')) b.click(); });
@@ -4525,16 +4534,22 @@ async function suggestionsCheck(browser, base) {
     await closeLists(page);
     // Étape : même composant.
     await page.click('#btn-add-stop');
+    // v64 : le récent « Clermont » s'affiche tout de suite ; les lignes d'ORS (sans lui : doublon) arrivent après.
+    const orsRows = (id) => page.waitForFunction((sel) => document.querySelectorAll(`${sel} li.suggest-row:not(.suggest-recent)`).length > 0, id, { timeout: 5000 }).catch(() => {});
+    const rowKinds = (id) => page.$$eval(`${id} li.suggest-row`, (ls) => ls.map((l) => (l.classList.contains('suggest-recent') ? 'R' : 'O')).join(''));
     await page.fill('#stop-input-0', 'Clermont');
-    await page.waitForSelector('#stop-list-0 li.suggest-row', { timeout: 5000 });
-    check(await page.locator('#stop-list-0 li.suggest-row').count() === 5 && await page.locator('#stop-list-0 .suggest-close').count() === 1, `${tag} : étape, même liste`);
-    await page.locator('#stop-list-0 li.suggest-row').first().click();
+    await orsRows('#stop-list-0');
+    const stopKinds = await rowKinds('#stop-list-0');
+    check(stopKinds === 'ROOOO' && await page.locator('#stop-list-0 .suggest-close').count() === 1, `${tag} : étape, même liste (récent puis ORS sans doublon)`, stopKinds);
+    await page.locator('#stop-list-0 li.suggest-row:not(.suggest-recent)').nth(1).click(); // Aire de Clermont-Ferrand Nord
     // Départ : même composant.
     await page.fill('#from-input', 'Clermont');
-    await page.waitForSelector('#from-list li.suggest-row', { timeout: 5000 });
-    check(await page.locator('#from-list li.suggest-row').count() === 5, `${tag} : départ, même liste`);
+    await orsRows('#from-list');
+    const fromKinds = await rowKinds('#from-list');
+    check(fromKinds === 'RROOO', `${tag} : départ, même liste (2 récents puis ORS sans doublon)`, fromKinds);
     await closeLists(page);
     await page.fill('#from-input', '');
+    await closeLists(page); // v64 : champ vidé → liste des récents (voulu), fermée ici
     // Clavier ouvert : l'appli tient dans la partie visible, la liste reste au-dessus du clavier.
     if (width < 700) {
       await page.click('#to-input');
@@ -4575,6 +4590,92 @@ async function suggestionsCheck(browser, base) {
     await page.waitForSelector('.route-card', { timeout: 10000 }).catch(() => {});
     check(stats.peliasSearch === s0 + 1 && stats.directions > d0 && await page.inputValue('#to-input') === 'Clermont-Ferrand, Clermont-Ferrand, France',
       `${tag} : validé sans choix, un lieu → pris, calcul`, `${stats.peliasSearch - s0} / ${stats.directions - d0} / ${await page.inputValue('#to-input')}`);
+    // v64 : recherches récentes. Choix dans la liste gardé (Clermont), texte validé sans choix jamais (Clermont-Ferrand).
+    const recentSaved = async () => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.recentPlaces') ?? '[]'));
+    let rec = await recentSaved();
+    check(rec.map((p) => p.label).join(' / ') === 'Aire de Clermont-Ferrand Nord, Gerzat, France / Clermont, Clermont, France'
+      && !rec.some((p) => p.label === 'Clermont-Ferrand, Clermont-Ferrand, France') && rec.every((p) => Object.keys(p).sort().join() === 'label,lat,lon,name,place'),
+      `${tag} : récents = lieux choisis dans la liste seulement (nom, commune, coordonnées)`, JSON.stringify(rec));
+    await page.evaluate(() => {
+      const mk = (i) => ({ label: `Dépôt ${i}, Ville ${i}, France`, name: `Dépôt ${i}`, place: `0100${i} Ville ${i}, France`, lon: 4 + i / 10, lat: 46 + i / 10 });
+      const list = [{ label: 'Saint-Étienne, Loire, France', name: 'Saint-Étienne', place: '42000 Saint-Étienne, France', lon: 4.3872, lat: 45.4397 },
+        mk(1), mk(2), mk(3), mk(4), mk(5), { label: 'Clermont, Clermont, France', name: 'Clermont', place: '60600 Clermont, France', lon: 2.41249, lat: 49.37912 }];
+      localStorage.setItem('gabarit.recentPlaces', JSON.stringify(list));
+    });
+    await page.reload();
+    await page.waitForSelector('#to-input');
+    await page.waitForTimeout(500);
+    c0 = n();
+    await page.fill('#to-input', '');
+    await page.click('#to-input');
+    await page.waitForSelector('#to-list li.suggest-recent', { timeout: 5000 }).catch(() => {});
+    const focusRows = await page.$$eval('#to-list li', (ls) => ls.map((l) => l.className + ':' + (l.querySelector('.suggest-name')?.textContent ?? l.textContent)));
+    const titleColor = await page.$eval('#to-list .suggest-title', (t) => getComputedStyle(t).color).catch(() => '');
+    const headTitle = await page.textContent('#to-list .suggest-head .suggest-title').catch(() => '');
+    check(headTitle === 'Recherches récentes' && focusRows.length === 6 && focusRows.slice(1).every((r) => r.includes('suggest-recent'))
+      && focusRows[1].endsWith(':Saint-Étienne') && focusRows[5].endsWith(':Dépôt 4') && titleColor === muted && n() === c0,
+      `${tag} : focus champ vide → « Recherches récentes » (gris) + 5 derniers, aucun appel`, focusRows.join(' / '));
+    const rm = await page.locator('#to-list li.suggest-recent .suggest-remove').first().boundingBox();
+    check(rm && rm.width >= 48 && rm.height >= 48, `${tag} : ✕ d'une ligne récente ≥ 48 px`, JSON.stringify(rm));
+    await noHorizontalScroll(page, `${tag} récents`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-recents.png`) });
+    // Filtre local sans accents ni majuscules : récent avant ORS ; doublon retiré.
+    await page.keyboard.type('SAINT etienne', { delay: 20 });
+    await page.waitForTimeout(100);
+    check(await page.locator('#to-list li.suggest-recent').count() === 1 && (await page.textContent('#to-list li.suggest-recent .suggest-name')) === 'Saint-Étienne',
+      `${tag} : « SAINT etienne » → Saint-Étienne récent, tout de suite`);
+    await page.fill('#to-input', 'clermont');
+    await page.waitForFunction(() => document.querySelectorAll('#to-list li.suggest-row:not(.suggest-recent)').length > 0, null, { timeout: 5000 }).catch(() => {});
+    const mixed = await page.$$eval('#to-list li.suggest-row', (ls) => ls.map((l) => `${l.classList.contains('suggest-recent') ? 'R' : 'O'}:${l.querySelector('.suggest-name').textContent}|${l.querySelector('.suggest-sub')?.textContent ?? ''}`));
+    check(mixed[0] === 'R:Clermont|60600 Clermont, France' && mixed.slice(1).every((r) => r.startsWith('O:')) && !mixed.slice(1).some((r) => /^O:Clermont\|.*France$/.test(r) && !/Suisse/.test(r)),
+      `${tag} : récent avant ORS, doublon retiré`, mixed.join(' / '));
+    // ✕ : ligne retirée, liste ouverte, stockage à jour.
+    await page.fill('#to-input', '');
+    await page.click('#to-input');
+    await page.waitForSelector('#to-list li.suggest-recent', { timeout: 5000 });
+    await page.locator('#to-list li.suggest-recent .suggest-remove').first().click();
+    rec = await recentSaved();
+    const after = await page.$$eval('#to-list li.suggest-recent .suggest-name', (ls) => ls.map((l) => l.textContent));
+    check(!rec.some((p) => p.name === 'Saint-Étienne') && rec.length === 6 && await page.isVisible('#to-list') && after[0] === 'Dépôt 1' && after.length === 5
+      && await page.inputValue('#to-input') === '', `${tag} : ✕ retire le lieu, la liste reste ouverte`, after.join(' / '));
+    // Choisir un récent : champ rempli, remonte en tête.
+    await page.locator('#to-list li.suggest-recent').nth(2).click();
+    rec = await recentSaved();
+    check(await page.inputValue('#to-input') === 'Dépôt 3, Ville 3, France' && rec[0].name === 'Dépôt 3' && rec.length === 6, `${tag} : récent choisi → remonte en tête`);
+    // Effacer (avec confirmation) ; section « Sources et licences » repliée au premier affichage, état gardé.
+    await page.click('#btn-settings');
+    const cr = await page.evaluate(() => {
+      const b = document.querySelector('#btn-credits');
+      return { exp: b.getAttribute('aria-expanded'), hidden: document.querySelector('#credits-body').hidden, h: b.getBoundingClientRect().height,
+        winter: document.querySelector('#winter-credit').getBoundingClientRect().height, priv: document.querySelector('#recent-card .hint').textContent };
+    });
+    check(cr.exp === 'false' && cr.hidden && cr.h >= 48 && cr.winter === 0, `${tag} : « Sources et licences » repliée au premier affichage, titre ≥ 48 px`, JSON.stringify(cr));
+    check(cr.priv === "Gardé seulement sur cet appareil. Inclus dans l'export.", `${tag} : phrase des recherches récentes`, cr.priv);
+    let asked = '';
+    page.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
+    await page.click('#btn-recent-clear');
+    check(/Effacer les recherches récentes/.test(asked) && (await recentSaved()).length === 6, `${tag} : effacer demande confirmation (refus → rien effacé)`, asked);
+    page.once('dialog', (d) => d.accept());
+    await page.click('#btn-recent-clear');
+    await page.waitForTimeout(200);
+    check((await recentSaved()).length === 0 && await page.evaluate(() => localStorage.getItem('gabarit.recentPlaces')) === null
+      && /effacées/.test(await page.textContent('#recent-status')) && await page.isDisabled('#btn-recent-clear'), `${tag} : effacées après confirmation`);
+    await openCredits(page);
+    const links = await page.$$eval('#credits-body a', (as) => as.filter((a) => a.getBoundingClientRect().height > 0).length);
+    check(await page.getAttribute('#btn-credits', 'aria-expanded') === 'true' && links >= 10, `${tag} : section dépliée, liens visibles`, String(links));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-sources.png`) });
+    await page.click('#dlg-settings [data-close]');
+    await page.reload();
+    await page.waitForSelector('#to-input');
+    await page.click('#btn-settings');
+    check(await page.getAttribute('#btn-credits', 'aria-expanded') === 'true' && !(await page.evaluate(() => document.querySelector('#credits-body').hidden)),
+      `${tag} : dépliée, gardée après rechargement`);
+    await page.click('#btn-credits');
+    await page.click('#dlg-settings [data-close]');
+    await page.fill('#to-input', '');
+    await page.click('#to-input');
+    await page.waitForTimeout(200);
+    check(await page.isHidden('#to-list'), `${tag} : plus aucun récent au focus`);
     // Plafond du jour atteint : ligne, aucun appel ; la validation reste possible (/search, compteur à part).
     await page.evaluate(() => {
       const d = new Date();

@@ -4,7 +4,8 @@ import { $, el, showMessage } from './ui/dom.js';
 import { createStore, memoryStorage, activeVehicle, addTrip } from './lib/store.js';
 import { createThemeController } from './ui/theme.js';
 import { createMap } from './ui/map.js';
-import { createRouteForm, attachAutocomplete } from './ui/route-form.js';
+import { createRouteForm, attachAutocomplete, recentPlaces, setRecentEditGuard } from './ui/route-form.js';
+import { recentEditAllowed } from './lib/recent-places.js';
 import { stopPoints, insertStopByRoute } from './lib/stops.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
@@ -909,7 +910,13 @@ const settings = createSettings({
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
   onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
+  onCreditsToggle: (open) => setSetting({ creditsOpen: open }), // v64
+  recent: recentPlaces, // v64 : effacer, exporter, importer
+  recentEditAllowed: () => recentAllowed(), // v64 : en guidage, à l'arrêt seulement
 });
+// v64 : ✕ des recherches récentes et « Effacer » : en guidage, à l'arrêt seulement (R412-6-2).
+function recentAllowed() { return recentEditAllowed({ navigating: !!navigation?.active, parked: navigation?.parked === true }); }
+setRecentEditGuard(recentAllowed);
 createVehicles({ getData: () => data, update });
 
 const form = createRouteForm({
