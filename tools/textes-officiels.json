@@ -1159,12 +1159,50 @@
       "maxDocs": 8,
       "ocr": "fra",
       "head": 200
+    },
+    {
+      "id": "mb3-arrete-fr",
+      "title": "5b bis, 3e tour (24/11/2026) — Mont-Blanc, rampe française : copie archivée de circ_2010-60.pdf et des pages « Transport de matières dangereuses » de la préfecture (web.archive.org)",
+      "urls": [
+        "https://web.archive.org/web/2024id_/https://www.haute-savoie.gouv.fr/contenu/telechargement/1781/8918/file/circ_2010-60.pdf",
+        "https://www.haute-savoie.gouv.fr/contenu/telechargement/1781/8918/file/circ_2010-60.pdf",
+        "https://web.archive.org/web/2015/http://www.haute-savoie.gouv.fr/Demarches-administratives/Activites-reglementees/Transport-de-matieres-dangereuses",
+        "https://web.archive.org/web/2022/https://www.haute-savoie.gouv.fr/Actions-de-l-Etat/Prevenir-le-risque-et-se-proteger/Risques-technologiques/Transport-de-matieres-dangereuses",
+        "https://web.archive.org/web/2012/http://www.haute-savoie.gouv.fr/Actions-de-l-Etat/Prevenir-le-risque-et-se-proteger/Risques-technologiques/Tunnels-routiers"
+      ],
+      "follow": "(2010-60|2010_60|circ_|telechargement.*(tunnel|mont|tmd|TMD|circ)|content/download)",
+      "keywords": [
+        "2010-60|2010_60",
+        "3077|3082",
+        "2919|3291|3331|3359|3373",
+        "rampes?|Passy|Le Fayet|Chamonix",
+        "num[ée]ros? ONU|matières dangereuses"
+      ],
+      "span": 800,
+      "max": 4,
+      "maxDocs": 12,
+      "ocr": "fra",
+      "head": 400
+    },
+    {
+      "id": "mb3-cdx-it",
+      "title": "5b bis, 3e tour (24/11/2026) — Mont-Blanc, rampe italienne : index CDX de regione.vda.it (requête réduite)",
+      "urls": [
+        "https://web.archive.org/cdx/search/cdx?url=regione.vda.it/territorio/*&filter=original:.*(traforo|Bianco|pericolos).*&collapse=urlkey&limit=100",
+        "https://web.archive.org/cdx/search/cdx?url=regione.vda.it/amministrazione/leggi/*&filter=original:.*(traforo|Bianco|pericolos|2919).*&collapse=urlkey&limit=100"
+      ],
+      "keywords": [
+        "traforo|Bianco",
+        "pericolos"
+      ],
+      "span": 300,
+      "max": 8,
+      "maxDocs": 2,
+      "head": 3000
     }
   ],
   "run": [
-    "mb2-cdx",
-    "mb2-rampe-fr",
-    "mb2-rampe-it",
-    "mb2-exploitant"
+    "mb3-arrete-fr",
+    "mb3-cdx-it"
   ]
 }
