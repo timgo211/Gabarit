@@ -237,7 +237,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
     toujours seulement à l'arrêt.
 - v63, recherches récentes (`src/lib/recent-places.js`, objet `recentPlaces` exporté par `route-form.js`, une seule
   liste pour départ, arrivée, étapes et « Ajouter une étape » d'Autres itinéraires) :
-  - `suggestionRows({ status, items, recent })` : titre `.suggest-title` (`--muted`) « Recherches récentes », lignes
+  - `suggestionRows({ status, items, recent })` : titre `.suggest-title` (`--muted`) « Recherches récentes » dans la barre du ✕ (`.suggest-head`, une ligne
+    de gagnée clavier ouvert), lignes
     `li.suggest-row.suggest-recent` (✕ `.suggest-remove` 48 px, retire sans fermer la liste), puis ORS sans les lieux
     déjà proposés (`samePlace` : coordonnées à 4 décimales ou libellé normalisé) ; « Aucun résultat » omis si un
     récent correspond ; focus champ vide → les 5 derniers ; filtre dès 1 caractère, tous les mots tapés présents ;

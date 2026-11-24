@@ -123,15 +123,17 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
     recent = recentPlaces.match(input.value);
     rows = suggestionRows({ status, items, recent });
     if (!rows.length) { close(); return; }
+    // v63 : titre « Recherches récentes » dans la barre du ✕ (collée en haut) : une ligne de gagnée, clavier ouvert.
+    const title = rows[0]?.kind === 'title' ? rows[0].text : '';
     const closeBtn = el('li', { class: 'suggest-head', role: 'presentation' }, [
+      title ? el('span', { class: 'suggest-title', text: title }) : null,
       el('button', {
         type: 'button', class: 'suggest-close', 'aria-label': SUGGEST.CLOSE_LABEL, text: '✕',
         onpointerdown: keep,
         onclick: (e) => { e.preventDefault(); suggester.cancel(); close(); },
       }),
     ]);
-    list.replaceChildren(closeBtn, ...rows.map((r, i) => {
-      if (r.kind === 'title') return el('li', { role: 'presentation', class: 'suggest-title', text: r.text });
+    list.replaceChildren(closeBtn, ...rows.filter((r) => r.kind !== 'title').map((r, i) => { // titre : barre du ✕
       if (r.kind === 'recent') return recentRow(r, i);
       if (r.kind === 'place') {
         return el('li', {

@@ -4611,8 +4611,9 @@ async function suggestionsCheck(browser, base) {
     await page.waitForSelector('#to-list li.suggest-recent', { timeout: 5000 }).catch(() => {});
     const focusRows = await page.$$eval('#to-list li', (ls) => ls.map((l) => l.className + ':' + (l.querySelector('.suggest-name')?.textContent ?? l.textContent)));
     const titleColor = await page.$eval('#to-list .suggest-title', (t) => getComputedStyle(t).color).catch(() => '');
-    check(focusRows[1] === 'suggest-title:Recherches récentes' && focusRows.filter((r) => r.includes('suggest-recent')).length === 5
-      && focusRows[2].endsWith(':Saint-Étienne') && focusRows[6].endsWith(':Dépôt 4') && titleColor === muted && n() === c0,
+    const headTitle = await page.textContent('#to-list .suggest-head .suggest-title').catch(() => '');
+    check(headTitle === 'Recherches récentes' && focusRows.length === 6 && focusRows.slice(1).every((r) => r.includes('suggest-recent'))
+      && focusRows[1].endsWith(':Saint-Étienne') && focusRows[5].endsWith(':Dépôt 4') && titleColor === muted && n() === c0,
       `${tag} : focus champ vide → « Recherches récentes » (gris) + 5 derniers, aucun appel`, focusRows.join(' / '));
     const rm = await page.locator('#to-list li.suggest-recent .suggest-remove').first().boundingBox();
     check(rm && rm.width >= 48 && rm.height >= 48, `${tag} : ✕ d'une ligne récente ≥ 48 px`, JSON.stringify(rm));

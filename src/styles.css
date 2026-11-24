@@ -260,10 +260,9 @@ input, select, textarea { min-width: 0; }
 }
 
 /* v63 : recherches récentes (titre gris, ligne + ✕ de 48 px qui retire le lieu). */
-.suggestions .suggest-title {
-  min-height: 0; padding: 6px 14px; cursor: default; color: var(--muted); font-size: .9rem; font-weight: 700;
+.suggest-head .suggest-title {
+  flex: 1 1 auto; align-self: center; padding: 0 14px; color: var(--muted); font-size: .9rem; font-weight: 700;
 }
-.suggestions .suggest-title:active { background: none; color: var(--muted); }
 .suggestions .suggest-recent { display: flex; align-items: center; gap: 8px; padding-right: 0; }
 .suggest-recent .suggest-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; }
 .suggest-remove {
