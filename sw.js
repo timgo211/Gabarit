@@ -8,7 +8,7 @@ import { cacheStrategy, MAPLIBRE_ASSETS } from './src/lib/sw-routing.js';
 import { VERSION_REQUEST, versionReply } from './src/lib/app-version.js';
 
 // Seule source du numéro : affiché en bas de Réglages (réponse à VERSION_REQUEST, src/lib/app-version.js).
-const VERSION = 'v58';
+const VERSION = 'v59';
 const CACHE = `gabarit-${VERSION}`;
 
 const APP_FILES = [
@@ -41,6 +41,8 @@ const APP_FILES = [
   './src/lib/speed-rules.js',
   './src/lib/directions.js',
   './src/lib/directions-convert.js',
+  './src/lib/lanes-convert.js',
+  './src/lib/places-convert.js',
   './src/lib/adr.js',
   './src/lib/adr-settings.js',
   './src/lib/app-version.js',
