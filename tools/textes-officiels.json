@@ -1,5 +1,5 @@
 {
-  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles). 6e lecture (24/11/2026, phase 5b bis, 2e tour) : arrêté DDT-2010-60 (copies archivées, recueil des actes), décrets de la Vallée d'Aoste modifiant le n° 33, page de l'exploitant.",
+  "note": "Textes lus par l'Action « Textes officiels » (journal seulement). Chaque entrée : adresses de départ, liens suivis (expression régulière), mots-clés imprimés avec leur contexte, langues de la reconnaissance de texte. 2e lecture (23/11/2026) : curl, en-têtes de navigateur, nouvelles adresses. 3e lecture (23/11/2026, phase 7d) : conditions et tuiles réelles (statut, type, CORS) des orthophotos voisines ; wiki OSM des sorties. 4e lecture (phase 4) : API prix des carburants (en-têtes CORS, quotas, champs, facette des services). 5e lecture (v58, restes de la phase 7d) : Flandre, Wallonie, Bade-Wurtemberg, Bavière, Sarre, Hesse (pages de conditions, GetCapabilities en mode headers pour Fees / AccessConstraints et CORS, tuiles réelles). 6e lecture (24/11/2026, phase 5b bis, 2e tour) : arrêté DDT-2010-60 (copies archivées, recueil des actes), décrets de la Vallée d'Aoste modifiant le n° 33, page de l'exploitant. 7e lecture (24/11/2026, satellite hors France, relecture des licences) : Flandre, Wallonie, Sarre (fiches de métadonnées officielles, texte de licence, tuiles), NGI (licence, services).",
   "entries": [
     {
       "id": "mb-rampe-fr",
@@ -1199,10 +1199,128 @@
       "max": 8,
       "maxDocs": 2,
       "head": 3000
+    },
+    {
+      "id": "sat9-vl",
+      "title": "Phase 4 (24/11/2026) — Flandre : licence des orthophotos (fiches de métadonnées officielles, Vlaamse Open Data licentie v1.2) et tuile",
+      "urls": [
+        "https://metadata.vlaanderen.be/srv/api/records/51eb0ab9-741a-4c91-9470-6e810825b3c0/formatters/xml",
+        "https://metadata.vlaanderen.be/srv/api/records/56b524b0-fce0-706a-a60d-0250-22bc-8421-92960339/formatters/xml",
+        "https://www.vlaanderen.be/digitaal-vlaanderen/nieuws/release-orthofotomozaiek-middenschalig-2025",
+        "https://www.vlaanderen.be/datavindplaats/catalogus/orthofotomozaiek-middenschalig-zomeropnamen"
+      ],
+      "follow": "(open-data-licentie|modellicentie|licentie-v1|gratis-hergebruik)",
+      "keywords": [
+        "Open Data [Ll]icentie|Modellicentie|licentie v?1\\.2|CC[ -]?BY|CC0|useLimitation|otherConstraints|accessConstraints",
+        "bronvermelding|©|Digitaal Vlaanderen ?- ?Orthofoto|verkorte",
+        "gratis|kosteloos|hergebruik|commerci"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 7,
+      "head": 0,
+      "tiles": [
+        {
+          "label": "BE-VL OMWRGBMRVL WMS 3857 (Gent)",
+          "url": "https://geo.api.vlaanderen.be/OMWRGBMRVL/wms?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=OMWRGBMRVL&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 3.72,
+          "lat": 51.054,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat9-wa",
+      "title": "Phase 4 (24/11/2026) — Wallonie : licence des orthophotos SPW (fiches de métadonnées, CC BY 4.0 ?) et tuile",
+      "urls": [
+        "https://inspire-geoportal.ec.europa.eu/srv/api/records/b73f0c68-817c-4b05-abcc-4716f4660d3b/formatters/xml",
+        "https://metawal.wallonie.be/geonetwork/srv/api/records/b73f0c68-817c-4b05-abcc-4716f4660d3b/formatters/xml",
+        "https://geoservices.wallonie.be/arcgis/rest/services/IMAGERIE/ORTHO_LAST/MapServer?f=pjson",
+        "https://geoservices.wallonie.be/arcgis/rest/services/IMAGERIE/ORTHO_2026_PRINTEMPS/MapServer?f=pjson"
+      ],
+      "keywords": [
+        "CC[ -]?BY|Creative Commons|licen[cs]e|useLimitation|otherConstraints|accessConstraints|copyrightText",
+        "mention|citer|source|©|SPW",
+        "gratuit|commercial|réutilisation"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 4,
+      "head": 300,
+      "tiles": [
+        {
+          "label": "BE-WA ORTHO_LAST WMS 3857 (Namur)",
+          "url": "https://geoservices.wallonie.be/arcgis/services/IMAGERIE/ORTHO_LAST/MapServer/WMSServer?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=0&STYLES=&FORMAT=image/jpeg&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 4.867,
+          "lat": 50.465,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat9-sl",
+      "title": "Phase 4 (24/11/2026) — Sarre : licence des DOP20 LVGL (fiches INSPIRE / GDI-DE, dl-de/by-2-0 ?) et tuile",
+      "urls": [
+        "https://inspire-geoportal.ec.europa.eu/srv/api/records/b5ee7fe3-8691-4c50-8803-89ff5cc0ccd3/formatters/xml",
+        "https://inspire-geoportal.ec.europa.eu/srv/api/records/d1c7c303-ec71-4fd5-bb48-8b6d5ddfc67b/formatters/xml",
+        "https://inspire-geoportal.ec.europa.eu/srv/api/records/2b823d7b-b39d-454a-8119-60dcfb0a1e09/formatters/xml",
+        "https://www.govdata.de/dl-de/by-2-0"
+      ],
+      "keywords": [
+        "dl-de|Datenlizenz|Namensnennung|licen[cs]e|Lizenz|useLimitation|otherConstraints|accessConstraints",
+        "GeoBasis|LVGL|©|Quellenvermerk",
+        "DOP|Orthophoto|truedop|title"
+      ],
+      "span": 600,
+      "max": 3,
+      "maxDocs": 4,
+      "head": 300,
+      "tiles": [
+        {
+          "label": "DE-SL truedop WMS 3857 (Saarbrücken)",
+          "url": "https://geoportal.saarland.de/freewms/truedop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&LAYERS=sl_dop20_rgb&STYLES=&FORMAT=image/png&CRS=EPSG:3857&WIDTH=256&HEIGHT=256&BBOX={bbox-epsg-3857}",
+          "lon": 6.996,
+          "lat": 49.234,
+          "z": 17
+        }
+      ]
+    },
+    {
+      "id": "sat9-ngi",
+      "title": "Phase 4 (24/11/2026) — NGI (Belgique, fédéral) : licence des orthophotos et services WMS / WMTS",
+      "urls": [
+        "https://inspire-geoportal.ec.europa.eu/srv/api/records/e59181f0-8469-44c6-8f6c-a5e1a4af15d5/formatters/xml",
+        "https://www.ngi.be/website/fr/",
+        "https://www.ngi.be/website/fr/open-data/"
+      ],
+      "follow": "(open-?data|licen|conditions|gratuit|orthophoto|ortho)",
+      "keywords": [
+        "licen[cs]e|CC[ -]?BY|CC0|Creative Commons|open ?data|useLimitation|otherConstraints|accessConstraints",
+        "gratuit|kosteloos|commercial|mention|©|IGN|NGI",
+        "ortho|WMS|WMTS"
+      ],
+      "span": 500,
+      "max": 3,
+      "maxDocs": 8,
+      "head": 200,
+      "headers": [
+        {
+          "label": "NGI cartoweb WMTS GetCapabilities",
+          "url": "https://cartoweb.wmts.ngi.be/1.0.0/WMTSCapabilities.xml",
+          "head": 4000
+        },
+        {
+          "label": "NGI ortho WMS GetCapabilities",
+          "url": "https://wms.ngi.be/inspire/ortho/service?SERVICE=WMS&REQUEST=GetCapabilities",
+          "head": 6000
+        }
+      ]
     }
   ],
   "run": [
-    "mb3-arrete-fr",
-    "mb3-cdx-it"
+    "sat9-vl",
+    "sat9-wa",
+    "sat9-sl",
+    "sat9-ngi"
   ]
 }
