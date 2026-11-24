@@ -34,7 +34,7 @@ import { fetchRoute } from './api.js';
 import {
   startNavigation, updateNavigation, rerouteDone, rerouteFailed, gpsLost, fixFromPosition, requestReroute, overviewBbox,
   remainingStops, tripSoFar,
-  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, markStopAsWork, NAV,
+  setNavigationAreas, setNavigationWind, setNavigationTunnels, setNavigationCountries, setNavigationAccess, setNavigationSpeeds, setNavigationDirections, setNavigationPlaces, markStopAsWork, NAV,
   resumeNavigation,
 } from '../lib/navigation.js';
 import {
@@ -923,13 +923,13 @@ export function createNavigation(ctx) {
   function start({
     route, params, vehicle, simulate = null, areas = null, announceAreas = false, rules = null,
     driving = null, driveVoice = true, wind = null, windGust, windVoice = true, speeds = null, directions = null,
-    resume = null, carry = null, tripFrom = '',
+    places = null, resume = null, carry = null, tripFrom = '',
   }) {
     if (s) stop();
     const now = Date.now();
     const begun = startNavigation(route, {
       destination: params.end, now, areas, announceAreas, rules,
-      driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions,
+      driving: simulate ? null : driving, driveVoice, wind, windGust, windVoice, speeds, directions, places,
       stops: params.stops ?? [], // v55
       carry: simulate ? null : carry, tripFrom, // v56 : historique
     });
@@ -1226,6 +1226,11 @@ export function createNavigation(ctx) {
     setDirections(data) {
       if (!s) return;
       s.state = setNavigationDirections(s.state, data);
+    },
+    /** Cases de data/lieux-osm/ arrivées après « Démarrer » ou au recalcul (phase 11c) : « vers X » recalculés. */
+    setPlaces(data) {
+      if (!s) return;
+      s.state = setNavigationPlaces(s.state, data);
     },
     /** Cases de data/vitesses-osm/ arrivées après « Démarrer » ou au recalcul (phase 11a) : limites recalculées. */
     setSpeeds(data) {

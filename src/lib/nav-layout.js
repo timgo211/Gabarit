@@ -38,8 +38,9 @@ export const TRAVELED = Object.freeze({ STEP_M: 25, MIN_KMH: 3 });
 
 /**
  * Texte du bandeau de manœuvre : badges de route et nom de rue (le plus gros), ou la consigne entière quand elle
- * donne une direction (« Prenez la sortie 34 en direction de Mâcon ») ou qu'il n'y a pas de nom.
- * @param {{ text:string, name?:string|null }|null} maneuver vue du moteur
+ * donne une direction (« Prenez la sortie 34 en direction de Mâcon »), un lieu « vers X » (phase 11c, maneuver.place)
+ * ou qu'il n'y a pas de nom.
+ * @param {{ text:string, name?:string|null, place?:string|null }|null} maneuver vue du moteur
  * @returns {{ badges:object[], text:string, long:boolean, full:string }}
  */
 export function bannerText(maneuver) {
@@ -47,7 +48,7 @@ export function bannerText(maneuver) {
   const full = keepRefsTogether(String(maneuver?.text ?? ''));
   const label = roadLabel(maneuver?.name);
   const named = label.street !== '' || label.badges.length > 0;
-  if (!named || /\bdirection\b/i.test(full)) return { badges: [], text: full, long: isLongInstruction(full), full };
+  if (!named || maneuver?.place || /\bdirection\b/i.test(full)) return { badges: [], text: full, long: isLongInstruction(full), full };
   const street = keepRefsTogether(label.street);
   return { badges: label.badges, text: street, long: isLongInstruction(street), full };
 }
