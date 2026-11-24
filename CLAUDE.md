@@ -98,6 +98,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   seulement, jamais dans un fichier partagé ; « Mes lieux » en tête des suggestions, aucun appel.
 - Signalements pour un ami (3c, v68, `reports-share.js`) : fichier = mes confirmés seulement, jour seulement, sans
   lieux ni notes par défaut ; import vérifié (512 Ko, schéma, types), aperçu + confirmation, marqués importés, jamais dits.
+  v69 : import à l'arrêt seulement (`canImportShare`, règle 3a), redit à « Importer » (`confirmImport`) : sinon rien fusionné.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais

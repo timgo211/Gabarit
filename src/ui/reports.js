@@ -4,7 +4,9 @@
 
 import { $, el } from './dom.js';
 import { pickShareMethod, shareResultText } from '../lib/share.js';
-import { SHARE, buildShareFile, shareFileName, parseShareFile, previewImport, previewText, mergeImported } from '../lib/reports-share.js';
+import {
+  SHARE, buildShareFile, shareFileName, parseShareFile, previewImport, previewText, canImportShare, confirmImport,
+} from '../lib/reports-share.js';
 import {
   REPORT, canEditReports, updateReport, removeReport, reportLabel, reportStatus, MOVING_TEXT,
 } from '../lib/reports.js';
@@ -80,6 +82,7 @@ export function createReports(ctx) {
   function render() {
     renderPanel();
     renderList();
+    renderImport();
   }
 
   function remove(id, node) {
@@ -164,11 +167,35 @@ export function createReports(ctx) {
       shareStatus.textContent = shareResultText('download', { failed: true });
     }
   });
-  // Import : vérifié (taille, schéma, types), aperçu « N signalements à importer » puis confirmation avant fusion.
-  $('#reports-import-file').addEventListener('change', async (e) => {
+  // Import : vérifié (taille, schéma, types), aperçu « N signalements à importer » puis « Importer » avant fusion.
+  // v69 : à l'arrêt seulement (canImportShare, même règle que l'édition 3a) ; contrôle redit à « Importer ».
+  const importInput = $('#reports-import-file');
+  const importBtn = $('#btn-reports-import');
+  const importHint = $('#reports-import-hint');
+  const preview = $('#reports-import-preview');
+  const previewNode = $('#reports-import-text');
+  let pending = null; // { reports, dropped, summary } en attente de « Importer »
+  const importAllowed = () => canImportShare({ parked: ctx.getParked() === true });
+
+  function renderImport() {
+    const ok = importAllowed();
+    importInput.disabled = !ok;
+    importBtn.setAttribute('aria-disabled', String(!ok));
+    importHint.hidden = ok;
+  }
+  function closePreview() { pending = null; preview.hidden = true; previewNode.textContent = ''; }
+
+  importBtn.addEventListener('click', (e) => {
+    if (importAllowed()) return;
+    e.preventDefault();
+    shareStatus.textContent = SHARE.PARKED_ONLY_TEXT;
+  });
+  importInput.addEventListener('change', async (e) => {
     const f = e.target.files?.[0];
     e.target.value = '';
+    closePreview();
     if (!f) return;
+    if (!importAllowed()) { shareStatus.textContent = SHARE.PARKED_ONLY_TEXT; renderImport(); return; }
     if (f.size > SHARE.MAX_BYTES) { shareStatus.textContent = 'Fichier trop gros (512 Ko au plus).'; return; }
     let text = '';
     try { text = await f.text(); } catch { shareStatus.textContent = 'Fichier illisible.'; return; }
@@ -176,12 +203,22 @@ export function createReports(ctx) {
     if (!r.ok) { shareStatus.textContent = r.error; return; }
     const p = previewImport(ctx.getList(), r.reports);
     if (!p.add) { shareStatus.textContent = 'Rien à importer : tous ces signalements sont déjà présents.'; return; }
-    const summary = previewText(p);
-    if (!window.confirm(`${summary}\n\nImporter ?`)) { shareStatus.textContent = 'Import annulé.'; return; }
-    ctx.setList(mergeImported(ctx.getList(), r.reports));
-    shareStatus.textContent = `Importé : ${summary}${r.dropped ? ` ${r.dropped} ligne(s) illisible(s) écartée(s).` : ''}`;
+    pending = { reports: r.reports, dropped: r.dropped, summary: previewText(p) };
+    previewNode.textContent = pending.summary;
+    shareStatus.textContent = '';
+    preview.hidden = false;
+  });
+  $('#btn-reports-import-ok').addEventListener('click', () => {
+    if (!pending) return;
+    const { reports, dropped, summary } = pending;
+    closePreview();
+    const r = confirmImport(ctx.getList(), reports, { parked: ctx.getParked() === true });
+    if (!r.ok) { shareStatus.textContent = r.text; render(); return; }
+    ctx.setList(r.list);
+    shareStatus.textContent = `Importé : ${summary}${dropped ? ` ${dropped} ligne(s) illisible(s) écartée(s).` : ''}`;
     render();
   });
+  $('#btn-reports-import-cancel').addEventListener('click', () => { closePreview(); shareStatus.textContent = 'Import annulé.'; });
 
   render();
   return {

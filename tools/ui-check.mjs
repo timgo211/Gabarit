@@ -5214,6 +5214,8 @@ async function savedPlacesCheck(browser, base) {
  * Phase 3c (v68) : signalements pour un ami. 412×900 jour, 1280×800 nuit : fichier téléchargé = signalements confirmés
  * seulement, jour seulement, sans notes ni lieux ; import d'un fichier piégé (note HTML, champs inconnus, type inconnu) :
  * aperçu + confirmation (refus → rien), puis accepté → « importé, à vérifier », note en texte brut, aucun élément créé.
+ * v69 : import à l'arrêt seulement (relevés GPS hors guidage) : bouton grisé en roulant (« Disponible à l'arrêt »),
+ * actif à l'arrêt ; le camion repart avant « Importer » → « Import annulé : camion en mouvement. », rien de fusionné.
  */
 async function reportsShareCheck(browser, base) {
   const reports = [
@@ -5243,14 +5245,37 @@ async function reportsShareCheck(browser, base) {
       { type: 'low-bridge', lat: 47.25, lon: 5.50001, createdAt: '2026-11-03' },
     ] });
     const file = { name: 'ami.json', mimeType: 'application/json', buffer: Buffer.from(piege) };
-    let asked = '';
-    page.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
+    const count = () => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports.length);
+    const geo = async (speed, n) => { for (let i = 0; i < n; i += 1) { await setGeo(page, { lon: 5.4, lat: 47.2, accuracy: 5, speed }); await page.waitForTimeout(1000); } };
+    // v69 : en roulant, bouton grisé.
+    await geo(20, 3);
+    check(await page.isDisabled('#reports-import-file') && await page.getAttribute('#btn-reports-import', 'aria-disabled') === 'true'
+      && /Disponible à l'arrêt/.test(await page.textContent('#reports-import-hint')) && await page.isVisible('#reports-import-hint'),
+    `${tag} : « Importer le fichier d'un ami… » grisé en roulant, « Disponible à l'arrêt »`);
+    await page.click('#btn-reports-import', { force: true });
+    check(/Disponible à l'arrêt/.test(await page.textContent('#reports-share-status')), `${tag} : touché en roulant → « Disponible à l'arrêt »`);
+    // À l'arrêt (≥ 3 s) : actif.
+    await geo(0, 6);
+    check(await page.isEnabled('#reports-import-file') && await page.getAttribute('#btn-reports-import', 'aria-disabled') === 'false'
+      && await page.isHidden('#reports-import-hint'), `${tag} : actif à l'arrêt`);
     await page.setInputFiles('#reports-import-file', file);
-    await page.waitForTimeout(500);
-    const afterRefuse = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports.length);
+    await page.waitForSelector('#reports-import-preview:not([hidden])', { timeout: 3000 }).catch(() => {});
+    const asked = await page.textContent('#reports-import-text');
+    await page.click('#btn-reports-import-cancel');
+    const afterRefuse = await count();
     check(/^2 signalements à importer \(1 déjà présent\)/.test(asked) && afterRefuse === 2, `${tag} : aperçu « 2 signalements à importer », refus → rien`, asked);
-    page.once('dialog', (d) => d.accept());
+    // Le camion repart avant « Importer » → rien de fusionné.
     await page.setInputFiles('#reports-import-file', file);
+    await page.waitForSelector('#reports-import-preview:not([hidden])', { timeout: 3000 }).catch(() => {});
+    await geo(20, 3);
+    await page.click('#btn-reports-import-ok');
+    await page.waitForTimeout(300);
+    check(await page.textContent('#reports-share-status') === 'Import annulé : camion en mouvement.' && await count() === 2
+      && await page.isHidden('#reports-import-preview'), `${tag} : camion reparti avant « Importer » → import annulé, rien de changé`);
+    await geo(0, 6);
+    await page.setInputFiles('#reports-import-file', file);
+    await page.waitForSelector('#reports-import-preview:not([hidden])', { timeout: 3000 }).catch(() => {});
+    await page.click('#btn-reports-import-ok');
     await page.waitForTimeout(500);
     const list = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports);
     const imp = list.filter((r) => r.origin === 'imported');
