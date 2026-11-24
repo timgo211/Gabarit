@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 
 import {
   STOPS, cleanStop, sanitizeStops, moveStop, removeStop, appendStop, insertStopByRoute, crowPath, tripPoints, legLines,
+  nextStopLine,
 } from '../src/lib/stops.js';
+import { formatArrival } from '../src/lib/format.js';
 import { parseDirections, haversine } from '../src/lib/ors-response.js';
 import { computeRouteOptions, describeOption, guidanceParams, requestFor, VARIANTS, stopUnreachableText } from '../src/lib/route-options.js';
 import { restrictionsForTrip } from '../src/lib/restrictions.js';
@@ -78,13 +80,17 @@ test('réponse ORS avec étapes : un tronçon par segment, way_points gardés', 
   assert.equal(SINGLE.legs[0].duration, SINGLE.duration);
 });
 
-test('fiche : une ligne par étape (heure d\'arrivée cumulée, durée du tronçon)', () => {
+test('fiche : une ligne par tronçon (durée, km, heure d\'arrivée cumulée), dernier tronçon compris', () => {
   const now = new Date(2026, 10, 23, 8, 0);
-  assert.deepEqual(legLines(ROUTE, [STOP], now), ['Étape 1 · Quai 4 — 08:02 (3 min)']);
+  assert.deepEqual(legLines(ROUTE, [STOP], now), [
+    { title: 'Tronçon 1 : Départ → Étape 1', detail: '« Quai 4 » · 3 min · 3,8 km · arrivée 08:02' },
+    { title: 'Tronçon 2 : Étape 1 → Arrivée', detail: '3 min · 2,2 km · arrivée 08:05' },
+  ]);
   assert.deepEqual(legLines(SINGLE, [STOP], now), [], 'tronçons incohérents : rien');
   const option = { key: 'recommended', label: 'Recommandé', note: '', also: [], route: ROUTE, request: requestFor(VARIANTS.recommended) };
   const d = describeOption(option, option, { vehicle, now, stops: [STOP] });
-  assert.deepEqual(d.legs, ['Étape 1 · Quai 4 — 08:02 (3 min)']);
+  assert.equal(d.legs.length, 2);
+  assert.equal(d.legs[0].title, 'Tronçon 1 : Départ → Étape 1');
   assert.match(d.arrival, /^Arrivée : 08:0[56]$/);
   assert.deepEqual(guidanceParams(option, { start: C[0], end: C[33], stops: [STOP] }).stops, [STOP]);
 });
@@ -293,4 +299,64 @@ test('mémoire de l\'itinéraire : étapes gardées, ancienne sauvegarde sans é
   const bad = structuredClone(save);
   bad.choice.stops = [{ lon: 'x' }];
   assert.equal(isValidSave(bad), false);
+});
+
+// v62 : fixture à 2 étapes (ors-directions-2-etapes.json) : 254 km vers le nord, épingle de 80 km (37,5 km est, 5 km,
+// 37,5 km ouest : l'étape 2 est à 5 km à vol d'oiseau de l'étape 1), puis 100 km.
+const ROUTE2 = parseDirections(fixture('ors-directions-2-etapes.json'));
+const C2 = ROUTE2.coordinates;
+const STOPS2 = [
+  { label: 'Total Aire de la Couline', lon: C2[26][0], lat: C2[26][1] },
+  { label: 'Quai 4', lon: C2[37][0], lat: C2[37][1] },
+];
+
+test('fiche à 2 étapes : 3 tronçons lus dans segments, somme = total de la fiche, dernière heure = arrivée', () => {
+  const now = new Date(2026, 10, 23, 12, 3);
+  assert.deepEqual(ROUTE2.wayPoints, [0, 26, 37, 47]);
+  assert.equal(ROUTE2.legs.length, 3);
+  const lines = legLines(ROUTE2, STOPS2, now);
+  assert.deepEqual(lines, [
+    { title: 'Tronçon 1 : Départ → Étape 1', detail: '« Total Aire de la Couline » · 3 h 29 · 254 km · arrivée 15:32' },
+    { title: 'Tronçon 2 : Étape 1 → Étape 2', detail: '« Quai 4 » · 1 h 05 · 80,0 km · arrivée 16:37' },
+    { title: 'Tronçon 3 : Étape 2 → Arrivée', detail: '1 h 20 · 100 km · arrivée 17:57' },
+  ]);
+  const sumD = ROUTE2.legs.reduce((a, l) => a + l.duration, 0);
+  const sumM = ROUTE2.legs.reduce((a, l) => a + l.distance, 0);
+  assert.equal(sumD, ROUTE2.duration, 'somme des durées = total');
+  assert.equal(sumM, ROUTE2.distance, 'somme des distances = total');
+  const option = { key: 'recommended', label: 'Recommandé', note: '', also: [], route: ROUTE2, request: requestFor(VARIANTS.recommended) };
+  const d = describeOption(option, option, { vehicle, now, stops: STOPS2 });
+  assert.equal(d.duration, '5 h 54');
+  assert.equal(d.distance, '434 km');
+  assert.equal(d.arrival, `Arrivée : ${formatArrival(now, ROUTE2.duration)}`);
+  assert.equal(d.arrival, 'Arrivée : 17:57');
+  assert.ok(d.legs.at(-1).detail.endsWith('arrivée 17:57'), 'arrivée du dernier tronçon = arrivée de la fiche');
+  assert.ok(!d.legs.some((l) => /^Total|· Total/.test(l.title)), '« Total » jamais dans un titre');
+});
+
+test('guidage : « Étape k/n : durée · km » le long du tracé, jamais à vol d\'oiseau, mis à jour à chaque étape', () => {
+  assert.equal(nextStopLine(null), '');
+  assert.equal(nextStopLine({ index: 2, count: 2, distance: 0, duration: 0 }), '');
+  const line = prepareLine(C2);
+  const s0 = startNavigation(ROUTE2, { destination: C2[47], now: T0, stops: STOPS2 });
+  let s = s0;
+  const seen = [];
+  const said = [];
+  const STEP = 100; // m, toutes les 4 s (90 km/h)
+  for (let k = 0, a = 0; a <= line.total; k += 1, a += STEP) {
+    const { point: p, bearing: heading } = pointAt(line, a);
+    const r = updateNavigation(s, { lon: p[0], lat: p[1], accuracy: 5, speed: 25, heading, timestamp: T0 + k * 4000 });
+    s = r.state;
+    said.push(...r.events.filter((e) => e.type === 'speak').map((e) => e.text));
+    const text = nextStopLine(r.view?.nextStop);
+    if (!seen.length || seen.at(-1).text !== text.replace(/ : .*/, '')) seen.push({ text: text.replace(/ : .*/, ''), a, full: text, view: r.view?.nextStop });
+  }
+  assert.deepEqual(seen.map((x) => x.text), ['Étape 1/2', 'Étape 2/2', ''], 'mise à jour à chaque étape atteinte');
+  assert.equal(seen[0].full, 'Étape 1/2 : 3 h 29 · 254 km');
+  // Juste après l'étape 1 : 80 km par l'épingle, alors que l'étape 2 est à 5 km à vol d'oiseau.
+  const v = seen[1].view;
+  assert.ok(v.distance > 75000 && v.distance <= 80100, `distance le long du tracé : ${v.distance}`);
+  assert.ok(haversine(pointAt(line, seen[1].a).point, C2[37]) < 6000, 'à vol d\'oiseau : environ 5 km');
+  assert.match(seen[1].full, /^Étape 2\/2 : 1 h 0\d · (7\d|80),\d km$/);
+  assert.equal(said.filter((t) => t === STOP_REACHED_TEXT).length, 2, '« Étape atteinte. » à chaque étape');
 });

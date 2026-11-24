@@ -146,7 +146,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
-  start = START, fuel = null,
+  start = START, fuel = null, pelias = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -165,7 +165,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, overpass: [], wind: 0, copy: [], satTiles: {}, fuel: [] };
+  const stats = { tiles: 0, directions: 0, pelias: 0, peliasSearch: 0, peliasTexts: [], overpass: [], wind: 0, copy: [], satTiles: {}, fuel: [] };
   if (driving) await ctx.addInitScript((d) => { if (!sessionStorage.getItem('ui-check-init')) localStorage.setItem('gabarit.driving', d); }, JSON.stringify(driving));
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -250,8 +250,15 @@ async function open(browser, base, {
       if (json.__status) return route.fulfill({ status: json.__status, json: {}, headers: { 'access-control-allow-origin': '*' } });
       return route.fulfill({ json, headers: { 'access-control-allow-origin': '*' } });
     }
-    if (url.includes('/pelias/v1/autocomplete')) stats.pelias += 1;
-    if (url.includes('/pelias/v1/autocomplete')) return route.fulfill({ json: fixture('pelias-autocomplete.json') });
+    // v62 : pelias(url, kind) → JSON, ou null (réseau coupé) ; /search (texte validé sans choix) compté à part.
+    if (url.includes('/pelias/v1/autocomplete') || url.includes('/pelias/v1/search')) {
+      const kind = url.includes('/pelias/v1/search') ? 'search' : 'autocomplete';
+      if (kind === 'search') stats.peliasSearch += 1; else stats.pelias += 1;
+      stats.peliasTexts.push(`${kind}:${new URL(url).searchParams.get('text')}`);
+      const json = pelias ? pelias(url, kind) : fixture('pelias-autocomplete.json');
+      if (!json) return route.abort('internetdisconnected');
+      return route.fulfill({ json });
+    }
     if (url.includes('/openrouteservice/v2/directions/')) {
       stats.directions += 1;
       const body = JSON.parse(route.request().postData() || '{}');
@@ -446,8 +453,8 @@ function tollNetworkFixture() {
 
 async function computeRoute(page) {
   await page.fill('#to-input', 'Lyon');
-  await page.waitForSelector('#to-list li', { timeout: 5000 });
-  await page.dispatchEvent('#to-list li', 'pointerdown');
+  await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+  await page.dispatchEvent('#to-list li.suggest-row', 'click');
   await page.click('#btn-route');
   await page.waitForSelector('.route-card', { timeout: 10000 });
   await page.waitForTimeout(1200);
@@ -746,8 +753,8 @@ async function longTextCheck(browser, base) {
   ];
   const { page, ctx } = await open(browser, base, { width: 360, height: 760, directions: () => nav });
   await page.fill('#to-input', 'Lyon');
-  await page.waitForSelector('#to-list li');
-  await page.dispatchEvent('#to-list li', 'pointerdown');
+  await page.waitForSelector('#to-list li.suggest-row');
+  await page.dispatchEvent('#to-list li.suggest-row', 'click');
   await page.click('#btn-route');
   await page.waitForSelector('#btn-nav-start:not([hidden])');
   await page.click('#btn-nav-start');
@@ -1048,8 +1055,8 @@ async function parkedCheck(browser, base) {
   // positions.
   const { page, ctx, stats } = await open(browser, base, { width: 360, height: 760, directions: () => nav });
   await page.fill('#to-input', 'Lyon');
-  await page.waitForSelector('#to-list li');
-  await page.dispatchEvent('#to-list li', 'pointerdown');
+  await page.waitForSelector('#to-list li.suggest-row');
+  await page.dispatchEvent('#to-list li.suggest-row', 'click');
   await page.click('#btn-route');
   await page.waitForSelector('#btn-nav-start:not([hidden])');
   const [lon, lat] = nav.features[0].geometry.coordinates[3];
@@ -1150,8 +1157,8 @@ async function comfortCheck(browser, base) {
 
     // Guidage réel (GPS émulé) : boutons de carte, nom de la route, satellite, jour plus clair.
     await page.fill('#to-input', 'Lyon');
-    await page.waitForSelector('#to-list li');
-    await page.dispatchEvent('#to-list li', 'pointerdown');
+    await page.waitForSelector('#to-list li.suggest-row');
+    await page.dispatchEvent('#to-list li.suggest-row', 'click');
     await page.click('#btn-route');
     await page.waitForSelector('#btn-nav-start:not([hidden])');
     const line = nav.features[0].geometry.coordinates;
@@ -1220,15 +1227,15 @@ async function destinationsCheck(browser, base) {
   // Coordonnées saisies : proposées sans appel Pelias.
   const before = stats.pelias;
   await page.fill('#to-input', '48°41\'31.6"N 6°11\'03.8"E');
-  await page.waitForSelector('#to-list li');
-  const label = await page.textContent('#to-list li');
+  await page.waitForSelector('#to-list li.suggest-row');
+  const label = await page.textContent('#to-list li.suggest-row');
   check(label === '48,69211, 6,18439', 'coordonnées DMS reconnues', label);
-  await page.dispatchEvent('#to-list li', 'pointerdown');
+  await page.dispatchEvent('#to-list li.suggest-row', 'click');
   check(stats.pelias === before, 'aucun appel au géocodage pour des coordonnées', String(stats.pelias - before));
   await page.fill('#from-input', '48.6921, 6.1844');
-  await page.waitForSelector('#from-list li');
-  check(await page.textContent('#from-list li') === '48,69210, 6,18440', 'coordonnées décimales reconnues');
-  await page.dispatchEvent('#from-list li', 'pointerdown');
+  await page.waitForSelector('#from-list li.suggest-row');
+  check(await page.textContent('#from-list li.suggest-row') === '48,69210, 6,18440', 'coordonnées décimales reconnues');
+  await page.dispatchEvent('#from-list li.suggest-row', 'click');
   await page.click('#btn-route');
   await page.waitForSelector('.route-card', { timeout: 10000 });
   check(true, 'itinéraire calculé depuis des coordonnées');
@@ -1289,8 +1296,8 @@ async function overviewGpsCheck(browser, base) {
     const nav = fixture('ors-directions-nav.json');
     const { page, ctx, errors } = await open(browser, base, { width: 412, height: 900, directions: () => nav });
     await page.fill('#to-input', 'Lyon');
-    await page.waitForSelector('#to-list li');
-    await page.dispatchEvent('#to-list li', 'pointerdown');
+    await page.waitForSelector('#to-list li.suggest-row');
+    await page.dispatchEvent('#to-list li.suggest-row', 'click');
     await page.click('#btn-route');
     await page.waitForSelector('#btn-nav-start:not([hidden])');
     const line = nav.features[0].geometry.coordinates;
@@ -1377,8 +1384,8 @@ async function pressThenTypeCheck(browser, base) {
     const n = (await page.inputValue(sel)).length;
     for (let i = 0; i < n; i += 1) await page.keyboard.press('Backspace', { delay: 15 });
     await page.keyboard.type('Lyon', { delay: 30 });
-    await page.waitForSelector(`${list} li`);
-    await page.dispatchEvent(`${list} li`, 'pointerdown');
+    await page.waitForSelector(`${list} li.suggest-row`);
+    await page.dispatchEvent(`${list} li.suggest-row`, 'click');
   };
   // Arrivée.
   await longPress(0);
@@ -2350,8 +2357,8 @@ async function tollsCheck(browser, base) {
   const er = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'),
     directions: () => ({ __status: 404, error: { code: 2009, message: 'Route could not be found - Unable to find a route between points 1 and 2.' } }) });
   await er.page.fill('#to-input', 'Lyon');
-  await er.page.waitForSelector('#to-list li', { timeout: 5000 });
-  await er.page.dispatchEvent('#to-list li', 'pointerdown');
+  await er.page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+  await er.page.dispatchEvent('#to-list li.suggest-row', 'click');
   await er.page.click('#btn-route');
   await er.page.waitForSelector('#message:not([hidden]) .message-detail', { timeout: 10000 });
   const msg = await er.page.textContent('#message');
@@ -3197,8 +3204,8 @@ async function restrictionsCheck(browser, base) {
     const coordsRoute = async () => {
       for (const [field, p] of [['from', line[0]], ['to', line.at(-1)]]) {
         await page.fill(`#${field}-input`, `${p[1]}, ${p[0]}`);
-        await page.waitForSelector(`#${field}-list li`);
-        await page.dispatchEvent(`#${field}-list li`, 'pointerdown');
+        await page.waitForSelector(`#${field}-list li.suggest-row`);
+        await page.dispatchEvent(`#${field}-list li.suggest-row`, 'click');
       }
       await page.click('#btn-route');
       await page.waitForSelector('.route-card', { timeout: 10000 });
@@ -4165,8 +4172,8 @@ async function stopsCheck(browser, base) {
     for (const i of [0, 1]) {
       await page.click('#btn-add-stop');
       await page.fill(`#stop-input-${i}`, i === 0 ? 'Port' : 'Lyon');
-      await page.waitForSelector(`#stop-list-${i} li`, { timeout: 5000 });
-      await page.dispatchEvent(`#stop-list-${i} li >> nth=${i === 0 ? 1 : 0}`, 'pointerdown');
+      await page.waitForSelector(`#stop-list-${i} li.suggest-row`, { timeout: 5000 });
+      await page.dispatchEvent(`#stop-list-${i} li.suggest-row >> nth=${i === 0 ? 1 : 0}`, 'click');
     }
     const labels = async () => page.$$eval('.stop-input', (n) => n.map((x) => x.value));
     const before = await labels();
@@ -4182,8 +4189,19 @@ async function stopsCheck(browser, base) {
     const sent = bodies.slice();
     check(sent.length >= 1 && sent.length <= 3 && sent.every((b) => b.coordinates.length === 3 && !b.alternative_routes),
       `${tag} : 1 à 3 requêtes, tous les points, jamais alternative_routes`, JSON.stringify(sent.map((b) => b.coordinates.length)));
-    const leg = await page.locator('.route-card-leg').first().textContent().catch(() => '');
-    check(/^Étape 1 · .+ — \d\d:\d\d \(\d+ min\)$/.test(leg.trim()), `${tag} : fiche, une ligne par étape`, leg);
+    // v62 : une ligne par tronçon (titre, puis « nom » · durée · km · arrivée hh:mm), dernier tronçon compris.
+    const legs = await page.$$eval('.route-card[aria-checked="true"] .route-card-leg', (n) => n.map((x) => ({
+      title: x.querySelector('.route-card-leg-title')?.textContent ?? '', detail: x.querySelector('.route-card-leg-detail')?.textContent ?? '',
+    })));
+    check(legs.length === 2 && legs[0].title === 'Tronçon 1 : Départ → Étape 1' && legs[1].title === 'Tronçon 2 : Étape 1 → Arrivée',
+      `${tag} : fiche, une ligne par tronçon`, JSON.stringify(legs));
+    check(/^« .+ » · \d+ min · [\d,]+ km · arrivée \d\d:\d\d$/.test(legs[0]?.detail ?? '') && /^\d+ min · [\d,]+ km · arrivée \d\d:\d\d$/.test(legs[1]?.detail ?? ''),
+      `${tag} : tronçon = nom entre guillemets, durée, km, heure`, JSON.stringify(legs));
+    const cardArrival = (await page.textContent('.route-card[aria-checked="true"] .route-card-facts')).match(/Arrivée : (\d\d:\d\d)/)?.[1];
+    check(cardArrival && legs[1]?.detail.endsWith(`arrivée ${cardArrival}`), `${tag} : arrivée du dernier tronçon = arrivée de la fiche`, `${cardArrival} / ${legs[1]?.detail}`);
+    const legColor = await page.$eval('.route-card-leg-detail', (n) => getComputedStyle(n).color);
+    const mutedColor = await page.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--muted)'; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c; });
+    check(legColor === mutedColor, `${tag} : détail du tronçon en gris`, `${legColor} / ${mutedColor}`);
     check(/étape : Heures sans temps passé aux étapes\./.test(await page.textContent('#route-notes')), `${tag} : note « sans temps passé aux étapes »`);
     check(await page.locator('.stop-marker').count() === 1, `${tag} : repère numéroté de l'étape`);
     await noHorizontalScroll(page, `${tag} fiche`);
@@ -4211,6 +4229,12 @@ async function stopsCheck(browser, base) {
     await page.waitForSelector('#nav:not([hidden])');
     for (let i = 1; i <= 6; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(700); }
     check(/Prochaine étape \(1\/1\)/.test(await page.textContent('#nav-facts')), `${tag} : prochaine étape dans les détails`, await page.textContent('#nav-facts'));
+    // v62 : « Étape 1/1 : durée · km » sous le total, toujours visible ; total gardé.
+    const stopLine = await page.textContent('#nav-stop');
+    check(await page.isVisible('#nav-stop') && /^Étape 1\/1 : \d+ min · [\d,]+ (km|m)$/.test(stopLine), `${tag} : « Étape 1/1 : durée · km » visible`, stopLine);
+    check(await page.isVisible('#nav-time') && /\d/.test(await page.textContent('#nav-remaining')), `${tag} : total restant gardé`);
+    const ov = await footOverlaps(page);
+    check(ov.out.length === 0, `${tag} : ligne d'étape, rien ne se chevauche`, ov.out.join(' | '));
     check(await page.locator('.stop-marker').count() === 1, `${tag} : repère de l'étape en guidage`);
     // Hors itinéraire en roulant (300 m au nord, 14 m/s) → recalcul avec l'étape restante.
     const n1 = bodies.length;
@@ -4222,6 +4246,8 @@ async function stopsCheck(browser, base) {
     const spoken = await page.evaluate(() => window.__spoken ?? []);
     check(spoken.filter((t) => t === 'Étape atteinte.').length === 1, `${tag} : « Étape atteinte. » dite une fois`, spoken.join(' | '));
     check(!spoken.some((t) => /Destination atteinte/.test(t)), `${tag} : jamais « Destination atteinte » à l'étape`);
+    check(await page.isHidden('#nav-stop'), `${tag} : ligne d'étape retirée après la dernière étape`);
+    check(!spoken.some((t) => /Étape 1\/|km ·/.test(t)), `${tag} : ligne d'étape jamais dite`);
     // « Autres itinéraires » à l'arrêt : plus d'étape restante → 2 points.
     const stopAt = line[18];
     for (let i = 0; i < 5; i += 1) { await setGeo(page, { lon: stopAt[0], lat: stopAt[1], accuracy: 5, speed: 0 }); await page.waitForTimeout(1000); }
@@ -4231,9 +4257,9 @@ async function stopsCheck(browser, base) {
     check(bodies.slice(n2).every((b) => b.coordinates.length === 2), `${tag} : « Autres itinéraires » sans l'étape déjà atteinte`);
     check(await page.isVisible('#alts-stop-input'), `${tag} : « Ajouter une étape » dans « Autres itinéraires » à l'arrêt`);
     await page.fill('#alts-stop-input', 'Port');
-    await page.waitForSelector('#alts-stop-list li', { timeout: 5000 }).catch(() => {});
+    await page.waitForSelector('#alts-stop-list li.suggest-row', { timeout: 5000 }).catch(() => {});
     const n3 = bodies.length;
-    await page.dispatchEvent('#alts-stop-list li >> nth=1', 'pointerdown').catch(() => {});
+    await page.dispatchEvent('#alts-stop-list li.suggest-row >> nth=1', 'click').catch(() => {});
     await page.waitForSelector('#nav-alts .route-card', { timeout: 10000 }).catch(() => {});
     await page.waitForTimeout(800);
     check(bodies.slice(n3).length >= 1 && bodies.slice(n3).every((b) => b.coordinates.length === 3), `${tag} : étape ajoutée à l'arrêt → calcul avec elle`, JSON.stringify(bodies.slice(n3).map((b) => b.coordinates.length)));
@@ -4242,10 +4268,303 @@ async function stopsCheck(browser, base) {
     // Le véhicule roule : panneau fermé.
     for (let i = 19; i <= 21; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
     check(await page.isHidden('#nav-alts'), `${tag} : panneau fermé dès que le véhicule roule`);
+    check(await page.locator('#alts-stop-input').count() === 0, `${tag} : champ « Ajouter une étape » absent en roulant`);
     await stopGuidance(page);
     check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
     await ctx.close();
   }
+}
+
+/**
+ * v62 : préparation — repère d'étape posé sur un P (toujours au-dessus), règle des P selon le zoom (aucun < 8, groupes
+ * « P n » de 8 à 11, tous ≥ 11, toucher d'un groupe = zoom + 2), P jamais recréés en suivant le véhicule ; poignée du
+ * panneau (replié = carte seule, gardé au rechargement, ≥ 48 px). 412×900 jour, 900×412 nuit, 1280×800 jour.
+ */
+async function preparationCheck(browser, base) {
+  const withStop = fixture('ors-directions-etapes.json');
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
+    const tag = `préparation ${width}×${height} ${theme}`;
+    const landscape = width > height;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, official: fixture('aires-pl.json'), overpass: () => fixture('overpass-aires.json'),
+      directions: (b) => (b.coordinates.length > 2 ? withStop : nav),
+    });
+    await computeRoute(page);
+    await page.waitForSelector('.area-marker', { timeout: 10000 });
+    const total = await page.locator('.area-marker:not(.area-group)').count();
+    // Étape posée exactement sur un P (coordonnées tapées : sans géocodage).
+    const ll = await page.evaluate(() => {
+      const m = document.querySelector('.area-marker:not(.other-side)');
+      const r = m.getBoundingClientRect();
+      const map = window.__maps.at(-1);
+      const c = map.getCanvas().getBoundingClientRect();
+      const q = map.unproject([r.left + r.width / 2 - c.left, r.top + r.height / 2 - c.top]);
+      return [q.lng, q.lat];
+    });
+    await page.click('#btn-add-stop');
+    await page.fill('#stop-input-0', `${ll[1].toFixed(6)}, ${ll[0].toFixed(6)}`);
+    await page.waitForSelector('#stop-list-0 li.suggest-row', { timeout: 5000 });
+    await page.dispatchEvent('#stop-list-0 li.suggest-row', 'click');
+    await page.click('#btn-route');
+    await page.waitForSelector('.stop-marker', { timeout: 10000 });
+    await page.waitForTimeout(1200);
+    const z = await page.evaluate(() => {
+      const st = document.querySelector('.stop-marker');
+      const sb = st.getBoundingClientRect();
+      const under = [...document.querySelectorAll('.area-marker')].filter((a) => {
+        const b = a.getBoundingClientRect();
+        return b.left < sb.right && sb.left < b.right && b.top < sb.bottom && sb.top < b.bottom;
+      });
+      return { stop: Number(getComputedStyle(st).zIndex), areas: under.map((a) => Number(getComputedStyle(a).zIndex)), visible: sb.width >= 30 };
+    });
+    check(z.visible && z.areas.length >= 1 && z.areas.every((a) => a < z.stop), `${tag} : repère d'étape au-dessus du P qu'il recouvre`, JSON.stringify(z));
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-etape-sur-p.png`) });
+    // Règle des P selon le zoom.
+    const at = async (zoom) => {
+      await page.evaluate(({ zoom: zz, c }) => new Promise((res) => {
+        const map = window.__maps.at(-1);
+        map.once('moveend', () => setTimeout(res, 50));
+        map.jumpTo({ center: c, zoom: zz });
+      }), { zoom, c: ll });
+      return page.evaluate(() => ({
+        areas: document.querySelectorAll('.area-marker:not(.area-group)').length,
+        groups: [...document.querySelectorAll('.area-group')].map((g) => g.textContent),
+      }));
+    };
+    const z7 = await at(7);
+    check(z7.areas === 0 && z7.groups.length === 0, `${tag} : zoom 7, aucun P`, JSON.stringify(z7));
+    const z9 = await at(9.5);
+    const inGroups = z9.groups.reduce((a, t) => a + Number(t.replace('P ', '')), 0);
+    check(z9.groups.length >= 1 && z9.groups.every((t) => /^P \d+$/.test(t)) && z9.areas + inGroups <= total,
+      `${tag} : zoom 9,5, P regroupés « P n »`, JSON.stringify(z9));
+    const z12 = await at(12);
+    check(z12.areas === total && z12.groups.length === 0, `${tag} : zoom 12, tous les P`, `${JSON.stringify(z12)} / ${total}`);
+    await at(9.5);
+    const before = await page.evaluate(() => window.__maps.at(-1).getZoom());
+    await page.locator('.area-group').first().click();
+    await page.waitForTimeout(900);
+    const after = await page.evaluate(() => window.__maps.at(-1).getZoom());
+    check(after - before > 1.9, `${tag} : groupe touché → zoom + 2`, `${before.toFixed(1)} → ${after.toFixed(1)}`);
+    // Poignée du panneau : replié = carte seule.
+    const grip = await page.locator('#btn-panel-grip').boundingBox();
+    check(grip && grip.height >= 48, `${tag} : poignée ≥ 48 px`, JSON.stringify(grip));
+    const mapBox0 = await page.locator('#map').boundingBox();
+    await page.click('#btn-panel-grip');
+    await page.waitForTimeout(500);
+    const mapBox1 = await page.locator('#map').boundingBox();
+    const st = await page.evaluate(() => ({
+      cls: document.querySelector('.app').classList.contains('panel-collapsed'),
+      expanded: document.querySelector('#btn-panel-grip').getAttribute('aria-expanded'),
+      body: document.querySelector('#panel-body').getClientRects().length,
+      panel: document.querySelector('.panel').getBoundingClientRect().toJSON(),
+      saved: JSON.parse(localStorage.getItem('gabarit.data')).settings.panelCollapsed,
+    }));
+    const grown = landscape ? mapBox1.width > mapBox0.width + 200 : mapBox1.height > mapBox0.height + 200;
+    check(st.cls && st.expanded === 'false' && st.body === 0 && grown && (landscape ? st.panel.width <= 60 : st.panel.height <= 60) && st.saved === true,
+      `${tag} : replié = carte seule, état gardé`, JSON.stringify({ ...st, mapBox0, mapBox1 }));
+    await noHorizontalScroll(page, `${tag} replié`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-panneau-replie.png`) });
+    await page.reload();
+    await page.waitForSelector('#btn-panel-grip');
+    await page.waitForTimeout(800);
+    check(await page.evaluate(() => document.querySelector('.app').classList.contains('panel-collapsed')), `${tag} : replié après rechargement`);
+    await page.click('#btn-panel-grip');
+    await page.waitForTimeout(400);
+    check(await page.isVisible('#route-form') && await page.getAttribute('#btn-panel-grip', 'aria-expanded') === 'true', `${tag} : déplié par la poignée`);
+    await noHorizontalScroll(page, `${tag} déplié`);
+    // Guidage : P jamais recréés en suivant le véhicule (zoom du suivi ≥ 11).
+    if (!(await page.isVisible('.route-card'))) await computeRoute(page);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    await page.click('#btn-nav-start');
+    await page.waitForSelector('#nav:not([hidden])');
+    await page.waitForTimeout(1500);
+    await page.evaluate(() => {
+      window.__areaAdds = 0;
+      new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.classList?.contains('area-marker')) window.__areaAdds += 1; })
+        .observe(document.querySelector('#map'), { childList: true, subtree: true });
+    });
+    for (let i = 1; i <= 6; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(800); }
+    check(await page.evaluate(() => window.__areaAdds) === 0, `${tag} : P jamais recréés en suivant le véhicule`, String(await page.evaluate(() => window.__areaAdds)));
+    await stopGuidance(page);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
+/**
+ * v62 : menu de suggestions commun (départ, arrivée, étapes) — 3 caractères, 400 ms, requête précédente annulée,
+ * 5 lignes (nom, commune et pays en gris, ≥ 48 px), « Aucun résultat », « Pas de connexion », ✕, toucher dehors, choix,
+ * clavier ouvert (visualViewport simulé : liste au-dessus du clavier), plafond du jour (aucun appel, ligne), texte validé
+ * sans choix (/search : un lieu → calcul ; plusieurs → liste). Compte les appels de géocodage (chiffre de la PR).
+ * 412×900 jour, 360×760 nuit, 1280×800 jour.
+ */
+async function suggestionsCheck(browser, base) {
+  // Échap viderait un champ type=search (comportement natif) : fermeture par le ✕ de chaque liste ouverte.
+  const closeLists = (page) => page.evaluate(() => { for (const b of document.querySelectorAll('.suggestions:not([hidden]) .suggest-close')) b.click(); });
+  const five = fixture('pelias-suggest-5.json');
+  const one = { ...five, features: five.features.slice(0, 1) };
+  const empty = fixture('pelias-suggest-vide.json');
+  const pelias = (url, kind) => {
+    const t = new URL(url).searchParams.get('text');
+    if (/^Coupure/.test(t)) return null;
+    if (/^Zzq/.test(t)) return empty;
+    if (kind === 'search' && t === 'Clermont-Ferrand') return one;
+    return five;
+  };
+  for (const [width, height, theme] of [[412, 900, 'day'], [360, 760, 'night'], [1280, 800, 'day']]) {
+    const tag = `suggestions ${width}×${height} ${theme}`;
+    const { page, ctx, stats, errors } = await open(browser, base, { width, height, theme, pelias });
+    // Simulation du clavier : partie visible réduite (Android et iPhone ne réduisent que visualViewport).
+    await page.addInitScript(() => {
+      const vv = new EventTarget();
+      let h = window.innerHeight;
+      Object.defineProperties(vv, {
+        height: { get: () => h }, width: { get: () => window.innerWidth }, offsetTop: { get: () => 0 }, offsetLeft: { get: () => 0 }, scale: { get: () => 1 },
+      });
+      Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => vv });
+      window.__keyboard = (px) => { h = window.innerHeight - px; vv.dispatchEvent(new Event('resize')); };
+    });
+    await page.reload();
+    await page.waitForSelector('#to-input');
+    await page.waitForTimeout(500);
+    const n = () => stats.pelias;
+    // Moins de 3 caractères : aucun appel.
+    let c0 = n();
+    await page.click('#to-input');
+    await page.keyboard.type('Cl', { delay: 60 });
+    await page.waitForTimeout(900);
+    check(n() === c0, `${tag} : 2 caractères, aucun appel`);
+    // Saisie type « Clermont-Ferrand » à 4 caractères/s : 1 appel seulement (400 ms après la dernière frappe).
+    await page.fill('#to-input', '');
+    c0 = n();
+    await page.keyboard.type('Clermont-Ferrand', { delay: 250 });
+    await page.waitForTimeout(100); // type() attend déjà 250 ms après la dernière touche : 350 ms en tout
+    check(n() === c0, `${tag} : rien avant 400 ms`, String(n() - c0));
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+    const typed4 = n() - c0;
+    check(typed4 === 1, `${tag} : « Clermont-Ferrand » à 4 car./s → 1 appel`, String(typed4));
+    const rows = await page.$$eval('#to-list li.suggest-row', (ls) => ls.map((l) => ({
+      name: l.querySelector('.suggest-name')?.textContent, sub: l.querySelector('.suggest-sub')?.textContent ?? '',
+      h: l.getBoundingClientRect().height, sub_c: l.querySelector('.suggest-sub') ? getComputedStyle(l.querySelector('.suggest-sub')).color : '',
+    })));
+    const muted = await page.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--muted)'; document.body.append(d); const col = getComputedStyle(d).color; d.remove(); return col; });
+    check(rows.length === 5, `${tag} : 5 lignes au plus`, String(rows.length));
+    check(rows.every((r) => r.h >= 48), `${tag} : lignes ≥ 48 px`, rows.map((r) => Math.round(r.h)).join(', '));
+    check(rows[2]?.name === 'Aire de Clermont-Ferrand Nord' && rows[2]?.sub === 'Gerzat, France' && rows[2]?.sub_c === muted,
+      `${tag} : nom, puis commune et pays en gris`, JSON.stringify(rows[2]));
+    const closeBox = await page.locator('#to-list .suggest-close').boundingBox();
+    check(closeBox && closeBox.width >= 48 && closeBox.height >= 48, `${tag} : ✕ ≥ 48 px`, JSON.stringify(closeBox));
+    await noHorizontalScroll(page, `${tag} liste`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-suggestions.png`) });
+    // Requête précédente annulée : une frappe pendant la réponse n'affiche jamais l'ancienne liste.
+    await page.click('#to-list .suggest-close');
+    check(await page.isHidden('#to-list'), `${tag} : ✕ ferme la liste`);
+    await page.keyboard.type('x', { delay: 10 });
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+    await page.mouse.click(5, Math.round(height * 0.25)); // carte (portrait) ou bord de l'écran
+    await page.waitForTimeout(200);
+    check(await page.isHidden('#to-list'), `${tag} : toucher hors de la liste la ferme`);
+    // Aucun résultat, pas de connexion.
+    await page.fill('#to-input', 'Zzqxw');
+    await page.waitForSelector('#to-list .suggest-info', { timeout: 5000 });
+    check((await page.textContent('#to-list .suggest-info')) === 'Aucun résultat', `${tag} : « Aucun résultat »`);
+    await page.fill('#to-input', 'Coupure réseau');
+    await page.waitForFunction(() => document.querySelector('#to-list .suggest-info')?.textContent === 'Pas de connexion', null, { timeout: 5000 }).catch(() => {});
+    check((await page.textContent('#to-list .suggest-info').catch(() => '')) === 'Pas de connexion', `${tag} : « Pas de connexion »`);
+    // Choix : champ rempli, liste fermée ; même texte ensuite = cache (aucun appel).
+    await page.fill('#to-input', 'Clermont');
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+    await page.locator('#to-list li.suggest-row').nth(1).click();
+    check(await page.inputValue('#to-input') === 'Clermont, Clermont, France' && await page.isHidden('#to-list'), `${tag} : choix → champ rempli, liste fermée`, await page.inputValue('#to-input'));
+    c0 = n();
+    await page.fill('#to-input', 'Clermont');
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+    check(n() === c0, `${tag} : même texte → cache en mémoire, aucun appel`, String(n() - c0));
+    check(await page.evaluate(() => !Object.keys(localStorage).some((k) => (localStorage.getItem(k) ?? '').includes('Clermont-l'))), `${tag} : cache jamais écrit sur disque`);
+    await closeLists(page);
+    // Étape : même composant.
+    await page.click('#btn-add-stop');
+    await page.fill('#stop-input-0', 'Clermont');
+    await page.waitForSelector('#stop-list-0 li.suggest-row', { timeout: 5000 });
+    check(await page.locator('#stop-list-0 li.suggest-row').count() === 5 && await page.locator('#stop-list-0 .suggest-close').count() === 1, `${tag} : étape, même liste`);
+    await page.locator('#stop-list-0 li.suggest-row').first().click();
+    // Départ : même composant.
+    await page.fill('#from-input', 'Clermont');
+    await page.waitForSelector('#from-list li.suggest-row', { timeout: 5000 });
+    check(await page.locator('#from-list li.suggest-row').count() === 5, `${tag} : départ, même liste`);
+    await closeLists(page);
+    await page.fill('#from-input', '');
+    // Clavier ouvert : l'appli tient dans la partie visible, la liste reste au-dessus du clavier.
+    if (width < 700) {
+      await page.click('#to-input');
+      await page.evaluate(() => window.__keyboard(Math.round(window.innerHeight * 0.42)));
+      await page.fill('#to-input', 'Clermon');
+      await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
+      await page.waitForTimeout(500);
+      const k = await page.evaluate(() => {
+        const vh = window.visualViewport.height;
+        const input = document.querySelector('#to-input').getBoundingClientRect();
+        const list = document.querySelector('#to-list').getBoundingClientRect();
+        const firstRows = [...document.querySelectorAll('#to-list li.suggest-row')].slice(0, 3).map((r) => r.getBoundingClientRect().bottom);
+        return { kbd: document.querySelector('.app').classList.contains('kbd-open'), vh, input: input.top, listBottom: list.bottom, rows: firstRows };
+      });
+      // Liste entière au-dessus du clavier (elle défile dedans), ✕ et 2 lignes au moins visibles.
+      check(k.kbd && k.input >= 0 && k.listBottom <= k.vh + 1 && k.rows.length === 3 && k.rows.slice(0, 2).every((b) => b <= k.vh + 1),
+        `${tag} : clavier ouvert, champ et liste au-dessus du clavier`, JSON.stringify(k));
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-suggestions-clavier.png`) });
+      await closeLists(page);
+      await page.evaluate(() => { document.activeElement.blur(); window.__keyboard(0); });
+      await page.waitForTimeout(300);
+      check(!(await page.evaluate(() => document.querySelector('.app').classList.contains('kbd-open'))), `${tag} : clavier fermé, mise en page normale`);
+    }
+    // Texte validé sans choix : plusieurs lieux → liste ouverte, aucun calcul ; un seul → pris, calcul.
+    const d0 = stats.directions;
+    let s0 = stats.peliasSearch;
+    await page.fill('#to-input', 'Clermont');
+    await closeLists(page);
+    await page.click('#btn-route');
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 }).catch(() => {});
+    check(stats.peliasSearch === s0 + 1 && stats.directions === d0 && await page.locator('#to-list li.suggest-row').count() === 5,
+      `${tag} : validé sans choix, plusieurs lieux → liste, aucun calcul`, `${stats.peliasSearch - s0} / ${stats.directions - d0}`);
+    await closeLists(page);
+    await page.fill('#to-input', 'Clermont-Ferrand');
+    await closeLists(page);
+    s0 = stats.peliasSearch;
+    await page.click('#btn-route');
+    await page.waitForSelector('.route-card', { timeout: 10000 }).catch(() => {});
+    check(stats.peliasSearch === s0 + 1 && stats.directions > d0 && await page.inputValue('#to-input') === 'Clermont-Ferrand, Clermont-Ferrand, France',
+      `${tag} : validé sans choix, un lieu → pris, calcul`, `${stats.peliasSearch - s0} / ${stats.directions - d0} / ${await page.inputValue('#to-input')}`);
+    // Plafond du jour atteint : ligne, aucun appel ; la validation reste possible (/search, compteur à part).
+    await page.evaluate(() => {
+      const d = new Date();
+      const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      localStorage.setItem('gabarit.geocodeCount', JSON.stringify({ day, autocomplete: 500, search: 0 }));
+    });
+    c0 = n();
+    await page.fill('#to-input', 'Clermont-Fer');
+    await page.waitForSelector('#to-list .suggest-info', { timeout: 5000 }).catch(() => {});
+    check(n() === c0 && /épuisées.*validez/.test(await page.textContent('#to-list .suggest-info').catch(() => '')), `${tag} : plafond du jour → ligne, aucun appel`);
+    await page.fill('#to-input', 'Clermont-Ferrand');
+    await closeLists(page);
+    s0 = stats.peliasSearch;
+    await page.click('#btn-route');
+    await page.waitForTimeout(1500);
+    check(stats.peliasSearch === s0 + 1 && await page.inputValue('#to-input') === 'Clermont-Ferrand, Clermont-Ferrand, France', `${tag} : plafond atteint, validation toujours possible`);
+    const saved = await page.evaluate(() => localStorage.getItem('gabarit.geocodeCount'));
+    check(!/Clermont|cle-factice|\d+\.\d{3}/.test(saved), `${tag} : compteur sans texte, clé ni coordonnée`, saved);
+    console.log(`   ${tag} : appels de géocodage — autocomplete ${stats.pelias}, search ${stats.peliasSearch}`);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Mesure pour la PR : saisie lente (2 car./s) = un appel par frappe après 3 caractères.
+  const { page, ctx, stats } = await open(browser, base, { width: 412, height: 900, pelias });
+  await page.click('#to-input');
+  await page.keyboard.type('Clermont-Ferrand', { delay: 500 });
+  await page.waitForTimeout(900);
+  console.log(`   mesure : « Clermont-Ferrand » à 2 car./s → ${stats.pelias} appels ; à 4 car./s → 1 appel`);
+  await ctx.close();
 }
 
 /**
@@ -4542,7 +4861,8 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck };
+    carburant: fuelCheck, etapes: stopsCheck, historique: historyCheck, limites: ruleLimitsCheck,
+    preparation: preparationCheck, suggestions: suggestionsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

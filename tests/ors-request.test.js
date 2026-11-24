@@ -86,6 +86,9 @@ test('URL d\'autocomplétion Pelias', () => {
   assert.equal(url.searchParams.get('focus.point.lon'), '4.83570');
   assert.equal(url.searchParams.get('lang'), 'fr');
   assert.match(url.searchParams.get('boundary.country'), /^FR,/);
+  assert.equal(url.searchParams.get('size'), '5', 'v62 : 5 suggestions au plus');
+  const search = new URL(buildAutocompleteUrl({ text: 'Lyon', apiKey: 'CLE-FACTICE', endpoint: 'search' }));
+  assert.equal(search.pathname, '/pelias/v1/search', 'texte validé sans choix : /search');
   // Phase 5h : Autriche proposée (trajets München → Innsbruck).
   assert.ok(url.searchParams.get('boundary.country').split(',').includes('AT'));
 });
@@ -93,7 +96,8 @@ test('URL d\'autocomplétion Pelias', () => {
 test('lecture des suggestions Pelias (points invalides ignorés)', () => {
   const s = parseAutocomplete(fixture('pelias-autocomplete.json'));
   assert.equal(s.length, 2);
-  assert.deepEqual(s[0], { label: 'Lyon, France', lon: 4.835659, lat: 45.764043 });
+  assert.deepEqual(s[0], { label: 'Lyon, France', name: 'Lyon', place: 'France', lon: 4.835659, lat: 45.764043 });
+  assert.equal(s[1].place, 'Lyon, France', 'sans champs séparés : suite du libellé');
   assert.deepEqual(parseAutocomplete(null), []);
 });
 

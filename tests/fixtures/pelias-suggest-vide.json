@@ -1,0 +1,14 @@
+{
+ "geocoding": {
+  "version": "0.2",
+  "query": {
+   "text": "Zzqxw",
+   "size": 5,
+   "lang": {
+    "iso6391": "fr"
+   }
+  }
+ },
+ "type": "FeatureCollection",
+ "features": []
+}

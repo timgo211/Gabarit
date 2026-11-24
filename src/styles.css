@@ -119,11 +119,36 @@ html, body {
 .panel {
   grid-area: panel;
   background: var(--panel);
-  padding: 12px;
+  --panel-pad: 12px;
+  padding: var(--panel-pad);
   overflow-y: auto;
   max-height: 52dvh;
   border-top: 2px solid var(--border);
 }
+
+/* v62 : poignée du panneau de préparation ; repliée = carte seule (état dans settings.panelCollapsed). */
+.panel-grip {
+  position: sticky; top: calc(-1 * var(--panel-pad)); z-index: 3; display: flex; align-items: center; justify-content: center;
+  gap: 10px; box-sizing: border-box; width: calc(100% + 2 * var(--panel-pad)); min-height: 48px;
+  margin: calc(-1 * var(--panel-pad)) calc(-1 * var(--panel-pad)) 6px; padding: 0 12px; cursor: pointer;
+  background: var(--panel); color: var(--muted); border: 0; font: inherit; font-weight: 700;
+}
+.panel-grip .nav-grip { margin: 0; flex: 0 0 auto; }
+.app.panel-collapsed .panel-body { display: none; }
+.app.panel-collapsed .panel { overflow: hidden; padding-top: 0; padding-bottom: max(0px, env(safe-area-inset-bottom)); }
+.app.panel-collapsed .panel-grip { margin: 0 calc(-1 * var(--panel-pad)); color: var(--fg); }
+
+/* v62 : clavier ouvert pendant une saisie (route-form.js, keyboardState) : l'appli tient dans la partie visible ;
+   en portrait la carte cède sa place au panneau, le champ et sa liste restent au-dessus du clavier (iPhone compris). */
+.app.kbd-open { height: var(--vvh, 100dvh); }
+@media not all and (orientation: landscape) and (min-width: 700px) {
+  .app.kbd-open { grid-template-rows: auto 0 1fr auto; }
+  .app.kbd-open .panel { max-height: none; }
+  .app.kbd-open .map-wrap { min-height: 0; overflow: hidden; }
+  /* Place sous le dernier champ : le champ touché peut remonter en haut du panneau, sous la poignée. */
+  .app.kbd-open .panel-body { padding-bottom: 60vh; }
+}
+.panel input { scroll-margin-top: 56px; }
 
 /* Paysage : panneau à gauche, carte à droite. */
 @media (orientation: landscape) and (min-width: 700px) {
@@ -133,6 +158,13 @@ html, body {
     grid-template-areas: "top top" "panel map" "foot foot";
   }
   .panel { max-height: none; min-height: 0; border-top: 0; border-right: 2px solid var(--border); }
+  /* Replié : colonne étroite, poignée verticale ; la carte prend le reste. */
+  .app.panel-collapsed { grid-template-columns: 56px 1fr; }
+  .app.panel-collapsed .panel { padding: 0; }
+  .app.panel-collapsed .panel-grip {
+    position: static; width: 56px; height: 100%; margin: 0; padding: 12px 0; flex-direction: column; justify-content: flex-start;
+  }
+  .app.panel-collapsed .panel-grip-text { writing-mode: vertical-rl; }
 }
 
 .disclaimer {
@@ -196,7 +228,7 @@ input[type="search"], input[type="text"], input[type="password"], input[inputmod
 input.invalid { border-color: var(--danger); }
 /* Un champ a une largeur minimale implicite (≈ 20 caractères) : sans min-width 0, il fait déborder un téléphone. */
 input, select, textarea { min-width: 0; }
-.field, .combo, .route-form, .panel > *, .card { min-width: 0; }
+.field, .combo, .route-form, .panel > *, .panel-body > *, .card { min-width: 0; }
 
 .suggestions {
   list-style: none; margin: 4px 0 0; padding: 0;
@@ -209,6 +241,23 @@ input, select, textarea { min-width: 0; }
 }
 .suggestions li:last-child { border-bottom: 0; }
 .suggestions li[aria-selected="true"], .suggestions li:active { background: var(--accent); color: var(--accent-fg); }
+/* v62 : ligne = nom du lieu, puis commune et pays en gris ; zone tactile ≥ 48 px (--tap = 56 px). */
+.suggestions .suggest-row { display: grid; gap: 2px; align-content: center; overflow-wrap: anywhere; }
+.suggest-name { font-weight: 700; }
+.suggest-sub { color: var(--muted); font-size: .92rem; }
+.suggestions li:active .suggest-sub { color: inherit; }
+.suggestions .suggest-info { cursor: default; color: var(--muted); font-weight: 600; display: flex; align-items: center; }
+.suggestions .suggest-info:active { background: none; color: var(--muted); }
+/* ✕ en tête de liste, collé en haut pendant le défilement. */
+.suggestions .suggest-head {
+  position: sticky; top: 0; z-index: 1; min-height: 0; padding: 0; display: flex; justify-content: flex-end;
+  background: var(--card); cursor: default;
+}
+.suggestions .suggest-head:active { background: var(--card); }
+.suggest-close {
+  width: 48px; min-height: 48px; padding: 0; border: 0; background: none; color: var(--fg); font-size: 1.25rem;
+  font-weight: 800; cursor: pointer;
+}
 
 /* v55 : étapes entre le départ et l'arrivée (↑ ↓ ✕ : 48 px). */
 .stops-box { display: grid; gap: 8px; }
@@ -218,7 +267,10 @@ input, select, textarea { min-width: 0; }
 .stop-row .combo { gap: 6px; }
 .stop-row .btn-stop { flex: 0 0 48px; width: 48px; min-height: 48px; padding: 0; font-size: 1.2rem; }
 .btn-add-stop { justify-self: start; min-height: var(--tap); }
-.legs { display: block; font-size: .95rem; }
+.legs { display: block; font-size: .95rem; overflow-wrap: anywhere; }
+/* v62 : tronçon = titre en clair, puis nom de l'étape, durée, km, heure en gris (le « Total » d'une station n'est pas le total). */
+.route-card-leg-title { display: block; font-weight: 600; }
+.route-card-leg-detail { display: block; color: var(--muted); }
 .toggles { display: flex; flex-wrap: wrap; gap: 8px; }
 .toggle {
   flex: 1 1 140px; min-width: 0; min-height: var(--tap); display: flex; align-items: center; gap: 10px;
@@ -592,6 +644,9 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .nav-time .unit { font-size: .7em; margin-left: .1em; }
 .nav-sub { max-width: 100%; color: var(--muted); font-size: 1.05rem; font-weight: 600; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .nav-sub .unit { margin-left: .1em; }
+/* v62 : ligne « Étape 1/2 : 1 h 12 · 95 km » sous le total (affichage seulement). */
+.nav-stopline { max-width: 100%; color: var(--fg); font-size: 1rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+.nav-stopline[hidden] { display: none; }
 .nav-screen { margin: 0; font-weight: 700; font-size: .85rem; line-height: 1.2; color: var(--warn); text-align: center; }
 .nav-sim { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .nav-sim .btn { min-height: 56px; }
@@ -753,10 +808,18 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .bridge-marker.medium { color: var(--warn); }
 /* v55 : étapes numérotées (couleurs d'accent, contraste vérifié par contrast.test.js). */
 .stop-marker {
-  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
-  font-size: 15px; font-weight: 800; line-height: 1; background: var(--accent); color: var(--accent-fg); border: 2px solid var(--bg);
+  width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; pointer-events: none;
+  font-size: 16px; font-weight: 800; line-height: 1; background: var(--accent); color: var(--accent-fg); border: 2px solid var(--bg);
   box-shadow: 0 1px 4px rgba(0,0,0,.4);
 }
+/* v62 : ordre des repères DOM — étapes toujours au-dessus des P (et des ponts), aire choisie au-dessus des autres P.
+   (Le repère d'étape ne prend pas le toucher : un P dessous reste touchable.) */
+.maplibregl-marker.area-marker, .maplibregl-marker.bridge-marker { z-index: 1; }
+.maplibregl-marker.area-marker.selected { z-index: 2; }
+.maplibregl-marker.area-group { z-index: 2; }
+.maplibregl-marker.stop-marker { z-index: 4; }
+/* Groupe de P à zoom bas (area-cluster.js) : pastille « P 3 », toucher = zoom. */
+.area-marker.area-group { width: auto; min-width: 44px; height: 32px; padding: 0 8px; border-radius: 16px; font-size: 16px; white-space: nowrap; }
 /* Limites de poids d'OSM (phase 12a bis) : même repère, valeur écrite (« 3,5 t »), à l'arrêt seulement. */
 .bridge-marker.weight-marker { width: auto; min-width: 44px; height: 32px; border-radius: 16px; padding: 0 8px; font-size: 14px; white-space: nowrap; }
 .area-marker {
@@ -837,7 +900,7 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
   .btn-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .topbar .btn { padding: 0 10px; }
   .layer-switch .btn { min-height: 44px; padding: 0 10px; font-size: .95rem; }
-  .panel { padding: 10px; }
+  .panel { --panel-pad: 10px; }
   .row .btn { flex: 1 1 auto; }
   .disclaimer { font-size: .72rem; }
   .route-card-time { font-size: 1.35rem; }

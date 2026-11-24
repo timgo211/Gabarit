@@ -249,6 +249,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     « Ajouter comme étape », champ de « Autres itinéraires ») ; « Étape atteinte. » (phrase fixe) puis la suite ;
     recalcul, « Autres itinéraires » et mémoire de l'itinéraire avec les étapes restantes ; 150 km des zones évitées
     mesurés comme ORS (somme des tronçons à vol d'oiseau) ; 2009 : tronçon en échec nommé. (Reste de la phase 8.)
+  - [x] Retours de test des étapes (v62) : repères d'étapes toujours au-dessus des P ; P masqués sous le zoom 8,
+    regroupés « P n » de 8 à 11 (toucher = zoom + 2), tous dès 11, aire choisie jamais cachée (`area-cluster.js`) ;
+    fiche : une ligne par tronçon lue dans `segments` (« Tronçon 1 : Départ → Étape 1 », « nom » · durée · km ·
+    heure d'arrivée, dernier tronçon compris ; nom entre guillemets : une station « Total » ne se lit plus comme le
+    total) ; guidage : « Étape 1/n : durée · km » le long du tracé sous le total, jamais dit ; panneau de préparation
+    repliable par sa poignée (carte seule, `settings.panelCollapsed`) ; menu de suggestions commun (départ, arrivée,
+    étapes, étape du guidage) : 3 caractères, 400 ms, 5 lignes nom + commune et pays, « Aucun résultat »,
+    « Pas de connexion », ✕, toucher dehors, clavier ouvert (visualViewport) ; compteur de géocodage du jour
+    (`geocode-quota.js`, plafonds prudents 500 / jour et 40 / min par service, page des offres HeiGIT non lisible
+    depuis le conteneur) ; texte validé sans choix → une recherche `/search` (`place-resolve.js`), jamais d'impasse.
 
 ## Bloc 3 — Réglementation
 

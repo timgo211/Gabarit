@@ -208,3 +208,24 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   chiffres normaux, bord du compteur en pointillés `--fg` 3 px, jamais `--danger`. Règle d'autoroute (90, 80 ADR) ou
   étiquette OSM (avec ou sans condition) dépassée → `.over` (rouge) comme avant. Panneau B14 jamais recoloré. Voix
   inchangée (une règle n'est jamais dite).
+- v62, retours de test des étapes :
+  - fiche : une ligne par tronçon (`legLines` : titre « Tronçon k : Départ → Étape 1 … → Arrivée », détail gris
+    « « nom » · durée · km · arrivée hh:mm »), lue dans `segments` ; somme = total, dernière heure = arrivée de la fiche ;
+  - guidage : `#nav-stop` « Étape k/n : durée · km » sous « km • heure » (`nextStopLine`, distance le long du tracé),
+    cachée après la dernière étape ; jamais dite ; `layoutGuidance` relit la hauteur ;
+  - carte : `.stop-marker` 32 px, z-index 4 au-dessus des P (1, choisie 2) ; règle des P : skill `gabarit-aires` ;
+  - panneau de préparation : poignée `#btn-panel-grip` (48 px, sticky) ; replié (`.app.panel-collapsed`) = carte seule
+    (portrait : barre de 48 px ; paysage : colonne de 56 px, texte vertical) ; `settings.panelCollapsed` gardé et
+    exporté ; `map.resize()` après chaque changement ; jamais replié tout seul ;
+  - suggestions (un seul composant, `attachAutocomplete` + `createSuggester`) : 3 caractères, 400 ms après la
+    dernière frappe, requête précédente annulée, 5 lignes (`.suggest-name` + `.suggest-sub` en `--muted`, ≥ 48 px),
+    ✕ `.suggest-close` en tête (48 px, collé en haut), fermée au choix (click, pas pointerdown : glisser dans la
+    liste ne choisit rien), au ✕, au toucher dehors (un écouteur `pointerdown` pour toutes les listes), Échap ; plus
+    au `blur` ; « Aucun résultat » / « Pas de connexion » / plafond du jour : ligne non choisissable ;
+  - clavier ouvert (Android et iPhone ne réduisent que `visualViewport`) : `keyboardState` met `.app.kbd-open` et
+    `--vvh` (hauteur visible) pendant une saisie dans `.panel` hors guidage ; en portrait la carte cède sa place,
+    `padding-bottom: 60vh` du panneau pour remonter le champ sous la poignée (`scroll-margin-top`), `max-height` de la
+    liste jusqu'au bas visible (`fitList`) ;
+  - texte validé sans choix : une requête `/search` par champ (`place-resolve.js`) ; 1 lieu pris, plusieurs → liste,
+    rien de deviné ; plafond de recherche : appui long ou coordonnées. Champ « Ajouter une étape » du guidage :
+    toujours seulement à l'arrêt.

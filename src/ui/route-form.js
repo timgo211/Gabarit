@@ -2,72 +2,181 @@
 
 import { $, el } from './dom.js';
 import { fetchSuggestions } from './api.js';
-import { suggestionPlan } from '../lib/coords.js';
+import { createSuggester, suggestionRows, SUGGEST } from '../lib/suggest.js';
+import { resolvePlace, RESOLVE } from '../lib/place-resolve.js';
+import { createGeocodeBudget, createTextCache } from '../lib/geocode-quota.js';
 import { STOPS, moveStop, removeStop } from '../lib/stops.js';
 
-const DEBOUNCE_MS = 300;
+// v62 : budget de géocodage (compteur du jour en localStorage, minute en mémoire) et cache des 20 derniers textes
+// (mémoire seulement), partagés par tous les champs.
+function safeStorage() {
+  try { return window.localStorage; } catch { return null; }
+}
+const geocodeBudget = createGeocodeBudget({ storage: safeStorage(), now: () => Date.now() });
+const textCache = createTextCache();
+/** Appels de géocodage du jour (contrôle d'ui-check, chiffre de la PR). */
+export const geocodeCount = (kind) => geocodeBudget.count(kind);
 
-/** Liste déroulante de suggestions attachée à un champ (aussi « Ajouter une étape » du guidage, v55). */
+// Listes ouvertes : fermées au toucher hors du champ et de la liste (un seul écouteur pour tous les champs).
+const openLists = new Set();
+document.addEventListener('pointerdown', (e) => {
+  for (const o of [...openLists]) {
+    if (!o.input.isConnected) { openLists.delete(o); continue; }
+    if (!o.input.contains(e.target) && !o.list.contains(e.target)) o.close();
+  }
+}, true);
+
+/**
+ * Hauteur de la liste : jusqu'au bas de la partie visible de l'écran (clavier ouvert compris, iPhone : visualViewport),
+ * 8 px de marge, ✕ et 2 lignes au moins ; sans visualViewport : 50vh (CSS).
+ */
+function fitList(o) {
+  const vv = window.visualViewport;
+  if (!vv || o.list.hidden) return;
+  const top = o.list.getBoundingClientRect().top;
+  const bottom = vv.offsetTop + vv.height;
+  o.list.style.maxHeight = `${Math.max(2 * 48 + 48, Math.floor(bottom - top - 8))}px`;
+}
+/**
+ * Clavier ouvert (Android et iPhone ne réduisent que la partie visible, visualViewport) pendant une saisie dans le
+ * panneau de préparation : classe `kbd-open` sur .app, hauteur = partie visible (--vvh) ; en portrait la carte cède sa
+ * place au panneau (styles.css) : le champ et sa liste restent au-dessus du clavier.
+ */
+function keyboardState() {
+  const vv = window.visualViewport;
+  const app = document.querySelector('.app');
+  if (!vv || !app) return;
+  const active = document.activeElement;
+  const typing = active?.tagName === 'INPUT' && !!active.closest('.panel') && !app.classList.contains('navigating');
+  const open = typing && vv.height < window.innerHeight - 120;
+  const was = app.classList.contains('kbd-open');
+  app.style.setProperty('--vvh', `${Math.round(vv.height)}px`);
+  app.classList.toggle('kbd-open', open);
+  if (open && vv.offsetTop > 0) window.scrollTo(0, 0);
+  if (open !== was) {
+    window.dispatchEvent(new Event('resize')); // carte recadrée sur sa nouvelle taille (app.js)
+    if (open) active.scrollIntoView({ block: 'start' });
+  }
+  for (const o of openLists) fitList(o);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', keyboardState);
+  window.visualViewport.addEventListener('scroll', keyboardState);
+  document.addEventListener('focusin', () => setTimeout(keyboardState, 50));
+  document.addEventListener('focusout', () => setTimeout(keyboardState, 50));
+}
+
+/**
+ * Liste déroulante de suggestions attachée à un champ : un seul composant pour départ, arrivée, étapes et « Ajouter une
+ * étape » du guidage (v55). v62 : 400 ms, 5 lignes (nom + commune et pays en gris, 48 px au moins), « Aucun résultat »,
+ * « Pas de connexion », ✕, fermeture au choix, au ✕ et au toucher dehors, visible clavier ouvert.
+ * Renvoie { resolve(what) } : texte validé sans choix → recherche (place-resolve.js).
+ */
 export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
-  let timer = null;
-  let ctrl = null;
   let items = [];
+  let rows = [];
+  const self = { input, list, close };
 
   function close() {
     list.hidden = true;
     list.replaceChildren();
+    list.style.maxHeight = '';
     input.setAttribute('aria-expanded', 'false');
+    openLists.delete(self);
   }
 
-  function render() {
-    list.replaceChildren(...items.map((s, i) => el('li', {
-      role: 'option', id: `${list.id}-${i}`, text: s.label,
-      onpointerdown: (e) => { e.preventDefault(); pick(i); },
-    })));
-    list.hidden = items.length === 0;
-    input.setAttribute('aria-expanded', String(!list.hidden));
+  function show(status, list2 = []) {
+    items = status === 'results' ? list2 : [];
+    rows = suggestionRows({ status, items });
+    if (!rows.length) { close(); return; }
+    const closeBtn = el('li', { class: 'suggest-head', role: 'presentation' }, [
+      el('button', {
+        type: 'button', class: 'suggest-close', 'aria-label': SUGGEST.CLOSE_LABEL, text: '✕',
+        onpointerdown: (e) => { e.preventDefault(); },
+        onclick: (e) => { e.preventDefault(); suggester.cancel(); close(); },
+      }),
+    ]);
+    list.replaceChildren(closeBtn, ...rows.map((r, i) => (r.kind === 'place'
+      ? el('li', {
+        role: 'option', id: `${list.id}-${i}`, class: 'suggest-row',
+        onpointerdown: (e) => { e.preventDefault(); },
+        onclick: (e) => { e.preventDefault(); pick(r.index); },
+      }, [
+        el('span', { class: 'suggest-name', text: r.text }),
+        r.sub ? el('span', { class: 'suggest-sub', text: r.sub }) : null,
+      ])
+      : el('li', { role: 'option', 'aria-disabled': 'true', class: 'suggest-info', text: r.text }))));
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    openLists.add(self);
+    fitList(self);
   }
 
   function pick(i) {
     const s = items[i];
     if (!s) return;
     input.value = s.label;
+    suggester.cancel();
     close();
     onPick(s);
   }
+
+  const search = (text, signal) => fetchSuggestions({ apiKey: getApiKey(), text, focus: getFocus(), signal });
+  const suggester = createSuggester({
+    search,
+    budget: geocodeBudget,
+    cache: textCache,
+    onState: ({ status, items: found }) => show(status, found),
+    onError: (err) => onError(err),
+    isOnline: () => navigator.onLine !== false,
+  });
 
   input.addEventListener('input', () => {
     // Toute saisie oublie le point choisi (suggestion, lien reçu ou appui long sur la carte, avec son repère).
     onPick(null);
     onEdit?.();
-    clearTimeout(timer);
-    ctrl?.abort();
     // Liste remplacée tout de suite : aucune ancienne suggestion à toucher pendant la recherche (src/lib/coords.js).
-    // Coordonnées GPS (phase 8) : proposées directement, sans appel au géocodage.
-    const plan = suggestionPlan(input.value);
-    items = plan.items;
-    render();
-    if (items.length) onError(null);
-    if (!plan.search) return;
-    const text = plan.search;
-    timer = setTimeout(async () => {
-      ctrl = new AbortController();
-      try {
-        items = await fetchSuggestions({ apiKey: getApiKey(), text, focus: getFocus(), signal: ctrl.signal });
-        render();
-        onError(null);
-      } catch (err) {
-        if (ctrl.signal.aborted) return;
-        close();
-        onError(err);
-      }
-    }, DEBOUNCE_MS);
+    suggester.input(input.value);
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !list.hidden && items.length) { e.preventDefault(); pick(0); }
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') { suggester.cancel(); close(); }
   });
-  input.addEventListener('blur', () => setTimeout(close, 150));
+  // Clavier ouvert : le champ remonte en haut du panneau, la liste garde la place visible dessous.
+  input.addEventListener('focus', () => {
+    setTimeout(() => {
+      if (document.activeElement !== input) return;
+      input.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      fitList(self);
+    }, 300);
+  });
+
+  return {
+    /**
+     * Texte validé sans choix (v62) : coordonnées ou une recherche /search. Résout le lieu pris, ou null (liste ouverte
+     * avec plusieurs lieux, « Aucun résultat », « Pas de connexion », quota : message donné par onError).
+     * @param {string} what « l'arrivée », « le départ », « l'étape 2 »
+     */
+    async resolve(what) {
+      const r = await resolvePlace(input.value, {
+        search: (text) => fetchSuggestions({ apiKey: getApiKey(), text, focus: getFocus(), endpoint: 'search' }),
+        budget: geocodeBudget,
+        isOnline: () => navigator.onLine !== false,
+      });
+      if (r.kind === 'picked') {
+        input.value = r.item.label;
+        close();
+        onPick(r.item);
+        return r.item;
+      }
+      if (r.kind === 'choose') { show('results', r.items); onError(RESOLVE.CHOOSE_TEXT(what)); input.focus(); }
+      else if (r.kind === 'none') { show('empty'); onError(RESOLVE.NONE_TEXT(what.charAt(0).toUpperCase() + what.slice(1))); }
+      else if (r.kind === 'offline') { show('offline'); onError(SUGGEST.OFFLINE_TEXT + '.'); }
+      else if (r.kind === 'quota') onError(RESOLVE.QUOTA_TEXT);
+      else if (r.kind === 'error') onError(r.error);
+      return null;
+    },
+  };
 }
 
 /**
@@ -96,11 +205,14 @@ export function createRouteForm(opts) {
   avoidFerries.addEventListener('change', optionsChanged);
 
   const common = { getApiKey: opts.getApiKey, getFocus: () => myPosition, onError: opts.onError };
-  attachAutocomplete(fromInput, $('#from-list'), { ...common, onPick: (s) => { from = s; }, onEdit: () => opts.onEdit?.('from') });
-  attachAutocomplete(toInput, $('#to-list'), { ...common, onPick: (s) => { to = s; }, onEdit: () => opts.onEdit?.('to') });
+  const fromAc = attachAutocomplete(fromInput, $('#from-list'), { ...common, onPick: (s) => { from = s; }, onEdit: () => opts.onEdit?.('from') });
+  const toAc = attachAutocomplete(toInput, $('#to-list'), { ...common, onPick: (s) => { to = s; }, onEdit: () => opts.onEdit?.('to') });
+  /** v62 : composant de chaque champ d'étape (même ordre que stops), pour résoudre un texte validé sans choix. */
+  let stopAcs = [];
 
   /** Lignes des étapes : champ avec la même recherche que l'arrivée, ↑ ↓ ✕ (48 px). Redessinées à chaque changement. */
   function renderStops() {
+    stopAcs = [];
     stopsList.replaceChildren(...stops.map((st, i) => {
       const id = `stop-input-${i}`;
       const input = el('input', {
@@ -109,7 +221,7 @@ export function createRouteForm(opts) {
       });
       input.value = st.place ? st.place.label : st.text;
       const list = el('ul', { id: `stop-list-${i}`, class: 'suggestions', role: 'listbox', hidden: true });
-      attachAutocomplete(input, list, {
+      stopAcs[i] = attachAutocomplete(input, list, {
         ...common,
         onPick: (place) => { stops[i] = { place, text: input.value }; },
       });
@@ -171,12 +283,28 @@ export function createRouteForm(opts) {
     }
   });
 
+  let resolving = false;
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    if (!to) { opts.onError("Choisis l'arrivée dans la liste de suggestions."); toInput.focus(); return; }
-    if (fromInput.value.trim() && !from) { opts.onError('Choisis le départ dans la liste, ou touche 📍 pour ta position.'); return; }
-    const missing = stops.findIndex((st) => !st.place);
-    if (missing >= 0) { opts.onError(`Choisis l'étape ${missing + 1} dans la liste, ou retire-la (✕).`); return; }
+    if (resolving) return;
+    // v62 : un texte tapé sans choix dans la liste est cherché (une requête /search par champ, compteur à part) : un seul
+    // lieu → pris ; plusieurs → liste ouverte ; jamais d'impasse quand les suggestions sont épuisées.
+    resolving = true;
+    try {
+      if (fromInput.value.trim() && !from) await fromAc.resolve('le départ');
+      if (fromInput.value.trim() && !from) return;
+      for (let i = 0; i < stops.length; i += 1) {
+        if (!stops[i].place && (stops[i].text ?? '').trim()) await stopAcs[i]?.resolve(`l'étape ${i + 1}`);
+        if (!stops[i].place) {
+          if (!(stops[i].text ?? '').trim()) opts.onError(`Choisis l'étape ${i + 1} dans la liste, ou retire-la (✕).`);
+          return;
+        }
+      }
+      if (!to && toInput.value.trim()) await toAc.resolve("l'arrivée");
+    } finally {
+      resolving = false;
+    }
+    if (!to) { if (!toInput.value.trim()) { opts.onError("Choisis l'arrivée dans la liste de suggestions."); toInput.focus(); } return; }
     let start;
     let fromLabel;
     if (from) {

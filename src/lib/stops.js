@@ -13,7 +13,7 @@
 
 import { haversine } from './ors-response.js';
 import { prepareLine, locateOnLine } from './nav-geo.js';
-import { formatArrival, formatDuration } from './format.js';
+import { formatArrival, formatDistance, formatDuration } from './format.js';
 
 export const STOPS = Object.freeze({
   MAX: 10,
@@ -114,7 +114,13 @@ export function tripPoints(start, stops, end) {
 }
 
 /**
- * Lignes de la fiche, une par étape : « Étape 1 · Metz — 14:35 (1 h 12) » (heure d'arrivée cumulée, durée du tronçon).
+ * Lignes de la fiche, une par tronçon (v62), lues dans les `segments` de la réponse ORS (route.legs) :
+ *   { title: 'Tronçon 1 : Départ → Étape 1', detail: '« Metz » · 1 h 12 · 95 km · arrivée 14:35' }
+ *   …
+ *   { title: 'Tronçon 2 : Étape 1 → Arrivée', detail: '1 h 05 · 80 km · arrivée 15:40' }
+ * Le nom de l'étape est entre guillemets dans le détail : une station « Total » ne se lit pas comme le total du trajet.
+ * Heures cumulées sur les secondes brutes (arrondies à l'affichage seulement) : la dernière heure d'arrivée est celle de
+ * la fiche quand la somme des segments égale le résumé (cas d'ORS).
  * Sans tronçons lisibles (route.legs absent ou d'une autre longueur) : rien.
  * @param {object} route itinéraire lu par parseDirections (legs)
  * @param {object[]} stops étapes { label }
@@ -123,10 +129,27 @@ export function tripPoints(start, stops, end) {
 export function legLines(route, stops, now = new Date()) {
   const legs = route?.legs;
   if (!Array.isArray(stops) || !stops.length || !Array.isArray(legs) || legs.length !== stops.length + 1) return [];
+  const name = (i) => (i === 0 ? 'Départ' : i > stops.length ? 'Arrivée' : `Étape ${i}`);
   let t = 0;
-  return stops.map((s, i) => {
-    const d = isNum(legs[i]?.duration) ? legs[i].duration : 0;
+  return legs.map((leg, i) => {
+    const d = isNum(leg?.duration) ? leg.duration : 0;
+    const km = isNum(leg?.distance) ? leg.distance : 0;
     t += d;
-    return `Étape ${i + 1} · ${s.label} — ${formatArrival(now, t)} (${formatDuration(d)})`;
+    const label = i < stops.length ? `« ${stops[i].label} » · ` : '';
+    return {
+      title: `Tronçon ${i + 1} : ${name(i)} → ${name(i + 1)}`,
+      detail: `${label}${formatDuration(d)} · ${formatDistance(km)} · arrivée ${formatArrival(now, t)}`,
+    };
   });
+}
+
+/**
+ * Ligne du guidage jusqu'à la prochaine étape (v62) : « Étape 1/2 : 1 h 12 · 95 km ». `next` = view.nextStop du
+ * moteur (distance le long du tracé, jamais à vol d'oiseau). Sans étape à venir : ''. Affichée seulement, jamais dite.
+ */
+export function nextStopLine(next) {
+  if (!next || !Number.isInteger(next.index) || !Number.isInteger(next.count) || next.index >= next.count) return '';
+  const d = isNum(next.duration) ? Math.max(0, next.duration) : 0;
+  const km = isNum(next.distance) ? Math.max(0, next.distance) : 0;
+  return `Étape ${next.index + 1}/${next.count} : ${formatDuration(d)} · ${formatDistance(km)}`;
 }

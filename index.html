@@ -128,6 +128,8 @@
               <span class="nav-grip" aria-hidden="true"></span>
               <span id="nav-time" class="nav-time">—</span>
               <span class="nav-sub"><span id="nav-remaining">—</span><span aria-hidden="true"> • </span><span id="nav-eta">—</span></span>
+              <!-- v62 : jusqu'à la prochaine étape (le long du tracé), affichage seulement. -->
+              <span id="nav-stop" class="nav-stopline" hidden></span>
             </button>
             <button type="button" id="btn-nav-overview" class="nav-round" aria-pressed="false" aria-label="Vue d'ensemble du trajet restant"></button>
           </div>
@@ -181,6 +183,12 @@
     </main>
 
     <section class="panel" aria-label="Itinéraire">
+      <!-- v62 : poignée du panneau (préparation) : replié = carte seule ; état gardé dans les réglages. -->
+      <button type="button" id="btn-panel-grip" class="panel-grip" aria-expanded="true" aria-controls="panel-body">
+        <span class="nav-grip" aria-hidden="true"></span>
+        <span id="panel-grip-text" class="panel-grip-text">Masquer l'itinéraire</span>
+      </button>
+      <div id="panel-body" class="panel-body">
       <form id="route-form" class="route-form" autocomplete="off">
         <div class="field">
           <label for="from-input">Départ</label>
@@ -241,6 +249,7 @@
         <p class="hint areas-credit">Aires : © contributeurs OpenStreetMap (ODbL<span id="areas-copy-date"></span>) et Bison
           Futé (Licence Ouverte). La signalisation et le règlement de l'aire font foi.</p>
       </section>
+      </div>
     </section>
 
     <footer class="disclaimer">Restrictions basées sur OpenStreetMap : la signalisation fait foi.</footer>

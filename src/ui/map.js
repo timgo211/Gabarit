@@ -21,6 +21,7 @@ import {
   STREET_BUBBLE, bubbleColors, sanitizeNightLevel,
 } from '../lib/map-palette.js';
 import { vehicleElement } from './vehicle-icon.js';
+import { clusterAreas, groupLabel, AREA_CLUSTER } from '../lib/area-cluster.js';
 import { sanitizeVehicleIcon } from '../lib/prefs.js';
 import { ROUTE_ARROWS } from '../lib/nav-layout.js';
 import { CHEVRON_IMAGE, TURN_IMAGE, chevronImage, turnImage } from './route-arrows.js';
@@ -149,6 +150,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
    * touchent facilement). [{ id, lonlat, label, otherSide }]
    */
   let areaItems = [];
+  let areaKey = ''; // v62 : repères des aires dessinés (clusterAreas) ; areaDraws compte les dessins (ui-check)
+  let areaDraws = 0;
   let areaMarkers = [];
   // Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement, jamais en guidage.
   let bridgeItems = [];
@@ -513,6 +516,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       if (e.id === CHEVRON_IMAGE || e.id === TURN_IMAGE) putArrowImages();
     });
     map.on('moveend', applyLayer);
+    // v62 : P masqués / regroupés selon le zoom (area-cluster.js), recalculés à la fin d'un mouvement seulement.
+    map.on('moveend', () => drawAreas());
     map.on('webglcontextlost', () => {
       lost = true;
       scheduleRestoreCheck(RESTORE_WAIT_LOST_MS);
@@ -530,7 +535,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.pin) marker('pin', marks.pin, MARK_COLORS.pin);
     if (marks.pinTo) marker('pinTo', marks.pinTo, MARK_COLORS.pin);
     if (marks.pinFrom) marker('pinFrom', marks.pinFrom, MARK_COLORS.pin);
-    drawAreas();
+    drawAreas({ force: true });
     drawBridges();
     drawStops();
   }
@@ -597,13 +602,44 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     areaMarkers = [];
   }
 
-  function drawAreas() {
+  function groupElement(mark) {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'area-marker area-group';
+    const l = groupLabel(mark.items.length);
+    node.textContent = l.text;
+    node.setAttribute('aria-label', l.aria);
+    node.title = l.aria;
+    for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!map) return;
+      if (anim) anim.follow = false;
+      map.easeTo({ center: mark.lonlat, zoom: map.getZoom() + AREA_CLUSTER.GROUP_ZOOM_STEP, duration: 500 });
+    });
+    return node;
+  }
+
+  function drawAreas({ force = false } = {}) {
+    if (!map) { clearAreaMarkers(); areaKey = ''; return; }
+    const plan = clusterAreas(areaItems, {
+      zoom: map.getZoom(),
+      project: (ll) => map.project(ll),
+      keep: highlighted,
+      stops: stopItems,
+    });
+    // Mêmes repères qu'avant : rien n'est recréé (le suivi du véhicule ne redessine jamais les P).
+    if (!force && plan.key === areaKey) return;
+    areaKey = plan.key;
+    areaDraws += 1;
     clearAreaMarkers();
-    if (!map) return;
-    // Autre sens en dessous (ajoutés d'abord), sens de circulation par-dessus.
-    const items = [...areaItems].sort((a, b) => Number(b.otherSide) - Number(a.otherSide));
-    for (const item of items) {
-      areaMarkers.push(new lib.Marker({ element: areaElement(item), anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
+    // Autre sens en dessous (ajoutés d'abord), sens de circulation par-dessus ; groupes au-dessus des P.
+    const rank = (m) => (m.kind === 'group' ? 2 : m.item.otherSide ? 0 : 1);
+    const marks = [...plan.marks].sort((a, b) => rank(a) - rank(b));
+    for (const m of marks) {
+      const node = m.kind === 'group' ? groupElement(m) : areaElement(m.item);
+      areaMarkers.push(new lib.Marker({ element: node, anchor: 'center' }).setLngLat(m.kind === 'group' ? m.lonlat : m.item.lonlat).addTo(map));
     }
   }
 
@@ -844,6 +880,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
      */
     highlightArea(id) {
       highlighted = id ?? null;
+      // v62 : à zoom bas, l'aire choisie sort de son groupe (jamais cachée) : repères recalculés si besoin.
+      drawAreas();
       for (const m of areaMarkers) {
         const el = m.getElement();
         el.classList.toggle('selected', !!highlighted && el.dataset.id === highlighted);
@@ -856,6 +894,10 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       map.easeTo({ center: lonlat, duration: 600 });
     },
     showRoutes,
+    /** v62 : nombre de fois où les repères des aires ont été recréés (contrôle d'ui-check : 0 en suivant le véhicule). */
+    areaDrawCount() {
+      return areaDraws;
+    },
     /** Un seul itinéraire (guidage, recalcul) : les autres disparaissent. */
     showRoute(coordinates, bbox, opts = {}) {
       showRoutes([{ coordinates, bbox }], 0, opts);
@@ -874,7 +916,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     /** Repères des aires du trajet (phase 9) : [{ id, lonlat, label, otherSide }] ; liste vide = aucun repère. */
     showAreas(items) {
       areaItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
-      drawAreas();
+      drawAreas({ force: true });
     },
     /**
      * Ponts sans hauteur connue (phase 12a) : [{ key, lonlat, level, label }] ; repères à l'arrêt seulement (retirés
@@ -889,6 +931,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     showStops(points) {
       stopItems = (Array.isArray(points) ? points : []).filter((p) => Array.isArray(p) && p.length >= 2);
       drawStops();
+      drawAreas(); // v62 : un P seul collé à une étape est masqué à zoom bas
     },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
