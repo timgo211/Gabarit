@@ -167,7 +167,8 @@ export function arrivalSide(instruction) {
 /**
  * Texte d'une manœuvre à l'impératif, tel qu'affiché (spoken false) ou prononcé (spoken true). Phase 11b : complément
  * « direction Metz » (m.direction, directions.js) affiché dès qu'une seule bretelle correspond, dit seulement si la
- * correspondance est sans ambiguïté (m.direction.speak) ; jamais si la consigne donne déjà une direction.
+ * correspondance est sans ambiguïté (m.direction.speak) ; jamais si la consigne donne déjà une direction. Phase 11c :
+ * « vers Metz » (m.place, places.js) quand aucune direction de panneau n'est connue, affiché seulement (jamais dit).
  */
 export function maneuverText(m, { uturnSafe = false, spoken = false } = {}) {
   if (!m) return '';
@@ -180,6 +181,8 @@ export function maneuverText(m, { uturnSafe = false, spoken = false } = {}) {
   const base = (m.instruction || '').trim() || 'Continuez';
   const d = m.direction;
   if (d?.text && (!spoken || d.speak === true) && !/\bdirection\b/i.test(base)) return `${base}, direction ${d.text}`;
+  // Phase 11c : « vers X » (lieu OSM, places.js) affiché seulement, jamais dit ; jamais avec une direction.
+  if (!spoken && !d?.text && m.place?.text && !/\bdirection\b/i.test(base)) return `${base}, vers ${m.place.text}`;
   return base;
 }
 

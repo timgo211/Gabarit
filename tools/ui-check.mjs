@@ -29,6 +29,7 @@ import { BRIDGE } from '../src/lib/bridge-check.js';
 import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
 import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
 import { directionFromFeature, convertDirections } from '../src/lib/directions-convert.js';
+import { placeFromFeature, convertPlaces } from '../src/lib/places-convert.js';
 import { sunTimes } from '../src/lib/sun.js';
 import { MAP_PALETTE, NIGHT_PALETTES, NIGHT_LEVELS, SATELLITE_NIGHT_BRIGHTNESS } from '../src/lib/map-palette.js';
 
@@ -143,7 +144,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined,
-  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null,
   start = START, fuel = null,
 } = {}) {
   const ctx = await browser.newContext({
@@ -345,6 +346,15 @@ async function open(browser, base, {
     const name = new URL(route.request().url()).pathname.split('/').pop();
     stats.dirCopy = [...(stats.dirCopy ?? []), name];
     const json = dirFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
+  // Phase 11c : copie data/lieux-osm/ (null : absente, 404 ; 'fixture', 'egalite' : lieux de
+  // tests/fixtures/osm-lieux-sortie.geojsonseq passés par les fonctions de l'Action).
+  const placeFiles = placesCopyFiles(placesCopy);
+  await ctx.route(/\/data\/lieux-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.placeCopy = [...(stats.placeCopy ?? []), name];
+    const json = placeFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
   const page = await ctx.newPage();
@@ -2978,6 +2988,18 @@ function directionsCopyFiles(kind) {
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
 }
 
+/** Fichiers de la copie des lieux simulée (nom → JSON), d'après les fonctions de l'Action (phase 11c). */
+function placesCopyFiles(kind) {
+  if (!kind) return null;
+  const ids = kind === 'egalite' ? ['n8101', 'n8103'] : ['n8101', 'n8102', 'n8104'];
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const feats = readFileSync(join(ROOT, 'tests', 'fixtures', 'osm-lieux-sortie.geojsonseq'), 'utf8').split('\n')
+    .map(parseGeojsonLine).filter((f) => f && ids.includes(f.id));
+  const { index, tiles } = convertPlaces(feats.map(placeFromFeature).filter(Boolean),
+    { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
 /**
  * Phase 11b : directions des panneaux. Itinéraire synthétique (autoroute puis bretelle, « Restez à droite » au km 2,2),
  * copie data/directions-osm/ construite par les fonctions de l'Action. GPS émulé à 90 km/h vers la sortie : bandeau
@@ -2992,15 +3014,21 @@ async function directionsCheck(browser, base) {
   const cases = [
     [412, 900, 'day', 'fixture'], [900, 412, 'night', 'fixture'], [360, 760, 'night', 'fixture'], [1280, 800, 'day', 'fixture'],
     [412, 900, 'day', 'proche'], [412, 900, 'day', 'ambigu'], [900, 412, 'night', null],
+    // Phase 11c : lieux « vers X » (copie data/lieux-osm/) quand aucune bretelle sûre ne donne la direction.
+    [412, 900, 'day', 'ambigu', 'fixture'], [900, 412, 'night', null, 'fixture'], [360, 760, 'night', null, 'fixture'],
+    [1280, 800, 'day', 'fixture', 'fixture'], [412, 900, 'day', null, 'egalite'],
   ];
-  for (const [width, height, theme, kind] of cases) {
-    const tag = `${width}×${height} ${theme} (${kind ?? 'copie absente'})`;
+  const VERS = 'Restez à droite, vers Ennery-Test';
+  for (const [width, height, theme, kind, placesKind = null] of cases) {
+    const tag = `${width}×${height} ${theme} (${kind ?? 'copie absente'}${placesKind ? `, lieux ${placesKind}` : ''})`;
     const { page, ctx, errors, stats } = await open(browser, base, {
       width, height, theme, voice: true, directions: () => sortie, overpass: () => ({ elements: [] }), directionsCopy: kind,
+      placesCopy: placesKind,
     });
     await computeRoute(page);
     await page.waitForTimeout(800);
     if (kind) check((stats.dirCopy ?? []).includes('index.json') && (stats.dirCopy ?? []).includes('6_49.json'), `${tag} : copie data/directions-osm/ lue`, (stats.dirCopy ?? []).join(','));
+    if (placesKind) check((stats.placeCopy ?? []).includes('index.json') && (stats.placeCopy ?? []).includes('6_49.json'), `${tag} : copie data/lieux-osm/ lue`, (stats.placeCopy ?? []).join(','));
     await setGeo(page, { lon: line[10][0], lat: line[10][1], accuracy: 5, speed: 0 });
     await page.click('#btn-nav-start');
     await page.waitForSelector('#nav:not([hidden])');
@@ -3022,7 +3050,14 @@ async function directionsCheck(browser, base) {
       const pill = await pillUnderVehicle(page);
       if (pill.why !== 'absente') check(pill.ok && /^A.31$/.test(pill.badge ?? ''), `${tag} : écusson « A 31 » dans la pastille de la rue`, JSON.stringify(pill));
     } else check(exit.hidden, `${tag} : pas de sortie connue → pas de ligne`, JSON.stringify(exit));
-    if (kind === 'fixture') {
+    check(spoken.every((t) => !/\bvers\b|Ennery|Trémery|Proche-Test/.test(t)), `${tag} : lieu jamais dit`, spoken.join(' | '));
+    if (placesKind === 'fixture' && kind !== 'fixture') {
+      check(instr === VERS, `${tag} : aucune bretelle sûre → « vers » le premier lieu à plus de 300 m`, instr);
+      const fits = await page.evaluate(() => { const el = document.querySelector('#nav-instr'); return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1; });
+      check(fits, `${tag} : consigne « vers » entière dans le bandeau`);
+    } else if (placesKind === 'egalite') {
+      check(instr === 'Restez à droite', `${tag} : deux lieux à moins de 300 m → consigne inchangée`, instr);
+    } else if (kind === 'fixture') {
       check(instr === FULL, `${tag} : bandeau avec la direction`, instr);
       const fits = await page.evaluate(() => { const el = document.querySelector('#nav-instr'); return el.scrollWidth <= el.clientWidth + 1 && el.scrollHeight <= el.clientHeight + 1; });
       check(fits, `${tag} : consigne entière dans le bandeau`);
