@@ -147,8 +147,13 @@ export function buildKeyTestRequest() {
 }
 
 /**
- * Lit une réponse Pelias (GeoJSON) en suggestions (5 au plus, v62) : { label, name, place, lon, lat }.
- * name = nom du lieu ; place = commune (locality, sinon localadmin ou county) et pays, sans répéter le nom (gris).
+ * Lit une réponse Pelias (GeoJSON) en suggestions (5 au plus, v62) :
+ *   { label, name, place, postalcode, area, details:{ street, county, localadmin }, lon, lat }.
+ * name = nom du lieu ; place = ligne grise « 88600 Bruyères · Vosges, France » : code postal et commune, puis
+ * département et pays ; sans code postal (cas des communes, couche locality de Who's On First) : « Vosges, France ».
+ * En France, Pelias range le département dans `region` (Who's On First : region = département, macroregion = région,
+ * county = arrondissement ; fiche de Paris 101751119 lue le 24/11/2026) ; sinon `county`. details : ce qui sépare deux
+ * homonymes (suggest.js), jamais un appel de plus.
  */
 export function parseAutocomplete(json) {
   const features = Array.isArray(json?.features) ? json.features : [];
@@ -160,11 +165,18 @@ export function parseAutocomplete(json) {
       const p = f.properties ?? {};
       const label = str(p.label) || str(p.name) || 'Lieu sans nom';
       const name = str(p.name) || label.split(',')[0].trim() || label;
-      const town = str(p.locality) || str(p.localadmin) || str(p.county);
-      const fields = [town, str(p.country)].filter((x, i, a) => x && x !== name && a.indexOf(x) === i).join(', ');
+      const postalcode = str(p.postalcode);
+      const town = str(p.locality) || str(p.localadmin);
+      const area = str(p.region) || str(p.county);
+      const left = postalcode ? `${postalcode} ${town}`.trim() : (town && town !== name ? town : '');
+      const right = [area, str(p.country)].filter((x, i, a) => x && x !== name && x !== town && a.indexOf(x) === i).join(', ');
+      const fields = [left, right].filter(Boolean).join(' · ');
       // Sans champs séparés : la suite du libellé Pelias (« Port Édouard Herriot, Lyon, France » → « Lyon, France »).
       const rest = label.startsWith(name) ? label.slice(name.length).replace(/^\s*,\s*/, '').trim() : '';
-      const place = fields || rest;
-      return { label, name, place, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] };
+      return {
+        label, name, place: fields || rest, postalcode, area,
+        details: { street: str(p.street), county: str(p.county) !== area ? str(p.county) : '', localadmin: str(p.localadmin) },
+        lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1],
+      };
     });
 }

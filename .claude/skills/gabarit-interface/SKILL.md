@@ -226,6 +226,11 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
     `--vvh` (hauteur visible) pendant une saisie dans `.panel` hors guidage ; en portrait la carte cède sa place,
     `padding-bottom: 60vh` du panneau pour remonter le champ sous la poignée (`scroll-margin-top`), `max-height` de la
     liste jusqu'au bas visible (`fitList`) ;
+  - homonymes : ligne grise « 88600 Bruyères · Vosges, France » (code postal + commune · département, pays ;
+    `parseAutocomplete`) ; sans code postal (communes de Who's On First) : « Vosges, France » ; département = `region`
+    (France : département dans Who's On First), sinon `county` ; deux lignes de même nom et même code (ou
+    département) : `homonymDetails` ajoute rue, puis second niveau (`county`, arrondissement), puis `localadmin` ;
+    rien qui les sépare → rien ajouté ; jamais un appel de plus ;
   - texte validé sans choix : une requête `/search` par champ (`place-resolve.js`) ; 1 lieu pris, plusieurs → liste,
     rien de deviné ; plafond de recherche : appui long ou coordonnées. Champ « Ajouter une étape » du guidage :
     toujours seulement à l'arrêt.

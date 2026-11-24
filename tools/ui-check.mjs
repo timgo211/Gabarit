@@ -4406,8 +4406,12 @@ async function suggestionsCheck(browser, base) {
   const five = fixture('pelias-suggest-5.json');
   const one = { ...five, features: five.features.slice(0, 1) };
   const empty = fixture('pelias-suggest-vide.json');
+  const homonyms = fixture('pelias-homonymes.json');
+  const noCode = fixture('pelias-sans-code.json');
   const pelias = (url, kind) => {
     const t = new URL(url).searchParams.get('text');
+    if (/^Sainte-Colombe/.test(t)) return homonyms;
+    if (/^Saint-Martin/.test(t)) return noCode;
     if (/^Coupure/.test(t)) return null;
     if (/^Zzq/.test(t)) return empty;
     if (kind === 'search' && t === 'Clermont-Ferrand') return one;
@@ -4452,12 +4456,30 @@ async function suggestionsCheck(browser, base) {
     const muted = await page.evaluate(() => { const d = document.createElement('span'); d.style.color = 'var(--muted)'; document.body.append(d); const col = getComputedStyle(d).color; d.remove(); return col; });
     check(rows.length === 5, `${tag} : 5 lignes au plus`, String(rows.length));
     check(rows.every((r) => r.h >= 48), `${tag} : lignes ≥ 48 px`, rows.map((r) => Math.round(r.h)).join(', '));
-    check(rows[2]?.name === 'Aire de Clermont-Ferrand Nord' && rows[2]?.sub === 'Gerzat, France' && rows[2]?.sub_c === muted,
+    check(rows[2]?.name === 'Aire de Clermont-Ferrand Nord' && rows[2]?.sub === 'Gerzat · France' && rows[2]?.sub_c === muted,
       `${tag} : nom, puis commune et pays en gris`, JSON.stringify(rows[2]));
     const closeBox = await page.locator('#to-list .suggest-close').boundingBox();
     check(closeBox && closeBox.width >= 48 && closeBox.height >= 48, `${tag} : ✕ ≥ 48 px`, JSON.stringify(closeBox));
     await noHorizontalScroll(page, `${tag} liste`);
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-suggestions.png`) });
+    // Homonymes : code postal dans la ligne grise ; sans code postal, département et ce qui les sépare.
+    const subs = async (text) => {
+      await page.fill('#to-input', text);
+      await page.waitForFunction((tt) => document.querySelector('#to-list li.suggest-row .suggest-name')?.textContent.startsWith(tt), text, { timeout: 5000 }).catch(() => {});
+      return page.$$eval('#to-list li.suggest-row', (ls) => ls.map((l) => `${l.querySelector('.suggest-name')?.textContent} | ${l.querySelector('.suggest-sub')?.textContent ?? ''}`));
+    };
+    const hom = await subs('Sainte-Colombe');
+    check(hom[0] === 'Sainte-Colombe | 69560 Sainte-Colombe · Rhône, France' && hom[1] === 'Sainte-Colombe | 77650 Sainte-Colombe · Seine-et-Marne, France'
+      && hom[2] === 'Sainte-Colombe | 33350 Sainte-Colombe · Gironde, France' && new Set(hom).size === hom.length,
+      `${tag} : 3 homonymes, code postal dans la ligne grise`, hom.join(' / '));
+    const sm = await subs('Saint-Martin');
+    check(sm[0] === 'Saint-Martin | Hautes-Alpes, France · Gap' && sm[1] === 'Saint-Martin | Hautes-Alpes, France · Briançon'
+      && sm[2] === 'Saint-Martin | Gers, France' && sm[3] === 'Bruyères | 88600 Bruyères · Vosges, France' && new Set(sm).size === sm.length,
+      `${tag} : sans code postal, département ; homonymes séparés`, sm.join(' / '));
+    await noHorizontalScroll(page, `${tag} homonymes`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-homonymes.png`) });
+    await page.fill('#to-input', 'Clermont');
+    await page.waitForSelector('#to-list li.suggest-row', { timeout: 5000 });
     // Requête précédente annulée : une frappe pendant la réponse n'affiche jamais l'ancienne liste.
     await page.click('#to-list .suggest-close');
     check(await page.isHidden('#to-list'), `${tag} : ✕ ferme la liste`);

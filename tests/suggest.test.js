@@ -55,13 +55,13 @@ test('5 résultats au plus ; ligne = nom puis commune et pays (gris)', () => {
   assert.deepEqual(items.map((i) => [i.name, i.place]), [
     ['Clermont-Ferrand', 'France'],
     ['Clermont', 'France'],
-    ['Aire de Clermont-Ferrand Nord', 'Gerzat, France'],
-    ['Rue de Clermont', 'Riom, France'],
+    ['Aire de Clermont-Ferrand Nord', 'Gerzat · France'],
+    ['Rue de Clermont', 'Riom · France'],
     ['Clermont-l’Hérault', 'France'],
   ]);
   const rows = suggestionRows({ status: 'results', items });
   assert.equal(rows.length, 5);
-  assert.deepEqual(rows[2], { kind: 'place', text: 'Aire de Clermont-Ferrand Nord', sub: 'Gerzat, France', index: 2 });
+  assert.deepEqual(rows[2], { kind: 'place', text: 'Aire de Clermont-Ferrand Nord', sub: 'Gerzat · France', index: 2 });
   assert.deepEqual(suggestionRows({ status: 'empty' }), [{ kind: 'info', text: 'Aucun résultat' }]);
   assert.deepEqual(suggestionRows({ status: 'offline' }), [{ kind: 'info', text: 'Pas de connexion' }]);
   assert.equal(parseAutocomplete(EMPTY).length, 0);
@@ -218,4 +218,44 @@ test('texte validé sans choix : coordonnées sans appel, 1 lieu pris, plusieurs
   assert.equal(q.kind, 'quota');
   assert.match(RESOLVE.QUOTA_TEXT, /touchez la carte longuement|coordonnées/, 'jamais une impasse');
   assert.equal((await resolvePlace('48.6921, 6.1844', { search: by(one), budget: b })).kind, 'picked', 'coordonnées : toujours');
+});
+
+// v62 : homonymes — code postal dans la ligne grise, repli département sans code postal, détail qui sépare deux
+// lignes de même nom et même code (ou département). Fixtures synthétiques : pelias-homonymes.json, pelias-sans-code.json.
+test('ligne grise : « 88600 Bruyères · Vosges, France » ; sans code postal : département', () => {
+  const sans = parseAutocomplete(fixture('pelias-sans-code.json'));
+  const rows = suggestionRows({ status: 'results', items: sans });
+  assert.equal(rows[3].text, 'Bruyères');
+  assert.equal(rows[3].sub, '88600 Bruyères · Vosges, France');
+  assert.equal(rows[2].sub, 'Gers, France', 'sans code postal : département à la place');
+  // Deux Saint-Martin des Hautes-Alpes sans code postal : arrondissement ajouté ; celui du Gers inchangé.
+  assert.equal(rows[0].sub, 'Hautes-Alpes, France · Gap');
+  assert.equal(rows[1].sub, 'Hautes-Alpes, France · Briançon');
+  assert.equal(new Set(rows.map((r) => `${r.text}|${r.sub}`)).size, rows.length, 'aucune ligne en double');
+});
+
+test('3 communes homonymes : codes postaux différents → lignes distinctes sans détail de plus', () => {
+  const items = parseAutocomplete(fixture('pelias-homonymes.json'));
+  const rows = suggestionRows({ status: 'results', items });
+  assert.deepEqual(rows.slice(0, 3).map((r) => r.sub), [
+    '69560 Sainte-Colombe · Rhône, France',
+    '77650 Sainte-Colombe · Seine-et-Marne, France',
+    '33350 Sainte-Colombe · Gironde, France',
+  ]);
+  assert.equal(rows[3].sub, '88600 Bruyères · Vosges, France', 'rue : code postal et commune');
+  assert.equal(new Set(rows.map((r) => `${r.text}|${r.sub}`)).size, rows.length);
+});
+
+test('homonymes de même code postal : rue, puis second niveau, sinon rien', () => {
+  const base = { name: 'Aire PL', postalcode: '88600', area: 'Vosges', place: '88600 Bruyères · Vosges, France' };
+  const rows = suggestionRows({ status: 'results', items: [
+    { ...base, details: { street: 'Rue de la Gare', county: 'Épinal' } },
+    { ...base, details: { street: 'Route de Laval', county: 'Épinal' } },
+  ] });
+  assert.deepEqual(rows.map((r) => r.sub), ['88600 Bruyères · Vosges, France · Rue de la Gare', '88600 Bruyères · Vosges, France · Route de Laval']);
+  const same = suggestionRows({ status: 'results', items: [
+    { ...base, details: { street: 'Rue A', county: 'Épinal' } },
+    { ...base, details: { street: 'Rue A', county: 'Épinal' } },
+  ] });
+  assert.deepEqual(same.map((r) => r.sub), [base.place, base.place], 'rien qui les sépare : rien ajouté, rien inventé');
 });

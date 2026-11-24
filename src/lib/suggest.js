@@ -30,6 +30,35 @@ export function isOfflineError(err) {
   return ['offline', 'network', 'timeout'].includes(err?.kind);
 }
 
+/** Ce qui sépare deux homonymes, dans cet ordre : rue, second niveau administratif (arrondissement), commune. */
+const HOMONYM_FIELDS = ['street', 'county', 'localadmin'];
+
+/**
+ * v62 : lignes de même nom et même code postal (ou, sans code postal, même département) : pour chacune, le premier
+ * détail connu de toutes et différent pour chacune (rue, puis second niveau administratif, puis commune). Rien
+ * d'autre n'est cherché (aucun appel de plus) ; sans détail qui les sépare : rien ajouté.
+ * @returns {string[]} détail à ajouter à chaque ligne ('' sinon)
+ */
+export function homonymDetails(items) {
+  const list = Array.isArray(items) ? items : [];
+  const out = list.map(() => '');
+  const norm = (x) => String(x ?? '').trim().toLowerCase();
+  const key = (s) => `${norm(s.name || s.label)}|${s.postalcode ? `cp:${norm(s.postalcode)}` : `dep:${norm(s.area)}`}`;
+  const groups = new Map();
+  list.forEach((s, i) => { const k = key(s); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(i); });
+  for (const idx of groups.values()) {
+    if (idx.length < 2) continue;
+    for (const f of HOMONYM_FIELDS) {
+      const vals = idx.map((i) => (list[i].details?.[f] ?? '').trim());
+      if (vals.every(Boolean) && new Set(vals.map(norm)).size === vals.length) {
+        idx.forEach((i, k) => { out[i] = vals[k]; });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * Lignes de la liste.
  * @param {{ items?:object[], status:'idle'|'results'|'empty'|'offline'|'exhausted' }} st
@@ -37,10 +66,13 @@ export function isOfflineError(err) {
  */
 export function suggestionRows(st) {
   switch (st?.status) {
-    case 'results':
-      return (st.items ?? []).slice(0, SUGGEST.MAX).map((s, index) => ({
-        kind: 'place', text: s.name || s.label, sub: s.place ?? '', index,
+    case 'results': {
+      const items = (st.items ?? []).slice(0, SUGGEST.MAX);
+      const extra = homonymDetails(items);
+      return items.map((s, index) => ({
+        kind: 'place', text: s.name || s.label, sub: [s.place ?? '', extra[index]].filter(Boolean).join(' · '), index,
       }));
+    }
     case 'empty': return [{ kind: 'info', text: SUGGEST.NO_RESULT_TEXT }];
     case 'offline': return [{ kind: 'info', text: SUGGEST.OFFLINE_TEXT }];
     case 'exhausted': return [{ kind: 'info', text: SUGGEST.EXHAUSTED_TEXT }];

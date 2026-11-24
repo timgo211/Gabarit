@@ -258,7 +258,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     étapes, étape du guidage) : 3 caractères, 400 ms, 5 lignes nom + commune et pays, « Aucun résultat »,
     « Pas de connexion », ✕, toucher dehors, clavier ouvert (visualViewport) ; compteur de géocodage du jour
     (`geocode-quota.js`, plafonds prudents 500 / jour et 40 / min par service, page des offres HeiGIT non lisible
-    depuis le conteneur) ; texte validé sans choix → une recherche `/search` (`place-resolve.js`), jamais d'impasse.
+    depuis le conteneur) ; texte validé sans choix → une recherche `/search` (`place-resolve.js`), jamais d'impasse ;
+    homonymes : « 88600 Bruyères · Vosges, France », département sans code postal, détail qui sépare deux lignes
+    identiques (rue, arrondissement). À vérifier sur la tablette avec la vraie clé : champs renvoyés par HeiGIT
+    (commune, adresse, « Saint-Martin ») et saisie « 88600 ».
 
 ## Bloc 3 — Réglementation
 

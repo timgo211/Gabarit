@@ -165,5 +165,7 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   4 car./s → 1 appel, rien avant 400 ms ; 5 lignes ≥ 48 px, nom puis commune et pays en `--muted`, ✕ ≥ 48 px, ✕ et
   toucher dehors ferment ; « Aucun résultat », « Pas de connexion » ; choix ; même texte → cache (0 appel, rien sur
   disque) ; étape et départ : même liste ; clavier simulé (`visualViewport` remplacé, `__keyboard(px)`) : `.kbd-open`,
-  liste au-dessus du clavier ; validé sans choix → /search (plusieurs → liste, un → calcul) ; plafond du jour → ligne,
+  liste au-dessus du clavier ; homonymes (`pelias-homonymes.json` : 3 Sainte-Colombe aux codes postaux différents ;
+  `pelias-sans-code.json` : Saint-Martin des Hautes-Alpes séparés par l'arrondissement, Gers, Bruyères 88600) ;
+  validé sans choix → /search (plusieurs → liste, un → calcul) ; plafond du jour → ligne,
   0 appel, validation toujours possible ; mesure : 2 car./s → 14 appels.

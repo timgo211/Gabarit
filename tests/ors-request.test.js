@@ -96,7 +96,10 @@ test('URL d\'autocomplétion Pelias', () => {
 test('lecture des suggestions Pelias (points invalides ignorés)', () => {
   const s = parseAutocomplete(fixture('pelias-autocomplete.json'));
   assert.equal(s.length, 2);
-  assert.deepEqual(s[0], { label: 'Lyon, France', name: 'Lyon', place: 'France', lon: 4.835659, lat: 45.764043 });
+  assert.deepEqual(s[0], {
+    label: 'Lyon, France', name: 'Lyon', place: 'France', postalcode: '', area: '',
+    details: { street: '', county: '', localadmin: '' }, lon: 4.835659, lat: 45.764043,
+  });
   assert.equal(s[1].place, 'Lyon, France', 'sans champs séparés : suite du libellé');
   assert.deepEqual(parseAutocomplete(null), []);
 });
