@@ -16,6 +16,7 @@ import { sanitizeAreaNotes } from './area-notes.js';
 import { sanitizeHistory } from './trip-history.js';
 import { sanitizeRecent } from './recent-places.js';
 import { sanitizeReports } from './reports.js';
+import { sanitizePlaces } from './saved-places.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
@@ -104,7 +105,7 @@ export function sanitizeData(raw) {
     version: SCHEMA_VERSION,
     vehicles,
     activeVehicleId,
-    places: arr(raw.places),
+    places: sanitizePlaces(raw.places), // mes lieux (phase 3b) : données personnelles, champs connus seulement, 50 au plus
     reports: sanitizeReports(raw.reports), // mes signalements (phase 3a) : champs connus seulement, 500 au plus
     trips: arr(raw.trips).slice(0, MAX_TRIPS),
     areaReports: sanitizeAreaReports(raw.areaReports), // « Mon avis » sur les aires (phase 9)

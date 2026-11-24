@@ -14,6 +14,7 @@
 import { suggestionPlan } from './coords.js';
 import { SUGGEST_MAX } from './ors-request.js';
 import { RECENT, samePlace } from './recent-places.js';
+import { SAVED, placeSub } from './saved-places.js';
 
 export const SUGGEST = Object.freeze({
   DELAY_MS: 400,
@@ -69,20 +70,25 @@ export function homonymDetails(items) {
  * @returns {{ kind:'title'|'recent'|'place'|'info', text:string, sub?:string, index?:number }[]}
  */
 export function suggestionRows(st) {
-  const recent = (st?.recent ?? []).slice(0, RECENT.SHOW);
-  const head = recent.length
-    ? [{ kind: 'title', text: RECENT.TITLE }, ...recent.map((p, index) => ({ kind: 'recent', text: p.name || p.label, sub: p.place ?? '', index }))]
-    : [];
+  // Phase 3b : mes lieux enregistrés en tête (titre « Mes lieux »), puis les récents qui ne sont pas déjà dedans.
+  const saved = (st?.saved ?? []).slice(0, SAVED.SHOW);
+  const inSaved = (x) => saved.some((p) => samePlace({ ...p, label: p.label || p.name }, x));
+  const recent = (st?.recent ?? []).filter((p) => !inSaved(p)).slice(0, RECENT.SHOW);
+  const head = [
+    ...(saved.length ? [{ kind: 'title', text: SAVED.TITLE }, ...saved.map((p, index) => ({ kind: 'saved', text: p.name, sub: placeSub(p), index }))] : []),
+    ...(recent.length ? [{ kind: 'title', text: RECENT.TITLE }, ...recent.map((p) => ({ kind: 'recent', text: p.name || p.label, sub: p.place ?? '', index: st.recent.indexOf(p) }))] : []),
+  ];
+  const known = saved.length + recent.length > 0;
   switch (st?.status) {
     case 'results': {
       const items = (st.items ?? []).slice(0, SUGGEST.MAX);
       const extra = homonymDetails(items);
       const rows = items.map((s, index) => ({
         kind: 'place', text: s.name || s.label, sub: [s.place ?? '', extra[index]].filter(Boolean).join(' · '), index,
-      })).filter((r) => !recent.some((p) => samePlace(p, items[r.index])));
+      })).filter((r) => !recent.some((p) => samePlace(p, items[r.index])) && !inSaved(items[r.index]));
       return [...head, ...rows];
     }
-    case 'empty': return recent.length ? head : [{ kind: 'info', text: SUGGEST.NO_RESULT_TEXT }];
+    case 'empty': return known ? head : [{ kind: 'info', text: SUGGEST.NO_RESULT_TEXT }];
     case 'offline': return [...head, { kind: 'info', text: SUGGEST.OFFLINE_TEXT }];
     case 'exhausted': return [...head, { kind: 'info', text: SUGGEST.EXHAUSTED_TEXT }];
     default: return head;

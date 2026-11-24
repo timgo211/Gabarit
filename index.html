@@ -414,6 +414,25 @@
         <p class="hint">Tronçons d'OpenStreetMap suivis par le trajet dont la limite de poids est inférieure au PTAC du profil (le calcul ne l'a peut-être pas prise en compte) : listés sur la fiche et repérés sur la carte avant le départ, jamais pendant le guidage ni à voix haute. À vérifier : la signalisation fait foi.</p>
       </section>
 
+      <section class="card" id="places-card">
+        <h3>Mes lieux</h3>
+        <p class="hint" id="places-privacy"></p>
+        <label for="place-kind" class="field-label">Catégorie</label>
+        <select id="place-kind">
+          <option value="home">Domicile</option>
+          <option value="depot">Dépôt</option>
+          <option value="client" selected>Client</option>
+        </select>
+        <label for="place-name" class="field-label">Nom</label>
+        <input id="place-name" type="text" maxlength="60" autocomplete="off" placeholder="ex. Dépôt Sud">
+        <div class="row">
+          <button type="button" id="btn-place-to" class="btn btn-primary">Enregistrer l'arrivée choisie</button>
+          <button type="button" id="btn-place-center" class="btn">Ajouter au centre de la carte</button>
+        </div>
+        <p id="places-status" class="status" role="status"></p>
+        <ul id="places-list" class="restr-list" aria-label="Mes lieux"></ul>
+      </section>
+
       <section class="card" id="reports-card">
         <h3>Mes signalements</h3>
         <p class="hint">En guidage, le bouton drapeau pose un repère d'un seul appui. Type, note et confirmation se règlent ici ou sur la fiche du repère, à l'arrêt seulement. Gardés seulement sur cet appareil. Inclus dans l'export.</p>

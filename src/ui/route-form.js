@@ -7,6 +7,7 @@ import { resolvePlace, RESOLVE } from '../lib/place-resolve.js';
 import { createGeocodeBudget, createTextCache } from '../lib/geocode-quota.js';
 import { STOPS, moveStop, removeStop } from '../lib/stops.js';
 import { RECENT, createRecentStore } from '../lib/recent-places.js';
+import { matchSaved, savedToPick } from '../lib/saved-places.js';
 
 // v62 : budget de géocodage (compteur du jour en localStorage, minute en mémoire) et cache des 20 derniers textes
 // (mémoire seulement), partagés par tous les champs.
@@ -23,6 +24,9 @@ export const recentPlaces = createRecentStore(safeStorage());
 /** ✕ d'une ligne récente permis (app.js : recentEditAllowed, à l'arrêt seulement en guidage). */
 let recentEditOk = () => true;
 export function setRecentEditGuard(fn) { recentEditOk = typeof fn === 'function' ? fn : () => true; }
+/** Phase 3b : mes lieux enregistrés (app.js : data.places), proposés en tête de chaque liste, sans appel réseau. */
+let savedSource = () => [];
+export function setSavedPlaces(fn) { savedSource = typeof fn === 'function' ? fn : () => []; }
 /** Appels de géocodage du jour (contrôle d'ui-check, chiffre de la PR). */
 export const geocodeCount = (kind) => geocodeBudget.count(kind);
 
@@ -86,6 +90,7 @@ if (window.visualViewport) {
 export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, onError, onEdit }) {
   let items = [];
   let recent = [];
+  let saved = [];
   let rows = [];
   let last = { status: 'idle', items: [] };
   const self = { input, list, close };
@@ -129,7 +134,8 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
     items = status === 'results' ? list2 : [];
     // v64 : récents qui correspondent au texte (tous les 5 derniers si le champ est vide), sans appel réseau.
     recent = recentPlaces.match(input.value);
-    rows = suggestionRows({ status, items, recent });
+    saved = matchSaved(savedSource(), input.value); // phase 3b
+    rows = suggestionRows({ status, items, recent, saved });
     if (!rows.length) { close(); return; }
     // v64 : titre « Recherches récentes » dans la barre du ✕ (collée en haut) : une ligne de gagnée, clavier ouvert.
     const title = rows[0]?.kind === 'title' ? rows[0].text : '';
@@ -141,8 +147,19 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
         onclick: (e) => { e.preventDefault(); suggester.cancel(); close(); },
       }),
     ]);
-    list.replaceChildren(closeBtn, ...rows.filter((r) => r.kind !== 'title').map((r, i) => { // titre : barre du ✕
+    list.replaceChildren(closeBtn, ...rows.filter((r, k) => !(k === 0 && r.kind === 'title')).map((r, i) => { // 1er titre : barre du ✕
+      if (r.kind === 'title') return el('li', { role: 'presentation', class: 'suggest-title suggest-title-row', text: r.text });
       if (r.kind === 'recent') return recentRow(r, i);
+      if (r.kind === 'saved') {
+        return el('li', {
+          role: 'option', id: `${list.id}-${i}`, class: 'suggest-row suggest-saved',
+          onpointerdown: keep,
+          onclick: (e) => { e.preventDefault(); const p = saved[r.index]; if (p) choose(savedToPick(p)); },
+        }, [
+          el('span', { class: 'suggest-name', text: r.text }),
+          r.sub ? el('span', { class: 'suggest-sub', text: r.sub }) : null,
+        ]);
+      }
       if (r.kind === 'place') {
         return el('li', {
           role: 'option', id: `${list.id}-${i}`, class: 'suggest-row',
@@ -196,8 +213,13 @@ export function attachAutocomplete(input, list, { getApiKey, getFocus, onPick, o
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !list.hidden) {
-      const first = rows.find((r) => r.kind === 'recent' || r.kind === 'place');
-      if (first) { e.preventDefault(); if (first.kind === 'recent') pickRecent(first.index); else pick(first.index); }
+      const first = rows.find((r) => r.kind === 'saved' || r.kind === 'recent' || r.kind === 'place');
+      if (first) {
+        e.preventDefault();
+        if (first.kind === 'saved') choose(savedToPick(saved[first.index]));
+        else if (first.kind === 'recent') pickRecent(first.index);
+        else pick(first.index);
+      }
     }
     if (e.key === 'Escape') { suggester.cancel(); close(); }
   });
@@ -420,6 +442,11 @@ export function createRouteForm(opts) {
     setStops(list) {
       stops = (Array.isArray(list) ? list : []).slice(0, STOPS.MAX).map((p) => ({ place: { ...p }, text: p.label }));
       renderStops();
+    },
+    /** Phase 3b : lieu choisi dans le champ (« to » : arrivée, « from » : départ ; null = rien choisi ou ma position). */
+    getPlace(which) {
+      const p = which === 'from' ? from : to;
+      return p && Number.isFinite(p.lon) && Number.isFinite(p.lat) ? { ...p } : null;
     },
     /** Étapes choisies, dans l'ordre ({ label, lon, lat } ; lignes non choisies ignorées). */
     getStops() {
