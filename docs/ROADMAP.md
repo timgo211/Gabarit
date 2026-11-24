@@ -570,11 +570,15 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 - [ ] **Phase 12 routage commercial : abandonnée (conditions d'usage)** — HERE Platform Terms art. 3.c interdisent de
   comparer leur service à ORS et de guider avec leur tracé. ORS reste le seul moteur.
-- [ ] **Mapillary (panneaux)** : à étudier après lecture des conditions.
+- [ ] **Mapillary (panneaux)** : étude faite le 24/11/2026, pas codée (`docs/etude-ponts-sources.md`) : compte et
+  jeton client obligatoires (clé dans le code : interdit), détection sans la valeur de la limite → écarté.
 - [ ] **Contribuer à OSM** : maxheight sur le pont de Colombier (chemin 243477938) et maxweight de la Rue du Viaduc
   (chemin 190520091), relevés sur place.
-- [ ] **Données départementales (transport.data.gouv.fr)** : limites de hauteur et de poids publiées par les
-  départements, à recenser.
+- [ ] **Données départementales (transport.data.gouv.fr)** : étude faite le 24/11/2026, pas codée
+  (`docs/etude-ponts-sources.md`) : une douzaine de jeux chiffrés et géolocalisés sur data.gouv.fr (Lozère, Charente-
+  Maritime, Antibes, Hauts-de-Seine, Mayenne, Maine-et-Loire, Ain, Alpes-Maritimes, Aude, Cannes, Mulhouse…), formats
+  tous différents ; jeu national DiaLog (DATEX II, 85 Mo, couverture inconnue). Recommandé : lecture de DiaLog dans une
+  Action avant toute copie. À décider.
 
 ## Ensuite
 
