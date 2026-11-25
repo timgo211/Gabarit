@@ -167,7 +167,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
-  start = START, fuel = null, pelias = null, reports = null,
+  start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo',
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -396,6 +396,17 @@ async function open(browser, base, {
     const json = laneFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // PR 3a : copie data/axes-osm/ ('repo', par défaut : celle du dépôt ; 'fixture' : tests/fixtures/axes-osm-joigny/ ;
+  // null : absente, 404).
+  if (axesCopy !== 'repo') {
+    await ctx.route(/\/data\/axes-osm\/[^/]+\.json(\?.*)?$/, (route) => {
+      const name = new URL(route.request().url()).pathname.split('/').pop();
+      stats.axes = [...(stats.axes ?? []), name];
+      const file = join(ROOT, 'tests', 'fixtures', 'axes-osm-joigny', name);
+      return axesCopy === 'fixture' && existsSync(file) ? route.fulfill({ body: readFileSync(file), contentType: 'application/json' })
+        : route.fulfill({ status: 404, body: '' });
+    });
+  }
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
@@ -5348,6 +5359,74 @@ async function reportsShareCheck(browser, base) {
   }
 }
 
+/**
+ * PR 3a : repli par la géométrie (data/axes-osm/). Reconstitution Joigny → Gonfreville-l'Orcher (diagnostic v70 : A12
+ * et A13 dans des étapes sans nom), samedi 8 h 30 : ligne week-end Île-de-France avec « à vérifier » seulement quand la copie est lue ; ordre des
+ * fiches inchangé ; diagnostic (deux lignes de classes, ligne technique) ; « Copier la réponse ORS » grisé en roulant,
+ * actif à l'arrêt ; copie absente → « données non chargées » ; rien dit.
+ */
+async function axesFallbackCheck(browser, base) {
+  const json = fixture('ors-directions-joigny-gonfreville.json');
+  const line = json.features[0].geometry.coordinates;
+  const saturday = new Date(2026, 10, 28, 8, 30).getTime();
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => json, overpass: () => ({ elements: [] }), axesCopy: 'fixture',
+      now: saturday, start: line[0],
+    });
+    await computeRoute(page);
+    await page.waitForFunction(() => /Île-de-France/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 15000 }).catch(() => {});
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    const idf = notes.filter((t) => /Interdiction PL Île-de-France/.test(t));
+    check(idf.length === 1 && /Numéro de route retrouvé par la géométrie \(OpenStreetMap\) : à vérifier\./.test(idf[0]),
+      `${tag} : week-end Île-de-France sur l'A13 retrouvée, « à vérifier »`, notes.join(' | '));
+    check((stats.axes ?? []).includes('index.json') && (stats.axes ?? []).includes('2_48.json'), `${tag} : copie data/axes-osm/ lue`, (stats.axes ?? []).join(','));
+    await page.waitForFunction(() => /géométrie : à vérifier/.test(document.querySelector('.route-card[aria-checked="true"]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check(/Autoroute et nationale : \d+ % \(numéros retrouvés par la géométrie : à vérifier\)/.test(await page.textContent('.route-card[aria-checked="true"]')),
+      `${tag} : ligne « Autoroute et nationale » mise à jour avec le repli`, await page.textContent('.route-card[aria-checked="true"]'));
+    await page.locator('.route-diag summary').click();
+    await page.waitForFunction(() => /Repli par la géométrie/.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    const diag = await page.textContent('.route-diag-text');
+    check(/Avec le repli par la géométrie \(à vérifier, choix du Recommandé inchangé\)/.test(diag) && /km retrouvés sur [\d,]+ km sans nom ni référence/.test(diag),
+      `${tag} : diagnostic, km retrouvés`, (diag.match(/Repli[^\n]*/) ?? [''])[0]);
+    // En roulant : bouton grisé ; à l'arrêt (3 s) : actif, copie dans le presse-papiers.
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 15 });
+    await page.waitForTimeout(800);
+    const raw = page.locator('.btn-diag-raw');
+    check(await raw.count() === 1 && await raw.isDisabled(), `${tag} : « Copier la réponse ORS » grisé en roulant`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    const enabled = await page.waitForSelector('.btn-diag-raw:not([disabled])', { state: 'attached', timeout: 20000 }).then(() => true).catch(() => false);
+    check(enabled, `${tag} : « Copier la réponse ORS » actif à l'arrêt`);
+    check(await page.locator('.route-diag').getAttribute('open') !== null, `${tag} : diagnostic resté ouvert après le passage à l'arrêt`);
+    const rawNow = page.locator('.btn-diag-raw');
+    await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+    await rawNow.click();
+    await page.waitForTimeout(300);
+    const copied = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+    check(/"FeatureCollection"/.test(copied) && !/cle-factice-de-test/.test(copied), `${tag} : réponse ORS copiée, sans clé`, copied.slice(0, 80));
+    await noHorizontalScroll(page, `${tag} repli`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-repli.png`) });
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /Île-de-France|géométrie/i.test(t)), `${tag} : rien dit`, spoken.join(' | '));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Copie absente : pas de ligne Île-de-France, ligne technique « données non chargées ».
+  const none = await open(browser, base, {
+    width: 412, height: 900, directions: () => json, overpass: () => ({ elements: [] }), axesCopy: null, now: saturday, start: line[0],
+  });
+  await computeRoute(none.page);
+  await none.page.waitForTimeout(1500);
+  check(!/Île-de-France/.test(await none.page.textContent('#route-notes')), 'copie absente : aucune ligne Île-de-France devinée');
+  check(/Autoroute et nationale : inconnue/.test(await none.page.textContent('.route-card[aria-checked="true"]')), 'copie absente : part A/N inconnue, comme avant');
+  await none.page.locator('.route-diag summary').click();
+  await none.page.waitForTimeout(500);
+  check(/Repli par la géométrie \(axes OSM\) : données non chargées/.test(await none.page.textContent('.route-diag-text')), 'copie absente : « données non chargées »');
+  check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
+  await none.ctx.close();
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5358,7 +5437,8 @@ try {
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
-    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck };
+    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
+    repli: axesFallbackCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

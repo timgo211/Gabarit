@@ -59,27 +59,57 @@ function perSegment(values, n) {
   return out;
 }
 
+/** Étape sans nom ni référence lisible (ORS renvoie « - » ou rien). */
+const stepUnnamed = (s) => {
+  const named = typeof s?.name === 'string' && s.name.trim() !== '' && s.name.trim() !== '-';
+  return !named && !roadRefs(s?.name).length;
+};
+
+/**
+ * Tronçons (i → i+1) d'une étape sans nom ni référence ; un tronçon hors de toute étape compte comme sans nom.
+ * @returns {boolean[]} longueur coordinates.length - 1
+ */
+export function unnamedSegments(route) {
+  const n = Math.max(0, (route?.coordinates?.length ?? 0) - 1);
+  const out = new Array(n).fill(true);
+  for (const s of route?.steps ?? []) {
+    if (!Array.isArray(s?.wayPoints)) continue;
+    const u = stepUnnamed(s);
+    for (let i = Math.max(0, s.wayPoints[0]); i < s.wayPoints[1] && i < n; i += 1) out[i] = u;
+  }
+  return out;
+}
+
 /**
  * Classe de chaque tronçon du tracé (i → i+1) et étape sans nom ni référence.
+ * PR 3a : `geo` (repli par la géométrie, axis-match.js) donne la référence des tronçons sans nom ni référence, comme si
+ * l'étape la portait (un tronçon nommé par ORS n'est jamais réécrit) ; l'autoroute reste lue par waycategory seul.
+ * Sans `geo` : calcul d'origine (choix du « Recommandé », jamais le repli).
  * @param {{ coordinates:number[][], steps?:object[], roadExtras?:object|null }} route
- * @returns {{ classes:string[], unknown:boolean[] }|null} null si les extras manquent
+ * @param {{ geo?:{ ref:(string|null)[] }|null }} [opts]
+ * @returns {{ classes:string[], unknown:boolean[], fromGeo:boolean[] }|null} null si les extras manquent
  */
-export function segmentClasses(route) {
+export function segmentClasses(route, { geo = null } = {}) {
   const coords = route?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2 || !route.roadExtras) return null;
   const n = coords.length - 1;
   const cat = perSegment(route.roadExtras.waycategory, n);
   const type = perSegment(route.roadExtras.waytype, n);
   const national = new Array(n).fill(false);
-  const unknown = new Array(n).fill(true);
+  const unknown = unnamedSegments(route);
+  const fromGeo = new Array(n).fill(false);
   for (const s of route.steps ?? []) {
     if (!Array.isArray(s?.wayPoints)) continue;
-    const refs = roadRefs(s.name);
-    const named = typeof s.name === 'string' && s.name.trim() !== '' && s.name.trim() !== '-';
-    const isN = refs.some((r) => /^N\d/.test(r));
-    for (let i = Math.max(0, s.wayPoints[0]); i < s.wayPoints[1] && i < n; i += 1) {
-      unknown[i] = !named && !refs.length;
-      national[i] = isN;
+    const isN = roadRefs(s.name).some((r) => /^N\d/.test(r));
+    for (let i = Math.max(0, s.wayPoints[0]); i < s.wayPoints[1] && i < n; i += 1) national[i] = isN;
+  }
+  if (Array.isArray(geo?.ref)) {
+    for (let i = 0; i < n; i += 1) {
+      const r = geo.ref[i];
+      if (!unknown[i] || typeof r !== 'string' || !r) continue;
+      unknown[i] = false;
+      fromGeo[i] = true;
+      national[i] = r.split(';').some((x) => /^N\d/.test(x));
     }
   }
   const classes = new Array(n);
@@ -88,23 +118,26 @@ export function segmentClasses(route) {
     else if (type[i] === WAYTYPE_STATE_ROAD && national[i] && !unknown[i]) classes[i] = ROAD_CLASS.NATIONAL;
     else classes[i] = ROAD_CLASS.OTHER;
   }
-  return { classes, unknown };
+  return { classes, unknown, fromGeo };
 }
 
 /**
  * Km par classe et part A/N d'un itinéraire.
- * @returns {{ total:number, motorway:number, national:number, other:number, unknown:number, share:number|null }|null}
- *   distances en m ; share (0 à 1) null si plus de MAX_UNKNOWN_SHARE de km inconnus ; null si extras absents
+ * @param {{ geo?:object|null }} [opts] repli par la géométrie (diagnostic seulement, jamais le « Recommandé »)
+ * @returns {{ total:number, motorway:number, national:number, other:number, unknown:number, geo:number,
+ *   share:number|null }|null}
+ *   distances en m (geo : km retrouvés par la géométrie) ; share (0 à 1) null si plus de MAX_UNKNOWN_SHARE de km inconnus ; null si extras absents
  */
-export function roadStats(route) {
-  const seg = segmentClasses(route);
+export function roadStats(route, { geo = null } = {}) {
+  const seg = segmentClasses(route, { geo });
   if (!seg) return null;
   const c = route.coordinates;
-  const out = { total: 0, motorway: 0, national: 0, other: 0, unknown: 0, share: null };
+  const out = { total: 0, motorway: 0, national: 0, other: 0, unknown: 0, geo: 0, share: null };
   for (let i = 0; i < seg.classes.length; i += 1) {
     const d = haversine(c[i], c[i + 1]);
     out.total += d;
     if (seg.unknown[i]) out.unknown += d;
+    if (seg.fromGeo[i]) out.geo += d;
     if (seg.classes[i] === ROAD_CLASS.MOTORWAY) out.motorway += d;
     else if (seg.classes[i] === ROAD_CLASS.NATIONAL) out.national += d;
     else out.other += d;
@@ -129,10 +162,17 @@ export function classAt(route, index, seg = segmentClasses(route)) {
 /** Part A/N en pourcentage entier (comparaisons et affichage). */
 export const sharePercent = (share) => Math.round(share * 100);
 
-/** Ligne de la fiche : « Autoroute et nationale : 82 % » (« inconnue » sans extras ou trop de km sans nom). */
-export function anShareText(route) {
-  const s = anShare(route);
-  return `Autoroute et nationale : ${s === null ? 'inconnue' : `${sharePercent(s)} %`}`;
+/**
+ * Ligne de la fiche : « Autoroute et nationale : 82 % » (« inconnue » sans extras ou trop de km sans nom).
+ * PR 3a : avec `geo` (repli par la géométrie chargé), part calculée avec les références retrouvées, mention « à
+ * vérifier » ; affichage seulement : le choix du « Recommandé » (pickRecommendedIndex) lit toujours anShare sans repli.
+ */
+export function anShareText(route, { geo = null } = {}) {
+  const useGeo = geo?.status === 'ok' && geo.km?.matched > 0;
+  const st = roadStats(route, { geo: useGeo ? geo : null });
+  const s = st?.share ?? null;
+  const geoNote = useGeo && st?.geo > 0 && s !== null ? ' (numéros retrouvés par la géométrie : à vérifier)' : '';
+  return `Autoroute et nationale : ${s === null ? 'inconnue' : `${sharePercent(s)} %`}${geoNote}`;
 }
 
 /**
@@ -165,11 +205,17 @@ export function pickRecommendedIndex(options, { excluded = null } = {}) {
   return best < 0 ? first : best;
 }
 
-/** Ligne du diagnostic du trajet : « Classes de route : A 52,1 km, N 10,0 km, autre 8,3 km, inconnus 0,0 km ; part A/N 88 % ». */
-export function roadStatsText(route) {
+/**
+ * Ligne du diagnostic du trajet : « Classes de route : A 52,1 km, N 10,0 km, autre 8,3 km, inconnus 0,0 km ; part A/N 88 % ».
+ * PR 3a : avec `geo`, deuxième ligne avec le repli par la géométrie (le « Recommandé » ne le lit pas).
+ */
+export function roadStatsText(route, { geo = null } = {}) {
   const s = roadStats(route);
   if (!s) return 'Classes de route (waycategory, waytype) : absentes';
   const km = (m) => (m / 1000).toFixed(1).replace('.', ',');
-  const share = s.share === null ? `inconnue (plus de ${sharePercent(ROUTE_PREF.MAX_UNKNOWN_SHARE)} % de km sans nom ni référence)` : `${sharePercent(s.share)} %`;
-  return `Classes de route : A ${km(s.motorway)} km, N ${km(s.national)} km, autre ${km(s.other)} km ; km inconnus (étapes sans nom ni référence) ${km(s.unknown)} km ; part A/N ${share}`;
+  const shareText = (x) => (x.share === null ? `inconnue (plus de ${sharePercent(ROUTE_PREF.MAX_UNKNOWN_SHARE)} % de km sans nom ni référence)` : `${sharePercent(x.share)} %`);
+  const base = `Classes de route : A ${km(s.motorway)} km, N ${km(s.national)} km, autre ${km(s.other)} km ; km inconnus (étapes sans nom ni référence) ${km(s.unknown)} km ; part A/N ${shareText(s)}`;
+  if (!geo || geo.status !== 'ok') return base;
+  const g = roadStats(route, { geo });
+  return `${base}\nAvec le repli par la géométrie (à vérifier, choix du Recommandé inchangé) : A ${km(g.motorway)} km, N ${km(g.national)} km, autre ${km(g.other)} km ; km inconnus ${km(g.unknown)} km, dont ${km(g.geo)} km retrouvés ; part A/N ${shareText(g)}`;
 }

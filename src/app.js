@@ -16,7 +16,9 @@ import { createPlanPark } from './ui/plan-park.js';
 import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption } from './lib/route-options.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
-import { createBridges } from './ui/bridges.js';
+import { createBridges, createTileCopy } from './ui/bridges.js';
+import { AXES } from './lib/axes-convert.js';
+import { parseAxesTile, mergeAxesTiles } from './lib/axis-match.js';
 import { createWeightLimits } from './ui/weight-limits.js';
 import { createSpeedLimits } from './ui/speed-limits.js';
 import { createDirections } from './ui/directions.js';
@@ -173,6 +175,7 @@ navigation = createNavigation({
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
     access.extend(route); // phase 5d : cases de data/acces-osm/ manquantes pour le nouveau tracé
     bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
+    axes.extend(route); // PR 3a : cases de data/axes-osm/ manquantes
     weightLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
     speedLimits.extend(route); // phase 11a : cases de data/vitesses-osm/ manquantes
     directions.extend(route); // phase 11b : cases de data/directions-osm/ manquantes
@@ -291,6 +294,13 @@ const access = createAccess({
 
 // ───────── Ponts sans hauteur connue (phase 12a) : data/ponts-osm/, cases touchées par les itinéraires proposés ─────────
 const bridges = createBridges({ onChange: () => renderChoice() });
+// Repli par la géométrie (PR 3a) : data/axes-osm/ (Action « Audit OSM »), cases touchées par les itinéraires proposés,
+// jamais précachées ; références retrouvées pour les étapes ORS sans nom (règles de la fiche seulement, jamais dites).
+const axes = createTileCopy({
+  indexPath: AXES.INDEX_PATH, dir: AXES.DIR, parse: parseAxesTile, merge: mergeAxesTiles, empty: Object.freeze({ lines: [] }),
+  meta: (j) => ({ tolerance: typeof j?.tolerance === 'number' ? j.tolerance : null }),
+  onChange: () => renderChoice(),
+});
 // Limites de poids d'OSM (phase 12a bis) : data/poids-osm/, mêmes cases que les ponts.
 const weightLimits = createWeightLimits({ onChange: () => renderChoice() });
 // Limitations de vitesse (phase 11a) : fiche, puis guidage (cases arrivées après « Démarrer » ou au recalcul).
@@ -421,15 +431,16 @@ function rulesOf(route, vehicle, departure) {
   const wl = weightLimits.state;
   const ww = data.settings.weightWarnings !== false;
   const spd = speedLimits.state;
-  if (hit && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  const ax = axes.state;
+  if (hit && hit.ax === ax && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
-    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd,
+    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax,
   });
-  rulesCache.set(route, { spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
+  rulesCache.set(route, { ax, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
   return rules;
 }
 
@@ -501,6 +512,7 @@ async function avoidZfe() {
     areas.select(route); // aires déjà trouvées replacées (la requête Overpass couvrait les premiers itinéraires)
     access.extend(route);
     bridges.extend(route);
+    axes.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -563,6 +575,7 @@ async function avoidTunnel() {
     areas.select(route);
     access.extend(route);
     bridges.extend(route);
+    axes.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -608,6 +621,7 @@ async function avoidLocal() {
     areas.select(route);
     access.extend(route);
     bridges.extend(route);
+    axes.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -807,7 +821,7 @@ async function openAlternatives(from, extraStop = null) {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
       stops,
     };
-    for (const o of options) { access.extend(o.route); bridges.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
   } catch (err) {
@@ -1026,6 +1040,7 @@ const form = createRouteForm({
       weather.clear();
       access.clear();
       bridges.clear();
+      axes.clear();
       weightLimits.clear();
       speedLimits.clear();
       directions.clear();
@@ -1067,6 +1082,7 @@ function showChoice(selected) {
   weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
   access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
   bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
+  axes.load(options.map((o) => o.route)); // PR 3a : cases de data/axes-osm/ (repli par la géométrie)
   weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
   speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
   directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/

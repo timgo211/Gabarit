@@ -43,6 +43,7 @@ import { isHoliday, addDays, dayKey } from './holidays.js';
 import { haversine } from './nav-geo.js';
 import { isInFrance, isInMetropole } from './map-layers.js';
 import { sampleRoute } from './route-samples.js';
+import { AXIS_GEO_NOTE } from './axis-match.js';
 import { BAN_STATUS_VALUES } from './vehicle.js';
 
 export const HGV_BANS = Object.freeze({
@@ -201,14 +202,18 @@ function networkOf(sample, prev, next) {
  * @returns {{ applies:boolean, calendarKnown:boolean, conflicts:{ kind:string, along:number, time:Date,
  *   start:Date, end:Date, roads:string[], approximate:boolean }[] }}
  *   un conflit par fenêtre (le premier point du trajet qui y tombe) ; approximate : réseau AURA ou Île-de-France
- *   reconnu d'après le nom de la route (sections exactes : voir les arrêtés)
+ *   reconnu d'après le nom de la route (sections exactes : voir les arrêtés) ; geo : réseau reconnu d'après une
+ *   référence retrouvée par la géométrie (PR 3a), à vérifier
+ * ctx.geo : repli par la géométrie (axis-match.js, matchRouteAxes) ; fiche seulement, le guidage (guidanceBan) ne lit
+ *   que le réseau général et ne dit jamais ces conflits
  */
-export function bansAlongRoute(route, { vehicle, departure = new Date(), elapsed = (t) => t } = {}) {
+export function bansAlongRoute(route, { vehicle, departure = new Date(), elapsed = (t) => t, geo = null } = {}) {
   const scope = vehicleBanScope(vehicle);
   const years = [departure.getFullYear(), new Date(departure.getTime() + elapsed(route?.duration ?? 0) * 1000).getFullYear()];
   const known = years.every(calendarKnown);
   if (!scope.general && !scope.idf) return { applies: false, calendarKnown: known, conflicts: [] };
-  const samples = sampleRoute(route, HGV_BANS.SAMPLE_M);
+  // PR 3a : références retrouvées par la géométrie (axis-match.js) sur les étapes ORS sans nom ni référence.
+  const samples = sampleRoute(route, HGV_BANS.SAMPLE_M, { geo });
   const conflicts = [];
   const seen = new Set();
   let prev = null;
@@ -231,7 +236,7 @@ export function bansAlongRoute(route, { vehicle, departure = new Date(), elapsed
       if (conflicts.some((c) => c.start.getTime() === w.start.getTime() && c.end.getTime() === w.end.getTime())) continue;
       conflicts.push({
         kind: n.startsWith('idf') ? 'idf' : w.kind, network: n, along: sm.along, time: new Date(t), start: w.start, end: w.end,
-        roads: sm.roads, approximate: n !== 'france',
+        roads: sm.roads, approximate: n !== 'france', geo: n !== 'france' && sm.geo === true,
       });
     }
   }
@@ -263,7 +268,8 @@ const KIND_TEXT = {
 export function describeBanConflict(c) {
   const where = `km ${Math.round(c.along / 1000)}`;
   const check = c.approximate ? ' Section et sens à vérifier dans l\'arrêté.' : '';
-  return `${KIND_TEXT[c.kind] ?? KIND_TEXT.general} ${dayTime(c.start)} → ${dayTime(c.end)} : vous y seriez vers ${where} (${dayTime(c.time)}).${check}`;
+  const geo = c.geo ? ` ${AXIS_GEO_NOTE}` : '';
+  return `${KIND_TEXT[c.kind] ?? KIND_TEXT.general} ${dayTime(c.start)} → ${dayTime(c.end)} : vous y seriez vers ${where} (${dayTime(c.time)}).${check}${geo}`;
 }
 
 /**

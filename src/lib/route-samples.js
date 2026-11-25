@@ -27,9 +27,11 @@ export function roadRefs(name) {
  * @param {number} stepM écart entre deux points (m)
  * @returns {{ along:number, lonlat:number[], time:number, roads:string[], index:number }[]}
  *   time : secondes depuis le départ ; roads : références de la route (étape ORS en cours) ;
- *   index : segment du tracé
+ *   index : segment du tracé ; geo : true si roads vient du repli par la géométrie (PR 3a, axis-match.js)
+ * @param {{ geo?:{ ref:(string|null)[] }|null }} [opts] geo : repli par la géométrie, lu seulement quand l'étape ORS
+ *   n'a ni nom ni référence (une étape nommée n'est jamais réécrite)
  */
-export function sampleRoute(route, stepM = 200) {
+export function sampleRoute(route, stepM = 200, { geo = null } = {}) {
   if (!Array.isArray(route?.coordinates) || route.coordinates.length < 2) return [];
   const line = prepareLine(route.coordinates);
   const steps = (Array.isArray(route.steps) ? route.steps : []).filter((s) => Array.isArray(s?.wayPoints));
@@ -42,7 +44,13 @@ export function sampleRoute(route, stepM = 200) {
     const along = Math.min(total, k * (total / n));
     const at = pointAt(line, along);
     while (si < steps.length - 1 && isNum(line.cum[steps[si].wayPoints[1]]) && line.cum[steps[si].wayPoints[1]] < along) si += 1;
-    out.push({ along, lonlat: at.point, time: timeAt(route, line, along), roads: refs[si] ?? [], index: at.segIndex ?? 0 });
+    const index = at.segIndex ?? 0;
+    let roads = refs[si] ?? [];
+    let fromGeo = false;
+    const named = typeof steps[si]?.name === 'string' && steps[si].name.trim() !== '' && steps[si].name.trim() !== '-';
+    const g = geo?.ref?.[index];
+    if (!roads.length && !named && typeof g === 'string' && g) { roads = g.split(';'); fromGeo = true; }
+    out.push({ along, lonlat: at.point, time: timeAt(route, line, along), roads, index, geo: fromGeo });
   }
   return out;
 }

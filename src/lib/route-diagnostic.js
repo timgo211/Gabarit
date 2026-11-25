@@ -39,7 +39,8 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   if (Array.isArray(route.countries) && route.countries.length) {
     lines.push(`Pays (countryinfo) : ${route.countries.map((c) => c.code).join(' → ')}`);
   } else lines.push('Pays (countryinfo) : absent');
-  lines.push(roadStatsText(route)); // phase 2g : km A / N / autre / inconnus, part A/N
+  lines.push(roadStatsText(route, { geo: rules?.axes?.geo ?? null })); // phase 2g : km A / N / autre / inconnus, part A/N
+  if (rules?.axes?.tech) lines.push(rules.axes.tech); // PR 3a : repli par la géométrie (data/axes-osm/)
   lines.push('Étapes ORS (km début–fin | nom renvoyé | références lues | point de début) :');
   const steps = Array.isArray(route.steps) ? route.steps : [];
   const last = coords.length - 1;
