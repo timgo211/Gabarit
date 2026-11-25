@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture SYNTHÉTIQUE écrite à la main sur le gabarit officiel DiaLog (templates/api/regulations.xml.twig).
+     Organisations, titres et lieux inventés ; aucune donnée réelle. -->
+<d2:payload modelBaseVersion="3" lang="FR"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:d2="http://datex2.eu/schema/3/d2Payload"
+  xmlns:com="http://datex2.eu/schema/3/common"
+  xmlns:loc="http://datex2.eu/schema/3/locationReferencing"
+  xmlns:dx="https://raw.githubusercontent.com/MTES-MCT/dialog/main/docs/spec/datex2"
+  xmlns="http://datex2.eu/schema/3/trafficRegulation"
+  xsi:type="TrafficRegulationPublication" id="fixture">
+  <com:publicationTime>2026-11-25T06:00:00+01:00</com:publicationTime>
+  <trafficRegulationsFromCompetentAuthorities>
+    <!-- 1 : permanent, hauteur ≤ 3.5 (Vosges), poids lourd > 7.5 t avec opérateur greaterThan -->
+    <trafficRegulationOrder id="o1" version="1">
+      <description><com:values><com:value>Arrêté permanent pont de l&apos;Exemple &amp; RD 1</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune A</com:value></com:values></issuingAuthority>
+      <regulationId>2026-001</regulationId>
+      <status>madeAndImplemented</status>
+      <validityByOrder><com:validityStatus>definedByValidityTimeSpec</com:validityStatus>
+        <com:validityTimeSpecification><com:overallStartTime>2026-01-01T00:00:00+01:00</com:overallStartTime></com:validityTimeSpecification>
+      </validityByOrder>
+      <trafficRegulation>
+        <status>active</status>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <loc:_linearLocationExtension><loc:linearLocationExtended>
+                <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.40,48.20],[6.42,48.22]]}</dx:geoJsonGeometry>
+              </loc:linearLocationExtended></loc:_linearLocationExtension>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics>
+                <com:heightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:vehicleHeight>3.5</com:vehicleHeight></com:heightCharacteristic>
+              </vehicleCharacteristics>
+            </conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>and</operator>
+            <conditions xsi:type="VehicleCondition"><negate>true</negate>
+              <vehicleCharacteristics><com:vehicleType>emergencyServices</com:vehicleType></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+      <trafficRegulation>
+        <status>active</status>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <loc:_linearLocationExtension><loc:linearLocationExtended>
+                <dx:geoJsonGeometry><![CDATA[{"type":"Polygon","coordinates":[[[2.30,48.80],[2.40,48.80],[2.40,48.90],[2.30,48.80]]]}]]></dx:geoJsonGeometry>
+              </loc:linearLocationExtended></loc:_linearLocationExtension>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics>
+                <com:vehicleType>heavyGoodsVehicle</com:vehicleType>
+                <com:grossWeightCharacteristic><com:comparisonOperator>greaterThan</com:comparisonOperator><com:grossVehicleWeight>7.5</com:grossVehicleWeight><com:typeOfWeight>maximumPermitted</com:typeOfWeight></com:grossWeightCharacteristic>
+              </vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <!-- 2 : temporaire terminé, poids lourd ≤ 19 t, sans géométrie ; vitesse -->
+    <trafficRegulationOrder id="o2" version="1">
+      <description><com:values><com:value>Travaux RD 2</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Département B</com:value></com:values></issuingAuthority>
+      <regulationId>T-2026-02</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2026-03-01T00:00:00+01:00</com:overallStartTime>
+        <com:overallEndTime>2026-04-01T00:00:00+02:00</com:overallEndTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics>
+                <com:vehicleType>heavyGoodsVehicle</com:vehicleType>
+                <com:grossWeightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:grossVehicleWeight>19</com:grossVehicleWeight></com:grossWeightCharacteristic>
+              </vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="SpeedLimit"><maxValue><numericValue>30</numericValue></maxValue></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder>
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;Point&quot;,&quot;coordinates&quot;:[4.85,45.75]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+  </trafficRegulationsFromCompetentAuthorities>
+</d2:payload>
