@@ -1,8 +1,12 @@
 // Contours IGN Admin Express (COG, millésime le plus récent publié en WFS par la Géoplateforme) pour les taxes PL
 // régionales (phase 5h ter, data/taxes-pl.json) : Bas-Rhin (67) et Haut-Rhin (68), région Grand Est (44),
-// Meurthe-et-Moselle (54), Eurométropole de Strasbourg (EPCI 246700488). Lancé par l'Action « Contours IGN »
+// Meurthe-et-Moselle (54), Eurométropole de Strasbourg (EPCI 246700488). v76 (PR 1 du contournement de Lyon) :
+// aussi la Métropole de Lyon (couche epci, cherchée par son nom, jamais par un code deviné ; code lu écrit dans
+// props.metropoleLyon), limite de la desserte locale des sections lyon-a6 / lyon-a7 ; facultative : absente ou
+// ambiguë → clé non écrite, les autres contours restent écrits. Lancé par l'Action « Contours IGN »
 // (.github/workflows/contours-ign.yml) : data.geopf.fr est bloqué depuis le conteneur de développement.
-// Simplification Douglas-Peucker en mètres (projection locale) : 150 m (départements, région), 50 m (Eurométropole),
+// Simplification Douglas-Peucker en mètres (projection locale) : 150 m (départements, région), 50 m (Eurométropole,
+// Métropole de Lyon),
 // comme les contours COG 2018 actuels ; coordonnées à 4 décimales (≈ 10 m). Seuls les anneaux extérieurs sont gardés
 // (pointInTax ne lit que des anneaux extérieurs). Écrit data/contours-ign.json ; le journal donne le millésime, le
 // nombre de points et la taille. Licence Ouverte (Etalab 2.0), © IGN.
@@ -103,6 +107,22 @@ console.log(`Millésime retenu : ${prefix}${year ? '' : ' (année non lue dans l
 const dep = await features(prefix, 'departement', "code_insee IN ('67','68','54')");
 const reg = await features(prefix, 'region', "code_insee='44'");
 const epci = await features(prefix, 'epci', "code_siren='246700488'");
+// Métropole de Lyon : nom exact d'abord, sinon les noms qui contiennent « Lyon » (journal) et un seul « Métropole de
+// Lyon » gardé. Filtre refusé par le service (propriété absente) : journal, rien de plus.
+async function metropoleLyon() {
+  const tries = ["nom_officiel='Métropole de Lyon'", "nom_officiel LIKE '%Lyon%'"];
+  for (const filter of tries) {
+    let list = [];
+    try { list = await features(prefix, 'epci', filter); } catch (err) { console.log(`epci [${filter}] : ${err.message}`); continue; }
+    for (const f of list) console.log(`  epci : ${JSON.stringify(f.properties ?? {}).slice(0, 300)}`);
+    const exact = list.filter((f) => /^Métropole de Lyon$/i.test(String(f.properties?.nom_officiel ?? '').trim()));
+    if (exact.length === 1) return exact;
+    if (list.length) { console.log(`Métropole de Lyon : ${exact.length} objet(s) au nom exact, ignorée.`); return []; }
+  }
+  console.log('Métropole de Lyon : introuvable, clé non écrite.');
+  return [];
+}
+const lyon = await metropoleLyon();
 const by = (code) => dep.filter((f) => f.properties?.code_insee === code);
 if (by('67').length !== 1 || by('68').length !== 1 || by('54').length !== 1 || reg.length !== 1 || epci.length !== 1) {
   console.log('Contours incomplets : rien écrit.');
@@ -120,7 +140,12 @@ const result = {
   eurometropole: rings(epci, 50),
   props: { epci: epci[0].properties, region: reg[0].properties },
 };
-for (const k of ['alsace', 'grandEst', 'meurtheEtMoselle', 'eurometropole']) {
+if (lyon.length === 1) {
+  result.metropoleLyon = rings(lyon, 50);
+  result.props.metropoleLyon = lyon[0].properties;
+}
+for (const k of ['alsace', 'grandEst', 'meurtheEtMoselle', 'eurometropole', 'metropoleLyon']) {
+  if (!result[k]) { console.log(`${k} : absent`); continue; }
   console.log(`${k} : ${result[k].length} anneau(x), ${result[k].reduce((s, r) => s + r.length, 0)} points`);
 }
 const text = `${JSON.stringify(result)}\n`;
