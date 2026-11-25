@@ -1464,9 +1464,33 @@
           "head": 60000
         }
       ]
+    },
+    {
+      "id": "osmfr-secours",
+      "title": "Source de secours de l'audit OSM : extrait France de download.openstreetmap.fr (joignabilité depuis l'Action, rien enregistré)",
+      "urls": [
+        "https://download.openstreetmap.fr/extracts/europe/"
+      ],
+      "keywords": [
+        "france-latest.osm.pbf",
+        "france.state"
+      ],
+      "headers": [
+        {
+          "label": "france-latest.osm.pbf.md5",
+          "url": "https://download.openstreetmap.fr/extracts/europe/france-latest.osm.pbf.md5",
+          "head": 300
+        },
+        {
+          "label": "france.state.txt",
+          "url": "https://download.openstreetmap.fr/extracts/europe/france.state.txt",
+          "head": 300
+        }
+      ],
+      "maxDocs": 1
     }
   ],
   "run": [
-    "sat11-brut"
+    "osmfr-secours"
   ]
 }
