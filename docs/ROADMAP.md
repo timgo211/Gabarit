@@ -614,9 +614,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     Gonfreville-l'Orcher par `tools/make-fixture-axes.mjs`, points et étapes du diagnostic v70). Ligne « Autoroute et
     nationale » de la fiche mise à jour une fois les cases chargées (« numéros retrouvés par la géométrie : à vérifier »),
     ordre des fiches et « Recommandé » inchangés.
-  - [ ] **Points sensibles avant départ** (PR 3b, après fusion de 3a) : `data/points-sensibles/` tiré des fiches
-    d'audit (interdictions par arrêté et Bison Futé marquées, hauteurs basses comparées au véhicule, tunnels sans
-    hauteur, ponts sur nationales ; jamais au-dessus d'une autoroute), nombre sur la fiche, détail à l'arrêt.
+  - [x] **v74 — Points sensibles avant départ** (PR 3b) : `data/points-sensibles/` (`sensitive-points.js`,
+    `tools/points-sensibles.mjs`, aussi lancé à la fin de l'Action « Audit OSM ») tiré des fiches d'audit :
+    interdictions PL lues par arrêté, et connues par Bison Futé (« source Bison Futé, arrêté non lu »), hauteurs
+    basses (comparées à la hauteur du véhicule, marge 0 m comme les ponts 12a), tunnels sans hauteur. Cap de chaque
+    point pris sur `data/axes-osm/` (5 m, même référence ; absent ou ambigu → écarté, compté par type). Ponts : aucun
+    dans la copie, ceux de l'audit sont tous dans `data/ponts-osm/` et déjà dans « ponts à vérifier » (recoupé au
+    journal). Rapprochement 15 m, cap ≤ 30° modulo 180°, veto de référence (ORS ou repli 3a). Fiche : « N points
+    sensibles à vérifier », lignes avec source et « La signalisation fait foi. », repères « ! » ; jamais dit, rien
+    dans le guidage. Premier calcul : 1 708 points, 67 cases, 78 Ko ; 71 écartés faute de cap. Diagnostic : route
+    retrouvée par la géométrie sur chaque étape sans nom (« A 13 », « ambigu », « inconnue »).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

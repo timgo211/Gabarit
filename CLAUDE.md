@@ -115,6 +115,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   (étape nommée jamais réécrite), 15 m, cap ≤ 30° modulo 180°, séries ≥ 300 m, ambigu = inconnu, copie simplifiée > 3 m
   = désactivé ; règles fondées sur la ref (week-end IdF, AURA), ligne A/N de la fiche et diagnostic, jamais le « Recommandé » ni le
   calcul ; « à vérifier », jamais dit. « Copier la réponse ORS » (diagnostic) à l'arrêt seulement, mémoire seulement.
+- Points sensibles (PR 3b, v74, `sensitive-points.js`, copie `data/points-sensibles/` des fiches d'audit, jamais
+  précachée) : interdictions (arrêté, ou Bison Futé marqué), hauteurs basses (≤ véhicule, marge 0), tunnels sans
+  hauteur ; point sans cap écarté ; aucun pont (alerte 12a seule) ; fiche et carte à l'arrêt, jamais dit ; source citée.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

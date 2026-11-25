@@ -190,10 +190,11 @@ const keyOf = (r) => (r === null ? null : r === 'ambiguous' ? 'ambiguous' : `${r
  * @param {{ coordinates:number[][], steps?:object[] }} route
  * @param {{ lines:object[] }|null} data copie lue (mergeAxesTiles)
  * @param {{ copyTolerance?:number|null }} opts simplification de la copie (index.json, champ tolerance)
- * @returns {{ status:'ok'|'disabled'|'none', cls:(number|null)[], ref:(string|null)[],
+ * @returns {{ status:'ok'|'disabled'|'none', cls:(number|null)[], ref:(string|null)[], amb:boolean[],
  *   km:{ matched:number, ambiguous:number, unnamed:number }, stats:{ samples:number, segmentsTested:number,
  *   segmentsIndexed:number } }|null}
- *   cls/ref par tronçon du tracé (i → i+1) : null si inconnu ; ref '' = voie retrouvée sans référence ; distances en m ;
+ *   cls/ref par tronçon du tracé (i → i+1) : null si inconnu ; ref '' = voie retrouvée sans référence ; amb : tronçon
+ *   ambigu (voies de classes ou de références incompatibles) ; distances en m ;
  *   null si le tracé est absent.
  */
 export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COPY_TOLERANCE_M } = {}) {
@@ -202,13 +203,14 @@ export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COP
   const n = coords.length - 1;
   const cls = new Array(n).fill(null);
   const ref = new Array(n).fill(null);
+  const amb = new Array(n).fill(false);
   const stats = { samples: 0, segmentsTested: 0, segmentsIndexed: 0 };
   const line = prepareLine(coords);
   const unnamed = unnamedSegments(route);
   let unnamedM = 0;
   for (let i = 0; i < n; i += 1) if (unnamed[i]) unnamedM += line.cum[i + 1] - line.cum[i];
   const km = { matched: 0, ambiguous: 0, unnamed: unnamedM };
-  const out = { status: 'none', cls, ref, km, stats };
+  const out = { status: 'none', cls, ref, amb, km, stats };
   if (!isNum(copyTolerance) || copyTolerance > AXIS_MATCH.MAX_COPY_TOLERANCE_M) return { ...out, status: 'disabled' };
   if (!data?.lines?.length || !unnamedM) return out;
   const index = buildAxisIndex(data.lines, corridorCells(line));
@@ -259,7 +261,7 @@ export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COP
     const keys = new Set(list.map((s) => s.key));
     if (keys.size !== 1) continue;
     const r = list[0].res;
-    if (r === 'ambiguous') { km.ambiguous += len; continue; }
+    if (r === 'ambiguous') { km.ambiguous += len; amb[i] = true; continue; }
     if (!r) continue;
     cls[i] = r.cls;
     ref[i] = r.ref;
@@ -279,6 +281,24 @@ export function geoRoadsFor(route, data, opts = {}) {
   const res = matchRouteAxes(route, data, opts);
   memo.set(route, { data, tol: opts.copyTolerance, res });
   return res;
+}
+
+/**
+ * Route retrouvée sur les tronçons [from, to) d'une étape (diagnostic, PR 3b) : références dans l'ordre du trajet
+ * (« A 12, A 13 »), sinon « ambigu », sinon « inconnue » ; « non chargée » sans repli calculé.
+ */
+export function geoStepLabel(geo, from, to) {
+  if (!geo || geo.status !== 'ok') return geo?.status === 'disabled' ? 'désactivé' : 'non chargée';
+  const refs = [];
+  let ambiguous = false;
+  for (let i = Math.max(0, from); i < to && i < geo.ref.length; i += 1) {
+    const r = geo.ref[i];
+    if (typeof r === 'string' && r) {
+      for (const x of r.split(';')) if (!refs.includes(x)) refs.push(x);
+    } else if (geo.amb?.[i]) ambiguous = true;
+  }
+  if (refs.length) return refs.map((x) => x.replace(/^([A-Z]+)(\d)/, '$1 $2')).join(', ');
+  return ambiguous ? 'ambigu' : 'inconnue';
 }
 
 const km1 = (m) => (m / 1000).toFixed(1).replace('.', ',');

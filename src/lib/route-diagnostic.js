@@ -12,6 +12,7 @@
 import { prepareLine, pointAt } from './nav-geo.js';
 import { roadRefs } from './route-samples.js';
 import { roadStatsText } from './road-class.js';
+import { geoStepLabel } from './axis-match.js';
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const km = (m) => (m / 1000).toFixed(1).replace('.', ',');
@@ -41,7 +42,7 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   } else lines.push('Pays (countryinfo) : absent');
   lines.push(roadStatsText(route, { geo: rules?.axes?.geo ?? null })); // phase 2g : km A / N / autre / inconnus, part A/N
   if (rules?.axes?.tech) lines.push(rules.axes.tech); // PR 3a : repli par la géométrie (data/axes-osm/)
-  lines.push('Étapes ORS (km début–fin | nom renvoyé | références lues | point de début) :');
+  lines.push('Étapes ORS (km début–fin | nom renvoyé | références lues | point de début | géométrie si sans nom) :');
   const steps = Array.isArray(route.steps) ? route.steps : [];
   const last = coords.length - 1;
   for (const s of steps) {
@@ -50,7 +51,10 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
     const b = wp ? line.cum[Math.max(0, Math.min(last, wp[1]))] ?? 0 : null;
     const name = typeof s?.name === 'string' && s.name ? s.name : '(sans nom)';
     const refs = roadRefs(s?.name);
-    lines.push(`  ${a === null ? '?' : km(a)}–${b === null ? '?' : km(b)} | ${name} | ${refs.length ? refs.join(', ') : '—'} | ${wp ? pt(coords[wp[0]]) : '?'}`);
+    // PR 3b : étape sans nom → route retrouvée par la géométrie (repli 3a), « ambigu » ou « inconnue ».
+    const unnamed = (name === '(sans nom)' || name.trim() === '-') && !refs.length;
+    const geo = unnamed && wp && rules ? ` | géométrie : ${geoStepLabel(rules.axes?.geo ?? null, wp[0], wp[1])}` : '';
+    lines.push(`  ${a === null ? '?' : km(a)}–${b === null ? '?' : km(b)} | ${name} | ${refs.length ? refs.join(', ') : '—'} | ${wp ? pt(coords[wp[0]]) : '?'}${geo}`);
     // Étape sans nom (ORS renvoie « - » ou rien) de plus de 5 km : un point tous les 10 km.
     if (a !== null && b !== null && (name === '(sans nom)' || name.trim() === '-') && b - a > UNNAMED_MIN_M) {
       for (let d = a + UNNAMED_STEP_M; d < b; d += UNNAMED_STEP_M) {
@@ -63,6 +67,7 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   if (rules?.bridges?.tech) lines.push(rules.bridges.tech); // phase 12a : mesure du bruit sur de vrais trajets
   if (rules?.weightLimits?.tech) lines.push(rules.weightLimits.tech); // phase 12a bis : « Limites de poids : N »
   if (rules?.speedLimits?.tech) lines.push(rules.speedLimits.tech); // phase 11a : couverture et sources des limites
+  if (rules?.sensitive?.tech) lines.push(rules.sensitive.tech); // PR 3b : points sensibles de l'audit OSM
   if (rules) {
     const zfe = rules.passages ?? [];
     lines.push(`ZFE (${zfe.length}) :${zfe.length ? '' : ' aucune'}`);

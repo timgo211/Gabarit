@@ -26,6 +26,7 @@ import { convertTollNetwork } from '../src/lib/hgv-tolls-convert.js';
 import { parseTollData } from '../src/lib/hgv-tolls.js';
 import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/lib/bridges-convert.js';
 import { BRIDGE } from '../src/lib/bridge-check.js';
+import { buildSensitivePoints } from '../src/lib/sensitive-points.js';
 import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
 import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
 import { directionFromFeature, convertDirections } from '../src/lib/directions-convert.js';
@@ -167,7 +168,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
-  start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo',
+  start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo', sensitiveCopy = 'repo',
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -405,6 +406,17 @@ async function open(browser, base, {
       const file = join(ROOT, 'tests', 'fixtures', 'axes-osm-joigny', name);
       return axesCopy === 'fixture' && existsSync(file) ? route.fulfill({ body: readFileSync(file), contentType: 'application/json' })
         : route.fulfill({ status: 404, body: '' });
+    });
+  }
+  // PR 3b : copie data/points-sensibles/ ('repo', par défaut : celle du dépôt ; 'fixture' : points posés sur
+  // ors-directions-nav.json par buildSensitivePoints ; null : absente, 404).
+  if (sensitiveCopy !== 'repo') {
+    const files = sensitiveCopy === 'fixture' ? sensitiveCopyFiles() : null;
+    await ctx.route(/\/data\/points-sensibles\/[^/]+\.json(\?.*)?$/, (route) => {
+      const name = new URL(route.request().url()).pathname.split('/').pop();
+      stats.sensitive = [...(stats.sensitive ?? []), name];
+      const json = files?.get(name);
+      return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
     });
   }
   const page = await ctx.newPage();
@@ -5360,6 +5372,88 @@ async function reportsShareCheck(browser, base) {
 }
 
 /**
+ * PR 3b : copie des points sensibles simulée (nom → JSON) : une interdiction lue par arrêté (> 7,5 t), une hauteur basse
+ * de 3,5 m et un tunnel sans hauteur posés sur le tracé de ors-directions-nav.json, par les fonctions de l'outil.
+ */
+function sensitiveCopyFiles() {
+  const nav = fixture('ors-directions-nav.json').features[0].geometry.coordinates;
+  const at = (k) => [(nav[k][0] + nav[k + 1][0]) / 2, (nav[k][1] + nav[k + 1][1]) / 2];
+  const sections = [{ id: 'test-75', refs: [], nature: 'poids', valeur: 7.5, texte: 'Route de test : marchandises > 7,5 t interdits',
+    arrete: 'arrêté de test du 01/01/2026', source: 'test', lu: 'arrêté' }];
+  const card = (type, k, extra = {}) => ({ way: 7000 + k, type, ref: '', point: at(k), etiquettesActuelles: { highway: 'primary' }, ...extra });
+  const cards = [
+    card('interdiction PL absente (test-75)', 3, { section: 'test-75' }),
+    card('hauteur basse connue', 10, { etiquettesActuelles: { highway: 'primary', maxheight: '3.5' } }),
+    card('tunnel sans hauteur', 20),
+  ];
+  const axesIndex = JSON.parse(readFileSync(join(ROOT, 'data', 'axes-osm', 'index.json'), 'utf8'));
+  const res = buildSensitivePoints(cards, sections, { lines: [{ refs: [], coords: nav }] }, { updated: '2026-11-24', grid: axesIndex.grid });
+  return new Map([['index.json', res.index], ...[...res.tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * PR 3b : points sensibles avant départ (fixture posée sur ors-directions-nav.json). Résumé sur la fiche, lignes « à
+ * vérifier » avec la source, repères « ! » à l'arrêt ; fourgon de 3,5 t : pas d'interdiction 7,5 t ; guidage : aucun
+ * repère, rien à l'écran ni à voix haute ; copie absente → « données non chargées ».
+ */
+async function sensitiveCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => nav, overpass: () => ({ elements: [] }), sensitiveCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForFunction(() => /Point sensible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+    const sens = notes.filter((t) => t.startsWith('Point sensible'));
+    check(sens.length === 3, `${tag} : 3 points sensibles dans la fiche`, notes.join(' | '));
+    check(sens.every((t) => /à vérifier/.test(t) && /La signalisation fait foi\./.test(t) && /OpenStreetMap way\/\d+, audit Gabarit du 24\/11\/2026/.test(t)),
+      `${tag} : « à vérifier », « La signalisation fait foi. », source`);
+    check(sens.some((t) => /Source : arrêté de test du 01\/01\/2026/.test(t)), `${tag} : arrêté cité`);
+    check(/3 points sensibles à vérifier/.test(await page.textContent('.route-card[aria-checked="true"]')), `${tag} : résumé sur la fiche`);
+    check(await page.locator('.sensitive-marker').count() === 3, `${tag} : 3 repères « ! » à l'arrêt`, String(await page.locator('.sensitive-marker').count()));
+    check((stats.sensitive ?? []).includes('index.json'), `${tag} : copie data/points-sensibles/ lue`);
+    await page.locator('.route-diag summary').click();
+    await page.waitForTimeout(400);
+    check(/Points sensibles : 3 \(interdictions 1/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique du diagnostic`);
+    await noHorizontalScroll(page, `${tag} sensibles`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-sensibles.png`) });
+    if (width === 412) {
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await page.waitForTimeout(1200);
+      check(await page.locator('.sensitive-marker').count() === 0, `${tag} : aucun repère pendant le guidage`);
+      check(!/sensible/i.test(await page.textContent('#nav')), `${tag} : rien dans l'écran de guidage`);
+      await drive(ctx, page, line, 50, 40);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((t) => /sensible|tunnel|hauteur/i.test(t)), `${tag} : rien dit`, spoken.join(' | '));
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Fourgon de 3,5 t : pas concerné par > 7,5 t, la hauteur de 3,5 m (fourgon de 2,8 m) non plus.
+  const van = await open(browser, base, {
+    width: 412, height: 900, directions: () => nav, overpass: () => ({ elements: [] }), sensitiveCopy: 'fixture',
+    vehicle: { id: 'v1', name: 'Fourgon', height: 2.8, width: 2.2, length: 6, weight: 3.5, axleload: 2, maxSpeed: 90 },
+  });
+  await computeRoute(van.page);
+  await van.page.waitForTimeout(1500);
+  const vanNotes = await van.page.textContent('#route-notes');
+  check(!/7,5 t interdits/.test(vanNotes) && /tunnel sans hauteur/.test(vanNotes), 'fourgon : pas d\'interdiction 7,5 t, tunnel gardé');
+  await van.ctx.close();
+  // Copie absente.
+  const none = await open(browser, base, { width: 412, height: 900, directions: () => nav, overpass: () => ({ elements: [] }), sensitiveCopy: null });
+  await computeRoute(none.page);
+  await none.page.waitForTimeout(1500);
+  check(/Points sensibles : données non chargées/.test(await none.page.textContent('#route-notes')), 'copie absente : « données non chargées »');
+  check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
+  await none.ctx.close();
+}
+
+/**
  * PR 3a : repli par la géométrie (data/axes-osm/). Reconstitution Joigny → Gonfreville-l'Orcher (diagnostic v70 : A12
  * et A13 dans des étapes sans nom), samedi 8 h 30 : ligne week-end Île-de-France avec « à vérifier » seulement quand la copie est lue ; ordre des
  * fiches inchangé ; diagnostic (deux lignes de classes, ligne technique) ; « Copier la réponse ORS » grisé en roulant,
@@ -5438,7 +5532,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

@@ -23,6 +23,7 @@ import { fileURLToPath } from 'node:url';
 import { download, downloadWithFallback, TIMEOUT_POLY_MS } from './osm-download.mjs';
 import { buildCoverage, parseGeojsonLine, parsePoly } from '../src/lib/areas-osm-data.js';
 import { axisFromFeature, convertAxes } from '../src/lib/axes-convert.js';
+import { writeSensitivePoints } from './points-sensibles.mjs';
 import {
   AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, axisCards, bridgeCards, bridgeCrossings,
   bridgeNearAxis, buildAxisIndex, placeFromFeature, placeIndex, restrictionCards, splitCards,
@@ -233,6 +234,9 @@ async function main() {
       const axesBytes = writeDir(AXES_DIR, [...ax.tiles.entries()].map(([k, t]) => [`${k}.json`, t]).concat([['index.json', ax.index]]));
       say(`data/axes-osm/ : ${ax.tiles.size} cases + index.json, ${(axesBytes / 1024 / 1024).toFixed(2)} Mo.`);
     }
+    // PR 3b : points sensibles (data/points-sensibles/) tirés des fiches et de la copie des axes qui viennent d'être
+    // écrites ; ponts recoupés avec data/ponts-osm/ (déjà signalés par la phase 12a).
+    writeSensitivePoints({ root: ROOT, say });
     say(`Durée totale : ${Math.round((Date.now() - start) / 60000)} min.`);
     mkdirSync(dirname(REPORT), { recursive: true });
     writeFileSync(REPORT, auditReport(idx, cards, { located: r.located, unlocated: r.unlocated, axesLog: ax.log, runLog: log }));

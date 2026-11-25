@@ -41,7 +41,7 @@ jobs:
       - name: Enregistrer si changé
         run: |
           P=""
-          for p in data/audit-osm data/axes-osm docs/audit-osm-axes.md; do
+          for p in data/audit-osm data/axes-osm data/points-sensibles docs/audit-osm-axes.md; do
             if [ -e "$p" ]; then P="$P $p"; fi
           done
           git add -A -N $P
