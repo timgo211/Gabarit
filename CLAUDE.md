@@ -109,6 +109,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - « Éviter le tunnel » (5b, v48 aussi classe Euro interdite 5g) : à l'arrêt seulement (`avoidTunnelAllowed`, relevés GPS
   hors guidage `plan-park.js`, vitesse inconnue = grisé), une requête dans le budget de 3 avec les diagnostics 2f
   (`computeAvoidRoute`), carré 80 m, 150 km à vol d'oiseau ; jamais dit, rien dans le guidage.
+- DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
+  seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
+  à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »
 - Textes officiels illisibles depuis le conteneur : Action « Textes officiels » (`tools/textes-officiels.json`, journal
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +
