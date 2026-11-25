@@ -587,6 +587,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 
 ## Ensuite
 
+- [ ] **Compléter OSM sur les grands axes** (au-delà de 150 km, ORS n'évite que ce qui est dans OSM) : étude faite le
+  25/11/2026 (`docs/etude-osm-axes.md` : graphe ORS public mis à jour en 2 à 3 semaines, étiquettes lues en
+  `driving-hgv`, Mapillary non faisable sans jeton, interdictions PL permanentes A/N « à vérifier », étapes ORS sans
+  nom). Ensuite : Action « Audit OSM » (lecture seule, niveaux autoroutes, nationales, puis grandes départementales).
+
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
   Vallorbe » (copie data/directions-osm/ étendue aux nœuds de sortie) ; chevrons et pastilles de manœuvre sur le
   tracé ; boutons ronds et compteur 25 % plus petits ; mémoire de l'itinéraire en arrière-plan (IndexedDB, reprise au
