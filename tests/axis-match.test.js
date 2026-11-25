@@ -1,6 +1,7 @@
 // Repli par la géométrie (PR 3a) : référence des étapes ORS sans nom retrouvée dans data/axes-osm/.
-// Fixture : reconstitution Joigny → Gonfreville-l'Orcher (tools/make-fixture-axes.mjs, points et étapes du diagnostic
-// v70 : 199 km sans nom sur 320,8, dont l'A13 de 146,1 à 249,5), cases réduites de la copie.
+// Fixture : vraie réponse ORS Joigny → Gonfreville-l'Orcher (driving-hgv 44 t, graphe du 24/11/2026, départ et arrivée
+// arrondis à 0,01°) : 204 km sans nom sur 338,8, dont 77 km d'A6 et 103 km d'A12 puis A13 ; cases réduites de la copie
+// (tools/make-fixture-axes.mjs, voies à moins de 300 m du tracé).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -79,9 +80,11 @@ test('case lue : références, classes, voies en double retirées ; case illisib
 
 test('Joigny → Gonfreville : km sans nom > 30 % sans repli, < 30 % avec ; l\'A13 retrouvée', () => {
   const r = route();
-  // Étapes du diagnostic v70 : sans nom, A 6, sans nom ×2, N 12, sans nom ×2, A 13, A 131, N 182, D 982.
-  assert.deepEqual(r.steps.slice(0, -1).map((s) => s.name || '-'), ['-', 'A 6', '-', '-', 'N 12', '-', '-', 'A 13', 'A 131', 'N 182', 'D 982']);
-  assert.ok(Math.abs(r.distance - 320800) < 15000, `${r.distance} m`);
+  // Étapes de la vraie réponse, rues de départ et d'arrivée retirées : sans nom ×2, A 6, sans nom ×2, N 12, sans nom ×2,
+  // A 13, A 131, N 182, D 982.
+  const roads = r.steps.slice(7, 19).map((s) => s.name || '-');
+  assert.deepEqual(roads, ['-', '-', 'Autoroute du Soleil, A 6', '-', '-', 'N 12', '-', '-', 'Autoroute de Normandie, A 13', 'A 131', 'N 182', 'D 982']);
+  assert.equal(r.distance, 338801.5);
   const before = roadStats(r);
   assert.ok(before.unknown / before.total > ROUTE_PREF.MAX_UNKNOWN_SHARE, 'part A/N inconnue sans repli');
   assert.equal(before.share, null);
@@ -96,8 +99,8 @@ test('Joigny → Gonfreville : km sans nom > 30 % sans repli, < 30 % avec ; l\'A
     km[geo.ref[i]] = (km[geo.ref[i]] ?? 0) + 1;
   }
   const top = Object.entries(km).sort((a, b) => b[1] - a[1]).map(([k]) => k);
-  assert.equal(top[0], 'A13');
-  assert.ok(top.includes('A6') && top.includes('A12'), top.join(','));
+  assert.deepEqual(top.slice(0, 2), ['A13', 'A6'], top.join(','));
+  assert.ok(top.includes('A12'), top.join(','));
   // Un tronçon nommé par ORS n'est jamais réécrit : rien n'est retrouvé sur les étapes nommées (A 6, N 12…).
   const seg = segmentClasses(r);
   for (let i = 0; i < geo.ref.length; i += 1) if (!seg.unknown[i]) assert.equal(geo.ref[i], null, `tronçon ${i} nommé`);
