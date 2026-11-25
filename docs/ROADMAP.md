@@ -630,6 +630,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     Mâcon → Valence : repli A6 puis N7 ; points sensibles lyon-a6 et lyon-a7 signalés pour 44 t, aucun pour 3,5 t
     (ORS passe dans Lyon : hgv:conditional non lu, avoid_polygons refusé au-delà de 150 km). `make-fixture-axes.mjs`
     ne fait plus que l'extraction des cases (`axes-osm-joigny/`, `axes-osm-macon-valence/`).
+  - [x] **Contour de la Métropole de Lyon** (PR 1 du contournement) : `tools/contours-ign.mjs` + Action « Contours
+    IGN » → clé `metropoleLyon` de `data/contours-ign.json` (1 objet par son nom, 58 communes, 455 points à 50 m).
+  - [x] **v76 — « Contourner par la rocade Est »** (Lyon, lyon-a6 / lyon-a7, > 7,5 t) : bouton à l'arrêt, 3 points
+    de passage A46 → N346 → A46 pris dans `data/axes-osm/` (chaussée du sens de marche), une requête ORS, fiche
+    « Rocade Est », « Allonge de X km / Y min » au-delà de +30 % ou +60 km ; pas de bouton en desserte locale (départ,
+    arrivée ou étape dans la Métropole) ; étapes `via` jamais dites ni montrées, gardées au recalcul. Sources : dépliant
+    Bison Futé 2020, question AN n° 146 (2008, à vérifier). Scénario `ui-check` non écrit (MapLibre non installable dans
+    le conteneur) : à faire.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

@@ -9,7 +9,9 @@
 //
 // Usage (déterministe ; à relancer seulement si data/axes-osm/ ou la fixture change) :
 //   node tools/make-fixture-axes.mjs tests/fixtures/ors-directions-joigny-gonfreville.json tests/fixtures/axes-osm-joigny
-//   node tools/make-fixture-axes.mjs tests/fixtures/ors-directions-macon-valence.json tests/fixtures/axes-osm-macon-valence
+//   node tools/make-fixture-axes.mjs tests/fixtures/ors-directions-macon-valence.json tests/fixtures/axes-osm-macon-valence --refs=A46,N346,A6,A7
+// v76 : --refs garde aussi, dans les cases du tracé, toutes les voies de ces références (rocade Est de Lyon pour
+// lyon-bypass.js : A46 et N346, et l'A6 / l'A7 pour l'écart aux échangeurs).
 
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +22,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = join(ROOT, 'data/axes-osm');
 const KEEP_M = 300;
 
-const [fixtureArg, outArg] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const refsArg = args.find((a) => a.startsWith('--refs='));
+const KEEP_REFS = new Set(refsArg ? refsArg.slice(7).split(',').filter(Boolean) : []);
+const [fixtureArg, outArg] = args.filter((a) => !a.startsWith('--'));
 if (!fixtureArg || !outArg) {
   process.stderr.write('Usage : node tools/make-fixture-axes.mjs <réponse ORS .json> <dossier de sortie>\n');
   process.exit(1);
@@ -65,7 +70,8 @@ for (const f of readdirSync(SRC).sort()) {
     let px = 0; let py = 0;
     const c = [];
     for (let i = 2; i < row.length; i += 2) { px += row[i]; py += row[i + 1]; c.push([px / 1e5, py / 1e5]); }
-    if (!keepNear(c)) continue;
+    const refs = row[0] >= 0 ? t.r[row[0]].split(';') : [];
+    if (!keepNear(c) && !refs.some((x) => KEEP_REFS.has(x))) continue;
     let i = -1;
     if (row[0] >= 0) {
       const ref = t.r[row[0]];
@@ -81,7 +87,7 @@ for (const f of readdirSync(SRC).sort()) {
 const index = {
   source: srcIndex.source, license: srcIndex.license, updated: srcIndex.updated, countries: srcIndex.countries,
   count: Object.values(counts).reduce((x, y) => x + y, 0), tolerance: srcIndex.tolerance, grid: srcIndex.grid, tiles: counts,
-  note: `extrait de data/axes-osm/ (voies à moins de 300 m du tracé de ${relative(ROOT, FIXTURE)}), tools/make-fixture-axes.mjs`,
+  note: `extrait de data/axes-osm/ (voies à moins de 300 m du tracé de ${relative(ROOT, FIXTURE)}${KEEP_REFS.size ? ` et toutes les voies ${[...KEEP_REFS].join(', ')} de ses cases` : ''}), tools/make-fixture-axes.mjs`,
 };
 writeFileSync(join(OUT_DIR, 'index.json'), `${JSON.stringify(index)}\n`);
 process.stdout.write(`${coords.length} points ; cases réduites : ${Object.keys(counts).length} (${index.count} voies) → ${relative(ROOT, OUT_DIR)}\n`);

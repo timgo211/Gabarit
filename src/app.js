@@ -7,13 +7,19 @@ import { createMap } from './ui/map.js';
 import { createRouteForm, attachAutocomplete, recentPlaces, setRecentEditGuard, setSavedPlaces } from './ui/route-form.js';
 import { createSavedPlaces } from './ui/saved-places.js';
 import { recentEditAllowed } from './lib/recent-places.js';
-import { stopPoints, insertStopByRoute } from './lib/stops.js';
+import { stopPoints, insertStopByRoute, shownStopPoints } from './lib/stops.js';
 import { renderRouteChoice, revealSelectedCard } from './ui/summary.js';
 import { createSettings } from './ui/settings.js';
 import { createVehicles } from './ui/vehicles.js';
 import { fetchRouteOptions, fetchRoute, fetchAvoidRoute } from './ui/api.js';
 import { createPlanPark } from './ui/plan-park.js';
-import { guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption } from './lib/route-options.js';
+import {
+  guidanceParams, reroutedOption, noZfeOption, noTunnelOption, noLocalOption, optionStops, rocadeOption,
+} from './lib/route-options.js';
+import {
+  LYON_BYPASS, LYON_STILL_TEXT, lyonBypassPlan, withBypassStops, bypassCost, bypassNote,
+} from './lib/lyon-bypass.js';
+import { prepareLine, locateOnLine } from './lib/nav-geo.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
 import { createBridges, createTileCopy } from './ui/bridges.js';
@@ -36,7 +42,7 @@ import { serviceDetailText } from './lib/ors-errors.js';
 import {
   ADR, parseTunnelData, effectiveCode, avoidTunnelsFor, avoidingOptionsText, tunnelName, avoidTunnelAllowed, AVOID_PARKED_TEXT,
 } from './lib/adr.js';
-import { ZFE, parseZfeData, avoidPolygonsFor } from './lib/zfe.js';
+import { ZFE, parseZfeData, avoidPolygonsFor, avoidForReroute } from './lib/zfe.js';
 import { routeRules, rulesSourceText, confirmedTunnelBans } from './lib/route-rules.js';
 import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
 import { createVoice } from './ui/voice.js';
@@ -167,10 +173,13 @@ navigation = createNavigation({
   // Recalcul en route (GPS réel) : les autres itinéraires partaient de l'ancien départ, il ne reste que le nouveau.
   onRouteChange: (route, stops = []) => {
     if (!choice) return;
+    const left = Array.isArray(stops) ? stops : [];
+    // v76 : points de passage techniques (« Rocade Est ») gardés par la fiche recalculée, jamais comptés comme étapes.
+    const rerouted = reroutedOption(choice.options[choice.selected], route);
     choice = {
-      ...choice, options: [reroutedOption(choice.options[choice.selected], route)], failures: [], selected: 0,
+      ...choice, options: [left.some((x) => x.via === true) ? { ...rerouted, stops: left } : rerouted], failures: [], selected: 0,
       start: route.coordinates[0], startIsMyPosition: true, // recalcul depuis la position GPS
-      stops: Array.isArray(stops) ? stops : [], // v55 : étapes non atteintes, celles du nouveau tracé
+      stops: left.filter((x) => x.via !== true), // v55 : étapes non atteintes, celles du nouveau tracé
     };
     renderChoice();
     areas.reroute(route); // mêmes aires replacées sur le nouvel itinéraire, sans requête
@@ -405,6 +414,9 @@ for (const code of COUNTRY_RULES.FILES) {
 // Phase 5h ter : réseau taxé en géométrie (data/taxes-pl-osm.json, copie OSM de l'Action, hors APP_FILES) ; absent ou
 // illisible → network null, repérage par les noms d'étape.
 let tolls = { status: 'loading', data: null, network: null };
+// v76 : contour de la Métropole de Lyon (« Contourner par la rocade Est », loadMetro) et plans déjà calculés.
+let metro = { status: 'idle', rings: null };
+const bypassCache = new WeakMap();
 const readJson = (path, parse) => fetch(path, { cache: 'no-cache' })
   .then((r) => (r.ok ? r.json() : null))
   .then((j) => parse(j))
@@ -471,6 +483,10 @@ function choiceRules(c = choice) {
       r.lines.unshift(...rl);
       r.short = [...r.short, ...rl.filter((l) => l.level === 'warn').map(() => 'Restriction saisie à vérifier').slice(0, 1)];
     }
+    // v76 : Lyon (lyon-a6 / lyon-a7) : ligne de la règle et plan du contournement par la rocade Est.
+    r.lyonBypass = bypassOf(o, c, r);
+    if (r.lyonBypass.concerned) loadMetro();
+    if (r.lyonBypass.lines.length) r.lines.unshift(...r.lyonBypass.lines);
     return r;
   });
   // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
@@ -496,6 +512,9 @@ function showZfeOnMap(rules) {
   map.showZfe([...seen.values()]);
 }
 
+/** v76 : fiche dérivée d'une fiche qui a ses propres étapes (« Rocade Est ») : elle les garde. */
+const keepStops = (from, option) => (Array.isArray(from?.stops) ? { ...option, stops: from.stops } : option);
+
 /**
  * « Éviter la ZFE » (à l'arrêt) : une requête ORS avec les ZFE interdites en options.avoid_polygons, mêmes réglages
  * que l'itinéraire choisi. Limites de l'API publique (150 km à vol d'oiseau…) : message clair, pas de requête.
@@ -505,7 +524,7 @@ async function avoidZfe() {
   const option = choice.options[choice.selected];
   const rules = rulesOf(option.route, choice.vehicle, new Date());
   const zones = [...new Set(rules.banned.map((p) => p.zone))];
-  const plan = avoidPolygonsFor(zones, { start: choice.start, end: choice.end, stops: choice.stops ?? [] });
+  const plan = avoidPolygonsFor(zones, { start: choice.start, end: choice.end, stops: optionStops(option, choice.stops) });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   avoidBusy = true;
   renderChoice();
@@ -515,10 +534,10 @@ async function avoidZfe() {
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
       avoidPolygons: mergeAvoid(option.request.avoidPolygons, plan.geometry), // phase 12b : restrictions gardées
-      via: stopPoints(choice.stops),
+      via: stopPoints(optionStops(option, choice.stops)),
     });
     if (!choice || navigation.active) return;
-    const nz = noZfeOption(option, route, mergeAvoid(option.request.avoidPolygons, plan.geometry), zones.map((z) => z.name));
+    const nz = keepStops(option, noZfeOption(option, route, mergeAvoid(option.request.avoidPolygons, plan.geometry), zones.map((z) => z.name)));
     const options = [...choice.options.filter((o) => o.key !== 'nozfe'), nz];
     choice = { ...choice, options, selected: options.length - 1 };
     map.showRoutes(options.map((o) => o.route), choice.selected);
@@ -568,7 +587,7 @@ async function avoidTunnel() {
   const option = choice.options[choice.selected];
   const forbidden = rulesOf(option.route, choice.vehicle, new Date()).avoidableTunnels ?? [];
   const plan = avoidTunnelsFor(forbidden, {
-    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: choice.stops ?? [],
+    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: optionStops(option, choice.stops),
   });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   tunnelBusy = true;
@@ -578,11 +597,11 @@ async function avoidTunnel() {
     const route = await fetchAvoidRoute({
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
-      avoidPolygons: plan.geometry, via: stopPoints(choice.stops),
+      avoidPolygons: plan.geometry, via: stopPoints(optionStops(option, choice.stops)),
     });
     if (!choice || navigation.active) return;
     const names = [...new Set(forbidden.map(tunnelName))];
-    const nt = noTunnelOption(option, route, plan.geometry, names);
+    const nt = keepStops(option, noTunnelOption(option, route, plan.geometry, names));
     const options = [...choice.options.filter((o) => o.key !== 'notunnel'), nt];
     choice = { ...choice, options, selected: options.length - 1 };
     map.showRoutes(options.map((o) => o.route), choice.selected);
@@ -616,7 +635,7 @@ async function avoidLocal() {
   const option = choice.options[choice.selected];
   const transit = rulesOf(option.route, choice.vehicle, new Date()).localTransit ?? [];
   const plan = avoidLocalFor(transit, {
-    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: choice.stops ?? [],
+    start: choice.start, end: choice.end, existing: option.request.avoidPolygons ?? null, stops: optionStops(option, choice.stops),
   });
   if (!plan.ok) { showMessage(messageNode, plan.text); return; }
   localBusy = true;
@@ -626,10 +645,10 @@ async function avoidLocal() {
     const route = await fetchRoute({
       apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
       avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
-      avoidPolygons: plan.geometry, via: stopPoints(choice.stops),
+      avoidPolygons: plan.geometry, via: stopPoints(optionStops(option, choice.stops)),
     });
     if (!choice || navigation.active) return;
-    const nl = noLocalOption(option, route, plan.geometry);
+    const nl = keepStops(option, noLocalOption(option, route, plan.geometry));
     const options = [...choice.options.filter((o) => o.key !== 'nolocal'), nl];
     choice = { ...choice, options, selected: options.length - 1 };
     map.showRoutes(options.map((o) => o.route), choice.selected);
@@ -654,6 +673,88 @@ async function avoidLocal() {
   }
 }
 
+// ───────── « Contourner par la rocade Est » (v76, lyon-bypass.js) : Lyon, sections lyon-a6 / lyon-a7 ─────────
+// Contour de la Métropole de Lyon (data/contours-ign.json, clé metropoleLyon, IGN Admin Express, Licence Ouverte) :
+// lu à la demande, la première fois qu'un itinéraire passe par une de ces sections ; jamais précaché.
+function loadMetro() {
+  if (metro.status !== 'idle') return;
+  metro = { status: 'loading', rings: null };
+  readJson(LYON_BYPASS.CONTOUR_PATH, (j) => (Array.isArray(j?.metropoleLyon) && j.metropoleLyon.length ? j.metropoleLyon : null))
+    .then((rings) => {
+      metro = rings ? { status: 'ok', rings } : { status: 'failed', rings: null };
+      renderChoice();
+    });
+}
+/** Plan par itinéraire, recalculé seulement si une donnée lue ou les étapes changent (cache : bypassCache). */
+function bypassOf(option, c, rules) {
+  const stops = optionStops(option, c.stops);
+  const hit = bypassCache.get(option.route);
+  const key = [sensitive.state, axes.state, metro, stops, c.vehicle, rules.sensitive];
+  if (hit && hit.key.every((x, i) => x === key[i])) return hit.plan;
+  const plan = lyonBypassPlan(option.route, {
+    items: rules.sensitive?.items ?? [], sensitive: sensitive.state, axes: axes.state, metro, start: c.start, end: c.end, stops,
+  });
+  bypassCache.set(option.route, { key, plan });
+  return plan;
+}
+
+/**
+ * Appui sur « Contourner par la rocade Est » (à l'arrêt seulement, hors guidage, comme « Éviter le tunnel ») : trois
+ * points de passage ajoutés aux étapes de la fiche choisie, une requête ORS avec tous les points (règle v55, budget
+ * de 3, jamais alternative_routes), aucun polygone ajouté. Échec : message, itinéraire inchangé. Jamais dit.
+ */
+let bypassBusy = false;
+async function bypassLyon() {
+  if (!choice || navigation.active || bypassBusy) return;
+  if (!tunnelAllowed()) { showMessage(messageNode, LYON_BYPASS.PARKED_TEXT, 'info'); return; }
+  const option = choice.options[choice.selected];
+  const plan = choiceRules()?.[choice.selected]?.lyonBypass;
+  if (!plan?.ok) return;
+  let line = null;
+  try { line = prepareLine(option.route.coordinates); } catch { line = null; }
+  const alongOf = (p) => (line ? locateOnLine(line, p).along : 0);
+  const stops = withBypassStops(optionStops(option, choice.stops), plan.via, alongOf);
+  // Zones évitées de la fiche (ZFE, restrictions) gardées si ORS les accepte encore (150 km à vol d'oiseau, points
+  // de passage compris) ; sinon non envoyées, et la fiche le dit.
+  const had = option.request.avoidPolygons ?? null;
+  const avoidPolygons = avoidForReroute(had, choice.start, choice.end, stopPoints(stops));
+  bypassBusy = true;
+  renderChoice();
+  showMessage(messageNode, '');
+  try {
+    const route = await fetchAvoidRoute({
+      apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
+      avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
+      avoidPolygons, via: stopPoints(stops),
+    });
+    if (!choice || navigation.active) return;
+    const note = [bypassNote(bypassCost(option.route, route)), had && !avoidPolygons ? LYON_BYPASS.ZONES_DROPPED_TEXT : '']
+      .filter(Boolean).join(' ');
+    const ro = { ...rocadeOption(option, route, stops, note), request: { ...option.request, avoidPolygons } };
+    const options = [...choice.options.filter((o) => o.key !== 'rocade'), ro];
+    choice = { ...choice, options, selected: options.length - 1 };
+    map.showRoutes(options.map((o) => o.route), choice.selected);
+    areas.select(route);
+    access.extend(route);
+    bridges.extend(route);
+    axes.extend(route);
+    sensitive.extend(route);
+    weightLimits.extend(route);
+    speedLimits.extend(route);
+    directions.extend(route);
+    places.extend(route);
+    lanes.extend(route);
+    winter.extend(route);
+    // Points sensibles relancés sur le nouveau tracé : encore une section interdite → message.
+    if (choiceRules()?.[choice.selected]?.lyonBypass?.concerned) showMessage(messageNode, LYON_STILL_TEXT, 'info');
+  } catch (err) {
+    showMessage(messageNode, `Contourner par la rocade Est : ${errorText(err) || 'calcul impossible.'}`);
+  } finally {
+    bypassBusy = false;
+    renderChoice();
+  }
+}
+
 function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
@@ -665,6 +766,7 @@ function renderChoice() {
     }),
     onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy, tunnelAllowed: tunnelAllowed(),
     onAvoidLocal: avoidLocal, localBusy,
+    onBypass: bypassLyon, bypassBusy, // v76
     windCredit: weather.status === 'ok',
   });
   // v48 : relevés GPS hors guidage tant que la fiche propose un bouton réservé à l'arrêt : « Éviter le tunnel », et

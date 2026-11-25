@@ -508,7 +508,7 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
     fuel,
     delta: reference && reference !== option ? deltaText(r, reference.route) : '',
     // v55 : une ligne par étape (heure d'arrivée, durée du tronçon), heures sans temps passé aux étapes.
-    legs: legLines(r, stops, now),
+    legs: legLines(r, optionStops(option, stops), now), // v76 : étapes de la fiche (points de passage réunis)
   };
 }
 
@@ -521,8 +521,24 @@ export function guidanceParams(option, { start, end, avoidFerries = false, stops
   return {
     start, end, avoidFerries, avoidTolls: option.request.avoidTolls, preference: option.request.preference ?? null,
     avoidPolygons: option.request.avoidPolygons ?? null, // « Sans ZFE » (phase 5)
-    stops: Array.isArray(stops) ? stops : [], // v55 : étapes (le recalcul garde celles qui ne sont pas atteintes)
+    // v55 : étapes (le recalcul garde celles qui ne sont pas atteintes) ; v76 : celles de la fiche si elle en a
+    // (« Rocade Est » : points de passage techniques compris).
+    stops: optionStops(option, stops),
   };
+}
+
+/** v76 : étapes d'une fiche : les siennes (« Rocade Est ») sinon celles du trajet. */
+export function optionStops(option, stops = []) {
+  if (Array.isArray(option?.stops)) return option.stops;
+  return Array.isArray(stops) ? stops : [];
+}
+
+/**
+ * v76 : itinéraire « Rocade Est » (lyon-bypass.js) : mêmes réglages que l'itinéraire choisi (aucun polygone ajouté),
+ * étapes = celles du trajet + trois points de passage techniques ; note avec l'écart si le trajet s'allonge fort.
+ */
+export function rocadeOption(option, route, stops, note) {
+  return { key: 'rocade', label: 'Rocade Est', note, also: [], route, request: { ...option.request }, stops };
 }
 
 /**

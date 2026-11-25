@@ -371,3 +371,26 @@ test('v70 : ligne d\'étape en morceaux insécables, même texte que nextStopLin
   const p = nextStopParts({ index: 9, count: 10, distance: -5, duration: Number.NaN });
   assert.deepEqual(p, { label: 'Étape 10/10 :', duration: '0 min', distance: '0 m' });
 });
+
+test('v76 : point de passage technique (`via`) : ni « Étape atteinte. », ni « Vous arrivez à l\'étape », ni ligne d\'étape', () => {
+  const via = { ...STOP, label: 'Rocade Est (point de passage)', via: true };
+  const s0 = startNavigation(ROUTE, { destination: C[33], now: T0, stops: [via] });
+  assert.equal(s0.stops[0].via, true);
+  assert.ok(!s0.route.maneuvers.some((m) => m.waypoint), 'arrivée intermédiaire du point de passage retirée');
+  const first = drive(s0, ROUTE, 50, 60);
+  assert.equal(first.view.nextStop, null, 'aucune ligne « Étape k/n »');
+  const all = drive(s0, ROUTE, 50, 600);
+  const said = all.events.filter((e) => e.type === 'speak').map((e) => e.text);
+  assert.equal(said.filter((t) => t === STOP_REACHED_TEXT).length, 0);
+  assert.ok(!said.some((t) => /arrivez à l'étape/.test(t)), said.join(' | '));
+  assert.equal(all.events.filter((e) => e.type === 'stop-reached').length, 0);
+  assert.equal(said.filter((t) => /Destination atteinte/.test(t)).length, 1);
+  assert.equal(all.state.nextStop, 1, 'passé en silence');
+  assert.deepEqual(all.state.stopsDone, [], 'jamais dans l\'historique');
+  // Recalcul avant le point : il est gardé (via) et toujours sans arrivée intermédiaire.
+  const left = remainingStops(first.state);
+  assert.deepEqual(left.map((x) => x.via), [true]);
+  const re = rerouteDone(first.state, ROUTE, left);
+  assert.ok(!re.state.route.maneuvers.some((m) => m.waypoint));
+  assert.equal(re.state.stops[0].via, true);
+});

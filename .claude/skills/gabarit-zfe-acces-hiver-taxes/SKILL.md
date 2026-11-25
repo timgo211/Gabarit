@@ -149,5 +149,28 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   Allemagne (Maut) : grille Toll Collect « ab 1. Juli 2024 » lue mais validité 2026 et BFStrMG annexe 1 non lus
   (gesetze-im-internet.de, bmv.de ne répondent pas à l'Action) → aucun montant. Burgenland : RIS 503, rien codé.
   R-Pass : délibération et issue du recours illisibles (alsace.eu, r-pass.eu) → `announced` inchangé.
+- « Contourner par la rocade Est » (v76, `src/lib/lyon-bypass.js`, Lyon seulement) : sections `lyon-a6` / `lyon-a7`
+  des points sensibles concernées par le profil (> 7,5 t). Sources lues le 25/11/2026 (texte des PDF, aucune OCR) :
+  dépliant Bison Futé 2020 (« A7 et A6 (25 km) : interdites aux plus de 7,5 t entre Ternay (69) et Limonest Dardilly
+  (69) - sauf desserte locale. ») ; question orale AN n° 146 (13e législature, JO du 29/01/2008 : « détourné par la
+  rocade est de Lyon… signalisé sur l'A6, à Anse, et sur l'A7, à Chasse-sur-Rhône », phrase du député, de 2008 → « à
+  vérifier ») ; hôte assemblee-nationale.fr ajouté à l'environnement. Ligne `LYON_RULE_TEXT` (warn) en tête de la fiche,
+  raison ajoutée quand il n'y a pas de bouton (`LYON_REASON_TEXTS` : local, metro, points, full, applied). Desserte
+  locale : départ, arrivée ou étape (hors `via`) dans le contour IGN Admin Express de la Métropole de Lyon (clé
+  `metropoleLyon` de `data/contours-ign.json`, Action « Contours IGN », cherchée par son nom ; lu à la demande par
+  `loadMetro`, jamais précaché) ; contour non chargé → pas de bouton. Points (`rocadePoints`) : P-nord = sommet A46 à
+  ≥ 3 km de l'A6, le plus proche des points de lyon-a6 ; P-milieu = sommet N346 le plus à l'est ; P-sud = sommet A46 à
+  ≥ 3 km de l'A7, le plus proche des points de lyon-a7 ; chaussée : segment ≤ 30° (modulo 180°) du sens voulu ET
+  chaussée opposée (même référence, 8–80 m) à gauche (circulation à droite) — la copie retourne des voies, le sens de
+  dessin n'est jamais lu ; point milieu pas le plus à l'est → rien. Sens : ordre de lyon-a6 / lyon-a7 sur le tracé,
+  sinon latitude départ / arrivée ; sud→nord = ordre inversé. 10 étapes au plus (3 de plus). Appui (`bypassLyon` d'app.js) :
+  `withBypassStops` (rangés à leur place sur le tracé), `fetchAvoidRoute` (une requête, budget de 3, jamais
+  `alternative_routes`), zones de la fiche gardées si ≤ 150 km (`avoidForReroute`) sinon non envoyées et dit ; fiche
+  `rocadeOption` (clé `rocade`, ses `stops`) ; « Allonge de X km / Y min » au-delà de +30 % de durée ou +60 km
+  (`bypassCost`) ; encore une section → `LYON_STILL_TEXT` ; échec → message, itinéraire inchangé. Étape `via` (stops.js,
+  navigation.js) : arrivée intermédiaire ORS retirée (`withoutViaArrivals`), passée en silence, hors « Étape k/n »,
+  `stopsDone`, repères (`shownStopPoints`) ; gardée par `remainingStops`, le recalcul et la mémoire (`option.stops`).
+  Fourvière : section non localisée, jamais déclencheur. Tests : `tests/lyon-bypass.test.js` (vraie fixture
+  Mâcon → Valence, cases `axes-osm-macon-valence` avec toutes les A46, N346, A6, A7 : `make-fixture-axes.mjs --refs`).
 - Champ « Essieux » du profil (`axles` : '', '2', '3', '4', '5+') : montré seulement si `AXLE_AMOUNTS` (un montant codé
   en dépend), sinon valeur gardée ; exporté avec les véhicules (normalizeVehicle).
