@@ -1,0 +1,32 @@
+name: Étude DiaLog (lecture, journal seulement)
+
+# Télécharge le XML DATEX II de DiaLog (réglementation de circulation, DGITM) par l'URL stable de data.gouv.fr et
+# imprime dans le journal des statistiques (hauteur, poids, sens de l'opérateur, géométrie, organisations) :
+# dialog.beta.gouv.fr est bloqué depuis le conteneur de développement. Lu en flux, jamais écrit sur le disque, rien
+# n'est enregistré ni poussé. Domaines permis : www.data.gouv.fr, static.data.gouv.fr, dialog.beta.gouv.fr.
+# Séparée de « Données OSM » pour ne jamais relancer la copie OSM. Lancée à la main seulement.
+# « Les restrictions diffusées par DiaLog n'ont pas de valeur juridique. Seul l'arrêté fait foi. »
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dialog-etude-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Lire le XML DiaLog
+        run: node tools/dialog-etude.mjs
