@@ -199,7 +199,7 @@ test('diagnostic : route retrouvée par étape sans nom (« A 13 »), « ambigu 
   const geo = matchRouteAxes(r, data, { copyTolerance: 3 });
   const unnamed = r.steps.filter((s) => !s.name && s.wayPoints && s.wayPoints[1] > s.wayPoints[0]);
   const labels = unnamed.map((s) => geoStepLabel(geo, s.wayPoints[0], s.wayPoints[1]));
-  assert.ok(labels[0].includes('A 6'), labels.join(' | '));
+  assert.ok(labels.some((l) => l.includes('A 6')), labels.join(' | '));
   assert.ok(labels.some((l) => l.includes('A 12')) && labels.some((l) => l.includes('A 13')), labels.join(' | '));
   const n = geo.ref.length;
   assert.equal(geoStepLabel({ status: 'ok', ref: new Array(n).fill(null), amb: new Array(n).fill(true) }, 0, 5), 'ambigu');
@@ -209,6 +209,36 @@ test('diagnostic : route retrouvée par étape sans nom (« A 13 »), « ambigu 
   const rules = routeRules(r, { vehicle: SEMI, axes });
   const diag = routeDiagnosticText(r, { rules });
   assert.match(diag, /\| \(sans nom\) \| — \| [^|]+ \| géométrie : A 6/);
-  assert.match(diag, /géométrie : A 13/);
+  assert.match(diag, /géométrie : A 12, A 13/, 'étape de 103 km : A12 puis A13');
   assert.ok(!/A 6 \| A6 \|[^\n]*géométrie/.test(diag), 'étape nommée : pas de colonne géométrie');
+});
+
+test('Mâcon → Valence (vraie réponse ORS, 44 t) : repli A6 puis N7 ; interdictions lyon-a6 et lyon-a7, aucune en 3,5 t', () => {
+  // Vraie réponse ORS driving-hgv 44 t du 24/11/2026 (départ et arrivée arrondis à 0,01°) : ORS passe par l'A6 puis
+  // l'A7 dans Lyon (hgv:conditional non lu, avoid_polygons refusé au-delà de 150 km à vol d'oiseau).
+  const DIR = new URL('./fixtures/axes-osm-macon-valence/', import.meta.url);
+  const data = mergeAxesTiles(readdirSync(DIR).filter((f) => f !== 'index.json')
+    .map((f) => parseAxesTile(JSON.parse(readFileSync(new URL(f, DIR), 'utf8')))));
+  const r = parseDirections(fixture('ors-directions-macon-valence.json'));
+  assert.equal(r.distance, 179631.5);
+  const geo = matchRouteAxes(r, data, { copyTolerance: 3 });
+  assert.equal(geo.status, 'ok');
+  const unnamed = r.steps.filter((s) => !s.name && s.wayPoints && s.wayPoints[1] > s.wayPoints[0]);
+  const labels = unnamed.map((s) => geoStepLabel(geo, s.wayPoints[0], s.wayPoints[1]));
+  const a6 = labels.indexOf('A 6');
+  const n7 = labels.indexOf('N 7');
+  assert.ok(a6 >= 0 && n7 > a6, labels.join(' | '));
+  assert.ok(unnamed[a6].wayPoints[1] - unnamed[a6].wayPoints[0] > 200, 'A6 : la longue étape sans nom Mâcon → Limonest');
+  // Couche points sensibles : copie du dépôt (data/points-sensibles/), cases du trajet.
+  const dir = new URL('../data/points-sensibles/', import.meta.url);
+  const index = JSON.parse(readFileSync(new URL('index.json', dir), 'utf8'));
+  const tiles = ['4_44', '4_45', '4_46'].map((k) => parseSensitiveTile(JSON.parse(readFileSync(new URL(`${k}.json`, dir), 'utf8'))));
+  const copy = { status: 'ok', data: mergeSensitiveTiles(tiles), updated: index.updated, meta: { sections: parseSensitiveSections(index) } };
+  const bans = (vehicle) => sensitiveRules(r, { vehicle, copy, geo }).items
+    .filter((i) => i.type === SENSITIVE.TYPES.BAN || i.type === SENSITIVE.TYPES.BAN_BF)
+    .map((i) => copy.meta.sections[i.section]?.id);
+  assert.deepEqual(bans({ weight: 44, height: 4 }).sort(), ['lyon-a6', 'lyon-a7']);
+  assert.deepEqual(bans({ weight: 3.5, height: 2.8 }), [], 'fourgon 3,5 t : pas concerné par > 7,5 t');
+  const semi = sensitiveRules(r, { vehicle: { weight: 44, height: 4 }, copy, geo });
+  assert.ok(semi.lines.every((l) => /La signalisation fait foi\./.test(l.text)));
 });

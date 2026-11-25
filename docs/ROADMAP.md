@@ -610,8 +610,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     la référence (week-end Île-de-France, réseau AURA : « Numéro de route retrouvé par la géométrie… à vérifier ») et
     au diagnostic (km retrouvés, ambigus) ; jamais au calcul ni au « Recommandé ». Cases lues à la demande, jamais
     précachées ; hors ligne : celles déjà lues, sinon « données non chargées ». Bouton « Copier la réponse ORS » du
-    diagnostic, à l'arrêt seulement, pour figer une vraie fixture (test actuel : reconstitution Joigny →
-    Gonfreville-l'Orcher par `tools/make-fixture-axes.mjs`, points et étapes du diagnostic v70). Ligne « Autoroute et
+    diagnostic, à l'arrêt seulement, pour figer une vraie fixture (v75 : vraies réponses Joigny →
+    Gonfreville-l'Orcher et Mâcon → Valence, cases réduites par `tools/make-fixture-axes.mjs`). Ligne « Autoroute et
     nationale » de la fiche mise à jour une fois les cases chargées (« numéros retrouvés par la géométrie : à vérifier »),
     ordre des fiches et « Recommandé » inchangés.
   - [x] **v74 — Points sensibles avant départ** (PR 3b) : `data/points-sensibles/` (`sensitive-points.js`,
@@ -624,6 +624,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     sensibles à vérifier », lignes avec source et « La signalisation fait foi. », repères « ! » ; jamais dit, rien
     dans le guidage. Premier calcul : 1 708 points, 67 cases, 78 Ko ; 71 écartés faute de cap. Diagnostic : route
     retrouvée par la géométrie sur chaque étape sans nom (« A 13 », « ambigu », « inconnue »).
+  - [x] **v75 — Vraies fixtures ORS** : réponses driving-hgv 44 t du 24/11/2026 envoyées par le propriétaire
+    (départ et arrivée arrondis à 0,01°, rien d'autre changé). Joigny → Gonfreville-l'Orcher remplace la
+    reconstitution : 204 km sans nom sur 338,8, repli : A6, A6B, A86, N385, A12, A13 (part A/N inconnue → 93 %).
+    Mâcon → Valence : repli A6 puis N7 ; points sensibles lyon-a6 et lyon-a7 signalés pour 44 t, aucun pour 3,5 t
+    (ORS passe dans Lyon : hgv:conditional non lu, avoid_polygons refusé au-delà de 150 km). `make-fixture-axes.mjs`
+    ne fait plus que l'extraction des cases (`axes-osm-joigny/`, `axes-osm-macon-valence/`).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
