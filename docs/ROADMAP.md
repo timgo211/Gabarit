@@ -591,6 +591,18 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   25/11/2026 (`docs/etude-osm-axes.md` : graphe ORS public mis à jour en 2 à 3 semaines, étiquettes lues en
   `driving-hgv`, Mapillary non faisable sans jeton, interdictions PL permanentes A/N « à vérifier », étapes ORS sans
   nom). Ensuite : Action « Audit OSM » (lecture seule, niveaux autoroutes, nationales, puis grandes départementales).
+  - [x] **v71 — Action « Audit OSM » et copie des axes** (manuelle, lecture seule, aucun secret, rien écrit dans OSM) :
+    extrait France Geofabrik (`tools/osm-download.mjs`, essais à attente croissante ; échec → rien enregistré), un
+    filtrage osmium, deux passes (axes et communes, puis ponts en flux, seuls ceux à < 50 m d'un axe ; mémoire max et
+    durée au journal). Fiches `data/audit-osm/` (≤ 5 Mo par fichier) : priorité 1 interdiction PL connue sans
+    l'étiquette (`tools/audit-osm-interdictions.json`, tableau 4 de l'étude, section localisée par ses communes ou
+    « non localisée »), 2 hauteur basse connue (< 4,30 m, tri), 3 pont ou tunnel d'un axe sans hauteur ; rapport
+    `docs/audit-osm-axes.md` avec « Trous connus » (Île-de-France). Copie `data/axes-osm/` (motorway / trunk /
+    primary + `ref`, ≤ 5 Mo / 30 Mo, jamais précachée ; trop grosse → rien écrit, ⚠ par classe). Chiffres : au
+    premier lancement depuis `main`.
+  - [ ] **Repli par la géométrie** (PR 3, après lecture du rapport) : A/N + numéro des étapes sans nom depuis
+    `data/axes-osm/` (méthode 5h ter).
+  - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
   Vallorbe » (copie data/directions-osm/ étendue aux nœuds de sortie) ; chevrons et pastilles de manœuvre sur le

@@ -1,0 +1,57 @@
+name: Audit OSM (grands axes, lecture seule)
+
+# Audit OpenStreetMap des grands axes de France (étude docs/etude-osm-axes.md) et copie des autoroutes, voies rapides et
+# routes primaires avec leur numéro (data/axes-osm/, ≤ 5 Mo par fichier, ≤ 30 Mo en tout, jamais précachée) : un seul
+# téléchargement de l'extrait France de Geofabrik, un seul filtrage osmium (tools/audit-osm.mjs). Lecture seule :
+# aucun appel à l'API d'écriture d'OpenStreetMap, aucun secret. Écrit data/audit-osm/, data/axes-osm/ et
+# docs/audit-osm-axes.md (fiches « à vérifier sur place » ; la signalisation fait foi). Téléchargement en échec : rien
+# n'est enregistré. Lancement à la main seulement (onglet Actions › Audit OSM › Run workflow, depuis main).
+
+on:
+  workflow_dispatch:
+    inputs:
+      niveaux:
+        description: "Niveaux audités : 1-2 (autoroutes, nationales) ou 1-3 (+ grandes départementales)"
+        type: choice
+        options:
+          - '1-2'
+          - '1-3'
+        default: '1-2'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: audit-osm-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Installer osmium
+        run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
+      - name: Télécharger l'extrait, filtrer et auditer
+        run: node --max-old-space-size=6144 tools/audit-osm.mjs --levels "${{ inputs.niveaux }}"
+      - name: Enregistrer si changé
+        run: |
+          P=""
+          for p in data/audit-osm data/axes-osm docs/audit-osm-axes.md; do
+            if [ -e "$p" ]; then P="$P $p"; fi
+          done
+          git add -A -N $P
+          if git diff --quiet -- $P; then
+            echo "Aucun changement."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A $P
+          git commit -m "Audit OSM des grands axes et copie des axes (lecture seule, mise à jour manuelle)"
+          git pull --rebase
+          git push

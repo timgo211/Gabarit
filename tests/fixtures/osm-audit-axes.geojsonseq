@@ -1,0 +1,20 @@
+{"type":"Feature","id":"n1","properties":{"place":"village","name":"Lissieu"},"geometry":{"type":"Point","coordinates":[4.745,45.858]}}
+{"type":"Feature","id":"n2","properties":{"place":"village","name":"Limonest"},"geometry":{"type":"Point","coordinates":[4.765,45.84]}}
+{"type":"Feature","id":"n3","properties":{"place":"village","name":"Ternay"},"geometry":{"type":"Point","coordinates":[4.81,45.6]}}
+{"type":"Feature","id":"n4","properties":{"place":"village","name":"Ternay"},"geometry":{"type":"Point","coordinates":[4.9,45.62]}}
+{"type":"Feature","id":"n5","properties":{"place":"town","name":"Saint-Fons"},"geometry":{"type":"Point","coordinates":[4.85,45.7]}}
+{"type":"Feature","id":"w11","properties":{"highway":"motorway","ref":"A 6","oneway":"yes"},"geometry":{"type":"LineString","coordinates":[[4.7,45.8],[4.75,45.85],[4.8,45.9]]}}
+{"type":"Feature","id":"w12","properties":{"highway":"motorway","ref":"A 6","hgv:conditional":"no @ (weight>7.5)"},"geometry":{"type":"LineString","coordinates":[[4.701,45.8],[4.751,45.85],[4.801,45.9]]}}
+{"type":"Feature","id":"w13","properties":{"highway":"motorway_link"},"geometry":{"type":"LineString","coordinates":[[4.8,45.9],[4.81,45.91]]}}
+{"type":"Feature","id":"w14","properties":{"highway":"primary","ref":"N 7"},"geometry":{"type":"LineString","coordinates":[[5,45.5],[5.02,45.5],[5.04,45.5]]}}
+{"type":"Feature","id":"w15","properties":{"highway":"secondary","ref":"D 306"},"geometry":{"type":"LineString","coordinates":[[5.1,45.4],[5.12,45.4]]}}
+{"type":"Feature","id":"w16","properties":{"highway":"motorway","ref":"A 7","tunnel":"yes","layer":"-1"},"geometry":{"type":"LineString","coordinates":[[4.85,45.7],[4.86,45.71]]}}
+{"type":"Feature","id":"w17","properties":{"highway":"trunk","ref":"N 205","maxheight":"3.9"},"geometry":{"type":"LineString","coordinates":[[6,45],[6.01,45]]}}
+{"type":"Feature","id":"w18","properties":{"highway":"primary","ref":"D 1084"},"geometry":{"type":"LineString","coordinates":[[5.3,45.3],[5.31,45.3]]}}
+{"type":"Feature","id":"w19","properties":{"highway":"primary"},"geometry":{"type":"LineString","coordinates":[[5.4,45.3],[5.41,45.3]]}}
+{"type":"Feature","id":"w100","properties":{"highway":"tertiary","bridge":"yes","layer":"1"},"geometry":{"type":"LineString","coordinates":[[4.74,45.86],[4.76,45.84]]}}
+{"type":"Feature","id":"w101","properties":{"railway":"rail","bridge":"yes","maxheight":"4.1"},"geometry":{"type":"LineString","coordinates":[[5.02,45.49],[5.02,45.51]]}}
+{"type":"Feature","id":"w102","properties":{"highway":"residential","bridge":"yes"},"geometry":{"type":"LineString","coordinates":[[3,44],[3.001,44.001]]}}
+{"type":"Feature","id":"w103","properties":{"highway":"footway","bridge":"yes"},"geometry":{"type":"LineString","coordinates":[[6.005,44.99],[6.005,45.01]]}}
+{"type":"Feature","id":"w104","properties":{"highway":"service","bridge":"yes","layer":"-1"},"geometry":{"type":"LineString","coordinates":[[5.03,45.49],[5.03,45.51]]}}
+{"type":"Feature","id":"w105","properties":{"highway":"secondary","bridge":"yes"},"geometry":{"type":"LineString","coordinates":[[5.11,45.39],[5.11,45.41]]}}

@@ -203,6 +203,20 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `contents: read`) : télécharge le XML DATEX II DiaLog (URL stable data.gouv.fr, domaines data.gouv.fr / DiaLog
   seulement, 3 essais), lu en flux (lecteur maison, DOCTYPE refusé), journal de statistiques seulement ; tests
   `dialog-etude.test.js` sur la fixture synthétique `dialog-datex.xml` ; fichier local en argument pour essayer.
+- `tools/audit-osm.mjs` + `.github/workflows/audit-osm.yml` (Action « Audit OSM », manuelle seulement, input
+  `niveaux` 1-2 ou 1-3, lecture seule, aucun appel d'écriture OSM) : extrait France Geofabrik téléchargé par
+  `tools/osm-download.mjs` (copie de `download` d'`osm-update.mjs`, mêmes essais ; `osm-update.mjs` à brancher dessus
+  dans une PR à part : un envoi qui le modifie relance « Données OSM »), un `osmium tags-filter` (axes, secondaires,
+  ponts, communes), export lu deux fois : passe 1 axes + communes, passe 2 ponts en flux (seuls les ponts à < 50 m
+  d'un axe examinés ; journal : mémoire max et durée par passe). Logique : `src/lib/osm-audit.js` (niveaux, fiches,
+  priorités 1 interdiction PL > 2 hauteur basse < 4,30 m > 3 hauteur inconnue, `splitCards` ≤ 5 Mo, rapport et
+  « Trous connus » d'Île-de-France) et `src/lib/axes-convert.js` (copie `data/axes-osm/` : motorway / trunk / primary
+  + bretelles, `ref` normalisé, cases de 1° `{ r, a:[[i_ref|-1, classe, x0, y0, dx, dy…]] }`, 3 / 8 / 20 m, ≤ 5 Mo par
+  fichier et 30 Mo en tout, sinon rien d'écrit ; lue par le repli de la PR 3, jamais précachée). Sections
+  d'interdiction : `tools/audit-osm-interdictions.json` (tableau 4 de `docs/etude-osm-axes.md`, communes de début et
+  de fin dans une zone, un seul nœud `place` chacune, sinon « non localisée »). Écrit `data/audit-osm/`,
+  `data/axes-osm/`, `docs/audit-osm-axes.md`. Tests `osm-audit.test.js`, `axes-convert.test.js` sur la fixture
+  synthétique `osm-audit-axes.geojsonseq` ; `--geojsonseq fichier` pour essayer sans osmium.
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :
