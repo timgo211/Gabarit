@@ -1,7 +1,8 @@
 name: Contours IGN (Admin Express, taxes PL)
 
 # Télécharge les contours IGN Admin Express COG (millésime le plus récent du WFS de la Géoplateforme) utiles aux taxes
-# PL régionales (Bas-Rhin, Haut-Rhin, Grand Est, Meurthe-et-Moselle, Eurométropole de Strasbourg), les simplifie
+# PL régionales (Bas-Rhin, Haut-Rhin, Grand Est, Meurthe-et-Moselle, Eurométropole de Strasbourg) et la Métropole
+# de Lyon (desserte locale des sections lyon-a6 / lyon-a7, v76), les simplifie
 # (tools/contours-ign.mjs) et pousse data/contours-ign.json sur la branche. data.geopf.fr est bloqué depuis le
 # conteneur de développement. data/taxes-pl.json n'est jamais modifié ici (remplacement relu à part, avec le test de
 # non-régression de la phase 5h ter) : la copie OSM n'est donc pas relancée.
