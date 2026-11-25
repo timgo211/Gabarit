@@ -202,7 +202,7 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   (`tunnelAllowed`, grisé sinon), réponse dans `choice.localAnswers` (mémoire v53, `sanitizeAnswers` : 30 zones, ids
   courts, booléens), jamais dans les réglages ni l'export. Oui → ligne info `declaredText`, plus de rouge pour elle.
   Interdiction active → ligne warn (« Interdiction connue sur le trajet (km X) : texte. En vigueur : à vérifier. La
-  signalisation fait foi. Source : arrêté | Bison Futé, arrêté non lu. »), fiche rouge (`rules.banned`,
+  signalisation fait foi. Source : arrêté | Bison Futé, arrêté non lu. »), fiche rouge (`rules.blocked` ; `rules.banned` reste la liste des ZFE interdites,
   `bannedShort`), confirmation (`confirmText`) avant « Démarrer » et au 2e appui de « Autres itinéraires ». Choix
   prudent : une autre fiche qui l'évite n'est ni promue ni utilisée pour masquer (données Bison Futé non lues en
   arrêté) ; le contournement automatique vient en PR C. Réglage désactivé : rien de tout ça. Interface :

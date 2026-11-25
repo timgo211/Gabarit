@@ -506,7 +506,7 @@ function choiceRules(c = choice) {
     r.localQuestions = localQuestions(bans, c.localAnswers);
     for (const b of bans) if (!active.includes(b)) r.lines.unshift({ level: 'info', text: declaredText(b) });
     for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', text: b.text });
-    r.banned = r.lyonBanned || active.length > 0;
+    r.blocked = r.lyonBanned || active.length > 0; // (r.banned = passages ZFE interdits, ne pas confondre)
     r.bannedShort = r.lyonBanned ? LYON_AUTO.BANNED_SHORT : `${BANS.SHORT_TEXT}, à vérifier`;
     r.confirmText = !active.length ? LYON_AUTO.CONFIRM_TEXT
       : confirmText([...(r.lyonBanned ? [{ label: 'Lyon, A6 et A7' }] : []), ...active]);
@@ -886,7 +886,7 @@ function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
   if (maybeAutoBypass(rules)) return; // v77 : état décidé, fiche déjà redessinée avec lui
-  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.banned) hideStartConfirm();
+  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.blocked) hideStartConfirm();
   // v77 : « Démarrer » grisé pendant le calcul du contournement (le trajet direct n'est pas proposé au départ).
   const pending = choice.lyonAuto === 'pending';
   navStartBtn.disabled = pending;
@@ -999,7 +999,7 @@ navStartBtn.addEventListener('click', () => {
   if (!choice || choice.lyonAuto === 'pending') return;
   // v77 : itinéraire interdit sans alternative trouvée : confirmation d'abord (jamais le fait accompli).
   const cur = choiceRules()?.[choice.selected];
-  if (cur?.banned) {
+  if (cur?.blocked) {
     startConfirm.title.textContent = cur.confirmText;
     startConfirm.panel.hidden = false;
     startConfirm.go.focus();
@@ -1136,7 +1136,7 @@ altUi.go.addEventListener('click', () => {
   if (!navigation.parked) { closeAlternatives('moving'); return; }
   // v77 : itinéraire par Lyon (A6 / A7) interdit aux plus de 7,5 t en transit : un second appui confirme.
   const altRules = choiceRules(altChoice)?.[altChoice.selected];
-  if (!altConfirm && altRules?.banned) {
+  if (!altConfirm && altRules?.blocked) {
     altConfirm = true;
     altUi.status.textContent = altRules.confirmText;
     renderAlternatives();

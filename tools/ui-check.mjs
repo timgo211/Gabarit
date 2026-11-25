@@ -5420,9 +5420,13 @@ async function sensitiveCheck(browser, base) {
     check(/Points sensibles : 3 \(interdictions 1/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique du diagnostic`);
     await noHorizontalScroll(page, `${tag} sensibles`);
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-sensibles.png`) });
+    // v78 : section de test (> 7,5 t, semi 44 t) = interdiction connue : fiche rouge, confirmation avant le départ.
+    check(await page.locator('.route-card.banned').count() === 1, `${tag} : interdiction connue : fiche en rouge (v78)`);
     if (width === 412) {
       await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
       await page.click('#btn-nav-start');
+      check(await page.locator('#start-confirm:not([hidden])').count() === 1, `${tag} : confirmation avant le départ (v78)`);
+      await page.click('#btn-start-anyway');
       await page.waitForSelector('#nav:not([hidden])');
       await page.waitForTimeout(1200);
       check(await page.locator('.sensitive-marker').count() === 0, `${tag} : aucun repère pendant le guidage`);

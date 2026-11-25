@@ -67,7 +67,7 @@ function restrictionsText(v) {
 
 function card(d, { checked, onSelect, rules, pending = false }) {
   const facts = [d.distance, d.arrival, d.toll, d.fuel].filter(Boolean);
-  const banned = rules?.banned === true; // v77 / v78 : interdit, aucune alternative trouvée
+  const banned = rules?.blocked === true; // v77 / v78 : interdit, aucune alternative trouvée
   return el('button', {
     type: 'button', class: banned ? 'route-card banned' : 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
   }, [
