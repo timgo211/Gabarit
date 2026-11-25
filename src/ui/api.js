@@ -106,12 +106,12 @@ export async function fetchRouteOptions({
  * @returns route analysée (voir parseDirections).
  */
 export async function fetchAvoidRoute({
-  apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null, via = [],
+  apiKey, start, end, vehicle, avoidTolls, avoidFerries, preference = null, avoidPolygons = null, via = [], diagnose = true,
 }) {
   requireKey(apiKey);
   try {
     const { route } = await computeAvoidRoute({
-      start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, via, send: (req) => postDirections(apiKey, req),
+      start, end, vehicle, avoidTolls, avoidFerries, preference, avoidPolygons, via, diagnose, send: (req) => postDirections(apiKey, req),
     });
     return route;
   } catch (err) {

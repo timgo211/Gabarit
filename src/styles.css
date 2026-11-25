@@ -344,6 +344,16 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card-note { color: var(--warn); font-weight: 600; font-size: .9rem; }
 /* Réglementation (phase 5) : ZFE interdite, interdiction PL sur le trajet. */
 .route-card-rules { color: var(--danger); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
+.route-card.banned, .route-card.banned[aria-checked="true"] { border-color: var(--danger); border-left-color: var(--danger); }
+.route-card-banned { color: var(--danger); font-weight: 800; overflow-wrap: anywhere; }
+/* v77 : confirmation avant le départ sur un itinéraire interdit sans alternative (deux gros boutons). */
+.start-confirm {
+  display: grid; gap: 12px; padding: 14px; border-radius: 16px; margin: 8px 0;
+  background: var(--error-bg); color: var(--error-fg); border: 2px solid var(--danger);
+}
+.start-confirm[hidden] { display: none; }
+.start-confirm-title { margin: 0; font-weight: 800; text-align: center; overflow-wrap: anywhere; }
+.start-confirm .nav-confirm-buttons .btn { min-height: 64px; }
 .rules-notes { margin: 10px 0 0; padding-left: 20px; font-size: .9rem; }
 .rules-notes li { overflow-wrap: anywhere; margin: 4px 0; }
 .rules-notes .warn { color: var(--danger); font-weight: 600; }

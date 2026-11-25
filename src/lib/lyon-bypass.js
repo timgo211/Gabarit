@@ -26,7 +26,7 @@
 
 import { inRing } from './hgv-tolls-geo.js';
 import { STOPS } from './stops.js';
-import { formatDuration } from './format.js';
+import { formatDuration, formatDistanceDelta, formatDurationDelta } from './format.js';
 
 export const LYON_BYPASS = Object.freeze({
   SECTIONS: Object.freeze(['lyon-a6', 'lyon-a7']),
@@ -277,4 +277,84 @@ export function bypassCost(orig, alt) {
 /** Note de la fiche « Rocade Est ». */
 export function bypassNote(cost) {
   return [LYON_REASON_TEXTS.applied, cost?.text].filter(Boolean).join(' ');
+}
+
+// ───────── v77 : contournement automatique (réglage « Contournement automatique des interdictions », oui par défaut) ─────────
+// Après le calcul de départ, une requête ORS de plus (à part du budget de 3 du calcul, sans diagnostic 2009 : choix du
+// propriétaire, 25/11/2026), seulement si le plan du Recommandé d'ORS est `ok` (mêmes conditions que le bouton v76).
+// Trouvé et hors des sections lyon-a6 / lyon-a7 → la rocade devient « Recommandé », toutes les fiches qui passent par
+// ces sections sont retirées. Échec → trajet direct gardé une fois, en rouge, confirmation avant le départ ; bouton v76
+// gardé pour réessayer. Jamais dit, rien dans le guidage. Réglage désactivé : comportement v76 (bouton seul).
+
+const SOURCES_TEXT = LYON_RULE_TEXT.slice(LYON_RULE_TEXT.indexOf('Sources :'));
+
+export const LYON_AUTO = Object.freeze({
+  /** États de choice.lyonAuto (gardés par la mémoire v53). */
+  STATES: Object.freeze(['pending', 'done', 'failed', 'local']),
+  PENDING_TEXT: 'Calcul du contournement de Lyon…',
+  APPLIED_TEXT: 'Contournement de Lyon appliqué : A6 et A7 (Limonest – Ternay) interdites aux plus de 7,5 t en transit, '
+    + `sauf desserte locale. À vérifier. La signalisation fait foi. ${SOURCES_TEXT}`,
+  REPLACED_TEXT: 'Itinéraire remplacé par le contournement de Lyon (A6 et A7 interdites aux plus de 7,5 t en transit). À vérifier. La signalisation fait foi.',
+  BANNED_SHORT: 'Interdit aux plus de 7,5 t en transit, aucune alternative trouvée',
+  BANNED_TEXT: 'Lyon, A6 et A7 (Limonest – Ternay) : interdit aux plus de 7,5 t en transit, sauf desserte locale. Aucune '
+    + `alternative trouvée. À vérifier. La signalisation fait foi. ${SOURCES_TEXT}`,
+  CONFIRM_TEXT: 'Itinéraire interdit aux plus de 7,5 t en transit (Lyon, A6 et A7). Aucune alternative trouvée. Démarrer quand même ?',
+  /** Raison courte de l'échec (fiche rouge). */
+  FAIL_REASONS: Object.freeze({
+    request: 'Calcul du contournement impossible',
+    still: 'Le contournement passe encore par la section interdite',
+    points: 'Points de passage de la rocade Est introuvables dans la copie OpenStreetMap',
+    metro: 'Contour de la Métropole de Lyon non chargé',
+    full: 'Trop d\'étapes pour ajouter les 3 points de passage',
+  }),
+});
+
+/**
+ * Que faire du plan du Recommandé d'ORS (`plan` : lyonBypassPlan) avant toute requête.
+ * @param {object|null} plan
+ * @param {{ metroStatus?:string, axesStatus?:string }} ctx copies encore en lecture → 'wait'
+ * @returns {'none'|'wait'|'run'|'local'|'done'|{ fail:string }}
+ */
+export function autoBypassStart(plan, { metroStatus = 'ok', axesStatus = 'ok' } = {}) {
+  if (!plan?.concerned) return 'none';
+  if (plan.ok) return 'run';
+  if (plan.reason === 'applied') return 'done';
+  if (plan.reason === 'local') return 'local';
+  if (plan.reason === 'metro' && (metroStatus === 'idle' || metroStatus === 'loading')) return 'wait';
+  if (plan.reason === 'points' && (axesStatus === 'idle' || axesStatus === 'loading')) return 'wait';
+  return { fail: plan.reason in LYON_AUTO.FAIL_REASONS ? plan.reason : 'request' };
+}
+
+/**
+ * Écart du contournement automatique, toujours affiché (sans seuil) : « Allonge de X km / Y min par rapport au trajet
+ * direct. » ; plus court (rare) : écarts signés.
+ */
+export function autoCost(orig, alt) {
+  if (!isNum(orig?.duration) || !isNum(alt?.duration) || !isNum(orig?.distance) || !isNum(alt?.distance)) return null;
+  const dd = alt.distance - orig.distance;
+  const dt = alt.duration - orig.duration;
+  const text = dd >= 0 && dt >= 0
+    ? `Allonge de ${Math.round(dd / 1000)} km / ${formatDuration(dt)} par rapport au trajet direct.`
+    : `Écart avec le trajet direct : ${formatDistanceDelta(dd)}, ${formatDurationDelta(dt)}.`;
+  return { distance: dd, duration: dt, text };
+}
+
+/** Note de la fiche « Recommandé » du contournement automatique. */
+export function autoNote(cost, extra = '') {
+  return [LYON_AUTO.APPLIED_TEXT, cost?.text, extra].filter(Boolean).join(' ');
+}
+
+/**
+ * Liste des fiches après un contournement trouvé : la rocade en tête, toutes les fiches qui passent par lyon-a6 /
+ * lyon-a7 retirées (`crosses[i]`), une ancienne fiche « rocade » retirée aussi. La fiche choisie reste choisie si elle
+ * est gardée ; sinon la rocade est choisie et `replaced` dit si c'était un choix du chauffeur (message à afficher).
+ * @returns {{ options:object[], selected:number, replaced:boolean }}
+ */
+export function applyAutoBypass({ options, crosses, rocade, selected = 0, manual = false }) {
+  const list = Array.isArray(options) ? options : [];
+  const keep = list.map((o, i) => !crosses?.[i] && o?.key !== 'rocade');
+  const out = [rocade, ...list.filter((_, i) => keep[i])];
+  const was = list[selected];
+  if (was && keep[selected]) return { options: out, selected: out.indexOf(was), replaced: false };
+  return { options: out, selected: 0, replaced: !!manual && !!was };
 }

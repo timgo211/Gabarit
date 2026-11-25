@@ -5,7 +5,7 @@
 import { el } from './dom.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { STOPS } from '../lib/stops.js';
-import { LYON_BYPASS } from '../lib/lyon-bypass.js';
+import { LYON_BYPASS, LYON_AUTO } from '../lib/lyon-bypass.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
@@ -65,11 +65,14 @@ function restrictionsText(v) {
   return parts.join(' · ');
 }
 
-function card(d, { checked, onSelect, rules }) {
+function card(d, { checked, onSelect, rules, pending = false }) {
   const facts = [d.distance, d.arrival, d.toll, d.fuel].filter(Boolean);
+  const banned = rules?.lyonBanned === true; // v77 : interdit, aucune alternative trouvée
   return el('button', {
-    type: 'button', class: 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
+    type: 'button', class: banned ? 'route-card banned' : 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
   }, [
+    banned ? el('span', { class: 'route-card-banned', text: `⛔ ${LYON_AUTO.BANNED_SHORT}` }) : null,
+    pending ? el('span', { class: 'route-card-pending hint', text: LYON_AUTO.PENDING_TEXT }) : null,
     el('span', { class: 'route-card-head' }, [
       el('span', { class: 'route-card-title' }, [
         el('span', { class: 'route-card-name', text: d.name }),
@@ -230,7 +233,7 @@ export function renderRouteChoice(node, notesNode, {
   const reference = options[0];
   const stops = Array.isArray(choice.stops) ? choice.stops : [];
   const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now, stops, geo: rules?.[i]?.axes?.geo ?? null }), {
-    checked: i === selected, onSelect: () => onSelect(i), rules: rules?.[i],
+    checked: i === selected, onSelect: () => onSelect(i), rules: rules?.[i], pending: i === 0 && choice.lyonAuto === 'pending',
   }));
 
   const current = options[selected];

@@ -18,6 +18,9 @@
 
 import { sanitizeStops } from './stops.js';
 
+/** v77 : états gardés du contournement automatique (« pending » non gardé : refait à la reprise). */
+const AUTO_STATES = Object.freeze(['done', 'failed', 'local', 'none']);
+
 export const ROUTE_SAVE = Object.freeze({
   FORMAT: 1,
   /** Au-delà, la reprise est demandée (à l'arrêt) au lieu d'être faite seule. */
@@ -73,6 +76,8 @@ export function buildSave({
       toLabel: typeof choice.toLabel === 'string' ? choice.toLabel : '',
       startIsMyPosition: choice.startIsMyPosition === true,
       stops: sanitizeStops(choice.stops) ?? [],
+      // v77 : état du contournement automatique (Lyon) : jamais refait à la reprise s'il est fait ou en échec.
+      ...(AUTO_STATES.includes(choice.lyonAuto) ? { lyonAuto: choice.lyonAuto } : {}),
     }),
   };
   if (kind === 'nav') {
@@ -147,5 +152,9 @@ export function restoredChoice(save, vehicles) {
   const vehicle = (vehicles ?? []).find((v) => v?.id === save.vehicleId);
   if (!vehicle) return null;
   const options = save.choice.options.map((o) => (o.stops === undefined ? o : { ...o, stops: sanitizeStops(o.stops) }));
-  return { ...save.choice, options, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle };
+  const { lyonAuto, ...rest } = save.choice;
+  return {
+    ...rest, options, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle,
+    ...(AUTO_STATES.includes(lyonAuto) ? { lyonAuto } : {}), // v77
+  };
 }
