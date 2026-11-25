@@ -134,7 +134,52 @@ Rien n'est codé par cette étude.
 
 ## 7. Reste à décider (propriétaire)
 
-- Lancer ou non l'étude DiaLog dans une Action (option 3), puis la copie.
+- Étude DiaLog faite le 25/11/2026 (section 8) : coder ou non une copie DiaLog (recommandé : non pour l'instant).
 - Ajouter ou non des jeux départementaux un par un (lesquels en premier).
 - Évaluer ou non la BD TOPO (gros téléchargements par département).
 - Afficher une source officielle « à vérifier » à côté d'OSM quand les deux diffèrent : quelle règle d'affichage.
+
+## 8. DiaLog lu par l'Action (25/11/2026)
+
+Action manuelle « Étude DiaLog » (`.github/workflows/dialog-etude.yml`, outil `tools/dialog-etude.mjs`, journal
+seulement, rien gardé), lancement du 25/11/2026 07 h 09 UTC (run 45565976042, 1er essai). URL stable data.gouv.fr →
+301 → 302 → `dialog.beta.gouv.fr/api/regulations/datex`, 200 `text/xml`. « Seul l'arrêté fait foi » : DiaLog n'a pas de
+valeur juridique, la signalisation fait foi.
+
+**Chiffres du journal**
+- Fichier : 85 508 263 o (81,5 Mo), `publicationTime` 24/11/2026 15 h 30 UTC ; 6 983 règlements, 9 449 mesures.
+- Conditions sur le véhicule visé : hauteur 271, poids 2 905, largeur 59, longueur 241. Permanentes (sans date de fin) :
+  267 / 2 894 / 59 / 241 ; temporaires : 4 / 11 / 0 / 0. En vigueur le 25/11/2026 : 271 / 2 904 / 59 / 241 (périodes
+  jour/heure récurrentes non comptées). Aucune condition en dérogation (`negate=true`) sur ces quatre grandeurs.
+- **Mesures avec hauteur ou poids : 3 150** (permanentes 3 136, temporaires 14, en vigueur 3 149, toutes avec géométrie).
+- Types de mesure : `noEntry` 3 930, `speedLimit` 2 755, stationnement interdit 2 504, circulation alternée 173,
+  interdiction de dépasser 87. Véhicules visés par mesure : tous véhicules 5 889, poids lourd seul 2 807, poids lourd
+  et/ou gabarit 548, autres 159, poids lourd avec d'autres types 46. Matières dangereuses : 43 mesures.
+- Géométrie : GeoJSON sur 9 449 / 9 449 mesures (MultiLineString 6 525, LineString 6 363, GeometryCollection 258,
+  Point 138, Polygon 31, MultiPoint 11), aucune illisible.
+- Hauteur ou poids : boîte 42,88–51,04 N, −4,61–7,74 E, 59 cellules d'un degré ; les plus remplies : 45N 4E 881 (Lyon),
+  44N −1E 391 (Bordeaux), 43N 5E 284 (Marseille), 48N 2E 240 (Paris), 48N −5E 218 (Brest), 45N 0E 146 (Angoulême),
+  50N 2E 138 (Béthune), 45N 6E 111 (Annecy), 43N 1E 109 (Toulouse), 49N 4E 77 (Reims).
+- Organisations : 251, dont 161 avec hauteur ou poids. En tête (hauteur ou poids / mesures) : Lyon (métropole)
+  845/1 040, Bordeaux Metropole (cub) 390/512, Métropole d'Aix-Marseille-Provence (AMP) 282/298, Brest Métropole
+  213/2 634, Sarthe (département) 153/995, CA du Grand Angoulême 142/144, CA de Béthune-Bruay, Artois-Lys Romane
+  126/132, Grand Annecy 112/115, Toulouse Metropole 100/100, CU du Grand Reims 81/99 (liste des 40 dans le journal).
+- Zone Destord / Vosges (48,0–48,6 N ; 5,8–7,0 E) : **5 mesures**, dont Rosieres-aux-Salines (hauteur 3,4, beffroi,
+  permanent), Frizon (« PONT FRAGILE », poids 3,5 t, permanent), Eloyes (poids 3,5 t, travaux, jusqu'au 31/12/2026).
+
+**Sens de l'opérateur : tranché.** Les 3 477 conditions lues (hauteur, poids, largeur, longueur) ont toutes
+`lessThanOrEqualTo`, aucune autre valeur : l'opérateur est écrit en dur dans le gabarit officiel
+(`templates/api/regulations.xml.twig`), il ne porte donc aucune information. Les titres des arrêtés disent l'inverse
+(« Interdiction aux véhicules de +7,5T… » à Maisse, « Circulation interdite aux véhicules de plus de 5 tonnes » à
+Art-sur-Meurthe, « éviter le passage des semi-remorques sous le beffroi » avec 3,4 m), comme l'aide de l'interface
+(« PTAC supérieur à… »). Lecture retenue : la valeur est le **maximum autorisé** ; l'interdiction vise les véhicules
+au-dessus. Un usage éventuel devra ignorer l'opérateur. Le XML ne donne que le titre de l'arrêté, pas son texte.
+
+**Couverture** : 161 collectivités sur un pays qui en compte des dizaines de milliers, surtout quelques métropoles
+(Lyon, Bordeaux, Marseille, Brest, Toulouse) ; ailleurs presque rien (5 mesures sur la zone des Vosges). La plupart
+des mesures « poids » sont des interdictions PL de centre-ville, pas des ponts ; 271 hauteurs seulement en France.
+
+**Recommandation**
+1. Ne pas coder de copie DiaLog maintenant : couverture trop inégale (métropoles), 271 hauteurs seulement, peu sur nos trajets.
+2. Si un jour : petite copie (3 150 mesures) comme les ponts OSM (fiche et carte à l'arrêt, jamais dit, « à vérifier »,
+   « seul l'arrêté fait foi »), valeur lue comme maximum, opérateur ignoré. Relancer l'étude dans 6 mois pour voir la croissance.

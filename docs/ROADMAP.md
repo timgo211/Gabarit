@@ -577,8 +577,13 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
 - [ ] **Données départementales (transport.data.gouv.fr)** : étude faite le 24/11/2026, pas codée
   (`docs/etude-ponts-sources.md`) : une douzaine de jeux chiffrés et géolocalisés sur data.gouv.fr (Lozère, Charente-
   Maritime, Antibes, Hauts-de-Seine, Mayenne, Maine-et-Loire, Ain, Alpes-Maritimes, Aude, Cannes, Mulhouse…), formats
-  tous différents ; jeu national DiaLog (DATEX II, 85 Mo, couverture inconnue). Recommandé : lecture de DiaLog dans une
-  Action avant toute copie. À décider.
+  tous différents ; jeu national DiaLog (DATEX II, 85 Mo). À décider.
+- [x] **Étude DiaLog (lecture par une Action)** : faite le 25/11/2026 (Action manuelle « Étude DiaLog », journal
+  seulement ; `docs/etude-ponts-sources.md` section 8) : 3 150 mesures avec hauteur (271) ou poids (2 905), 161
+  organisations surtout des métropoles, 5 mesures sur les Vosges ; opérateur toujours `lessThanOrEqualTo` (écrit en dur),
+  sens réel « supérieur à » (titres des arrêtés). Rien codé dans l'appli.
+  - [ ] Copie DiaLog (comme les ponts OSM, à l'arrêt seulement, « à vérifier », « seul l'arrêté fait foi ») :
+    recommandé non pour l'instant (couverture inégale). À décider ; relancer l'étude dans 6 mois.
 
 ## Ensuite
 

@@ -199,6 +199,10 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
 - `tools/textes-officiels.mjs` : entrées `tiles` (7d) : tuile réelle demandée avec `Origin: https://timgo211.github.io`,
   journal : statut, type, taille, `access-control-allow-origin` → UTILISABLE / NON UTILISABLE ; champ `run` du JSON :
   entrées lues (toutes si absent).
+- `tools/dialog-etude.mjs` + `.github/workflows/dialog-etude.yml` (Action « Étude DiaLog », manuelle seulement,
+  `contents: read`) : télécharge le XML DATEX II DiaLog (URL stable data.gouv.fr, domaines data.gouv.fr / DiaLog
+  seulement, 3 essais), lu en flux (lecteur maison, DOCTYPE refusé), journal de statistiques seulement ; tests
+  `dialog-etude.test.js` sur la fixture synthétique `dialog-datex.xml` ; fichier local en argument pour essayer.
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :
