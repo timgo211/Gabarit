@@ -600,6 +600,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     `docs/audit-osm-axes.md` avec « Trous connus » (Île-de-France). Copie `data/axes-osm/` (motorway / trunk /
     primary + `ref`, ≤ 5 Mo / 30 Mo, jamais précachée ; trop grosse → rien écrit, ⚠ par classe). Chiffres : au
     premier lancement depuis `main`.
+  - [x] **v72 — Source de secours de l'audit** : après 5 essais refusés par Geofabrik (run 1 du 25/11/2026 :
+    `ECONNREFUSED`), extrait France de download.openstreetmap.fr (joignable depuis une Action, lu le 25/11/2026 :
+    `france-latest.osm.pbf` du 23/11/2026, 5 Go) ; source au journal, au rapport et dans `data/audit-osm/index.json` ;
+    licence ODbL inchangée. Audit seulement (`osm-update.mjs` non modifié).
   - [ ] **Repli par la géométrie** (PR 3, après lecture du rapport) : A/N + numéro des étapes sans nom depuis
     `data/axes-osm/` (méthode 5h ter).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).

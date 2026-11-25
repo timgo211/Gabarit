@@ -204,7 +204,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   seulement, 3 essais), lu en flux (lecteur maison, DOCTYPE refusé), journal de statistiques seulement ; tests
   `dialog-etude.test.js` sur la fixture synthétique `dialog-datex.xml` ; fichier local en argument pour essayer.
 - `tools/audit-osm.mjs` + `.github/workflows/audit-osm.yml` (Action « Audit OSM », manuelle seulement, input
-  `niveaux` 1-2 ou 1-3, lecture seule, aucun appel d'écriture OSM) : extrait France Geofabrik téléchargé par
+  `niveaux` 1-2 ou 1-3, lecture seule, aucun appel d'écriture OSM) : extrait France Geofabrik, en secours (v72)
+  download.openstreetmap.fr après 5 échecs (`downloadWithFallback`, source au journal, au rapport et dans
+  `index.json` `sourceExtrait` ; contour `.poly` alors repris de `data/ponts-osm/`), téléchargé par
   `tools/osm-download.mjs` (copie de `download` d'`osm-update.mjs`, mêmes essais ; `osm-update.mjs` à brancher dessus
   dans une PR à part : un envoi qui le modifie relance « Données OSM »), un `osmium tags-filter` (axes, secondaires,
   ponts, communes), export lu deux fois : passe 1 axes + communes, passe 2 ponts en flux (seuls les ponts à < 50 m
