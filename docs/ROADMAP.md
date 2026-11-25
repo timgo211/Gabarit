@@ -611,7 +611,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     au diagnostic (km retrouvés, ambigus) ; jamais au calcul ni au « Recommandé ». Cases lues à la demande, jamais
     précachées ; hors ligne : celles déjà lues, sinon « données non chargées ». Bouton « Copier la réponse ORS » du
     diagnostic, à l'arrêt seulement, pour figer une vraie fixture (test actuel : reconstitution Joigny →
-    Gonfreville-l'Orcher par `tools/make-fixture-axes.mjs`, A6, N12, A13, A131).
+    Gonfreville-l'Orcher par `tools/make-fixture-axes.mjs`, points et étapes du diagnostic v70). Ligne « Autoroute et
+    nationale » de la fiche mise à jour une fois les cases chargées (« numéros retrouvés par la géométrie : à vérifier »),
+    ordre des fiches et « Recommandé » inchangés.
   - [ ] **Points sensibles avant départ** (PR 3b, après fusion de 3a) : `data/points-sensibles/` tiré des fiches
     d'audit (interdictions par arrêté et Bison Futé marquées, hauteurs basses comparées au véhicule, tunnels sans
     hauteur, ponts sur nationales ; jamais au-dessus d'une autoroute), nombre sur la fiche, détail à l'arrêt.

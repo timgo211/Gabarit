@@ -5360,15 +5360,15 @@ async function reportsShareCheck(browser, base) {
 }
 
 /**
- * PR 3a : repli par la géométrie (data/axes-osm/). Reconstitution Joigny → Gonfreville-l'Orcher (A13 dans une étape
- * sans nom), samedi 8 h : ligne week-end Île-de-France avec « à vérifier » seulement quand la copie est lue ; ordre des
+ * PR 3a : repli par la géométrie (data/axes-osm/). Reconstitution Joigny → Gonfreville-l'Orcher (diagnostic v70 : A12
+ * et A13 dans des étapes sans nom), samedi 8 h 30 : ligne week-end Île-de-France avec « à vérifier » seulement quand la copie est lue ; ordre des
  * fiches inchangé ; diagnostic (deux lignes de classes, ligne technique) ; « Copier la réponse ORS » grisé en roulant,
  * actif à l'arrêt ; copie absente → « données non chargées » ; rien dit.
  */
 async function axesFallbackCheck(browser, base) {
   const json = fixture('ors-directions-joigny-gonfreville.json');
   const line = json.features[0].geometry.coordinates;
-  const saturday = new Date(2026, 10, 28, 8, 0).getTime();
+  const saturday = new Date(2026, 10, 28, 8, 30).getTime();
   for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [1280, 800, 'day']]) {
     const tag = `${width}×${height} ${theme}`;
     const { page, ctx, errors, stats } = await open(browser, base, {
@@ -5382,8 +5382,9 @@ async function axesFallbackCheck(browser, base) {
     check(idf.length === 1 && /Numéro de route retrouvé par la géométrie \(OpenStreetMap\) : à vérifier\./.test(idf[0]),
       `${tag} : week-end Île-de-France sur l'A13 retrouvée, « à vérifier »`, notes.join(' | '));
     check((stats.axes ?? []).includes('index.json') && (stats.axes ?? []).includes('2_48.json'), `${tag} : copie data/axes-osm/ lue`, (stats.axes ?? []).join(','));
-    check(await page.locator('.route-card').count() >= 1 && /Autoroute et nationale : inconnue/.test(await page.textContent('.route-card[aria-checked="true"]')),
-      `${tag} : part A/N de la fiche inchangée (le Recommandé ne lit pas le repli)`);
+    await page.waitForFunction(() => /géométrie : à vérifier/.test(document.querySelector('.route-card[aria-checked="true"]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check(/Autoroute et nationale : \d+ % \(numéros retrouvés par la géométrie : à vérifier\)/.test(await page.textContent('.route-card[aria-checked="true"]')),
+      `${tag} : ligne « Autoroute et nationale » mise à jour avec le repli`, await page.textContent('.route-card[aria-checked="true"]'));
     await page.locator('.route-diag summary').click();
     await page.waitForFunction(() => /Repli par la géométrie/.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     const diag = await page.textContent('.route-diag-text');
@@ -5395,12 +5396,10 @@ async function axesFallbackCheck(browser, base) {
     const raw = page.locator('.btn-diag-raw');
     check(await raw.count() === 1 && await raw.isDisabled(), `${tag} : « Copier la réponse ORS » grisé en roulant`);
     await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
-    await page.waitForTimeout(3600);
-    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
-    await page.waitForTimeout(600);
-    if (!(await page.locator('.route-diag').getAttribute('open') !== null)) await page.locator('.route-diag summary').click();
+    const enabled = await page.waitForSelector('.btn-diag-raw:not([disabled])', { state: 'attached', timeout: 20000 }).then(() => true).catch(() => false);
+    check(enabled, `${tag} : « Copier la réponse ORS » actif à l'arrêt`);
+    check(await page.locator('.route-diag').getAttribute('open') !== null, `${tag} : diagnostic resté ouvert après le passage à l'arrêt`);
     const rawNow = page.locator('.btn-diag-raw');
-    check(await rawNow.isEnabled(), `${tag} : « Copier la réponse ORS » actif à l'arrêt`);
     await ctx.grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
     await rawNow.click();
     await page.waitForTimeout(300);
@@ -5420,6 +5419,7 @@ async function axesFallbackCheck(browser, base) {
   await computeRoute(none.page);
   await none.page.waitForTimeout(1500);
   check(!/Île-de-France/.test(await none.page.textContent('#route-notes')), 'copie absente : aucune ligne Île-de-France devinée');
+  check(/Autoroute et nationale : inconnue/.test(await none.page.textContent('.route-card[aria-checked="true"]')), 'copie absente : part A/N inconnue, comme avant');
   await none.page.locator('.route-diag summary').click();
   await none.page.waitForTimeout(500);
   check(/Repli par la géométrie \(axes OSM\) : données non chargées/.test(await none.page.textContent('.route-diag-text')), 'copie absente : « données non chargées »');

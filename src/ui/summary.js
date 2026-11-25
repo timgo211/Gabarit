@@ -132,6 +132,9 @@ function rulesBlock(rules, {
   ].filter(Boolean);
 }
 
+// Bloc du diagnostic ouvert : gardé ouvert quand la fiche est redessinée (cases chargées, passage à l'arrêt).
+let diagOpen = false;
+
 /** Version pour le diagnostic : demandée une fois au service worker, redemandée tant qu'elle reste inconnue. */
 let knownVersion = null;
 function diagVersion() {
@@ -196,7 +199,8 @@ function diagnosticBlock(route, rules, label, rawAllowed = false) {
     ].filter(Boolean)),
     pre,
   ]);
-  d.addEventListener('toggle', () => { if (d.open) fill(); });
+  if (diagOpen) { d.open = true; fill(); }
+  d.addEventListener('toggle', () => { diagOpen = d.open; if (d.open) fill(); });
   return d;
 }
 
@@ -215,7 +219,7 @@ export function renderRouteChoice(node, notesNode, {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
   const stops = Array.isArray(choice.stops) ? choice.stops : [];
-  const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now, stops }), {
+  const cards = options.map((o, i) => card(describeOption(o, reference, { vehicle, dieselPrice, now, stops, geo: rules?.[i]?.axes?.geo ?? null }), {
     checked: i === selected, onSelect: () => onSelect(i), rules: rules?.[i],
   }));
 

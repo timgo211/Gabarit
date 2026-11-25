@@ -226,7 +226,7 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `tolerance` de l'index) dans `app.js` comme les ponts. Réponse ORS gardée en mémoire (`rawResponseOf`,
   `ors-response.js`) pour « Copier la réponse ORS » (`summary.js`, à l'arrêt). Fixture reconstituée
   `ors-directions-joigny-gonfreville.json` + cases réduites `tests/fixtures/axes-osm-joigny/` par
-  `tools/make-fixture-axes.mjs` (A6, N12, A13, A131 ; à remplacer par une vraie réponse copiée). Tests
+  `tools/make-fixture-axes.mjs` (points et étapes du diagnostic v70 : 199 km sans nom sur 320,8 ; à remplacer par une vraie réponse copiée). Tests
   `axis-match.test.js` ; interface `ui-check repli` (option `axesCopy` d'`open` : 'repo', 'fixture', null).
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)

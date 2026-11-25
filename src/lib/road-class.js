@@ -162,10 +162,17 @@ export function classAt(route, index, seg = segmentClasses(route)) {
 /** Part A/N en pourcentage entier (comparaisons et affichage). */
 export const sharePercent = (share) => Math.round(share * 100);
 
-/** Ligne de la fiche : « Autoroute et nationale : 82 % » (« inconnue » sans extras ou trop de km sans nom). */
-export function anShareText(route) {
-  const s = anShare(route);
-  return `Autoroute et nationale : ${s === null ? 'inconnue' : `${sharePercent(s)} %`}`;
+/**
+ * Ligne de la fiche : « Autoroute et nationale : 82 % » (« inconnue » sans extras ou trop de km sans nom).
+ * PR 3a : avec `geo` (repli par la géométrie chargé), part calculée avec les références retrouvées, mention « à
+ * vérifier » ; affichage seulement : le choix du « Recommandé » (pickRecommendedIndex) lit toujours anShare sans repli.
+ */
+export function anShareText(route, { geo = null } = {}) {
+  const useGeo = geo?.status === 'ok' && geo.km?.matched > 0;
+  const st = roadStats(route, { geo: useGeo ? geo : null });
+  const s = st?.share ?? null;
+  const geoNote = useGeo && st?.geo > 0 && s !== null ? ' (numéros retrouvés par la géométrie : à vérifier)' : '';
+  return `Autoroute et nationale : ${s === null ? 'inconnue' : `${sharePercent(s)} %`}${geoNote}`;
 }
 
 /**

@@ -1,5 +1,6 @@
 // Repli par la géométrie (PR 3a) : référence des étapes ORS sans nom retrouvée dans data/axes-osm/.
-// Fixture : reconstitution Joigny → Gonfreville-l'Orcher (tools/make-fixture-axes.mjs), cases réduites de la copie.
+// Fixture : reconstitution Joigny → Gonfreville-l'Orcher (tools/make-fixture-axes.mjs, points et étapes du diagnostic
+// v70 : 199 km sans nom sur 320,8, dont l'A13 de 146,1 à 249,5), cases réduites de la copie.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
@@ -8,7 +9,8 @@ import { parseDirections, rawResponseOf } from '../src/lib/ors-response.js';
 import {
   AXIS_MATCH, AXIS_GEO_NOTE, parseAxesTile, mergeAxesTiles, matchRouteAxes, geoRoadsFor, axisTechText,
 } from '../src/lib/axis-match.js';
-import { roadStats, roadStatsText, segmentClasses, pickRecommendedIndex, anShare, ROUTE_PREF } from '../src/lib/road-class.js';
+import { roadStats, segmentClasses, pickRecommendedIndex, anShare, anShareText, ROUTE_PREF } from '../src/lib/road-class.js';
+import { describeOption } from '../src/lib/route-options.js';
 import { sampleRoute } from '../src/lib/route-samples.js';
 import { bansAlongRoute, describeBanConflict } from '../src/lib/hgv-bans.js';
 import { routeRules } from '../src/lib/route-rules.js';
@@ -21,8 +23,9 @@ const DATA = mergeAxesTiles(tiles);
 const INDEX = JSON.parse(readFileSync(new URL('index.json', DIR), 'utf8'));
 const route = () => parseDirections(fixture('ors-directions-joigny-gonfreville.json'));
 const SEMI = { weight: 40, height: 4, width: 2.55, length: 16.5, hazmat: false };
-// Samedi 28/11/2026, 8 h : passage sur l'A13 près de Paris vers 10 h (art. 3 : samedi 10 h – 18 h, Paris-province).
-const SATURDAY = new Date(2026, 10, 28, 8, 0);
+// Samedi 28/11/2026, 8 h 30 : passage sur l'A12 puis l'A13 près de Paris après 10 h (art. 3 : samedi 10 h – 18 h,
+// Paris-province), étapes sans nom dans le diagnostic v70.
+const SATURDAY = new Date(2026, 10, 28, 8, 30);
 
 // Mini-copie de test : une voie [lon,lat] en 1e-5 degré, encodée comme axes-convert.js.
 const enc = (coords) => {
@@ -76,6 +79,9 @@ test('case lue : références, classes, voies en double retirées ; case illisib
 
 test('Joigny → Gonfreville : km sans nom > 30 % sans repli, < 30 % avec ; l\'A13 retrouvée', () => {
   const r = route();
+  // Étapes du diagnostic v70 : sans nom, A 6, sans nom ×2, N 12, sans nom ×2, A 13, A 131, N 182, D 982.
+  assert.deepEqual(r.steps.slice(0, -1).map((s) => s.name || '-'), ['-', 'A 6', '-', '-', 'N 12', '-', '-', 'A 13', 'A 131', 'N 182', 'D 982']);
+  assert.ok(Math.abs(r.distance - 320800) < 15000, `${r.distance} m`);
   const before = roadStats(r);
   assert.ok(before.unknown / before.total > ROUTE_PREF.MAX_UNKNOWN_SHARE, 'part A/N inconnue sans repli');
   assert.equal(before.share, null);
@@ -89,14 +95,25 @@ test('Joigny → Gonfreville : km sans nom > 30 % sans repli, < 30 % avec ; l\'A
     if (!geo.ref[i]) continue;
     km[geo.ref[i]] = (km[geo.ref[i]] ?? 0) + 1;
   }
-  const top = Object.entries(km).sort((a, b) => b[1] - a[1])[0][0];
-  assert.equal(top, 'A13');
+  const top = Object.entries(km).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+  assert.equal(top[0], 'A13');
+  assert.ok(top.includes('A6') && top.includes('A12'), top.join(','));
   // Un tronçon nommé par ORS n'est jamais réécrit : rien n'est retrouvé sur les étapes nommées (A 6, N 12…).
   const seg = segmentClasses(r);
   for (let i = 0; i < geo.ref.length; i += 1) if (!seg.unknown[i]) assert.equal(geo.ref[i], null, `tronçon ${i} nommé`);
   // Travail mesuré par compteur, borné : quelques dizaines de segments testés par point au plus.
   assert.ok(geo.stats.samples > 2000);
   assert.ok(geo.stats.segmentsTested < geo.stats.samples * 40, `${geo.stats.segmentsTested} segments testés`);
+});
+
+test('ligne « Autoroute et nationale » de la fiche : mise à jour avec le repli, « à vérifier »', () => {
+  const r = route();
+  const geo = matchRouteAxes(r, DATA, { copyTolerance: 3 });
+  assert.equal(anShareText(r), 'Autoroute et nationale : inconnue');
+  assert.match(anShareText(r, { geo }), /^Autoroute et nationale : \d+ % \(numéros retrouvés par la géométrie : à vérifier\)$/);
+  assert.equal(anShareText(r, { geo: { ...geo, status: 'disabled' } }), 'Autoroute et nationale : inconnue');
+  const d = describeOption({ route: r, label: 'Recommandé', also: [], note: '' }, null, { vehicle: SEMI, geo });
+  assert.match(d.an, /géométrie : à vérifier/);
 });
 
 test('« Recommandé » inchangé : sans option, segmentClasses et anShare ignorent le repli', () => {
@@ -117,7 +134,7 @@ test('week-end Île-de-France : conflit sur l\'A13 avec le repli, absent sans ; 
   const idf = withGeo.conflicts.filter((c) => c.kind === 'idf');
   assert.equal(idf.length, 1);
   assert.equal(idf[0].geo, true);
-  assert.deepEqual(idf[0].roads, ['A13']);
+  assert.ok(['A12', 'A13'].includes(idf[0].roads[0]), idf[0].roads.join(','));
   const text = describeBanConflict(idf[0]);
   assert.match(text, /Île-de-France/);
   assert.match(text, /Section et sens à vérifier dans l'arrêté\./);

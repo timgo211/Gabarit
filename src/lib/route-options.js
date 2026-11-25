@@ -485,9 +485,10 @@ export function tollText(m) {
  * Contenu d'une fiche d'itinéraire (textes prêts à afficher).
  * @param {object} option élément de computeRouteOptions().options
  * @param {object|null} reference option de référence (la première) ; écart vide pour elle-même
- * @param {{ vehicle:object, dieselPrice:number|null, now:Date }} ctx
+ * @param {{ vehicle:object, dieselPrice:number|null, now:Date, geo?:object|null }} ctx geo : repli par la géométrie
+ *   de cet itinéraire (PR 3a, ligne « Autoroute et nationale » seulement ; ordre et « Recommandé » inchangés)
  */
-export function describeOption(option, reference, { vehicle, dieselPrice = null, now = new Date(), stops = [] }) {
+export function describeOption(option, reference, { vehicle, dieselPrice = null, now = new Date(), stops = [], geo = null }) {
   const r = option.route;
   const liters = fuelEstimate(r.distance, vehicle?.consumption);
   const cost = fuelCost(liters, dieselPrice);
@@ -503,7 +504,7 @@ export function describeOption(option, reference, { vehicle, dieselPrice = null,
     distance: formatDistance(r.distance),
     arrival: `Arrivée : ${formatArrival(now, r.duration)}`,
     toll: `Péage : ${tollText(r.tollDistance)}`,
-    an: anShareText(r), // phase 2g
+    an: anShareText(r, { geo }), // phase 2g ; PR 3a : repli par la géométrie une fois les cases chargées
     fuel,
     delta: reference && reference !== option ? deltaText(r, reference.route) : '',
     // v55 : une ligne par étape (heure d'arrivée, durée du tronçon), heures sans temps passé aux étapes.
