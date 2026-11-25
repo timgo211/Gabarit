@@ -19,6 +19,7 @@ import { createAccess } from './ui/access.js';
 import { createBridges, createTileCopy } from './ui/bridges.js';
 import { AXES } from './lib/axes-convert.js';
 import { parseAxesTile, mergeAxesTiles } from './lib/axis-match.js';
+import { SENSITIVE, parseSensitiveTile, mergeSensitiveTiles, parseSensitiveSections } from './lib/sensitive-points.js';
 import { createWeightLimits } from './ui/weight-limits.js';
 import { createSpeedLimits } from './ui/speed-limits.js';
 import { createDirections } from './ui/directions.js';
@@ -176,6 +177,7 @@ navigation = createNavigation({
     access.extend(route); // phase 5d : cases de data/acces-osm/ manquantes pour le nouveau tracé
     bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
     axes.extend(route); // PR 3a : cases de data/axes-osm/ manquantes
+    sensitive.extend(route); // PR 3b : cases de data/points-sensibles/ manquantes
     weightLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
     speedLimits.extend(route); // phase 11a : cases de data/vitesses-osm/ manquantes
     directions.extend(route); // phase 11b : cases de data/directions-osm/ manquantes
@@ -301,6 +303,13 @@ const axes = createTileCopy({
   meta: (j) => ({ tolerance: typeof j?.tolerance === 'number' ? j.tolerance : null }),
   onChange: () => renderChoice(),
 });
+// Points sensibles (PR 3b) : data/points-sensibles/ (fiches de l'audit OSM), cases touchées, jamais précachées ;
+// fiche et carte à l'arrêt seulement, jamais dits.
+const sensitive = createTileCopy({
+  indexPath: SENSITIVE.INDEX_PATH, dir: SENSITIVE.DIR, parse: parseSensitiveTile, merge: mergeSensitiveTiles,
+  empty: Object.freeze({ points: [] }), meta: (j) => ({ sections: parseSensitiveSections(j) }),
+  onChange: () => renderChoice(),
+});
 // Limites de poids d'OSM (phase 12a bis) : data/poids-osm/, mêmes cases que les ponts.
 const weightLimits = createWeightLimits({ onChange: () => renderChoice() });
 // Limitations de vitesse (phase 11a) : fiche, puis guidage (cases arrivées après « Démarrer » ou au recalcul).
@@ -329,7 +338,9 @@ map.onBridgePick((key) => {
   const it = (rules.bridges?.items ?? []).find((x) => bridgeKey(x) === key);
   if (it) { restrictionsUi.openBridge(it); return; } // phase 12b : texte, aide et « Éviter ce passage »
   const w = (rules.weightLimits?.items ?? []).find((x) => weightKey(x) === key);
-  if (w) restrictionsUi.openWeight(w); // phase 12a bis : restriction de poids au point du tracé
+  if (w) { restrictionsUi.openWeight(w); return; } // phase 12a bis : restriction de poids au point du tracé
+  const sp = (rules.sensitive?.items ?? []).find((x) => sensitiveKey(x) === key);
+  if (sp) showMessage(messageNode, sp.text, 'info'); // PR 3b : texte du point sensible, jamais dit
 });
 // Mes restrictions (phase 12b) : Réglages et panneau du repère de pont ; ajout à l'arrêt seulement.
 const restrictionsUi = createRestrictions({
@@ -369,6 +380,7 @@ map.onReportPick((id) => {
 showReportMarkers();
 const bridgeKey = (it) => `${it.id}@${Math.round(it.along)}`;
 const weightKey = (it) => `w${it.id}@${Math.round(it.along)}`;
+const sensitiveKey = (it) => `s${it.type}:${it.way}@${Math.round(it.along)}`; // PR 3b
 
 // ───────── Équipements d'hiver (phase 5f) : data/hiver/, cases traversées par les itinéraires proposés ─────────
 const winter = createWinter({ onChange: () => renderChoice() });
@@ -432,15 +444,16 @@ function rulesOf(route, vehicle, departure) {
   const ww = data.settings.weightWarnings !== false;
   const spd = speedLimits.state;
   const ax = axes.state;
-  if (hit && hit.ax === ax && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  const sn = sensitive.state;
+  if (hit && hit.ax === ax && hit.sn === sn && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
-    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax,
+    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax, sensitive: sn,
   });
-  rulesCache.set(route, { ax, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
+  rulesCache.set(route, { ax, sn, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
   return rules;
 }
 
@@ -513,6 +526,7 @@ async function avoidZfe() {
     access.extend(route);
     bridges.extend(route);
     axes.extend(route);
+    sensitive.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -576,6 +590,7 @@ async function avoidTunnel() {
     access.extend(route);
     bridges.extend(route);
     axes.extend(route);
+    sensitive.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -622,6 +637,7 @@ async function avoidLocal() {
     access.extend(route);
     bridges.extend(route);
     axes.extend(route);
+    sensitive.extend(route);
     weightLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
@@ -667,6 +683,7 @@ function renderChoice() {
 function showBridgesOnMap(r) {
   const items = r?.bridges?.items ?? [];
   const weights = r?.weightLimits?.items ?? [];
+  const sens = r?.sensitive?.items ?? [];
   map.showBridges([
     ...items.map((it) => ({
       key: bridgeKey(it), lonlat: it.point, level: it.level,
@@ -675,6 +692,11 @@ function showBridgesOnMap(r) {
     ...weights.map((it) => ({
       key: weightKey(it), lonlat: it.point, level: 'high', kind: 'weight', glyph: `${String(it.limit).replace('.', ',')} t`,
       label: `Limite de poids à vérifier : ${String(it.limit).replace('.', ',')} t${it.local ? ', desserte locale possible' : ''}`,
+    })),
+    // PR 3b : points sensibles (interdictions, hauteurs basses, tunnels) ; texte au toucher, jamais dit.
+    ...sens.map((it) => ({
+      key: sensitiveKey(it), lonlat: it.point, level: 'high', kind: 'sensitive', glyph: '!',
+      label: 'Point sensible à vérifier',
     })),
   ]);
 }
@@ -821,7 +843,7 @@ async function openAlternatives(from, extraStop = null) {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
       stops,
     };
-    for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
   } catch (err) {
@@ -1041,6 +1063,7 @@ const form = createRouteForm({
       access.clear();
       bridges.clear();
       axes.clear();
+      sensitive.clear();
       weightLimits.clear();
       speedLimits.clear();
       directions.clear();
@@ -1083,6 +1106,7 @@ function showChoice(selected) {
   access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
   bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
   axes.load(options.map((o) => o.route)); // PR 3a : cases de data/axes-osm/ (repli par la géométrie)
+  sensitive.load(options.map((o) => o.route)); // PR 3b : cases de data/points-sensibles/
   weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
   speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
   directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/

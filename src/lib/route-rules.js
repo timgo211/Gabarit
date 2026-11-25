@@ -18,6 +18,7 @@ import { winterRules } from './winter.js';
 import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
 import { geoRoadsFor, axisTechText } from './axis-match.js';
+import { sensitiveRules } from './sensitive-points.js';
 import { weightRules as weightLimitRules } from './weight-check.js';
 import { speedRules } from './speed-limit.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
@@ -133,7 +134,8 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
  *   wind?:{ status:string, forecast:object|null, threshold:number }|null }} ctx
  *   driving : décompte du temps de conduite (driving-time.js) ; wind : prévisions Open-Meteo et seuil de rafales ;
  *   areas : aires placées sur ce tracé (placeAlongRoute), pour proposer la pause sur une aire du bon sens ;
- *   axes : copie data/axes-osm/ (createTileCopy : status, data, updated, meta.tolerance), repli par la géométrie (PR 3a)
+ *   axes : copie data/axes-osm/ (createTileCopy : status, data, updated, meta.tolerance), repli par la géométrie (PR 3a) ;
+ *   sensitive : copie data/points-sensibles/ (createTileCopy, meta.sections), points sensibles (PR 3b)
  * @returns {{ passages:object[], banned:object[], bans:object, lines:{ level:'warn'|'info', text:string, url?:string|null }[],
  *   short:string[] }}
  *   banned : passages interdits ; lines : notes complètes ; short : résumé pour la fiche (« ZFE Lyon interdite »)
@@ -141,7 +143,7 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
   access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
-  weightWarnings = true, speeds = null, axes = null,
+  weightWarnings = true, speeds = null, axes = null, sensitive = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -191,6 +193,11 @@ export function routeRules(route, {
   const wlim = weightLimitRules(route, { vehicle, weights: weightLimits, enabled: weightWarnings });
   lines.push(...wlim.lines.filter((l) => l.level === 'warn'));
   short.push(...wlim.short);
+  // Points sensibles (PR 3b) : interdictions PL, hauteurs basses, tunnels sans hauteur de l'audit OSM ; « à vérifier »,
+  // fiche et carte à l'arrêt seulement, jamais dit. Les ponts restent ceux de la phase 12a (pas de second compteur).
+  const sens = sensitiveRules(route, { vehicle, copy: sensitive, geo: geo?.status === 'ok' ? geo : null });
+  lines.push(...sens.lines);
+  short.push(...sens.short);
   // Limitations de vitesse (phase 11a) : couverture sur la fiche, conditions « à vérifier », rien dit.
   const spd = speedRules(route, { vehicle, speeds, countries });
   lines.push(...spd.lines);
@@ -234,7 +241,7 @@ export function routeRules(route, {
     avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
     countries: ctry, weight, winter: win, euro, tolls: toll, foreignTolls: ftoll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
-    axes: { geo, tech: axes ? axisTechText(axes, geo) : null },
+    axes: { geo, tech: axes ? axisTechText(axes, geo) : null }, sensitive: sens,
   };
 }
 

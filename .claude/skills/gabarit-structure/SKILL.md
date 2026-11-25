@@ -228,6 +228,16 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `ors-directions-joigny-gonfreville.json` + cases réduites `tests/fixtures/axes-osm-joigny/` par
   `tools/make-fixture-axes.mjs` (points et étapes du diagnostic v70 : 199 km sans nom sur 320,8 ; à remplacer par une vraie réponse copiée). Tests
   `axis-match.test.js` ; interface `ui-check repli` (option `axesCopy` d'`open` : 'repo', 'fixture', null).
+  PR 3b : `geoStepLabel` (route retrouvée par étape sans nom, colonne « géométrie » du diagnostic).
+- Points sensibles (PR 3b, v74) : `src/lib/sensitive-points.js` (construction `buildSensitivePoints` : fiches d'audit +
+  sections + copie des axes pour le cap + ids de `data/ponts-osm/` pour le recoupement des ponts ; lecture
+  `parseSensitiveTile` / `mergeSensitiveTiles` / `parseSensitiveSections` ; `sensitivePointsAlongRoute`,
+  `concernsVehicle`, `sensitiveText`, `sensitiveRules`). Outil `tools/points-sensibles.mjs` (`writeSensitivePoints`,
+  appelé à la fin de `tools/audit-osm.mjs`, dossier dans la liste de commit d'`audit-osm.yml`). Copie
+  `data/points-sensibles/` : `index.json` (sections citées, grille des axes) + cases `{ r, p:[[type, x, y, cap, i_ref,
+  valeur, i_section, way]] }`. Lue par `createTileCopy` (`meta` : sections) dans `app.js`, passée à `routeRules`
+  (`sensitive`) ; repères `kind: 'sensitive'` (`.sensitive-marker`). Tests `sensitive-points.test.js` ; interface
+  `ui-check sensibles` (option `sensitiveCopy` : 'repo', 'fixture', null).
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :
