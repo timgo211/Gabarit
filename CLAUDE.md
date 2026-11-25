@@ -128,6 +128,10 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   rocade « Recommandé », fiches par lyon-a6 / lyon-a7 retirées, « Allonge … par rapport au trajet direct » ; échec →
   direct en rouge + confirmation avant « Démarrer » (`#start-confirm`), bouton v76 gardé. « Autres itinéraires » : rien
   d'auto, rouge + 2e appui. Jamais dit, rien dans le guidage. Détail : skill zfe.
+- Interdictions connues hors Lyon (v78, `route-bans.js`, mêmes copie et réglage) : sections d'interdiction concernées
+  par le profil, hors lyon-a6/a7 et hauteurs ; sens « nord → sud » lu par le tracé ; fiche rouge + confirmation ;
+  transit / desserte → question « Desserte locale dans la zone … ? » (Non par défaut, à l'arrêt, `choice.localAnswers`,
+  trajet seulement). Jamais dit, rien dans le guidage. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

@@ -352,6 +352,11 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
   background: var(--error-bg); color: var(--error-fg); border: 2px solid var(--danger);
 }
 .start-confirm[hidden] { display: none; }
+/* v78 : question « Desserte locale dans la zone … ? » (deux gros boutons, à l'arrêt seulement). */
+.local-question { display: grid; gap: 8px; padding: 12px; margin: 8px 0; border-radius: 16px; border: 2px solid var(--danger); }
+.local-question-text { margin: 0; font-weight: 700; overflow-wrap: anywhere; }
+.local-question-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.local-question-buttons .btn { min-height: 56px; }
 .start-confirm-title { margin: 0; font-weight: 800; text-align: center; overflow-wrap: anywhere; }
 .start-confirm .nav-confirm-buttons .btn { min-height: 64px; }
 .rules-notes { margin: 10px 0 0; padding-left: 20px; font-size: .9rem; }

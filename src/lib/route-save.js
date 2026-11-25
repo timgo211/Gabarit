@@ -17,6 +17,7 @@
 //   mais illisibles → sauvegarde ignorée.
 
 import { sanitizeStops } from './stops.js';
+import { sanitizeAnswers } from './route-bans.js';
 
 /** v77 : états gardés du contournement automatique (« pending » non gardé : refait à la reprise). */
 const AUTO_STATES = Object.freeze(['done', 'failed', 'local', 'none']);
@@ -78,6 +79,8 @@ export function buildSave({
       stops: sanitizeStops(choice.stops) ?? [],
       // v77 : état du contournement automatique (Lyon) : jamais refait à la reprise s'il est fait ou en échec.
       ...(AUTO_STATES.includes(choice.lyonAuto) ? { lyonAuto: choice.lyonAuto } : {}),
+      // v78 : réponses « Desserte locale dans la zone … ? » de ce trajet.
+      localAnswers: sanitizeAnswers(choice.localAnswers),
     }),
   };
   if (kind === 'nav') {
@@ -156,5 +159,6 @@ export function restoredChoice(save, vehicles) {
   return {
     ...rest, options, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle,
     ...(AUTO_STATES.includes(lyonAuto) ? { lyonAuto } : {}), // v77
+    localAnswers: sanitizeAnswers(save.choice.localAnswers), // v78
   };
 }

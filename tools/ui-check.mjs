@@ -5656,6 +5656,93 @@ async function lyonAutoCheck(browser, base) {
   }
 }
 
+/**
+ * v78 : itinéraire de test tracé par les points d'une section de la copie data/points-sensibles/ du dépôt (du nord au
+ * sud), au format d'une réponse ORS (une étape). Jamais une vraie réponse d'ORS.
+ */
+function simulatedThrough(id) {
+  const dir = join(ROOT, 'data', 'points-sensibles');
+  const index = JSON.parse(readFileSync(join(dir, 'index.json'), 'utf8'));
+  const si = index.sections.findIndex((s) => s.id === id);
+  const pts = [];
+  for (const name of Object.keys(index.tiles)) {
+    const t = JSON.parse(readFileSync(join(dir, `${name}.json`), 'utf8'));
+    for (const p of t.p) if (p[6] === si) pts.push([p[1] / 1e5, p[2] / 1e5]);
+  }
+  pts.sort((a, b) => b[1] - a[1]);
+  const base = fixture('ors-directions-nav.json');
+  const f = base.features[0];
+  const n = pts.length - 1;
+  return {
+    ...base,
+    features: [{ ...f, geometry: { ...f.geometry, coordinates: pts },
+      properties: { segments: [{ distance: 30000, duration: 1800, steps: [
+        { distance: 30000, duration: 1800, type: 11, instruction: 'Démarrer', name: '-', way_points: [0, n] },
+        { distance: 0, duration: 0, type: 10, instruction: 'Arrivée', name: '-', way_points: [n, n] }] }],
+      extras: {}, summary: { distance: 30000, duration: 1800 }, way_points: [0, n] } }],
+  };
+}
+
+/**
+ * v78 : interdictions connues hors Lyon (route-bans.js) : N59 (> 3,5 t en transit) : fiche rouge, question « Desserte
+ * locale » (Non par défaut, grisée en roulant), « Oui » → plus de rouge et ligne « desserte déclarée », confirmation
+ * avant le départ ; réglage désactivé : rien ; rien dit.
+ */
+async function bansCheck(browser, base) {
+  const json = simulatedThrough('n59');
+  const line = json.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, {
+      width, height, theme, voice: true, start: line[0], directions: () => json, overpass: () => ({ elements: [] }),
+    });
+    await computeRoute(page);
+    const red = await page.waitForSelector('.route-card.banned', { timeout: 15000 }).then(() => true).catch(() => false);
+    check(red, `${tag} : fiche en rouge`);
+    check(/Interdiction connue sur le trajet, à vérifier/.test(await page.textContent('.route-card')), `${tag} : texte rouge de la fiche`);
+    const notes = await page.textContent('#route-notes');
+    check(/Interdiction connue sur le trajet \(km \d+\) : N59 \/ N159.*En vigueur : à vérifier\. La signalisation fait foi\. Source : Bison Futé, arrêté non lu\./.test(notes), `${tag} : ligne de l'interdiction, source`);
+    check(/Desserte locale dans la zone N59/.test(notes), `${tag} : question « Desserte locale »`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 15 });
+    await page.waitForTimeout(800);
+    check(await page.locator('.local-question button[disabled]').count() === 2, `${tag} : question grisée en roulant`);
+    await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+    const parked = await page.waitForSelector('.local-question button:not([disabled])', { timeout: 20000 }).then(() => true).catch(() => false);
+    check(parked, `${tag} : question active à l'arrêt`);
+    check(await page.getAttribute('.local-question button:has-text("Non")', 'aria-pressed') === 'true', `${tag} : « Non » par défaut`);
+    await noHorizontalScroll(page, `${tag} interdictions`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-interdictions.png`) });
+    await page.click('.local-question button:has-text("Oui")');
+    await page.waitForTimeout(300);
+    check(await page.locator('.route-card.banned').count() === 0, `${tag} : « Oui » : plus de rouge`);
+    check(/Desserte locale déclarée dans la zone N59/.test(await page.textContent('#route-notes')), `${tag} : ligne « desserte déclarée »`);
+    await page.click('.local-question button:has-text("Non")');
+    await page.waitForTimeout(300);
+    check(await page.locator('.route-card.banned').count() === 1, `${tag} : « Non » : rouge à nouveau`);
+    await page.click('#btn-nav-start');
+    check(await page.locator('#start-confirm:not([hidden])').count() === 1 && /interdiction connue \(N59/.test(await page.textContent('#start-confirm')),
+      `${tag} : confirmation avant le départ`);
+    await page.click('#btn-start-anyway');
+    const started = await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).then(() => true).catch(() => false);
+    check(started, `${tag} : « Démarrer quand même » démarre`);
+    await page.waitForTimeout(1200);
+    check(!/N59|interdiction|desserte/i.test(await page.textContent('#nav')), `${tag} : rien dans le guidage`);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /N59|interdi|desserte/i.test(t)), `${tag} : rien dit`, spoken.join(' | '));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  const off = await open(browser, base, {
+    width: 412, height: 900, start: line[0], directions: () => json, overpass: () => ({ elements: [] }), settings: { autoBypass: false },
+  });
+  await computeRoute(off.page);
+  await off.page.waitForTimeout(2000);
+  check(await off.page.locator('.route-card.banned').count() === 0 && await off.page.locator('.local-question').count() === 0,
+    'réglage désactivé : ni rouge ni question (comportement v76)');
+  check(off.errors.length === 0, 'réglage désactivé : aucune erreur JavaScript', off.errors.join(' | '));
+  await off.ctx.close();
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5667,7 +5754,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

@@ -119,3 +119,10 @@ test('v77 : état du contournement automatique gardé (fait, échec, local) ; «
   assert.equal(restoredChoice(bad, vehicles).lyonAuto, undefined);
   assert.equal('lyonAuto' in restoredChoice(buildSave({ kind: 'plan', choice, vehicleId: 'v1', now: 1 }), vehicles), false);
 });
+
+test('v78 : réponses « desserte locale » du trajet gardées et nettoyées', () => {
+  const save = buildSave({ kind: 'plan', choice: { ...choice, localAnswers: { n59: true, 'X Y': true } }, vehicleId: 'v1', now: 1 });
+  assert.deepEqual(save.choice.localAnswers, { n59: true });
+  assert.deepEqual(restoredChoice(save, vehicles).localAnswers, { n59: true });
+  assert.deepEqual(restoredChoice(buildSave({ kind: 'plan', choice, vehicleId: 'v1', now: 1 }), vehicles).localAnswers, {});
+});

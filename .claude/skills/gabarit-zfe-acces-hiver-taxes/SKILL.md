@@ -193,3 +193,17 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   itinéraires » : `lyonAuto: 'none'`, rien d'auto, 1er appui sur « Guider » = `CONFIRM_TEXT`, 2e = guidage. Simulation
   (Réglages) : pas de confirmation. Jamais dit, rien dans le guidage. Interface : `ui-check lyon` (rocade simulée par
   `simulatedRocade`, jamais une vraie réponse ORS).
+- Interdictions connues hors Lyon (v78, PR B, `src/lib/route-bans.js`) : sections de `data/points-sensibles/` (types 0
+  et 1) concernées par le profil (`concernsVehicle`), hors `BANS.EXCLUDED` (lyon-a6, lyon-a7 : rocade) et nature
+  « hauteur » (PR D). Sens de la source « nord → sud » / « sud → nord » (`oneWayOf`) : retenue seulement si le tracé y
+  roule dans ce sens (`travelAt`, latitude 1 km avant / après) ; sens illisible (est-ouest) → retenue. Desserte possible
+  (`localPossible` : nature « transit » ou « desserte » dans le texte : n59, n66, le-puy, rn524) → question
+  « Desserte locale dans la zone {début du texte} ? » [Non] [Oui] en tête des notes, Non par défaut, à l'arrêt seulement
+  (`tunnelAllowed`, grisé sinon), réponse dans `choice.localAnswers` (mémoire v53, `sanitizeAnswers` : 30 zones, ids
+  courts, booléens), jamais dans les réglages ni l'export. Oui → ligne info `declaredText`, plus de rouge pour elle.
+  Interdiction active → ligne warn (« Interdiction connue sur le trajet (km X) : texte. En vigueur : à vérifier. La
+  signalisation fait foi. Source : arrêté | Bison Futé, arrêté non lu. »), fiche rouge (`rules.banned`,
+  `bannedShort`), confirmation (`confirmText`) avant « Démarrer » et au 2e appui de « Autres itinéraires ». Choix
+  prudent : une autre fiche qui l'évite n'est ni promue ni utilisée pour masquer (données Bison Futé non lues en
+  arrêté) ; le contournement automatique vient en PR C. Réglage désactivé : rien de tout ça. Interface :
+  `ui-check interdictions` (tracé simulé par les points de la N59, `simulatedThrough`).
