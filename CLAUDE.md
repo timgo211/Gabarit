@@ -118,6 +118,11 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Points sensibles (PR 3b, v74, `sensitive-points.js`, copie `data/points-sensibles/` des fiches d'audit, jamais
   précachée) : interdictions (arrêté, ou Bison Futé marqué), hauteurs basses (≤ véhicule, marge 0), tunnels sans
   hauteur ; point sans cap écarté ; aucun pont (alerte 12a seule) ; fiche et carte à l'arrêt, jamais dit ; source citée.
+- « Contourner par la rocade Est » (v76, `lyon-bypass.js`, Lyon seulement : lyon-a6 / lyon-a7 > 7,5 t) : bouton à l'arrêt
+  (`avoidTunnelAllowed`), 3 points de passage `via` (A46 → N346 → A46, sommets de `data/axes-osm/`, chaussée au cap ≤ 30°
+  et chaussée opposée à gauche), une requête ORS, aucun polygone ajouté ; pas de bouton si départ, arrivée ou étape dans
+  la Métropole (contour IGN `metropoleLyon` de `data/contours-ign.json`, lu à la demande). Étape `via` : jamais dite, ni
+  « Étape k/n », ni historique, ni repère ; gardée au recalcul. Fourvière jamais déclencheur. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

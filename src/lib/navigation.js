@@ -171,7 +171,23 @@ export function placeStops(stops, route, line) {
     prev = along;
     // Point d'accroche : celui d'ORS seulement (là où le tracé passe à l'étape) ; sans lui, le point saisi.
     const snap = hooked ? line.coords[wp[i + 1]] : point;
-    return { label: typeof x.label === 'string' ? x.label : '', lon: x.lon, lat: x.lat, point, snap, along };
+    const out = { label: typeof x.label === 'string' ? x.label : '', lon: x.lon, lat: x.lat, point, snap, along };
+    if (x.via === true) out.via = true; // v76 : point de passage technique (contournement de Lyon)
+    return out;
+  });
+}
+
+/**
+ * v76 : ORS termine chaque tronçon par une arrivée (type 10) ; celle d'un point de passage technique (`via`) est
+ * retirée : jamais « Vous arrivez à l'étape », rien dans le bandeau. k-ième arrivée intermédiaire = k-ième étape.
+ */
+export function withoutViaArrivals(maneuvers, stops) {
+  if (!Array.isArray(stops) || !stops.some((x) => x?.via === true)) return maneuvers;
+  let k = -1;
+  return maneuvers.filter((m) => {
+    if (!m.waypoint) return true;
+    k += 1;
+    return stops[k]?.via !== true;
   });
 }
 
@@ -190,7 +206,8 @@ export function tripSoFar(state) {
 /** Étapes pas encore atteintes (recalcul, « Autres itinéraires », sauvegarde) : { label, lon, lat }. */
 export function remainingStops(state) {
   const list = state?.stops ?? [];
-  return list.slice(state?.nextStop ?? 0).map((x) => ({ label: x.label, lon: x.lon, lat: x.lat }));
+  return list.slice(state?.nextStop ?? 0).map((x) => (x.via === true
+    ? { label: x.label, lon: x.lon, lat: x.lat, via: true } : { label: x.label, lon: x.lon, lat: x.lat }));
 }
 
 /** Si la première manœuvre est un demi-tour : phrase prudente, dite une seule fois. */
@@ -269,6 +286,7 @@ export function startNavigation(route, {
 } = {}) {
   const speedCtx = { data: speeds?.data ?? null, voice: speeds?.voice === true };
   const prepared = prepareRoute(route, directions, places, lanes);
+  prepared.maneuvers = withoutViaArrivals(prepared.maneuvers, stops); // v76
   return {
     // v55 : étapes restantes, dans l'ordre du tracé ; nextStop = première non atteinte.
     stops: placeStops(stops, route, prepared.line),
@@ -433,13 +451,18 @@ export function updateNavigation(state, fix) {
     while (s.nextStop < s.stops.length) {
       const st = s.stops[s.nextStop];
       const toStop = Math.min(haversine(p, st.point), haversine(p, st.snap));
-      if (toStop <= NAV.ARRIVAL_RADIUS_M && (!onRoute || st.along - loc.along <= NAV.ARRIVAL_MAX_REMAINING_M)) {
+      // v76 : point de passage technique : marqué passé sans voix ni historique, comme une étape dépassée.
+      if (st.via === true && ((toStop <= NAV.ARRIVAL_RADIUS_M) || (onRoute && loc.along > st.along + NAV.STOP_PASSED_M))) {
+        s.nextStop += 1;
+        continue;
+      }
+      if (st.via !== true && toStop <= NAV.ARRIVAL_RADIUS_M && (!onRoute || st.along - loc.along <= NAV.ARRIVAL_MAX_REMAINING_M)) {
         s.nextStop += 1;
         s.stopsDone = [...(s.stopsDone ?? []), st.label].slice(0, 10); // v56 : historique
         events.push({ type: 'speak', text: STOP_REACHED_TEXT, interrupt: true }, { type: 'stop-reached', index: s.nextStop - 1 });
         break;
       }
-      if (onRoute && loc.along > st.along + NAV.STOP_PASSED_M) {
+      if (st.via !== true && onRoute && loc.along > st.along + NAV.STOP_PASSED_M) {
         s.nextStop += 1;
         s.stopsDone = [...(s.stopsDone ?? []), st.label].slice(0, 10);
         continue;
@@ -448,7 +471,10 @@ export function updateNavigation(state, fix) {
     }
   }
   const nextStop = s.stops?.[s.nextStop] ?? null;
-  const toNextStop = nextStop ? Math.min(haversine(p, nextStop.point), haversine(p, nextStop.snap)) : Infinity;
+  // v76 : ligne « Étape k/n » : prochaine vraie étape, points de passage techniques jamais comptés.
+  const shownIdx = (s.stops ?? []).findIndex((x, i) => i >= s.nextStop && x.via !== true);
+  const shownStop = shownIdx >= 0 ? s.stops[shownIdx] : null;
+  const toNextStop = nextStop && nextStop.via !== true ? Math.min(haversine(p, nextStop.point), haversine(p, nextStop.snap)) : Infinity;
 
   // Hors itinéraire → recalcul (jamais près de la destination ni après l'arrivée), seulement en roulant
   // (≥ 10 km/h) avec une position précise (≤ 30 m). À l'arrêt hors du tracé : proposition seulement.
@@ -628,10 +654,12 @@ export function updateNavigation(state, fix) {
     /**
      * v55 : prochaine étape (affichage seulement, jamais dite) : libellé, distance sur le tracé, temps (s), rang.
      */
-    nextStop: nextStop && !s.arrived ? {
-      label: nextStop.label, index: s.nextStop, count: s.stops.length,
-      distance: Math.max(0, nextStop.along - loc.along),
-      duration: Math.max(0, remainingDuration(s.route, loc.along) - remainingDuration(s.route, nextStop.along)),
+    nextStop: shownStop && !s.arrived ? {
+      label: shownStop.label,
+      index: s.stops.slice(0, shownIdx).filter((x) => x.via !== true).length,
+      count: s.stops.filter((x) => x.via !== true).length,
+      distance: Math.max(0, shownStop.along - loc.along),
+      duration: Math.max(0, remainingDuration(s.route, loc.along) - remainingDuration(s.route, shownStop.along)),
     } : null,
     /** Nom de la route en cours (étape ORS), seulement sur l'itinéraire. */
     roadName: onRoute && !s.arrived ? currentRoadName(maneuvers, line.cum, loc.along) : null,
@@ -856,6 +884,7 @@ export function markStopAsWork(state, now) {
 /** Nouvel itinéraire reçu après un recalcul. Les aires déjà trouvées sont replacées sur le nouveau tracé (sans requête). */
 export function rerouteDone(state, route, stops = null) {
   const prepared = prepareRoute(route, state.directionsData, state.placesData, state.lanesData);
+  prepared.maneuvers = withoutViaArrivals(prepared.maneuvers, Array.isArray(stops) ? stops : remainingStops(state)); // v76
   const s = {
     ...state,
     // v55 : le recalcul a été demandé avec les étapes restantes (remainingStops) : replacées sur le nouveau tracé.

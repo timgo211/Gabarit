@@ -32,7 +32,7 @@ import { maneuverSvg } from './nav-icon.js';
 import { symbolSvg } from './nav-symbols.js';
 import { laneSvg } from './lane-icons.js';
 import { lanesRow } from '../lib/lanes.js';
-import { nextStopLine, nextStopParts } from '../lib/stops.js';
+import { nextStopLine, nextStopParts, shownStopPoints } from '../lib/stops.js';
 import { REPORT, MARKED_TEXT as REPORT_MARKED_TEXT, DUPLICATE_MARK_TEXT as REPORT_DUPLICATE_TEXT, NO_FIX_TEXT as REPORT_NO_FIX_TEXT } from '../lib/reports.js';
 import { fetchRoute } from './api.js';
 import {
@@ -779,7 +779,7 @@ export function createNavigation(ctx) {
       else if (e.type === 'reroute') reroute(e.from);
       else if (e.type === 'stop-reached') {
         // v55 : étape atteinte (phrase fixe déjà dite) : repères des étapes restantes, sauvegarde à jour.
-        ctx.map.showStops?.(remainingStops(s.state).map((x) => [x.lon, x.lat]));
+        ctx.map.showStops?.(shownStopPoints(remainingStops(s.state)));
         ctx.onStopReached?.(remainingStops(s.state));
       }
       else if (e.type === 'arrived') {
@@ -838,7 +838,7 @@ export function createNavigation(ctx) {
       // Simulation : le nouvel itinéraire part d'une fausse position, il ne remplace pas l'itinéraire réel.
       if (s.sim) s.sim.setRoute(route.coordinates);
       else ctx.onRouteChange?.(route, stops);
-      ctx.map.showStops?.(via);
+      ctx.map.showStops?.(shownStopPoints(stops)); // v76 : points de passage techniques jamais montrés
       handle(done.events);
     } catch (err) {
       if (s !== session) return;
@@ -1058,7 +1058,7 @@ export function createNavigation(ctx) {
     renderVoice();
     ctx.map.setNavigating(true);
     ctx.map.showRoute(route.coordinates, route.bbox, { fit: false });
-    ctx.map.showStops?.(remainingStops(s.state).map((x) => [x.lon, x.lat])); // v55
+    ctx.map.showStops?.(shownStopPoints(remainingStops(s.state))); // v55
     ctx.map.showTurns(maneuverMarks(s.state.route.line, s.state.route.maneuvers));
     ctx.voice.speak(s.sim ? 'Simulation du trajet.' : s.state.resumed ? 'Guidage repris.' : 'Guidage démarré.', { interrupt: true });
     ctx.wakeLock.enable();

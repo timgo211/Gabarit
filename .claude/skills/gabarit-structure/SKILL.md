@@ -230,6 +230,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   par `tools/make-fixture-axes.mjs <fixture> <dossier>` (extraction seule, voies à < 300 m du tracé). Tests
   `axis-match.test.js` ; interface `ui-check repli` (option `axesCopy` d'`open` : 'repo', 'fixture', null).
   PR 3b : `geoStepLabel` (route retrouvée par étape sans nom, colonne « géométrie » du diagnostic).
+- Contournement de Lyon (v76) : `src/lib/lyon-bypass.js` (plan, points de passage, écart), tests
+  `tests/lyon-bypass.test.js` ; contour `metropoleLyon` de `data/contours-ign.json` ; détail : skill zfe.
 - Points sensibles (PR 3b, v74) : `src/lib/sensitive-points.js` (construction `buildSensitivePoints` : fiches d'audit +
   sections + copie des axes pour le cap + ids de `data/ponts-osm/` pour le recoupement des ponts ; lecture
   `parseSensitiveTile` / `mergeSensitiveTiles` / `parseSensitiveSections` ; `sensitivePointsAlongRoute`,

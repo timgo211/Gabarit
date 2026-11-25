@@ -26,11 +26,16 @@ export const STOPS = Object.freeze({
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const isLonLat = (lon, lat) => isNum(lon) && isNum(lat) && lon >= -180 && lon <= 180 && lat >= -90 && lat <= 90;
 
-/** Étape lisible { label, lon, lat } ou null. */
+/**
+ * Étape lisible { label, lon, lat } ou null. v76 : `via: true` = point de passage technique (contournement de Lyon,
+ * lyon-bypass.js) : jamais « Étape atteinte. », jamais dans la ligne « Étape k/n » ni l'historique, gardé au recalcul.
+ */
 export function cleanStop(s) {
   if (!s || typeof s !== 'object' || !isLonLat(s.lon, s.lat)) return null;
   const label = typeof s.label === 'string' ? s.label.trim().slice(0, STOPS.LABEL_MAX) : '';
-  return { label: label || 'Étape', lon: s.lon, lat: s.lat };
+  const out = { label: label || 'Étape', lon: s.lon, lat: s.lat };
+  if (s.via === true) out.via = true;
+  return out;
 }
 
 /**
@@ -44,9 +49,14 @@ export function sanitizeStops(list) {
   return out.every(Boolean) ? out : null;
 }
 
-/** Points [lon, lat] des étapes (champ `via` de la requête ORS). */
+/** Points [lon, lat] des étapes (champ `via` de la requête ORS ; v76 : points de passage compris). */
 export function stopPoints(stops) {
   return (stops ?? []).map((s) => [s.lon, s.lat]);
+}
+
+/** v76 : points [lon, lat] des étapes à montrer (repères numérotés) : sans les points de passage techniques. */
+export function shownStopPoints(stops) {
+  return (stops ?? []).filter((s) => s?.via !== true).map((s) => [s.lon, s.lat]);
 }
 
 /** Déplace l'étape i d'un rang (dir = -1 vers le haut, +1 vers le bas) ; liste inchangée au bord. */
@@ -126,9 +136,20 @@ export function tripPoints(start, stops, end) {
  * @param {object[]} stops étapes { label }
  * @param {Date} now
  */
-export function legLines(route, stops, now = new Date()) {
-  const legs = route?.legs;
-  if (!Array.isArray(stops) || !stops.length || !Array.isArray(legs) || legs.length !== stops.length + 1) return [];
+export function legLines(route, allStops, now = new Date()) {
+  const raw = route?.legs;
+  if (!Array.isArray(allStops) || !allStops.length || !Array.isArray(raw) || raw.length !== allStops.length + 1) return [];
+  // v76 : tronçons de part et d'autre d'un point de passage technique réunis (il n'est pas une étape).
+  const legs = [];
+  let acc = { duration: 0, distance: 0 };
+  raw.forEach((leg, i) => {
+    acc = { duration: acc.duration + (isNum(leg?.duration) ? leg.duration : 0), distance: acc.distance + (isNum(leg?.distance) ? leg.distance : 0) };
+    if (i < allStops.length && allStops[i]?.via === true) return;
+    legs.push(acc);
+    acc = { duration: 0, distance: 0 };
+  });
+  const stops = allStops.filter((s) => s?.via !== true);
+  if (!stops.length) return [];
   const name = (i) => (i === 0 ? 'Départ' : i > stops.length ? 'Arrivée' : `Étape ${i}`);
   let t = 0;
   return legs.map((leg, i) => {

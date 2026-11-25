@@ -97,6 +97,8 @@ export function isValidSave(save) {
   if (!Number.isInteger(c.selected) || c.selected < 0 || c.selected >= c.options.length) return false;
   if (!isPoint(c.end)) return false;
   if (sanitizeStops(c.stops) === null) return false; // v55 : absentes = aucune étape (ancienne sauvegarde)
+  // v76 : étapes propres à une fiche (« Rocade Est », points de passage `via` compris) : lisibles ou absentes.
+  if (c.options.some((o) => o.stops !== undefined && sanitizeStops(o.stops) === null)) return false;
   if (save.kind === 'nav' && !(save.progress && isNum(save.progress.along) && save.progress.along >= 0)) return false;
   return true;
 }
@@ -144,5 +146,6 @@ export function restoredChoice(save, vehicles) {
   if (!isValidSave(save)) return null;
   const vehicle = (vehicles ?? []).find((v) => v?.id === save.vehicleId);
   if (!vehicle) return null;
-  return { ...save.choice, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle };
+  const options = save.choice.options.map((o) => (o.stops === undefined ? o : { ...o, stops: sanitizeStops(o.stops) }));
+  return { ...save.choice, options, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle };
 }

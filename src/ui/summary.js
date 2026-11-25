@@ -5,6 +5,7 @@
 import { el } from './dom.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { STOPS } from '../lib/stops.js';
+import { LYON_BYPASS } from '../lib/lyon-bypass.js';
 import { clampMaxSpeed } from '../lib/ors-request.js';
 import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
@@ -96,6 +97,7 @@ function card(d, { checked, onSelect, rules }) {
  */
 function rulesBlock(rules, {
   source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed = false, onAvoidLocal, localBusy,
+  onBypass = null, bypassBusy = false,
 }) {
   if (!rules) return [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
@@ -114,6 +116,13 @@ function rulesBlock(rules, {
       type: 'button', class: 'btn btn-avoid-tunnel', disabled: !!tunnelBusy || !tunnelAllowed, onclick: onAvoidTunnel,
       'aria-disabled': String(!!tunnelBusy || !tunnelAllowed),
       text: tunnelBusy ? 'Calcul du contournement…' : tunnelAllowed ? '⛔ Éviter le tunnel' : '⛔ Éviter le tunnel (à l\'arrêt)',
+    }) : null,
+    // v76 : Lyon, A6 / A7 interdites aux plus de 7,5 t en transit : 3 points de passage sur la rocade Est, une requête
+    // ORS sur appui, à l'arrêt seulement (même règle qu'« Éviter le tunnel »), grisé sinon (vitesse inconnue).
+    onBypass && rules.lyonBypass?.ok ? el('button', {
+      type: 'button', class: 'btn btn-avoid-tunnel btn-bypass', disabled: !!bypassBusy || !tunnelAllowed, onclick: onBypass,
+      'aria-disabled': String(!!bypassBusy || !tunnelAllowed),
+      text: bypassBusy ? LYON_BYPASS.BUSY_TEXT : tunnelAllowed ? LYON_BYPASS.BUTTON_TEXT : LYON_BYPASS.BUTTON_PARKED_TEXT,
     }) : null,
     // Phase 5d : route réservée à la desserte locale traversée en transit (une requête ORS sur appui, à l'arrêt).
     onAvoidLocal && rules.localTransit?.length ? el('button', {
@@ -215,6 +224,7 @@ function diagnosticBlock(route, rules, label, rawAllowed = false) {
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
   windCredit = false, onAvoidTunnel = null, tunnelBusy = false, tunnelAllowed = false, onAvoidLocal = null, localBusy = false,
+  onBypass = null, bypassBusy = false,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -250,7 +260,7 @@ export function renderRouteChoice(node, notesNode, {
   notesNode.replaceChildren(
     ...rulesBlock(rules?.[selected], {
       source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed,
-      onAvoidLocal, localBusy,
+      onAvoidLocal, localBusy, onBypass, bypassBusy,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
     diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : '', tunnelAllowed),
