@@ -40,3 +40,21 @@ export async function download(url, file, {
   }
   throw new Error(failMessage ?? `Téléchargement impossible : ${url}.`);
 }
+
+/**
+ * Essaie chaque source dans l'ordre (5 essais chacune avec download) ; renvoie la source qui a servi. Toutes en échec
+ * → Error(failMessage). Une source : { name, url } (même extrait OpenStreetMap, licence ODbL, autre serveur).
+ * @param {{ name:string, url:string }[]} sources
+ */
+export async function downloadWithFallback(sources, file, { failMessage = null, ...opts } = {}) {
+  for (const [i, s] of sources.entries()) {
+    try {
+      await download(s.url, file, opts);
+      return s;
+    } catch {
+      const next = sources[i + 1];
+      console.log(`⚠ source ${s.name} en échec après tous les essais${next ? ` : essai de la source de secours ${next.name} (${next.url})` : ''}.`);
+    }
+  }
+  throw new Error(failMessage ?? `Téléchargement impossible : ${sources.map((s) => s.name).join(', ')}.`);
+}

@@ -20,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { download, TIMEOUT_POLY_MS } from './osm-download.mjs';
+import { download, downloadWithFallback, TIMEOUT_POLY_MS } from './osm-download.mjs';
 import { buildCoverage, parseGeojsonLine, parsePoly } from '../src/lib/areas-osm-data.js';
 import { axisFromFeature, convertAxes } from '../src/lib/axes-convert.js';
 import {
@@ -36,8 +36,18 @@ const RULES = join(ROOT, 'tools', 'audit-osm-interdictions.json');
 const PONTS_INDEX = join(ROOT, 'data', 'ponts-osm', 'index.json');
 const REGION = 'europe/france';
 const UA = 'Gabarit (GitHub Action, audit manuel en lecture seule)';
-const FAIL = 'Audit OSM : téléchargement de l\'extrait Geofabrik impossible après 5 essais — rien n\'est enregistré '
-  + '(data/axes-osm/, data/audit-osm/ et docs/audit-osm-axes.md inchangés).';
+// Extrait France : Geofabrik, puis en secours download.openstreetmap.fr (OpenStreetMap France ; même donnée OSM,
+// licence ODbL). Joignabilité du secours vérifiée depuis une Action le 25/11/2026 (run « Textes officiels » 25 :
+// liste du dossier HTTP 200, france-latest.osm.pbf du 23/11/2026, 5 Go ; france.state.txt HTTP 200).
+const SOURCES = Object.freeze([
+  Object.freeze({ name: 'Geofabrik', url: `https://download.geofabrik.de/${REGION}-latest.osm.pbf` }),
+  Object.freeze({
+    name: 'OpenStreetMap France', url: 'https://download.openstreetmap.fr/extracts/europe/france-latest.osm.pbf',
+    state: 'https://download.openstreetmap.fr/extracts/europe/france.state.txt',
+  }),
+]);
+const FAIL = `Audit OSM : téléchargement de l'extrait impossible (${SOURCES.map((s) => s.name).join(' puis ')}, 5 essais `
+  + 'chacune) — rien n\'est enregistré (data/axes-osm/, data/audit-osm/ et docs/audit-osm-axes.md inchangés).';
 
 /** Filtre osmium : axes (et secondaires pour le niveau 3), ponts, tunnels, communes. */
 const FILTER = [
@@ -53,6 +63,17 @@ function extractDate(file) {
   try {
     const v = execFileSync('osmium', ['fileinfo', '-g', 'header.option.osmosis_replication_timestamp', file], { encoding: 'utf8' }).trim();
     return /^\d{4}-\d{2}-\d{2}/.test(v) ? v.slice(0, 10) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Date d'un extrait OpenStreetMap France (fichier state.txt : « timestamp=2026-11-23T02\\:00\\:01Z »), ou null. */
+async function stateDate(url) {
+  try {
+    const res = await fetch(url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(TIMEOUT_POLY_MS) });
+    const m = /timestamp=(\d{4}-\d{2}-\d{2})/.exec(res.ok ? await res.text() : '');
+    return m ? m[1] : null;
   } catch {
     return null;
   }
@@ -115,15 +136,21 @@ async function main() {
   let updated = null;
   let polyText = args.poly ? readFileSync(args.poly, 'utf8') : null;
   let seq = args.seq;
+  let source = args.seq || args.pbf ? `fichier local (${args.seq ?? args.pbf})` : null;
+  let stateUrl = null;
   try {
     if (!seq) {
       let pbf = args.pbf;
       if (!pbf) {
         pbf = join(dir, 'france.osm.pbf');
         const t0 = Date.now();
-        await download(`https://download.geofabrik.de/${REGION}-latest.osm.pbf`, pbf, { userAgent: UA, failMessage: FAIL });
-        say(`Extrait ${REGION} : ${mo(statSync(pbf).size)} téléchargés en ${Math.round((Date.now() - t0) / 1000)} s.`);
-        try {
+        const used = await downloadWithFallback(SOURCES, pbf, { userAgent: UA, failMessage: FAIL });
+        source = `${used.name} (${used.url})`;
+        say(`Extrait France : source ${source}, ${mo(statSync(pbf).size)} téléchargés en ${Math.round((Date.now() - t0) / 1000)} s.`);
+        if (used.state) stateUrl = used.state;
+        if (used !== SOURCES[0]) {
+          say('Contour france.poly non demandé à Geofabrik (source de secours) : zone couverte reprise de data/ponts-osm/index.json.');
+        } else try {
           const polyFile = join(dir, 'france.poly');
           await download(`https://download.geofabrik.de/${REGION}.poly`, polyFile, { timeoutMs: TIMEOUT_POLY_MS, userAgent: UA });
           polyText = readFileSync(polyFile, 'utf8');
@@ -132,6 +159,7 @@ async function main() {
         }
       }
       updated = extractDate(pbf);
+      if (!updated && stateUrl) updated = await stateDate(stateUrl);
       const kept = join(dir, 'axes.osm.pbf');
       seq = join(dir, 'axes.geojsonseq');
       const t1 = Date.now();
@@ -198,7 +226,7 @@ async function main() {
 
     // Écriture (rien avant ce point).
     const files = splitCards(cards);
-    const idx = auditIndex(cards, files, { updated: day, levels: args.levels });
+    const idx = auditIndex(cards, files, { updated: day, levels: args.levels, extra: { sourceExtrait: source } });
     const auditBytes = writeDir(AUDIT_DIR, [...files.entries(), ['index.json', idx]]);
     say(`data/audit-osm/ : ${cards.length} fiches, ${files.size} fichiers + index.json, ${(auditBytes / 1024 / 1024).toFixed(2)} Mo.`);
     if (!ax.problem) {

@@ -458,7 +458,8 @@ export function auditReport(index, cards, { located = [], unlocated = [], axesLo
   const L = [];
   L.push('# Audit OSM des grands axes (lecture seule)', '');
   L.push(`Rapport écrit par l'Action « Audit OSM » (tools/audit-osm.mjs) ; extrait OpenStreetMap du ${index.updated ?? '?'} `
-    + `(Geofabrik, France) ; niveaux audités : ${index.levels.join(', ')} (1 autoroutes, 2 nationales, 3 grandes départementales).`, '');
+    + `(France) ; niveaux audités : ${index.levels.join(', ')} (1 autoroutes, 2 nationales, 3 grandes départementales).`, '');
+  L.push(`Source de l'extrait : ${index.sourceExtrait ?? 'inconnue'} (même donnée OpenStreetMap, licence ODbL).`, '');
   L.push('Règles :', '- rien n\'est écrit dans OpenStreetMap : chaque fiche est une proposition, **à vérifier sur place** ;',
     '- **la signalisation fait foi** ; seul l\'arrêté fait foi pour la règle ; « en vigueur : à vérifier » ;',
     '- une correction faite dans OSM met 2 à 3 semaines à atteindre l\'API publique d\'ORS (étude, section 1) ;',
