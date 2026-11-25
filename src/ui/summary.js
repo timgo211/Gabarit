@@ -10,6 +10,7 @@ import { WIND } from '../lib/wind.js';
 import { ADR, codeText, effectiveCode } from '../lib/adr.js';
 import { dayTime } from '../lib/hgv-bans.js';
 import { routeDiagnosticText } from '../lib/route-diagnostic.js';
+import { rawResponseOf } from '../lib/ors-response.js';
 import { requestVersionLabel } from '../lib/app-version.js';
 
 const link = (href, text) => el('a', { href, target: '_blank', rel: 'noopener noreferrer', text });
@@ -145,8 +146,10 @@ function diagVersion() {
  * Diagnostic du trajet (phase 5h bis) : bloc replié, texte calculé à l'ouverture, bouton « Copier » (presse-papiers,
  * sinon texte sélectionné pour une copie à la main). Version demandée au service worker qui contrôle la page (même
  * source que le bas de Réglages : VERSION de sw.js), dès la création du bloc.
+ * PR 3a : « Copier la réponse ORS » (réponse d'ORS de cet itinéraire, gardée en mémoire seulement), à l'arrêt seulement
+ * (rawAllowed : même règle que « Éviter le tunnel ») ; sert à figer une vraie fixture de test. Aucune clé dedans.
  */
-function diagnosticBlock(route, rules, label) {
+function diagnosticBlock(route, rules, label, rawAllowed = false) {
   const pre = el('pre', { class: 'route-diag-text' });
   const status = el('span', { class: 'route-diag-status', 'aria-live': 'polite' });
   const version = diagVersion();
@@ -169,13 +172,28 @@ function diagnosticBlock(route, rules, label) {
       status.textContent = 'Texte sélectionné : copiez-le avec le menu du navigateur.';
     }
   };
+  const raw = rawResponseOf(route);
+  const copyRaw = async () => {
+    if (!rawAllowed || !raw) return;
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(raw));
+      status.textContent = 'Réponse ORS copiée.';
+    } catch {
+      status.textContent = 'Copie impossible : le navigateur refuse le presse-papiers.';
+    }
+  };
+  const rawBtn = raw ? el('button', {
+    type: 'button', class: 'btn btn-diag-raw', disabled: !rawAllowed, 'aria-disabled': String(!rawAllowed), onclick: copyRaw,
+    text: rawAllowed ? 'Copier la réponse ORS' : 'Copier la réponse ORS (à l\'arrêt)',
+  }) : null;
   const d = el('details', { class: 'route-diag' }, [
     el('summary', { text: 'Diagnostic du trajet (routes lues, à copier)' }),
     el('p', { class: 'hint', text: 'Noms et références de route renvoyés par OpenRouteService, km, ZFE et taxes PL. Aucune clé ni profil complet.' }),
     el('div', { class: 'route-diag-actions' }, [
       el('button', { type: 'button', class: 'btn btn-diag-copy', onclick: copy, text: 'Copier' }),
+      rawBtn,
       status,
-    ]),
+    ].filter(Boolean)),
     pre,
   ]);
   d.addEventListener('toggle', () => { if (d.open) fill(); });
@@ -231,7 +249,7 @@ export function renderRouteChoice(node, notesNode, {
       onAvoidLocal, localBusy,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
-    diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : ''),
+    diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : '', tunnelAllowed),
   );
   notesNode.hidden = false;
 }

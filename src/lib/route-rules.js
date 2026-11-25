@@ -17,6 +17,7 @@ import { euroRules } from './euro.js';
 import { winterRules } from './winter.js';
 import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
+import { geoRoadsFor, axisTechText } from './axis-match.js';
 import { weightRules as weightLimitRules } from './weight-check.js';
 import { speedRules } from './speed-limit.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
@@ -131,7 +132,8 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
  *   countries?:Map<string,{ status:string, data:object|null }>|null,
  *   wind?:{ status:string, forecast:object|null, threshold:number }|null }} ctx
  *   driving : décompte du temps de conduite (driving-time.js) ; wind : prévisions Open-Meteo et seuil de rafales ;
- *   areas : aires placées sur ce tracé (placeAlongRoute), pour proposer la pause sur une aire du bon sens
+ *   areas : aires placées sur ce tracé (placeAlongRoute), pour proposer la pause sur une aire du bon sens ;
+ *   axes : copie data/axes-osm/ (createTileCopy : status, data, updated, meta.tolerance), repli par la géométrie (PR 3a)
  * @returns {{ passages:object[], banned:object[], bans:object, lines:{ level:'warn'|'info', text:string, url?:string|null }[],
  *   short:string[] }}
  *   banned : passages interdits ; lines : notes complètes ; short : résumé pour la fiche (« ZFE Lyon interdite »)
@@ -139,13 +141,16 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
   access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
-  weightWarnings = true, speeds = null,
+  weightWarnings = true, speeds = null, axes = null,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
   const passages = zfe ? zfeAlongRoute(route, { data: zfe, vehicle, departure, elapsed }) : [];
   const banned = passages.filter((p) => p.banned);
-  const bans = bansAlongRoute(route, { vehicle, departure, elapsed });
+  // PR 3a : repli par la géométrie (data/axes-osm/) pour les étapes sans nom ni référence : règles fondées sur la
+  // référence de la route seulement (week-end Île-de-France, réseau AURA) ; avertissements, jamais le calcul.
+  const geo = axes?.status === 'ok' ? geoRoadsFor(route, axes.data, { copyTolerance: axes.meta?.tolerance ?? null }) : null;
+  const bans = bansAlongRoute(route, { vehicle, departure, elapsed, geo: geo?.status === 'ok' ? geo : null });
   const lines = [];
   const short = [];
   // Tunnels interdits en premier : ils se contournent avant le départ, pas sur place.
@@ -229,6 +234,7 @@ export function routeRules(route, {
     avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
     countries: ctry, weight, winter: win, euro, tolls: toll, foreignTolls: ftoll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
+    axes: { geo, tech: axes ? axisTechText(axes, geo) : null },
   };
 }
 

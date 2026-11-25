@@ -110,8 +110,11 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   hors guidage `plan-park.js`, vitesse inconnue = grisé), une requête dans le budget de 3 avec les diagnostics 2f
   (`computeAvoidRoute`), carré 80 m, 150 km à vol d'oiseau ; jamais dit, rien dans le guidage.
 - Audit OSM (v71, Action manuelle « Audit OSM », `osm-audit.js`, `axes-convert.js`) : lecture seule, jamais d'écriture
-  dans OSM ; extrait Geofabrik, secours download.openstreetmap.fr (v72) ; fiches « à vérifier sur place » ; copie `data/axes-osm/` (≤ 5 Mo / 30 Mo, jamais précachée), rien
-  dans l'appli avant la PR 3. Détail : skill `gabarit-structure`.
+  dans OSM ; extrait Geofabrik, secours download.openstreetmap.fr (v72) ; fiches « à vérifier sur place » ; copie `data/axes-osm/` (≤ 5 Mo / 30 Mo, jamais précachée). Détail : skill `gabarit-structure`.
+- Repli par la géométrie (PR 3a, v73, `axis-match.js`, copie `data/axes-osm/`) : ref des étapes ORS sans nom seulement
+  (étape nommée jamais réécrite), 15 m, cap ≤ 30° modulo 180°, séries ≥ 300 m, ambigu = inconnu, copie simplifiée > 3 m
+  = désactivé ; règles fondées sur la ref (week-end IdF, AURA) et diagnostic seulement, jamais le « Recommandé » ni le
+  calcul ; « à vérifier », jamais dit. « Copier la réponse ORS » (diagnostic) à l'arrêt seulement, mémoire seulement.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

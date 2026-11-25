@@ -214,11 +214,20 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   priorités 1 interdiction PL > 2 hauteur basse < 4,30 m > 3 hauteur inconnue, `splitCards` ≤ 5 Mo, rapport et
   « Trous connus » d'Île-de-France) et `src/lib/axes-convert.js` (copie `data/axes-osm/` : motorway / trunk / primary
   + bretelles, `ref` normalisé, cases de 1° `{ r, a:[[i_ref|-1, classe, x0, y0, dx, dy…]] }`, 3 / 8 / 20 m, ≤ 5 Mo par
-  fichier et 30 Mo en tout, sinon rien d'écrit ; lue par le repli de la PR 3, jamais précachée). Sections
+  fichier et 30 Mo en tout, sinon rien d'écrit ; lue par le repli de la PR 3a, jamais précachée). Sections
   d'interdiction : `tools/audit-osm-interdictions.json` (tableau 4 de `docs/etude-osm-axes.md`, communes de début et
   de fin dans une zone, un seul nœud `place` chacune, sinon « non localisée »). Écrit `data/audit-osm/`,
   `data/axes-osm/`, `docs/audit-osm-axes.md`. Tests `osm-audit.test.js`, `axes-convert.test.js` sur la fixture
   synthétique `osm-audit-axes.geojsonseq` ; `--geojsonseq fichier` pour essayer sans osmium.
+- Repli par la géométrie (PR 3a, v73) : `src/lib/axis-match.js` (`parseAxesTile`, `mergeAxesTiles`, `matchRouteAxes`,
+  `geoRoadsFor` mémorisé, `axisTechText`) ; lu par `route-rules.js` (option `axes` = état de la copie), passé en `geo` à
+  `hgv-bans.js` → `sampleRoute(route, pas, { geo })` et à `roadStatsText` (diagnostic). `segmentClasses`/`roadStats`
+  sans option = calcul d'origine (Recommandé). Copie chargée par `createTileCopy` (`src/ui/bridges.js`, option `meta` :
+  `tolerance` de l'index) dans `app.js` comme les ponts. Réponse ORS gardée en mémoire (`rawResponseOf`,
+  `ors-response.js`) pour « Copier la réponse ORS » (`summary.js`, à l'arrêt). Fixture reconstituée
+  `ors-directions-joigny-gonfreville.json` + cases réduites `tests/fixtures/axes-osm-joigny/` par
+  `tools/make-fixture-axes.mjs` (A6, N12, A13, A131 ; à remplacer par une vraie réponse copiée). Tests
+  `axis-match.test.js` ; interface `ui-check repli` (option `axesCopy` d'`open` : 'repo', 'fixture', null).
 - `tools/aires-pl-update.mjs` + `.github/workflows/aires-pl.yml` : copie hebdomadaire du jeu officiel des aires PL
   dans `data/aires-pl.json` (lançable à la main ; fichiers locaux en arguments pour essayer)
 - `tools/osm-update.mjs` + `.github/workflows/osm-data.yml` (Action « Données OSM (tunnels ADR, aires PL, accès) ») :

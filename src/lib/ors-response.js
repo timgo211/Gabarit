@@ -164,7 +164,26 @@ export function parseDirections(json) {
   const feature = Array.isArray(json?.features) ? json.features[0] : null;
   const route = parseFeature(feature, json?.bbox);
   if (!route) throw new NoRouteError();
+  keepRaw(route, feature, json);
   return route;
+}
+
+// PR 3a : réponse d'ORS gardée en mémoire pour chaque itinéraire lu (jamais enregistrée, jamais exportée), pour le
+// bouton « Copier la réponse ORS » du diagnostic : une vraie réponse permet de figer une fixture de test. La clé
+// d'API n'y est jamais (elle part dans l'en-tête Authorization de la requête, pas dans la réponse).
+const rawResponses = new WeakMap();
+function keepRaw(route, feature, json) {
+  rawResponses.set(route, { feature, bbox: Array.isArray(json?.bbox) ? json.bbox : null, metadata: json?.metadata ?? null });
+}
+
+/**
+ * Réponse d'ORS (une Feature) de cet itinéraire, au format GeoJSON d'ORS ; null si l'itinéraire n'a pas été lu dans
+ * cette session (itinéraire repris de la mémoire v53, par exemple).
+ */
+export function rawResponseOf(route) {
+  const r = route && typeof route === 'object' ? rawResponses.get(route) : null;
+  if (!r) return null;
+  return { type: 'FeatureCollection', bbox: r.feature?.bbox ?? r.bbox, features: [r.feature], metadata: r.metadata };
 }
 
 /**
@@ -178,7 +197,10 @@ export function parseAllDirections(json) {
   const routes = [];
   for (const f of features) {
     const r = parseFeature(f, fallback);
-    if (r) routes.push(r.bbox ? r : { ...r, bbox: bboxOf(r.coordinates) });
+    if (!r) continue;
+    const route = r.bbox ? r : { ...r, bbox: bboxOf(r.coordinates) };
+    keepRaw(route, f, json);
+    routes.push(route);
   }
   if (!routes.length) throw new NoRouteError();
   return routes;
