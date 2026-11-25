@@ -285,7 +285,7 @@ async function open(browser, base, {
     if (url.includes('/openrouteservice/v2/directions/')) {
       stats.directions += 1;
       const body = JSON.parse(route.request().postData() || '{}');
-      const json = directions ? directions(body) : (body.alternative_routes
+      const json = directions ? await directions(body) : (body.alternative_routes
         ? fixture('ors-directions-alternatives.json') : fixture('ors-directions-nav.json'));
       // Phase 5h bis : { __status, ...corps } simule une réponse d'erreur d'ORS (statut HTTP et corps).
       if (json && json.__status) { const { __status, ...rest } = json; return route.fulfill({ status: __status, json: rest }); }
@@ -5521,6 +5521,141 @@ async function axesFallbackCheck(browser, base) {
   await none.ctx.close();
 }
 
+/**
+ * v77 : réponse ORS simulée du contournement par la rocade Est (jamais une vraie réponse) : tracé de la vraie fixture
+ * Mâcon → Valence au nord de 46,0° N, puis les trois points de passage reçus, puis la fixture au sud de 45,5° N ;
+ * une étape par tronçon, sans extras. Sert à vérifier l'affichage, pas le tracé réel d'ORS.
+ */
+function simulatedRocade(body) {
+  const direct = fixture('ors-directions-macon-valence.json');
+  const f = direct.features[0];
+  const c = f.geometry.coordinates;
+  const north = c.filter((p) => p[1] >= 46.0);
+  const south = c.filter((p) => p[1] < 45.5);
+  const via = (body.coordinates ?? []).slice(1, -1);
+  const coords = [...north, ...via, ...south];
+  const wp = [0, ...via.map((_, i) => north.length + i), coords.length - 1];
+  const segments = wp.slice(1).map((b, i) => ({
+    distance: 50000, duration: 2500,
+    steps: [{ distance: 50000, duration: 2500, type: 0, instruction: 'Continuer', name: 'A 46', way_points: [wp[i], b] },
+      { distance: 0, duration: 0, type: 10, instruction: 'Arrivée', name: '-', way_points: [b, b] }],
+  }));
+  return {
+    ...direct,
+    features: [{ ...f, geometry: { ...f.geometry, coordinates: coords },
+      properties: { segments, extras: {}, summary: { distance: f.properties.summary.distance + 31000, duration: f.properties.summary.duration + 1500 }, way_points: wp } }],
+  };
+}
+
+/**
+ * v77 : contournement automatique de Lyon (vraie fixture Mâcon → Valence, copies data/ du dépôt, rocade simulée) :
+ * ligne « Calcul du contournement de Lyon… » et « Démarrer » grisé pendant la requête, puis rocade « Recommandé »
+ * seule ; échec (ORS 500) : fiche rouge, bouton manuel, confirmation avant le départ, rien dit en guidage ; réglage
+ * désactivé : comportement v76 ; 3,5 t : rien.
+ */
+async function lyonAutoCheck(browser, base) {
+  const direct = fixture('ors-directions-macon-valence.json');
+  const line = direct.features[0].geometry.coordinates;
+  const valence = () => {
+    const j = fixture('pelias-autocomplete.json');
+    return { ...j, features: j.features.map((ft) => ({ ...ft, geometry: { ...ft.geometry, coordinates: [4.9, 44.93] } })) };
+  };
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const run = async ({ width, height, theme = 'day', fail = false, settings = null, vehicle = null }) => {
+    const via = [];
+    const o = await open(browser, base, {
+      width, height, theme, voice: true, start: line[0], pelias: valence, overpass: () => ({ elements: [] }), settings, vehicle,
+      directions: async (body) => {
+        if ((body.coordinates ?? []).length > 2) {
+          via.push(body);
+          await wait(1500);
+          return fail ? { __status: 500, error: { code: 2099, message: 'erreur simulée' } } : simulatedRocade(body);
+        }
+        return direct;
+      },
+    });
+    return { ...o, via };
+  };
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, via } = await run({ width, height, theme });
+    await computeRoute(page);
+    const sawPending = await page.waitForFunction(() => /Calcul du contournement de Lyon/.test(document.querySelector('#summary')?.textContent ?? ''), null, { timeout: 10000 }).then(() => true).catch(() => false);
+    check(sawPending, `${tag} : « Calcul du contournement de Lyon… » pendant la requête`);
+    check(sawPending && await page.locator('#btn-nav-start').isDisabled(), `${tag} : « Démarrer » grisé pendant le calcul`);
+    const done = await page.waitForFunction(() => /Contournement de Lyon appliqué/.test(document.querySelector('#summary')?.textContent ?? ''), null, { timeout: 15000 }).then(() => true).catch(() => false);
+    check(done, `${tag} : contournement appliqué`);
+    const cards = await page.$$eval('.route-card', (n) => n.map((c) => c.textContent));
+    check(cards.length === 1 && /^Recommandé \(aussi : Rocade Est\)/.test(cards[0]), `${tag} : rocade seule, « Recommandé »`, cards.join(' | '));
+    check(/Allonge de \d+ km \/ [^.]+ par rapport au trajet direct\./.test(cards[0] ?? ''), `${tag} : ligne « Allonge de X km / Y min »`, cards[0]);
+    check(/À vérifier\. La signalisation fait foi\. Sources : Bison Futé/.test(cards[0] ?? ''), `${tag} : « à vérifier », sources`);
+    check(via.length === 1 && !via[0].alternative_routes && !via[0].options?.avoid_polygons, `${tag} : une requête avec points de passage, sans alternative_routes ni polygone`, String(via.length));
+    check(!(await page.locator('#btn-nav-start').isDisabled()), `${tag} : « Démarrer » actif après`);
+    check(await page.locator('.route-card.banned').count() === 0, `${tag} : aucune fiche rouge`);
+    await noHorizontalScroll(page, `${tag} lyon`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-lyon-auto.png`) });
+    await page.waitForTimeout(1000);
+    check(via.length === 1, `${tag} : pas de 2e requête après de nouveaux dessins`, String(via.length));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  // Échec d'ORS : trajet direct gardé une fois, en rouge ; bouton manuel ; confirmation avant le départ.
+  {
+    const { page, ctx, errors, via } = await run({ width: 412, height: 900, fail: true });
+    await computeRoute(page);
+    const red = await page.waitForSelector('.route-card.banned', { timeout: 15000 }).then(() => true).catch(() => false);
+    check(red, 'échec : fiche en rouge');
+    const cards = await page.$$eval('.route-card', (n) => n.map((c) => c.textContent));
+    check(cards.length === 1 && /Interdit aux plus de 7,5 t en transit, aucune alternative trouvée/.test(cards[0]), 'échec : direct une seule fois, texte rouge', cards.join(' | '));
+    check(/aucune alternative trouvée\. À vérifier\. La signalisation fait foi\./i.test(await page.textContent('#route-notes')), 'échec : ligne de la règle, « à vérifier »');
+    check(await page.locator('.btn-bypass').count() === 1, 'échec : bouton « Contourner par la rocade Est » gardé');
+    await page.click('#btn-nav-start');
+    check(await page.locator('#start-confirm:not([hidden])').count() === 1, 'échec : confirmation avant le départ');
+    check(/Démarrer quand même \?/.test(await page.textContent('#start-confirm')), 'échec : texte de la confirmation');
+    check(await page.locator('#nav:not([hidden])').count() === 0, 'échec : rien démarré avant la confirmation');
+    await page.click('#btn-start-cancel');
+    check(await page.locator('#start-confirm[hidden]').count() === 1 && await page.locator('#nav:not([hidden])').count() === 0, 'échec : « Annuler » ne démarre rien');
+    await noHorizontalScroll(page, 'lyon échec');
+    await page.click('#btn-nav-start');
+    await page.screenshot({ path: join(SHOTS, '412x900-day-lyon-echec.png') });
+    await page.click('#btn-start-anyway');
+    const started = await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).then(() => true).catch(() => false);
+    check(started, 'échec : « Démarrer quand même » démarre');
+    await page.waitForTimeout(1500);
+    check(!/Lyon|7,5 t|interdit/i.test(await page.textContent('#nav')), 'échec : rien sur Lyon dans le guidage');
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((t) => /Lyon|rocade|interdit|7,5/i.test(t)), 'échec : rien dit sur Lyon', spoken.join(' | '));
+    check(via.length === 1, 'échec : une seule requête automatique', String(via.length));
+    check(errors.length === 0, 'échec : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+  // Réglage désactivé : comportement v76 (bouton seul, rien d'automatique, rien en rouge).
+  {
+    const { page, ctx, errors, via } = await run({ width: 412, height: 900, settings: { autoBypass: false } });
+    await computeRoute(page);
+    await page.waitForTimeout(2500);
+    check(via.length === 0, 'réglage désactivé : aucune requête automatique', String(via.length));
+    check(await page.locator('.route-card.banned').count() === 0, 'réglage désactivé : rien en rouge');
+    check(await page.locator('.btn-bypass').count() === 1, 'réglage désactivé : bouton v76 présent');
+    await page.click('#btn-settings');
+    await page.waitForTimeout(300);
+    check(await page.locator('#auto-bypass').isChecked() === false, 'réglage désactivé : case décochée dans Réglages');
+    check(errors.length === 0, 'réglage désactivé : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+  // Fourgon 3,5 t : pas concerné.
+  {
+    const { page, ctx, errors, via } = await run({
+      width: 412, height: 900, vehicle: { id: 'v1', name: 'Fourgon', height: 2.8, width: 2.2, length: 6, weight: 3.5, axleload: 2, maxSpeed: 90 },
+    });
+    await computeRoute(page);
+    await page.waitForTimeout(2500);
+    check(via.length === 0 && !/Lyon/.test(await page.textContent('#route-notes')), '3,5 t : rien sur Lyon, aucune requête');
+    check(errors.length === 0, '3,5 t : aucune erreur JavaScript', errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5532,7 +5667,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

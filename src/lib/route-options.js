@@ -537,8 +537,12 @@ export function optionStops(option, stops = []) {
  * v76 : itinéraire « Rocade Est » (lyon-bypass.js) : mêmes réglages que l'itinéraire choisi (aucun polygone ajouté),
  * étapes = celles du trajet + trois points de passage techniques ; note avec l'écart si le trajet s'allonge fort.
  */
-export function rocadeOption(option, route, stops, note) {
-  return { key: 'rocade', label: 'Rocade Est', note, also: [], route, request: { ...option.request }, stops };
+export function rocadeOption(option, route, stops, note, { recommended = false } = {}) {
+  // v77 : contournement automatique → « Recommandé » (en tête de liste), « Rocade Est » en « aussi ».
+  return {
+    key: 'rocade', label: recommended ? VARIANTS.recommended.label : 'Rocade Est', note, also: recommended ? ['Rocade Est'] : [],
+    route, request: { ...option.request }, stops, ...(recommended ? { auto: true } : {}),
+  };
 }
 
 /**
@@ -560,6 +564,7 @@ export function noZfeOption(option, route, avoidPolygons, names) {
  */
 export async function computeAvoidRoute({
   start, end, vehicle, avoidTolls = false, avoidFerries = false, preference = null, avoidPolygons = null, send, via = [],
+  diagnose = true,
 }) {
   let requests = 1;
   try {
@@ -567,7 +572,8 @@ export async function computeAvoidRoute({
     const routes = parseAllDirections(await send(req));
     return { route: routes[0], requests };
   } catch (err) {
-    if (err?.code === 2009) {
+    // v77 : contournement automatique (diagnose false) : exactement une requête, aucun diagnostic de plus.
+    if (diagnose && err?.code === 2009) {
       requests = await diagnose2009({ err, start, end, vehicle, avoidTolls, avoidFerries, send, requests, avoidPolygons, via });
     }
     throw withBlockedHint(err, avoidPolygons);

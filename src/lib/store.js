@@ -70,6 +70,7 @@ export function emptyData() {
       windVoice: true,
       windGust: WIND.GUST.default,
       bridgeWarnings: true,
+      autoBypass: true,
       weightWarnings: true,
       panelCollapsed: false,
       creditsOpen: false,
@@ -134,6 +135,7 @@ export function sanitizeData(raw) {
       windVoice: s.windVoice !== false, // annonce du vent fort (phase 5), activée par défaut
       windGust: sanitizeWindGust(s.windGust), // seuil de rafales (km/h), 70 par défaut
       bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
+      autoBypass: s.autoBypass !== false, // v77 : contournement automatique des interdictions, activé par défaut
       weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
       panelCollapsed: s.panelCollapsed === true, // v62 : panneau de préparation replié (carte seule), déplié par défaut
       creditsOpen: s.creditsOpen === true, // v64 : « Sources et licences » de Réglages dépliée ; repliée par défaut

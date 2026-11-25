@@ -123,6 +123,11 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   et chaussée opposée à gauche), une requête ORS, aucun polygone ajouté ; pas de bouton si départ, arrivée ou étape dans
   la Métropole (contour IGN `metropoleLyon` de `data/contours-ign.json`, lu à la demande). Étape `via` : jamais dite, ni
   « Étape k/n », ni historique, ni repère ; gardée au recalcul. Fourvière jamais déclencheur. Détail : skill zfe.
+- Contournement automatique (v77, réglage `autoBypass`, oui par défaut ; non = v76) : plan `ok` du Recommandé d'ORS →
+  1 requête à part (sans diagnostic 2009), une fois par calcul (`choice.lyonAuto`, mémoire v53) ; trouvé hors section →
+  rocade « Recommandé », fiches par lyon-a6 / lyon-a7 retirées, « Allonge … par rapport au trajet direct » ; échec →
+  direct en rouge + confirmation avant « Démarrer » (`#start-confirm`), bouton v76 gardé. « Autres itinéraires » : rien
+  d'auto, rouge + 2e appui. Jamais dit, rien dans le guidage. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

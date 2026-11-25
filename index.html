@@ -259,6 +259,14 @@
       </div>
       <div id="summary" class="summary" aria-live="polite" hidden></div>
       <button type="button" id="btn-nav-start" class="btn btn-primary btn-big btn-start" hidden>▶ Démarrer le guidage</button>
+      <!-- v77 : itinéraire interdit sans alternative trouvée : confirmation avant le départ (deux gros boutons). -->
+      <div id="start-confirm" class="start-confirm" role="alertdialog" aria-labelledby="start-confirm-title" hidden>
+        <p id="start-confirm-title" class="start-confirm-title"></p>
+        <div class="nav-confirm-buttons">
+          <button type="button" id="btn-start-cancel" class="btn btn-primary">Annuler</button>
+          <button type="button" id="btn-start-anyway" class="btn btn-danger">Démarrer quand même</button>
+        </div>
+      </div>
       <!-- Phase 4 : stations à moins de 2 km du tracé, prix du gazole (à l'arrêt seulement). -->
       <button type="button" id="btn-fuel" class="btn btn-big btn-fuel" aria-disabled="true" hidden>⛽ Carburant sur le trajet</button>
       <div id="route-notes" class="route-notes" hidden></div>
@@ -400,6 +408,12 @@
           <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a>
           (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>).
           La signalisation et les consignes sur place font foi.</p>
+      </section>
+
+      <section class="card">
+        <h3>Interdictions</h3>
+        <label class="toggle"><input type="checkbox" id="auto-bypass"> Contournement automatique des interdictions</label>
+        <p class="hint">Interdiction connue sur le trajet (Lyon, A6 et A7 aux plus de 7,5 t en transit) : un itinéraire qui l'évite est calculé seul et proposé en « Recommandé » ; sans alternative, le trajet interdit est marqué en rouge et une confirmation est demandée avant le départ. Désactivé : bouton « Contourner » seulement. À vérifier : la signalisation fait foi.</p>
       </section>
 
       <section class="card">

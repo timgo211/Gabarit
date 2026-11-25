@@ -137,3 +137,10 @@ test('v62 : panneau de préparation replié gardé (booléen), déplié par déf
   d.settings.panelCollapsed = true;
   assert.equal(JSON.parse(exportData(d)).settings.panelCollapsed, true);
 });
+
+test('v77 : « Contournement automatique des interdictions » activé par défaut, seul false le coupe, mémorisé', () => {
+  assert.equal(emptyData().settings.autoBypass, true);
+  assert.equal(sanitizeData({ ...emptyData(), settings: {} }).settings.autoBypass, true);
+  assert.equal(sanitizeData({ ...emptyData(), settings: { autoBypass: false } }).settings.autoBypass, false);
+  assert.equal(sanitizeData({ ...emptyData(), settings: { autoBypass: 'non' } }).settings.autoBypass, true);
+});

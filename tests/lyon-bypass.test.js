@@ -201,3 +201,95 @@ test('fiche « Rocade Est » : ses étapes servent au guidage et au recalcul ; l
   assert.deepEqual(guidanceParams(base, { start: [1, 2], end: [3, 4], stops: [{ label: 'A', lon: 1, lat: 1 }] }).stops.length, 1);
   assert.deepEqual(optionStops(base, null), []);
 });
+
+// ───────── v77 : contournement automatique (aucune API : réponses ORS simulées, tracés tirés de la vraie fixture) ─────────
+import { LYON_AUTO, autoBypassStart, autoCost, autoNote, applyAutoBypass } from '../src/lib/lyon-bypass.js';
+import { computeAvoidRoute } from '../src/lib/route-options.js';
+
+/** Tracé simulé : la vraie fixture coupée avant Lyon (Mâcon → nord d'Anse), donc hors des sections lyon-a6 / lyon-a7. */
+function northPart(r) {
+  const n = r.coordinates.findIndex((p) => p[1] < 46.0);
+  return { ...r, coordinates: r.coordinates.slice(0, n), steps: [], roadExtras: null, distance: r.distance + 25000, duration: r.duration + 1200 };
+}
+
+test('v77, 44 t Mâcon → Valence : contournement automatique lancé (plan ok) ; 3,5 t : rien ; Métropole : local', () => {
+  assert.equal(autoBypassStart(planFor(route())), 'run');
+  assert.equal(autoBypassStart(planFor(route(), { vehicle: VAN })), 'none');
+  const inside = route().coordinates.find((p) => inMetro(p, METRO.rings));
+  assert.equal(autoBypassStart(planFor(route(), { start: inside })), 'local');
+});
+
+test('v77 : copies encore en lecture → attendre ; contour ou axes absents, étapes pleines → échec (fiche rouge)', () => {
+  const noMetro = planFor(route(), { metro: { status: 'loading', rings: null } });
+  assert.equal(autoBypassStart(noMetro, { metroStatus: 'loading' }), 'wait');
+  assert.deepEqual(autoBypassStart(noMetro, { metroStatus: 'failed' }), { fail: 'metro' });
+  const noAxes = planFor(route(), { axes: { status: 'loading', data: null } });
+  assert.equal(autoBypassStart(noAxes, { axesStatus: 'loading' }), 'wait');
+  assert.deepEqual(autoBypassStart(noAxes, { axesStatus: 'failed' }), { fail: 'points' });
+  const ten = Array.from({ length: 10 }, (_, i) => ({ label: `E${i}`, lon: 4.85, lat: 45 + i * 0.001 }));
+  assert.deepEqual(autoBypassStart(planFor(route(), { stops: ten })), { fail: 'full' });
+  assert.equal(autoBypassStart(null), 'none');
+});
+
+test('v77 : contournement qui repasse par la section (tracé direct + points de passage) → encore concerné', () => {
+  const plan = planFor(route());
+  const again = planFor(route(), { stops: plan.via });
+  assert.equal(again.concerned, true);
+  assert.equal(again.applied, true);
+  assert.equal(autoBypassStart(again), 'done'); // jamais une 2e requête
+  const clean = planFor(northPart(route()), { stops: plan.via });
+  assert.equal(clean.concerned, false);
+});
+
+test('v77 : fiches après contournement : rocade « Recommandé » en tête, fiches par Lyon retirées, choix du chauffeur', () => {
+  const r = route();
+  const direct = { key: 'recommended', label: 'Recommandé', also: [], note: '', route: r, request: { avoidTolls: false, preference: null } };
+  const court = { key: 'shortest', label: 'Plus court', also: [], note: '', route: r, request: { preference: 'shortest' } };
+  const ailleurs = { key: 'no-toll', label: 'Sans péage', also: [], note: '', route: northPart(r), request: { avoidTolls: true } };
+  const plan = planFor(r);
+  const ro = rocadeOption(direct, northPart(r), plan.via, autoNote(autoCost(r, northPart(r))), { recommended: true });
+  assert.equal(ro.label, 'Recommandé');
+  assert.deepEqual(ro.also, ['Rocade Est']);
+  assert.equal(ro.auto, true);
+  const crosses = [true, true, false];
+  let out = applyAutoBypass({ options: [direct, court, ailleurs], crosses, rocade: ro, selected: 0 });
+  assert.deepEqual(out.options.map((o) => o.key), ['rocade', 'no-toll']);
+  assert.equal(out.selected, 0);
+  assert.equal(out.replaced, false); // choix par défaut : pas un choix du chauffeur
+  out = applyAutoBypass({ options: [direct, court, ailleurs], crosses, rocade: ro, selected: 1, manual: true });
+  assert.equal(out.selected, 0);
+  assert.equal(out.replaced, true); // fiche directe touchée : remplacée, message
+  out = applyAutoBypass({ options: [direct, court, ailleurs], crosses, rocade: ro, selected: 2, manual: true });
+  assert.equal(out.options[out.selected], ailleurs); // fiche hors de Lyon choisie : gardée
+  assert.equal(out.replaced, false);
+  const old = { ...ro, key: 'rocade', label: 'Rocade Est' };
+  assert.equal(applyAutoBypass({ options: [direct, old], crosses: [true, false], rocade: ro }).options.length, 1);
+});
+
+test('v77 : écart toujours affiché (sans seuil), note avec la règle, les sources, « à vérifier »', () => {
+  const orig = { distance: 180000, duration: 8700 };
+  assert.equal(autoCost(orig, { distance: 185000, duration: 9000 }).text, 'Allonge de 5 km / 5 min par rapport au trajet direct.');
+  assert.match(autoCost(orig, { distance: 170000, duration: 8000 }).text, /^Écart avec le trajet direct : −10 km, −12 min\.$/);
+  assert.equal(autoCost(null, orig), null);
+  const note = autoNote(autoCost(orig, { distance: 200000, duration: 9500 }));
+  assert.match(note, /^Contournement de Lyon appliqué : A6 et A7 \(Limonest – Ternay\) interdites aux plus de 7,5 t en transit, sauf desserte locale\. À vérifier\. La signalisation fait foi\. Sources : Bison Futé/);
+  assert.match(note, /Allonge de 20 km \/ 13 min par rapport au trajet direct\.$/);
+  assert.match(LYON_AUTO.BANNED_TEXT, /aucune alternative trouvée\. À vérifier\. La signalisation fait foi\. Sources :/i);
+  assert.match(LYON_AUTO.CONFIRM_TEXT, /Démarrer quand même \?$/);
+});
+
+test('v77 : requête automatique = exactement une requête, aucun diagnostic 2009 ; échec relancé (direct en rouge)', async () => {
+  let sent = 0;
+  const err = Object.assign(new Error('Route could not be found'), { code: 2009, kind: 'no-route' });
+  const send = async () => { sent += 1; throw err; };
+  const via = planFor(route()).via.map((s) => [s.lon, s.lat]);
+  await assert.rejects(computeAvoidRoute({ start: [4.83, 46.3], end: [4.89, 44.93], vehicle: SEMI, via, send, diagnose: false }));
+  assert.equal(sent, 1);
+  sent = 0;
+  await assert.rejects(computeAvoidRoute({ start: [4.83, 46.3], end: [4.89, 44.93], vehicle: SEMI, via, send }));
+  assert.ok(sent > 1); // bouton v76 : diagnostic gardé
+  const offline = Object.assign(new Error('hors ligne'), { kind: 'offline' });
+  sent = 0;
+  await assert.rejects(computeAvoidRoute({ start: [4.83, 46.3], end: [4.89, 44.93], vehicle: SEMI, via, diagnose: false, send: async () => { sent += 1; throw offline; } }), /hors ligne/);
+  assert.equal(sent, 1);
+});

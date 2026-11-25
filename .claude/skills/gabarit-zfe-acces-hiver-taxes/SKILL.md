@@ -174,3 +174,22 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   Mâcon → Valence, cases `axes-osm-macon-valence` avec toutes les A46, N346, A6, A7 : `make-fixture-axes.mjs --refs`).
 - Champ « Essieux » du profil (`axles` : '', '2', '3', '4', '5+') : montré seulement si `AXLE_AMOUNTS` (un montant codé
   en dépend), sinon valeur gardée ; exporté avec les véhicules (normalizeVehicle).
+- Contournement automatique (v77, `lyon-bypass.js` : `LYON_AUTO`, `autoBypassStart`, `autoCost`, `autoNote`,
+  `applyAutoBypass` ; app.js : `maybeAutoBypass`, `runAutoBypass`, `requestBypass`) : Réglages › « Contournement
+  automatique des interdictions » (`settings.autoBypass`, oui par défaut, seul false coupe ; non = comportement v76
+  exact). Décision sur le plan du Recommandé d'ORS (`options[0]`) dès que les points sensibles sont lus : `run` (plan
+  ok), `local` (Métropole : ligne v76 seulement), `wait` (contour ou axes en lecture), échec (`metro`, `points`, `full`).
+  Requête : `fetchAvoidRoute({ diagnose: false })` = exactement 1 requête, à part du budget de 3 (choix du propriétaire
+  du 25/11/2026), jamais `alternative_routes`, aucun polygone ajouté. Une seule fois par calcul : `choice.lyonAuto`
+  ('pending' | 'done' | 'failed' | 'local' | 'none'), gardé par la mémoire v53 sauf 'pending' (refait à la reprise).
+  Pendant la requête : « Calcul du contournement de Lyon… » sur la 1re fiche, « Démarrer » grisé. Réponse : points
+  sensibles relancés (cases de Lyon déjà lues) ; encore lyon-a6 / lyon-a7 → échec 'still'. Trouvé : fiche `rocade`
+  « Recommandé » (aussi : Rocade Est) en tête, note `APPLIED_TEXT` + sources + « Allonge de X km / Y min par rapport au
+  trajet direct. » (toujours, sans seuil ; plus court → écarts signés), toutes les fiches par Lyon retirées ; fiche du
+  chauffeur gardée si elle évite Lyon, sinon rocade choisie et `REPLACED_TEXT` si elle avait été touchée
+  (`choice.touched`). Échec ('failed') ou Recommandé hors de Lyon avec une autre fiche par Lyon ('none') : fiche rouge
+  (`lyonBanned`, `.route-card.banned`, `BANNED_SHORT`, ligne `BANNED_TEXT` + raison), « Démarrer » → `#start-confirm`
+  (Annuler / Démarrer quand même, voix dans ce geste), bouton v76 gardé (réussi → fiches plus rouges). « Autres
+  itinéraires » : `lyonAuto: 'none'`, rien d'auto, 1er appui sur « Guider » = `CONFIRM_TEXT`, 2e = guidage. Simulation
+  (Réglages) : pas de confirmation. Jamais dit, rien dans le guidage. Interface : `ui-check lyon` (rocade simulée par
+  `simulatedRocade`, jamais une vraie réponse ORS).

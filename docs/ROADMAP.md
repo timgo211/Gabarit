@@ -638,6 +638,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     arrivée ou étape dans la Métropole) ; étapes `via` jamais dites ni montrées, gardées au recalcul. Sources : dépliant
     Bison Futé 2020, question AN n° 146 (2008, à vérifier). Scénario `ui-check` non écrit (MapLibre non installable dans
     le conteneur) : à faire.
+  - [x] **v77 — contournement automatique de Lyon** (PR A du plan « contournement automatique », 25/11/2026) :
+    Réglages › « Contournement automatique des interdictions » (oui par défaut ; non = v76). Après le calcul, 1 requête
+    à part (sans diagnostic 2009) si le plan du Recommandé d'ORS est ok ; rocade « Recommandé », fiches par Lyon
+    retirées, « Allonge … par rapport au trajet direct » toujours ; échec → direct en rouge + confirmation avant le
+    départ. Scénario `ui-check lyon` écrit (rocade simulée : **non vérifié sur ORS réel**).
+  - [ ] **PR B** : affichage rouge + question « Desserte locale dans la zone ? » pour les autres sections localisées.
+  - [ ] **PR C** : contournement par tronçons des nationales (n7-vienne, n59, n66, rn524, le-puy).
+  - [ ] **PR D** : hauteurs (Mont-Blanc, Fréjus, hauteurs basses ≤ véhicule).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

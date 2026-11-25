@@ -18,6 +18,7 @@ import {
 } from './lib/route-options.js';
 import {
   LYON_BYPASS, LYON_STILL_TEXT, lyonBypassPlan, withBypassStops, bypassCost, bypassNote,
+  LYON_AUTO, autoBypassStart, autoCost, autoNote, applyAutoBypass,
 } from './lib/lyon-bypass.js';
 import { prepareLine, locateOnLine } from './lib/nav-geo.js';
 import { avoidLocalFor } from './lib/access-local.js';
@@ -487,6 +488,14 @@ function choiceRules(c = choice) {
     r.lyonBypass = bypassOf(o, c, r);
     if (r.lyonBypass.concerned) loadMetro();
     if (r.lyonBypass.lines.length) r.lines.unshift(...r.lyonBypass.lines);
+    // v77 : contournement automatique en échec (ou Recommandé hors de Lyon et cette fiche par Lyon) : fiche en rouge,
+    // confirmation avant le départ. Réglage désactivé : comportement v76 (rien de rouge).
+    r.lyonBanned = autoBypassOn() && r.lyonBypass.concerned && r.lyonBypass.reason !== 'local'
+      && (c.lyonAuto === 'failed' || c.lyonAuto === 'none');
+    if (r.lyonBanned) {
+      const why = c.lyonAuto === 'failed' ? LYON_AUTO.FAIL_REASONS[c.lyonAutoReason] : '';
+      r.lines.unshift({ level: 'warn', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
+    }
     return r;
   });
   // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
@@ -710,41 +719,20 @@ async function bypassLyon() {
   const option = choice.options[choice.selected];
   const plan = choiceRules()?.[choice.selected]?.lyonBypass;
   if (!plan?.ok) return;
-  let line = null;
-  try { line = prepareLine(option.route.coordinates); } catch { line = null; }
-  const alongOf = (p) => (line ? locateOnLine(line, p).along : 0);
-  const stops = withBypassStops(optionStops(option, choice.stops), plan.via, alongOf);
-  // Zones évitées de la fiche (ZFE, restrictions) gardées si ORS les accepte encore (150 km à vol d'oiseau, points
-  // de passage compris) ; sinon non envoyées, et la fiche le dit.
-  const had = option.request.avoidPolygons ?? null;
-  const avoidPolygons = avoidForReroute(had, choice.start, choice.end, stopPoints(stops));
   bypassBusy = true;
   renderChoice();
   showMessage(messageNode, '');
   try {
-    const route = await fetchAvoidRoute({
-      apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
-      avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
-      avoidPolygons, via: stopPoints(stops),
-    });
+    const { route, stops, avoidPolygons, had } = await requestBypass(option, plan, { diagnose: true });
     if (!choice || navigation.active) return;
     const note = [bypassNote(bypassCost(option.route, route)), had && !avoidPolygons ? LYON_BYPASS.ZONES_DROPPED_TEXT : '']
       .filter(Boolean).join(' ');
     const ro = { ...rocadeOption(option, route, stops, note), request: { ...option.request, avoidPolygons } };
     const options = [...choice.options.filter((o) => o.key !== 'rocade'), ro];
-    choice = { ...choice, options, selected: options.length - 1 };
+    // v77 : appui réussi (réessai après un échec automatique) : plus de fiche rouge pour la rocade trouvée.
+    choice = { ...choice, options, selected: options.length - 1, ...(choice.lyonAuto === 'failed' ? { lyonAuto: 'none' } : {}) };
     map.showRoutes(options.map((o) => o.route), choice.selected);
-    areas.select(route);
-    access.extend(route);
-    bridges.extend(route);
-    axes.extend(route);
-    sensitive.extend(route);
-    weightLimits.extend(route);
-    speedLimits.extend(route);
-    directions.extend(route);
-    places.extend(route);
-    lanes.extend(route);
-    winter.extend(route);
+    extendRoute(route);
     // Points sensibles relancés sur le nouveau tracé : encore une section interdite → message.
     if (choiceRules()?.[choice.selected]?.lyonBypass?.concerned) showMessage(messageNode, LYON_STILL_TEXT, 'info');
   } catch (err) {
@@ -755,9 +743,128 @@ async function bypassLyon() {
   }
 }
 
+/** Copies du trajet (cases data/…) complétées pour un nouveau tracé, aires replacées. */
+function extendRoute(route) {
+  areas.select(route);
+  access.extend(route);
+  bridges.extend(route);
+  axes.extend(route);
+  sensitive.extend(route);
+  weightLimits.extend(route);
+  speedLimits.extend(route);
+  directions.extend(route);
+  places.extend(route);
+  lanes.extend(route);
+  winter.extend(route);
+}
+
+/**
+ * Une requête ORS avec les trois points de passage de la rocade (bouton v76 et contournement automatique v77) :
+ * étapes de la fiche gardées, zones évitées gardées si ORS les accepte encore (150 km à vol d'oiseau, points de passage
+ * compris), sinon non envoyées. `diagnose` false (automatique) : exactement une requête.
+ */
+async function requestBypass(option, plan, { diagnose }) {
+  let line = null;
+  try { line = prepareLine(option.route.coordinates); } catch { line = null; }
+  const alongOf = (p) => (line ? locateOnLine(line, p).along : 0);
+  const stops = withBypassStops(optionStops(option, choice.stops), plan.via, alongOf);
+  const had = option.request.avoidPolygons ?? null;
+  const avoidPolygons = avoidForReroute(had, choice.start, choice.end, stopPoints(stops));
+  const route = await fetchAvoidRoute({
+    apiKey: store.getApiKey(), vehicle: choice.vehicle, start: choice.start, end: choice.end,
+    avoidTolls: option.request.avoidTolls, avoidFerries: choice.avoidFerries, preference: option.request.preference ?? null,
+    avoidPolygons, via: stopPoints(stops), diagnose,
+  });
+  return { route, stops, avoidPolygons, had };
+}
+
+// ───────── v77 : contournement automatique (Réglages › « Contournement automatique des interdictions ») ─────────
+// Lyon seulement : plan du Recommandé d'ORS (options[0]) `ok` → une requête ORS de plus (à part du budget de 3, sans
+// diagnostic), une seule fois par calcul (choice.lyonAuto, gardé par la mémoire v53). Jamais dit, rien dans le guidage.
+const autoBypassOn = () => data.settings.autoBypass !== false;
+let autoSeq = 0; // identifiant du calcul en cours : compteur, jamais l'horloge
+/** @returns {boolean} vrai si l'état a changé (la fiche vient d'être redessinée). */
+function maybeAutoBypass(rules) {
+  if (!choice || navigation.active || !autoBypassOn() || choice.lyonAuto) return false;
+  if (sensitive.state.status !== 'ok') return false; // points sensibles pas encore lus (ou absents : rien n'est décidé)
+  const decision = autoBypassStart(rules?.[0]?.lyonBypass, { metroStatus: metro.status, axesStatus: axes.state.status });
+  if (decision === 'wait') return false;
+  if (decision === 'none') {
+    // Recommandé hors de Lyon : une autre fiche par Lyon est marquée en rouge (aucune requête).
+    if (rules?.some((r) => r.lyonBypass?.concerned && r.lyonBypass.reason !== 'local')) choice.lyonAuto = 'none';
+    else return false;
+  } else if (decision === 'run') {
+    choice.lyonAuto = 'pending';
+    runAutoBypass(rules[0].lyonBypass);
+  } else if (typeof decision === 'object') {
+    choice.lyonAuto = 'failed';
+    choice.lyonAutoReason = decision.fail;
+  } else {
+    choice.lyonAuto = decision; // 'local' | 'done'
+  }
+  renderChoice();
+  saveRoute({ force: true });
+  return true;
+}
+async function runAutoBypass(plan) {
+  const id = ++autoSeq;
+  choice.autoId = id;
+  const option = choice.options[0];
+  const fail = (reason, err = null) => {
+    if (!choice || choice.autoId !== id) return;
+    choice = { ...choice, lyonAuto: 'failed', lyonAutoReason: reason };
+    if (err) showMessage(messageNode, `Contournement de Lyon : ${errorText(err) || 'calcul impossible.'}`, 'info', serviceDetailText(err, store.getApiKey() ?? ''));
+    renderChoice();
+    saveRoute({ force: true });
+  };
+  let res;
+  try {
+    res = await requestBypass(option, plan, { diagnose: false });
+  } catch (err) {
+    fail('request', err);
+    return;
+  }
+  if (!choice || choice.autoId !== id || navigation.active) return;
+  if (!autoBypassOn()) { choice = { ...choice, lyonAuto: undefined }; renderChoice(); return; } // réglage coupé entre-temps
+  const { route, stops, avoidPolygons, had } = res;
+  const extra = had && !avoidPolygons ? LYON_BYPASS.ZONES_DROPPED_TEXT : '';
+  const ro = {
+    ...rocadeOption(option, route, stops, autoNote(autoCost(option.route, route), extra), { recommended: true }),
+    request: { ...option.request, avoidPolygons },
+  };
+  // Points sensibles relancés sur le tracé du contournement (cases de Lyon déjà lues pour le trajet direct).
+  const check = bypassOf(ro, choice, rulesOf(route, choice.vehicle, new Date()));
+  if (check.concerned) { fail('still'); return; }
+  const rules = choiceRules();
+  const crosses = choice.options.map((_, i) => !!rules?.[i]?.lyonBypass?.concerned);
+  const next = applyAutoBypass({ options: choice.options, crosses, rocade: ro, selected: choice.selected, manual: choice.touched === true });
+  choice = { ...choice, options: next.options, selected: next.selected, lyonAuto: 'done' };
+  map.showRoutes(next.options.map((o) => o.route), next.selected); // une seule fois : pas de clignotement
+  extendRoute(route);
+  if (next.replaced) showMessage(messageNode, LYON_AUTO.REPLACED_TEXT, 'info');
+  renderChoice();
+  saveRoute({ force: true });
+}
+
+// v77 : « Démarrer » sur une fiche interdite sans alternative : confirmation (Annuler / Démarrer quand même).
+const startConfirm = { panel: $('#start-confirm'), title: $('#start-confirm-title'), cancel: $('#btn-start-cancel'), go: $('#btn-start-anyway') };
+function hideStartConfirm() { startConfirm.panel.hidden = true; }
+startConfirm.cancel.addEventListener('click', () => hideStartConfirm());
+startConfirm.go.addEventListener('click', () => {
+  hideStartConfirm();
+  if (!choice || navigation.active) return;
+  startGuidance(null); // la première phrase de voix part dans ce geste (règle de Chrome)
+});
+
 function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
+  if (maybeAutoBypass(rules)) return; // v77 : état décidé, fiche déjà redessinée avec lui
+  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.lyonBanned) hideStartConfirm();
+  // v77 : « Démarrer » grisé pendant le calcul du contournement (le trajet direct n'est pas proposé au départ).
+  const pending = choice.lyonAuto === 'pending';
+  navStartBtn.disabled = pending;
+  navStartBtn.setAttribute('aria-disabled', String(pending));
   renderRouteChoice(summaryNode, notesNode, {
     choice, dieselPrice: data.settings.dieselPrice, onSelect: selectRoute,
     rules,
@@ -806,7 +913,7 @@ function showBridgesOnMap(r) {
 /** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
 function selectRoute(index) {
   if (!choice || navigation.active || index === choice.selected || !choice.options[index]) return;
-  choice = { ...choice, selected: index };
+  choice = { ...choice, selected: index, touched: true }; // v77 : choix du chauffeur (gardé par le contournement)
   routeSaveOn = true;
   saveRoute({ force: true });
   map.selectRoute(index);
@@ -861,7 +968,17 @@ function startGuidance(simulate = null, resume = null, carry = null) {
   saveRoute({ force: true });
   return null;
 }
-navStartBtn.addEventListener('click', () => startGuidance(null));
+navStartBtn.addEventListener('click', () => {
+  if (!choice || choice.lyonAuto === 'pending') return;
+  // v77 : itinéraire interdit sans alternative trouvée : confirmation d'abord (jamais le fait accompli).
+  if (choiceRules()?.[choice.selected]?.lyonBanned) {
+    startConfirm.title.textContent = LYON_AUTO.CONFIRM_TEXT;
+    startConfirm.panel.hidden = false;
+    startConfirm.go.focus();
+    return;
+  }
+  startGuidance(null);
+});
 
 // ───────── v44 : « Autres itinéraires » depuis la vue d'ensemble du guidage, à l'arrêt seulement ─────────
 // Recalcul de la position reçue vers l'arrivée, profil actif, même budget (3 requêtes), mêmes règles et même fiche que
@@ -881,6 +998,7 @@ function renderAlternatives() {
     onSelect: (i) => {
       if (!altChoice?.options[i] || !navigation.parked) return;
       altChoice = { ...altChoice, selected: i };
+      altConfirm = false;
       renderAlternatives();
     },
     rulesSource: rulesSourceText(zfeData, {
@@ -889,6 +1007,7 @@ function renderAlternatives() {
     windCredit: weather.status === 'ok',
   });
   altUi.go.hidden = false;
+  altUi.go.textContent = altConfirm ? 'Guider quand même (itinéraire interdit)' : ALT_GO_TEXT;
 }
 function closeAlternatives(reason = '') {
   altTicket += 1;
@@ -906,6 +1025,9 @@ function closeAlternatives(reason = '') {
 }
 /** Départ du dernier calcul « Autres itinéraires » (v55 : étape ajoutée depuis ce panneau). */
 let altFrom = null;
+/** v77 : premier appui sur « Guider » d'une fiche interdite fait ; le second guide. */
+let altConfirm = false;
+const ALT_GO_TEXT = $('#btn-alts-go')?.textContent ?? 'Guider par cet itinéraire';
 /**
  * v44 / v55 : calcul depuis la dernière position, étapes non atteintes gardées ; `extraStop` (fiche carburant ou champ
  * « Ajouter une étape », à l'arrêt seulement) rangé parmi elles selon sa place sur le tracé en cours.
@@ -943,8 +1065,11 @@ async function openAlternatives(from, extraStop = null) {
     if (my !== altTicket || !navigation.active) return;
     altChoice = {
       ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
-      stops,
+      stops, touched: false, autoId: undefined,
+      // v77 : rien d'automatique ici ; fiche par Lyon (A6 / A7) en rouge, confirmation avant de la guider.
+      lyonAuto: 'none', lyonAutoReason: undefined,
     };
+    altConfirm = false;
     for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
@@ -981,6 +1106,14 @@ function showAltsStopField(on) {
 altUi.go.addEventListener('click', () => {
   if (!altChoice || !navigation.active) return;
   if (!navigation.parked) { closeAlternatives('moving'); return; }
+  // v77 : itinéraire par Lyon (A6 / A7) interdit aux plus de 7,5 t en transit : un second appui confirme.
+  if (!altConfirm && choiceRules(altChoice)?.[altChoice.selected]?.lyonBanned) {
+    altConfirm = true;
+    altUi.status.textContent = LYON_AUTO.CONFIRM_TEXT;
+    renderAlternatives();
+    return;
+  }
+  altConfirm = false;
   const sim = navigation.simulating ? { speedKmh: navigation.simSpeedKmh ?? data.settings.simSpeed } : null;
   const carry = navigation.tripCarry; // v56 : même trajet pour l'historique (km, début, étapes faites)
   choice = altChoice;
@@ -1085,6 +1218,7 @@ const settings = createSettings({
   onReportVoiceChange: (on) => setSetting({ reportVoice: on }), // phase 3a : désactivé par défaut
   onSpeedVoiceChange: (on) => setSetting({ speedVoice: on }), // phase 11a : « Limite X » au dépassement, désactivé par défaut
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
+  onAutoBypassChange: (on) => { setSetting({ autoBypass: on }); renderChoice(); }, // v77
   onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
   onClose: () => { settingsOpen = false; syncReportPark(); }, // phase 3a
   onOpen: () => { placesUi?.render(); restrictionsUi.render(); historyPanel.refresh(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu

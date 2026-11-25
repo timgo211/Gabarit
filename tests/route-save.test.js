@@ -106,3 +106,16 @@ test('reprise du guidage : à l\'étape gardée, consignes passées non rejouée
   const out = updateNavigation(r, { lon: p[0], lat: p[1], accuracy: 5, speed: 20, heading: 45, timestamp: 2000 });
   assert.ok(!out.events.some((e) => e.type === 'speak' && /^Restez à droite\.?$/.test(e.text)), 'consigne passée non rejouée');
 });
+
+test('v77 : état du contournement automatique gardé (fait, échec, local) ; « en cours » ou inconnu non gardé', () => {
+  for (const st of ['done', 'failed', 'local', 'none']) {
+    const save = buildSave({ kind: 'plan', choice: { ...choice, lyonAuto: st }, vehicleId: 'v1', now: 1 });
+    assert.equal(save.choice.lyonAuto, st);
+    assert.equal(restoredChoice(save, vehicles).lyonAuto, st);
+  }
+  assert.equal(buildSave({ kind: 'plan', choice: { ...choice, lyonAuto: 'pending' }, vehicleId: 'v1', now: 1 }).choice.lyonAuto, undefined);
+  const bad = buildSave({ kind: 'plan', choice, vehicleId: 'v1', now: 1 });
+  bad.choice.lyonAuto = 'n importe quoi';
+  assert.equal(restoredChoice(bad, vehicles).lyonAuto, undefined);
+  assert.equal('lyonAuto' in restoredChoice(buildSave({ kind: 'plan', choice, vehicleId: 'v1', now: 1 }), vehicles), false);
+});
