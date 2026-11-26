@@ -75,6 +75,9 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - Partage : liste blanche des champs (jamais clé ni véhicule) ; départ « Ma position » exclu sauf case cochée (GPX : tracé
   dès le premier carrefour après 500 m) ; lien reçu validé par `decodeRouteLink` (ne lève jamais), affiché en textContent,
   # effacé après lecture, jamais de calcul ni de guidage automatique.
+  v89 : Chromium refuse `.gpx` et tout type XML au partage Web (extension ET type vérifiés) → GPX téléchargé,
+  `GPX_DOWNLOAD_TEXT` ; nom jamais en `.txt` ; types essayés `GPX_SHARE_TYPES` (`pickShareType`) ; aide
+  `#share-gpx-hint` (`GPX_LINK_HINT`, textContent) sous « Fichier GPX ». ui-check `partage`.
 - Réglages 7c : `arrowColor` (auto, bleu, vert, orange, violet → `--arrow-fill` / `--arrow-stroke`), `voiceName`,
   `voiceRate`, `voiceVolume`. Musique : `navigator.audioSession` absent de Chrome (Safari seulement, MDN
   browser-compat-data) → phrase dans Réglages.

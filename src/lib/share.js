@@ -304,6 +304,39 @@ export function gpxFileName(toLabel) {
 
 export const GPX_MIME = 'application/gpx+xml';
 
+/**
+ * Types essayés (dans cet ordre, par navigator.canShare) pour partager le GPX ; le premier accepté est gardé.
+ * Source : liste officielle de Chromium, chrome/browser/webshare/share_service_impl.cc (IsDangerousFilename,
+ * IsDangerousMimeType) et, pour Android, components/browser_ui/webshare/android/java/src/org/chromium/components/
+ * browser_ui/webshare/ShareServiceImpl.java (PERMITTED_EXTENSIONS, PERMITTED_MIME_TYPES), branche main lue le 26/11/2026
+ * sur raw.githubusercontent.com/chromium/chromium. Un fichier n'est partagé que si son extension ET son type sont
+ * dans la liste : ni .gpx ni .xml, ni application/gpx+xml, application/xml, text/xml n'y sont. Le nom en .gpx étant
+ * gardé (lecture par les applis GPS ; jamais renommé en .txt), aucun type ne peut aider : on garde le type GPX, au cas
+ * où une version future l'accepte, et sinon le fichier est téléchargé (GPX_DOWNLOAD_TEXT).
+ */
+export const GPX_SHARE_TYPES = Object.freeze([GPX_MIME]);
+
+/** Après téléchargement du GPX (partage Android refusé ou absent). */
+export const GPX_DOWNLOAD_TEXT = 'Fichier GPX téléchargé (dossier Téléchargements) : joins-le à ton message.';
+/** Aide sous le bouton « Fichier GPX ». */
+export const GPX_LINK_HINT = 'Pour envoyer l\'itinéraire dans un message, le lien est le plus simple.';
+
+/**
+ * Premier type de `types` accepté par `accepts(type)` (navigator.canShare pour un fichier de ce type), sinon null.
+ * Une erreur de `accepts` compte comme un refus.
+ */
+export function pickShareType(types, accepts) {
+  if (!Array.isArray(types) || typeof accepts !== 'function') return null;
+  for (const type of types) {
+    try {
+      if (accepts(type) === true) return type;
+    } catch {
+      // refusé
+    }
+  }
+  return null;
+}
+
 // ---------- Méthode de partage ----------
 
 /**
@@ -321,13 +354,13 @@ export function pickShareMethod({ kind, hasShare = false, canShareFiles = false,
 }
 
 /** Message affiché après coup ('' : rien à dire, le partage Android s'est chargé du retour). */
-export function shareResultText(method, { cancelled = false, failed = false } = {}) {
+export function shareResultText(method, { cancelled = false, failed = false, gpx = false } = {}) {
   if (cancelled) return '';
   if (failed) {
     return method === 'download' ? 'Téléchargement impossible sur ce navigateur.' : 'Partage impossible : copie le lien ci-dessous.';
   }
   if (method === 'copy') return 'Lien copié : colle-le dans un message.';
-  if (method === 'download') return 'Fichier téléchargé (dossier Téléchargements).';
+  if (method === 'download') return gpx ? GPX_DOWNLOAD_TEXT : 'Fichier téléchargé (dossier Téléchargements).';
   if (method === 'show') return 'Copie ce lien à la main :';
   return '';
 }

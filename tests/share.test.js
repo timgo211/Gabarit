@@ -4,7 +4,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   encodeRouteLink, decodeRouteLink, cleanName, isLonLat, appBaseUrl, osmLink, appShareText, buildGpx, xmlEscape,
-  gpxFileName, privacyStartIndex, pickShareMethod, shareResultText, variantId, findVariantIndex,
+  gpxFileName, privacyStartIndex, pickShareMethod, shareResultText, variantId, findVariantIndex, pickShareType,
+  GPX_MIME, GPX_SHARE_TYPES, GPX_DOWNLOAD_TEXT, GPX_LINK_HINT,
   SHARE, SHARE_VARIANTS, BAD_LINK_TEXT, SHARED_START_NAME, SHARED_ROUTE_TEXT, SHARED_ROUTE_NO_KEY_TEXT,
 } from '../src/lib/share.js';
 import { parseDirections } from '../src/lib/ors-response.js';
@@ -267,4 +268,73 @@ test('« Partager Gabarit » : guide d\'installation pas à pas (lien, Chrome, c
   const text = appShareText();
   for (const [i, step] of INSTALL_STEPS.entries()) assert.ok(text.includes(`${i + 1}. ${step}`));
   assert.doesNotMatch(text, /cle-|key=|api_key/i, 'jamais de clé');
+});
+
+// v89 : partage du GPX quand la feuille de partage Android refuse le fichier.
+// Copie des listes de Chromium (branche main lue le 26/11/2026 : chrome/browser/webshare/share_service_impl.cc et
+// components/browser_ui/webshare/android/.../ShareServiceImpl.java) : extension ET type doivent y être.
+const CHROMIUM_EXTENSIONS = ['avif', 'bmp', 'css', 'csv', 'ehtml', 'flac', 'gif', 'htm', 'html', 'ico', 'jfif', 'jpeg', 'jpg',
+  'm4a', 'm4v', 'mp3', 'mp4', 'mpeg', 'mpg', 'oga', 'ogg', 'ogm', 'ogv', 'opus', 'pdf', 'pjp', 'pjpeg', 'png', 'shtm', 'shtml',
+  'svg', 'svgz', 'text', 'tif', 'tiff', 'txt', 'wav', 'weba', 'webm', 'webp', 'xbm'];
+const CHROMIUM_TYPES = ['application/pdf', 'audio/flac', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm',
+  'audio/x-m4a', 'image/avif', 'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/tiff', 'image/webp',
+  'image/x-icon', 'image/x-ms-bmp', 'image/x-xbitmap', 'text/comma-separated-values', 'text/css', 'text/csv', 'text/html',
+  'text/plain', 'video/mp4', 'video/mpeg', 'video/ogg', 'video/webm'];
+const chromiumAccepts = (name) => (type) => CHROMIUM_EXTENSIONS.includes(name.split('.').pop().toLowerCase()) && CHROMIUM_TYPES.includes(type);
+
+test('v89 : type de partage du GPX — premier accepté gardé, sinon aucun', () => {
+  assert.deepEqual([...GPX_SHARE_TYPES], [GPX_MIME]);
+  assert.ok(Object.isFrozen(GPX_SHARE_TYPES));
+  // Premier accepté, dans l'ordre donné.
+  const tried = [];
+  const accepts = (t) => { tried.push(t); return t === 'b' || t === 'c'; };
+  assert.equal(pickShareType(['a', 'b', 'c'], accepts), 'b');
+  assert.deepEqual(tried, ['a', 'b'], 'arrêt au premier accepté');
+  // Aucun accepté, erreur = refus, entrées invalides.
+  assert.equal(pickShareType(['a', 'b'], () => false), null);
+  assert.equal(pickShareType(['a'], () => { throw new Error('TypeError'); }), null);
+  assert.equal(pickShareType(['a'], () => 'oui'), null, 'seul true compte');
+  assert.equal(pickShareType(null, () => true), null);
+  assert.equal(pickShareType(['a'], null), null);
+  // Chromium : aucun type XML ni .gpx accepté → le GPX est téléchargé ; nom jamais en .txt.
+  const name = gpxFileName('Lyon');
+  assert.match(name, /\.gpx$/);
+  for (const t of [GPX_MIME, 'application/xml', 'text/xml']) assert.equal(chromiumAccepts(name)(t), false, t);
+  assert.equal(chromiumAccepts('x.xml')('text/xml'), false);
+  assert.equal(pickShareType(GPX_SHARE_TYPES, chromiumAccepts(name)), null);
+  assert.equal(pickShareMethod({ kind: 'file', hasShare: true, canShareFiles: !!pickShareType(GPX_SHARE_TYPES, chromiumAccepts(name)) }), 'download');
+  // Navigateur qui accepterait le type GPX : partagé.
+  assert.equal(pickShareType(GPX_SHARE_TYPES, (t) => t === GPX_MIME), GPX_MIME);
+});
+
+test('v89 : texte de repli du GPX et aide sous le bouton ; autres fichiers inchangés', () => {
+  assert.equal(GPX_DOWNLOAD_TEXT, 'Fichier GPX téléchargé (dossier Téléchargements) : joins-le à ton message.');
+  assert.equal(shareResultText('download', { gpx: true }), GPX_DOWNLOAD_TEXT);
+  assert.equal(shareResultText('download'), 'Fichier téléchargé (dossier Téléchargements).');
+  assert.equal(shareResultText('download', { failed: true, gpx: true }), 'Téléchargement impossible sur ce navigateur.');
+  assert.equal(shareResultText('share', { gpx: true }), '');
+  assert.equal(shareResultText('share', { gpx: true, cancelled: true }), '');
+  assert.equal(GPX_LINK_HINT, 'Pour envoyer l\'itinéraire dans un message, le lien est le plus simple.');
+});
+
+test('v89 : contenu du GPX inchangé (départ caché sans la case, jamais de clé ni de profil)', () => {
+  const r = { coordinates: [[4.835712, 45.764043], [4.9, 45.8], [5.0, 45.9]], steps: [{ wayPoints: [0, 1] }, { wayPoints: [1, 2] }] };
+  const now = new Date(Date.UTC(2026, 10, 26, 8));
+  const head = '<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Gabarit" xmlns="http://www.topografix.com/GPX/1/1" '
+    + 'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">\n'
+    + '  <metadata>\n    <name>Gabarit : vers Client</name>\n    <time>2026-11-26T08:00:00.000Z</time>\n  </metadata>\n';
+  const tail = '  <wpt lat="45.9" lon="5"><name>Client</name></wpt>\n  <trk>\n    <name>Gabarit : vers Client</name>\n    <trkseg>\n';
+  assert.equal(buildGpx({ route: r, fromLabel: 'Dépôt', toLabel: 'Client', now }), `${head
+  }  <wpt lat="45.764043" lon="4.835712"><name>Dépôt</name></wpt>\n${tail
+  }      <trkpt lat="45.764043" lon="4.835712"/>\n      <trkpt lat="45.8" lon="4.9"/>\n      <trkpt lat="45.9" lon="5"/>\n    </trkseg>\n  </trk>\n</gpx>\n`);
+  // « Ma position » sans la case : ni point de départ ni début du tracé.
+  const hidden = buildGpx({ route: r, startIsMyPosition: true, toLabel: 'Client', now });
+  assert.equal(hidden, `${head}${tail}      <trkpt lat="45.8" lon="4.9"/>\n      <trkpt lat="45.9" lon="5"/>\n    </trkseg>\n  </trk>\n</gpx>\n`);
+  assert.doesNotMatch(hidden, /4\.835712/);
+  // Case cochée : départ « Point de départ ».
+  assert.match(buildGpx({ route: r, startIsMyPosition: true, includeStart: true, toLabel: 'Client', now }), /<wpt lat="45.764043" lon="4.835712"><name>Point de départ<\/name><\/wpt>/);
+  const vehicle = { ...defaultVehicle(), name: 'Mon Actros secret', height: 4.12 };
+  const gpx = buildGpx({ route: { ...r, apiKey: FAKE_KEY, vehicle }, toLabel: 'Client', apiKey: FAKE_KEY, vehicle, now });
+  assert.doesNotMatch(gpx, new RegExp(FAKE_KEY));
+  assert.doesNotMatch(gpx, /Actros|4\.12|apiKey|vehicle|height|weight/i);
 });
