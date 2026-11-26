@@ -50,7 +50,7 @@ test('section sur le tracé, points A / B à 15 km, tronçon sous 150 km à vol 
 test('zone évitée : un carré de 80 m par point, chacun loin des 200 km² et 20 km d\'ORS', () => {
   const sq = sectionSquares(sectionPoints(COPY, 'n59'));
   assert.equal(sq.type, 'MultiPolygon');
-  assert.equal(sq.coordinates.length, 55);
+  assert.equal(sq.coordinates.length, sectionPoints(COPY, 'n59').length); // un carré par point de la copie
   const ring = sq.coordinates[0][0];
   const w = (ring[1][0] - ring[0][0]) * Math.cos(ring[0][1] * Math.PI / 180) * 111320;
   assert.ok(Math.abs(w - 80) < 1);
@@ -93,7 +93,7 @@ test('contournement complet : 1 tronçon + 1 trajet final = 2 requêtes, section
   assert.equal(out.requests, 2);
   assert.equal(legs.length, 1);
   assert.ok(crowPath([legs[0].a, legs[0].b]) <= 150000);
-  assert.equal(legs[0].avoid.coordinates.length, 55);
+  assert.equal(legs[0].avoid.coordinates.length, sectionPoints(COPY, 'n59').length);
   assert.ok(out.stops.some((s) => s.via === true && s.label === DETOUR.VIA_LABEL));
   assert.match(detourCost(ROUTE, out.route), /^Allonge de 20 km \/ 17 min par rapport au trajet direct\.$/);
   assert.match(detourNote(BANS, detourCost(ROUTE, out.route)), /^Contournement appliqué : N59 \/ N159.*À vérifier\. La signalisation fait foi\. Source : Bison Futé, arrêté non lu\. Allonge/);
@@ -163,7 +163,9 @@ test('v80 : Mont-Blanc pour 4,80 m : tronçon avec un carré par voie du tunnel'
 // A33 / N4 jusqu'à Lunéville (km ~39), N59 jusqu'à Raon-l'Étape (aucun point dans la copie), puis les points de la
 // copie (Raon → tunnel Maurice-Lemaire → N159), D1059, A35, Colmar. Plage OSM simulée : de Lunéville au tunnel.
 const { prepareLine, locateOnLine } = await import('../src/lib/nav-geo.js');
-const N59_PTS = sectionPoints(COPY, 'n59').map((p) => p.point).sort((a, b) => a[0] - b[0])
+// Géométrie de Raon-l'Étape au tunnel prise sur les points de la copie (lat < 48,40) ; Lunéville → Raon tracé à la main
+// (à des centaines de mètres de la vraie N59 : les points de la copie de ce tronçon, v82, ne s'y accrochent pas).
+const N59_PTS = sectionPoints(COPY, 'n59').map((p) => p.point).filter((p) => p[1] < 48.40).sort((a, b) => a[0] - b[0])
   .filter((p, i, all) => i === 0 || Math.hypot((p[0] - all[i - 1][0]) * 74000, (p[1] - all[i - 1][1]) * 111000) > 300);
 const NC_ROUTE = {
   coordinates: [[6.20, 48.70], [6.18, 48.63], [6.305, 48.618], [6.419, 48.591], [6.53, 48.57], [6.642, 48.522],

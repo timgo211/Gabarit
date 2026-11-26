@@ -204,3 +204,35 @@ test('constantes : 5 Mo par fichier, seuil de tri 4,30 m, garde-fou 50 m', () =>
   assert.equal(AUDIT.LOW_HEIGHT_M, 4.3);
   assert.equal(AUDIT.NEAR_M, 50);
 });
+
+// v82 : voies de la section qui portent déjà l'étiquette (N59 Lunéville → Raon-l'Étape : hgv:conditional partout) :
+// points de la section dans data/points-sensibles/, jamais des fiches de correction (data/audit-osm/ inchangé).
+test('v82 : voie déjà étiquetée → point de section gardé et marqué ; jamais une fiche ; voie non étiquetée inchangée', async () => {
+  const { r, cards, axes } = run();
+  assert.deepEqual(r.cards.map((c) => c.way), [11], 'fiche : voie sans étiquette seulement (comme avant)');
+  assert.deepEqual(r.tagged.map((c) => [c.way, c.section, c.dejaEtiquetee, c.etiquettesProposees]), [[12, 'lyon-a6', true, null]]);
+  assert.match(r.tagged[0].type, /^interdiction PL déjà étiquetée \(lyon-a6\)$/);
+  assert.equal(r.tagged[0].orsLit, 'non (déjà étiquetée, ORS ne la lit pas)');
+  assert.ok(!cards.some((c) => c.dejaEtiquetee), 'aucune voie déjà étiquetée parmi les fiches');
+  assert.deepEqual(r.located.map((l) => [l.entry.id, l.ways, l.missing, l.tagged]), [['lyon-a6', 2, 1, 1]]);
+  const { orsReadsPresent } = await import('../src/lib/osm-audit.js');
+  assert.equal(orsReadsPresent({ nature: 'interdit' }, { hgv: 'no' }), 'oui');
+  assert.equal(orsReadsPresent({ nature: 'hauteur' }, { maxheight: '4.3' }), 'oui');
+  // Points : la voie déjà étiquetée compte dans la section, marquée (9e champ = 1) ; la fiche reste un point simple.
+  const { buildSensitivePoints, parseSensitiveTile, mergeSensitiveTiles, sensitiveText } = await import('../src/lib/sensitive-points.js');
+  const lines = axes.map((a) => ({ refs: a.refs, coords: a.coords }));
+  const res = buildSensitivePoints([...r.cards, ...r.tagged], RULES, { lines });
+  assert.equal(res.problem, null);
+  const pts = mergeSensitiveTiles([...res.tiles.values()].map(parseSensitiveTile)).points;
+  assert.deepEqual(pts.map((p) => [p.way, p.section, p.tagged === true]).sort((a, b) => a[0] - b[0]), [[11, 0, false], [12, 0, true]]);
+  assert.equal(res.index.sections.length, 1, 'une seule section, pas de doublon');
+  assert.equal(res.index.taggedCount, 1);
+  assert.ok(res.log.some((l) => /section lyon-a6 : 2 points \(sans étiquette 1, déjà étiquetées 1\)/.test(l)));
+  assert.match(sensitiveText(pts.find((p) => p.tagged), res.index.sections[0]), /voie déjà étiquetée dans OSM\./);
+  // Sans les voies étiquetées (outil lancé seul) : comme avant.
+  const old = buildSensitivePoints(r.cards, RULES, { lines });
+  assert.equal(old.index.count, 1);
+  // Rapport : colonne des voies déjà étiquetées.
+  const md = auditReport(auditIndex(cards, splitCards(cards), { updated: '2026-11-26', levels: [1, 2] }), cards, { located: r.located, unlocated: r.unlocated });
+  assert.match(md, /\| lyon-a6 \| A6 \| 2 \| 1 \| 1 \|/);
+});

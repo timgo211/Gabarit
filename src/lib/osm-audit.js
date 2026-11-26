@@ -359,11 +359,24 @@ export function restrictionProposal(entry) {
 }
 
 /**
+ * Lecture par ORS d'une étiquette déjà présente sur la voie : hgv=no / private et maxheight bloquent le calcul ;
+ * hgv=destination / delivery et hgv:conditional ne bloquent rien (étude, section 2).
+ */
+export function orsReadsPresent(entry, tags) {
+  if (entry?.nature === 'hauteur') return 'oui';
+  if (tagVariants(tags ?? {}, 'hgv').some((v) => /^(no|private)$/.test(v))) return 'oui';
+  return 'non (déjà étiquetée, ORS ne la lit pas)';
+}
+
+/**
  * Fiches des interdictions connues : voies de même référence dans la section localisée sans l'étiquette attendue.
- * @returns {{ cards:object[], located:object[], unlocated:object[] }}
+ * v82 : voies de la section qui portent DÉJÀ l'étiquette (N59 de Lunéville à Raon-l'Étape : hgv:conditional sur chaque
+ * voie) renvoyées à part (`tagged`) avec la marque `dejaEtiquetee` : jamais une fiche de correction (data/audit-osm/
+ * inchangé), seulement des points de la section dans data/points-sensibles/ (section entière sur le tracé).
+ * @returns {{ cards:object[], located:object[], unlocated:object[], tagged:object[] }}
  */
 export function restrictionCards(entries, axes, places) {
-  const cards = []; const located = []; const unlocated = [];
+  const cards = []; const located = []; const unlocated = []; const tagged = [];
   for (const e of entries ?? []) {
     if (e.localisable === false) { unlocated.push({ entry: e, reason: e.raison ?? 'non localisable sans deviner' }); continue; }
     const sec = locateSection(e, places);
@@ -373,9 +386,17 @@ export function restrictionCards(entries, axes, places) {
       && ax.coords.some((p) => inBox(p, sec.box)));
     if (!ways.length) { unlocated.push({ entry: e, reason: `aucune voie ${refs.join('/')}${e.tunnel ? ' en tunnel' : ''} dans la section` }); continue; }
     const missing = ways.filter((ax) => !restrictionPresent(e, ax.tags));
-    located.push({ entry: e, ways: ways.length, missing: missing.length });
+    const present = ways.filter((ax) => restrictionPresent(e, ax.tags));
+    located.push({ entry: e, ways: ways.length, missing: missing.length, tagged: present.length });
     const { proposed, ors } = restrictionProposal(e);
     const confidence = e.lu === 'arrêté' ? 'moyenne' : 'faible';
+    for (const ax of present) {
+      tagged.push(auditCard({
+        axis: ax, priority: 0, type: `interdiction PL déjà étiquetée (${e.id})`, proposed: null,
+        source: `${e.texte} — ${e.arrete} ; ${e.source} ; en vigueur : à vérifier`,
+        confidence, orsReads: orsReadsPresent(e, ax.tags), extra: { section: e.id, dejaEtiquetee: true },
+      }));
+    }
     for (const ax of missing) {
       cards.push(auditCard({
         axis: ax, priority: 1, type: `interdiction PL absente (${e.id})`, proposed,
@@ -384,7 +405,7 @@ export function restrictionCards(entries, axes, places) {
       }));
     }
   }
-  return { cards, located, unlocated };
+  return { cards, located, unlocated, tagged };
 }
 
 // ───────── Tri, découpage, rapport ─────────
@@ -475,8 +496,8 @@ export function auditReport(index, cards, { located = [], unlocated = [], axesLo
   L.push('', 'Fichiers : ' + (Object.entries(index.files).map(([f, n]) => `\`${f}\` (${n})`).join(', ') || 'aucun') + '.', '');
   L.push('## Interdictions connues (tableau 4 de l\'étude)', '');
   if (located.length) {
-    L.push('| Section | Route | Voies trouvées | Sans l\'étiquette |', '|---|---|---|---|');
-    for (const l of located) L.push(`| ${esc(l.entry.id)} | ${esc(l.entry.refs.join('/'))} | ${l.ways} | ${l.missing} |`);
+    L.push('| Section | Route | Voies trouvées | Sans l\'étiquette | Déjà étiquetées (points de section, pas des fiches) |', '|---|---|---|---|---|');
+    for (const l of located) L.push(`| ${esc(l.entry.id)} | ${esc(l.entry.refs.join('/'))} | ${l.ways} | ${l.missing} | ${l.tagged ?? 0} |`);
     L.push('');
   }
   L.push('Non localisées (jamais devinées) :', '');

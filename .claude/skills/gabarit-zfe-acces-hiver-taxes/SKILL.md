@@ -264,3 +264,11 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   « Recommandé » inchangés) ; diagnostic « géométrie : A 46, A 7 (nom ORS = début de l'étape) » (étape nommée > 5 km).
   Copie des points : l'audit ne garde que les voies sans l'étiquette attendue → aucun point N59 Lunéville → Raon
   (voies déjà en `hgv:conditional`) ; correctif de données à part (ROADMAP).
+- Sections entières (v82) : `restrictionCards` (osm-audit.js) renvoie aussi `tagged` = voies de la section qui portent
+  déjà l'étiquette attendue (`restrictionPresent`), type « interdiction PL déjà étiquetée (id) », `dejaEtiquetee: true`,
+  `etiquettesProposees: null`, `orsLit` (`orsReadsPresent` : « oui » pour hgv=no / private et hauteur, sinon « non
+  (déjà étiquetée, ORS ne la lit pas) ») ; jamais ajoutées aux fiches (data/audit-osm/, rapport : colonne « Déjà
+  étiquetées »). `writeSensitivePoints({ tagged })` (passé par tools/audit-osm.mjs ; lancé seul : fiches seulement,
+  dit au journal) → points de la section, 9e champ = 1 (`tagged: true` à la lecture, source « voie déjà étiquetée dans
+  OSM ») ; journal : points par section (sans étiquette / déjà étiquetées), `index.taggedCount`. Une section reste une
+  entrée (regroupement par section) : aucune alerte en double.
