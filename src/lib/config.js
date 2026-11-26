@@ -16,6 +16,13 @@ export const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1';
  */
 export const FUEL_API = 'https://data.economie.gouv.fr/api/explore/v2.1/catalog/datasets/prix-des-carburants-en-france-flux-instantane-v2';
 
+/**
+ * Trafic (phase 10 A) : fichier national de l'Action « Trafic » (événements DIR, Bison Futé, Licence Ouverte Etalab 2.0)
+ * sur la branche de données trafic-data ; raw.githubusercontent.com répond avec CORS « * » (mesuré par l'Action le
+ * 26/11/2026). Aucun paramètre : aucune position envoyée. Jamais mis en cache par le service worker (autre origine).
+ */
+export const TRAFFIC_URL = 'https://raw.githubusercontent.com/timgo211/Gabarit/trafic-data/trafic.json';
+
 /** ORS refuse maximum_speed < 80 km/h. */
 export const ORS_MIN_MAX_SPEED = 80;
 

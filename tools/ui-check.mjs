@@ -169,7 +169,7 @@ async function open(browser, base, {
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
   bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, dialogCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
-  start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo', sensitiveCopy = 'repo',
+  start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo', sensitiveCopy = 'repo', traffic = null,
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height }, deviceScaleFactor: 1, hasTouch: true, isMobile: width < 700,
@@ -188,7 +188,7 @@ async function open(browser, base, {
       window.Date = Shifted;
     }, now);
   }
-  const stats = { tiles: 0, directions: 0, pelias: 0, peliasSearch: 0, peliasTexts: [], overpass: [], wind: 0, copy: [], satTiles: {}, fuel: [] };
+  const stats = { tiles: 0, directions: 0, pelias: 0, peliasSearch: 0, peliasTexts: [], overpass: [], wind: 0, copy: [], satTiles: {}, fuel: [], traffic: [] };
   if (driving) await ctx.addInitScript((d) => { if (!sessionStorage.getItem('ui-check-init')) localStorage.setItem('gabarit.driving', d); }, JSON.stringify(driving));
   await ctx.addInitScript(() => {
     window.__raf = 0;
@@ -273,6 +273,15 @@ async function open(browser, base, {
       if (!json) return route.abort('internetdisconnected');
       if (json.__status) return route.fulfill({ status: json.__status, json: {}, headers: { 'access-control-allow-origin': '*' } });
       return route.fulfill({ json, headers: { 'access-control-allow-origin': '*' } });
+    }
+    // Phase 10 A : fichier national du trafic (raw.githubusercontent.com, branche trafic-data) ; traffic(url) → JSON,
+    // { __status } ou null (réseau coupé). Servi en text/plain comme raw.githubusercontent.com, CORS « * ».
+    if (url.startsWith('https://raw.githubusercontent.com/')) {
+      stats.traffic.push(url);
+      const json = traffic ? traffic(url) : null;
+      if (!json) return route.abort('internetdisconnected');
+      if (json.__status) return route.fulfill({ status: json.__status, body: '', headers: { 'access-control-allow-origin': '*' } });
+      return route.fulfill({ body: JSON.stringify(json), contentType: 'text/plain; charset=utf-8', headers: { 'access-control-allow-origin': '*', 'cache-control': 'max-age=300' } });
     }
     // v62 : pelias(url, kind) → JSON, ou null (réseau coupé) ; /search (texte validé sans choix) compté à part.
     if (url.includes('/pelias/v1/autocomplete') || url.includes('/pelias/v1/search')) {
@@ -5214,6 +5223,171 @@ async function ruleLimitsCheck(browser, base) {
   }
 }
 
+/**
+ * Phase 10 A (v88) : trafic Bison Futé (DIR) à l'arrêt. Fichier national simulé (option `traffic` d'`open`, servi comme
+ * raw.githubusercontent.com en text/plain) avec 4 événements autour du tracé de `ors-directions-nav.json` : fermeture en
+ * ligne droite (commentaire piégé en HTML), bouchon à ≈ 33 m, accident à ≈ 1,1 km du tracé (écarté), chantier terminé
+ * (écarté).
+ * 412×900 et 900×412, jour et nuit : en roulant grisé, message, rien d'ouvert, aucune requête ; à l'arrêt une requête
+ * sans paramètre, 2 lignes dans l'ordre du trajet, mentions (source et heure, couverture, « tracé approximatif »),
+ * texte de la source en texte brut, 2 repères pointillés, toucher = zoom, carte visible, aucune requête ORS ; fiche
+ * et repères fermés dès que le véhicule roule. 412×900 jour : « Ancien » (copie de 4 h), liste vide, hors ligne ;
+ * guidage (412×900 jour, 900×412 nuit) : puce grisée en roulant, fiche à l'arrêt, fermée en roulant ; rien dit.
+ */
+async function trafficCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const now = Date.now();
+  const iso = (ms) => new Date(ms).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const at = (i, dLat = 0) => [Math.round(line[i][0] * 1e4) / 1e4, Math.round((line[i][1] + dLat) * 1e4) / 1e4];
+  const fileAt = (pub, events = null) => ({
+    format: 'gabarit-trafic', version: 1, source: 'Bison Futé (DIR) — essai', licence: 'Licence Ouverte Etalab 2.0',
+    publication: iso(pub), lastModified: iso(pub), copied: iso(pub), count: 4, counts: {},
+    events: events ?? [
+      { id: 't-fermeture', k: 'fermeture', st: 'roadClosed', p: at(10), l: [at(8), at(12)], s: iso(now - 3600e3), e: iso(now + 86400e3), d: 'one', dv: null, r: 'N0085', c: '<img src=x onerror="window.__piege=1"> Fermeture de nuit', v: null },
+      { id: 't-bouchon', k: 'bouchon', st: 'queuingTraffic', p: at(20, 0.0003), l: null, s: iso(now - 600e3), e: null, d: 'both', dv: 'bothWays', r: 'N0007', c: null, v: null },
+      { id: 't-loin', k: 'accident', st: null, p: at(15, -0.02), l: null, s: iso(now - 600e3), e: null, d: null, dv: null, r: null, c: null, v: null },
+      { id: 't-fini', k: 'chantier', st: 'roadworks', p: at(25), l: null, s: iso(now - 86400e3), e: iso(now - 3600e3), d: null, dv: null, r: null, c: null, v: null },
+    ],
+  });
+  const vehicle = { id: 'v1', name: 'Semi 44 t', height: 4, width: 2.55, length: 16.5, weight: 44, axleload: 11.5, maxSpeed: 90 };
+  const park = async (page, p, speed, n = 4) => { for (let i = 0; i < n; i += 1) { await setGeo(page, { lon: p[0], lat: p[1], accuracy: 5, speed }); await page.waitForTimeout(1000); } };
+  const titles = (page) => page.locator('#traffic-list .traffic-title').allTextContents();
+  const markers = (page) => page.locator('.traffic-marker').count();
+  for (const [width, height, theme] of [[412, 900, 'day'], [412, 900, 'night'], [900, 412, 'day'], [900, 412, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const full = width === 412 && theme === 'day';
+    const guide = full || (width === 900 && theme === 'night');
+    let mode = 'ok';
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, vehicle, overpass: () => ({ elements: [] }), directions: () => nav,
+      traffic: () => (mode === 'ok' ? fileAt(now - 600e3) : mode === 'old' ? fileAt(now - 4 * 3600e3)
+        : mode === 'empty' ? fileAt(now - 600e3, []) : mode === 'err' ? { __status: 503 } : null),
+    });
+    await computeRoute(page);
+    check(await page.isVisible('#btn-traffic'), `${tag} : bouton « Trafic » sous la fiche`);
+    // En roulant : grisé, message, rien d'ouvert, aucune requête.
+    await park(page, line[0], 14);
+    check(await page.getAttribute('#btn-traffic', 'aria-disabled') === 'true', `${tag} : « Trafic » grisé en roulant`);
+    await page.click('#btn-traffic', { force: true });
+    await page.waitForTimeout(400);
+    check(/Trafic : disponible à l'arrêt/.test(await page.textContent('#message')) && await page.isHidden('#traffic-panel') && stats.traffic.length === 0,
+      `${tag} : en roulant → « disponible à l'arrêt », rien d'ouvert, aucune requête`, String(stats.traffic.length));
+    // À l'arrêt : une requête sans paramètre, 2 événements dans l'ordre du trajet.
+    await park(page, line[0], 0, 5);
+    check(await page.getAttribute('#btn-traffic', 'aria-disabled') === 'false', `${tag} : actif à l'arrêt`);
+    const orsBefore = stats.directions;
+    await page.click('#btn-traffic');
+    await page.waitForSelector('#traffic-list .traffic-row', { timeout: 10000 }).catch(() => {});
+    const u = stats.traffic[0] ? new URL(stats.traffic[0]) : null;
+    check(stats.traffic.length === 1 && u?.search === '' && /\/trafic-data\/trafic\.json$/.test(u?.pathname ?? ''),
+      `${tag} : une requête, fichier national sans paramètre (aucune position)`, stats.traffic.join(' '));
+    const t = await titles(page);
+    check(t.length === 2 && /^Fermeture \(route fermée\) · N\u00a085$/.test(t[0]) && /^Bouchon \(file d'attente\) · N\u00a07$/.test(t[1]),
+      `${tag} : 2 événements à 100 m, dans l'ordre du trajet (accident à 1 km et chantier terminé écartés)`, t.join(' | '));
+    const src = await page.textContent('#traffic-source');
+    check(/^Source : Bison Futé \(DIR\), mis à jour à \d\d:\d\d — à vérifier, la signalisation fait foi\.$/.test(src), `${tag} : source et heure`, src);
+    check(await page.textContent('#traffic-coverage') === 'Routes nationales et autoroutes non concédées : les autoroutes à péage ne sont pas couvertes.', `${tag} : couverture`);
+    check(await page.isHidden('#traffic-old'), `${tag} : copie de 10 min : pas « Ancien »`);
+    const first = await page.textContent('#traffic-list .traffic-row >> nth=0');
+    check(/tracé approximatif/.test(first) && /un seul sens, lequel : à vérifier/.test(first) && /fin prévue le/.test(first), `${tag} : ligne droite « tracé approximatif », sens, fin`, first);
+    check(/<img src=x/.test(first) && await page.locator('#traffic-panel img').count() === 0 && !(await page.evaluate(() => window.__piege)),
+      `${tag} : texte de la source affiché en texte brut (aucun élément créé)`);
+    check(/deux sens/.test(await page.textContent('#traffic-list .traffic-row >> nth=1')), `${tag} : bouchon « deux sens »`);
+    check(await markers(page) === 2, `${tag} : 2 repères sur la carte`, String(await markers(page)));
+    const style = await page.evaluate(() => { const m = document.querySelector('.traffic-marker'); const c = getComputedStyle(m); return { b: c.borderTopStyle, col: c.borderTopColor, danger: getComputedStyle(document.documentElement).getPropertyValue('--danger') }; });
+    check(style.b === 'dashed', `${tag} : repères au bord pointillé (à vérifier)`, JSON.stringify(style));
+    const box = await page.locator('#traffic-panel').boundingBox();
+    const mapVisible = width < height ? box.y > height * 0.4 : box.x + box.width < width * 0.6;
+    check(box && box.x >= 0 && box.x + box.width <= width + 1 && mapVisible, `${tag} : fiche dans l'écran, carte visible`, JSON.stringify(box));
+    await noHorizontalScroll(page, `${tag} trafic`);
+    // Toucher = zoom sur l'événement.
+    const before = await page.evaluate(() => { const m = window.__maps.at(-1); return { c: m.getCenter(), z: m.getZoom() }; });
+    await page.locator('#traffic-list .traffic-pick').nth(1).click();
+    await page.waitForTimeout(1000);
+    const after = await page.evaluate(() => { const m = window.__maps.at(-1); return { c: m.getCenter(), z: m.getZoom() }; });
+    check(Math.abs(after.z - 15) < 0.2 && (after.c.lng !== before.c.lng || after.c.lat !== before.c.lat)
+      && await page.locator('#traffic-list .traffic-row.selected').count() === 1, `${tag} : toucher = zoom sur l'événement`, JSON.stringify({ before, after }));
+    check(stats.directions === orsBefore, `${tag} : aucune requête ORS`, `${orsBefore} → ${stats.directions}`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-trafic.png`) });
+    // Le véhicule roule : fiche et repères fermés, message.
+    await park(page, line[0], 14);
+    check(await page.isHidden('#traffic-panel') && await markers(page) === 0 && /Trafic : disponible à l'arrêt/.test(await page.textContent('#message')),
+      `${tag} : fiche et repères fermés dès que le véhicule roule`);
+    if (full) {
+      // « Ancien » : copie de 4 h.
+      mode = 'old';
+      await park(page, line[0], 0, 5);
+      await page.click('#btn-traffic');
+      await page.waitForSelector('#traffic-list .traffic-row', { timeout: 10000 }).catch(() => {});
+      check(await page.isVisible('#traffic-old') && await page.textContent('#traffic-old') === 'Ancien' && stats.traffic.length === 2,
+        `${tag} : copie de plus de 3 h → « Ancien » (nouvelle requête au toucher)`, String(stats.traffic.length));
+      await page.click('#btn-traffic-close');
+      check(await markers(page) === 0, `${tag} : « Fermer » retire les repères`);
+      // Liste vide : jamais « route libre ».
+      mode = 'empty';
+      await page.click('#btn-traffic');
+      await page.waitForTimeout(1200);
+      const empty = await page.textContent('#traffic-status');
+      check(empty === 'Aucun événement trouvé dans la source. Ce n\'est pas une garantie : la signalisation fait foi.'
+        && await page.locator('#traffic-list .traffic-row').count() === 0, `${tag} : liste vide → phrase fixe, jamais « route libre »`, empty);
+      await page.click('#btn-traffic-close');
+      // Hors ligne, puis réponse refusée : message, rien d'autre.
+      mode = 'off';
+      await page.click('#btn-traffic');
+      await page.waitForTimeout(1200);
+      check(await page.textContent('#traffic-status') === 'Pas de connexion : trafic indisponible.' && await page.locator('#traffic-list .traffic-row').count() === 0
+        && await markers(page) === 0, `${tag} : hors ligne → « Pas de connexion », rien d'autre`, await page.textContent('#traffic-status'));
+      await page.click('#btn-traffic-close');
+      mode = 'err';
+      await page.click('#btn-traffic');
+      await page.waitForTimeout(1200);
+      check(await page.textContent('#traffic-status') === 'Trafic indisponible pour l\'instant.', `${tag} : réponse refusée → message`, await page.textContent('#traffic-status'));
+      await page.click('#btn-traffic-close');
+      // Réglages › Sources et licences : crédit Bison Futé, Licence Ouverte Etalab 2.0, date lue.
+      mode = 'ok';
+      await page.click('#btn-traffic');
+      await page.waitForSelector('#traffic-list .traffic-row', { timeout: 10000 }).catch(() => {});
+      await page.click('#btn-traffic-close');
+      await openSettings(page);
+      await openCredits(page);
+      const credit = await page.textContent('#traffic-credit');
+      check(/Bison Futé/.test(credit) && /Licence Ouverte Etalab 2\.0/.test(credit) && /Dernière mise à jour lue : \d\d\/\d\d à \d\d:\d\d\./.test(credit) && /autoroutes à péage ne sont pas couvertes/.test(credit),
+        `${tag} : crédit dans Réglages › Sources et licences, avec la date lue`, credit.replace(/\s+/g, ' '));
+      await page.click('#dlg-settings [data-close]');
+      await page.waitForTimeout(500);
+    }
+    if (guide) {
+      // Guidage : puce grisée en roulant, fiche à l'arrêt, fermée en roulant ; rien dit.
+      mode = 'ok';
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      for (let i = 1; i <= 3; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+      await page.click('#btn-nav-search');
+      check(await page.getAttribute('#btn-nav-traffic', 'aria-disabled') === 'true', `${tag} guidage : « Trafic » grisé en roulant`);
+      const n = stats.traffic.length;
+      await page.click('#btn-nav-traffic', { force: true });
+      await page.waitForTimeout(400);
+      check(await page.isHidden('#traffic-panel') && stats.traffic.length === n && /Disponible à l'arrêt/.test(await page.textContent('#nav-toast')),
+        `${tag} guidage : en roulant → « Disponible à l'arrêt », rien d'ouvert, aucune requête`);
+      await park(page, line[4], 0, 5);
+      await page.click('#btn-nav-search');
+      await page.click('#btn-nav-traffic');
+      await page.waitForSelector('#traffic-list .traffic-row', { timeout: 10000 }).catch(() => {});
+      check((await titles(page)).length === 2 && await markers(page) === 2 && stats.traffic.length === n + 1, `${tag} guidage : à l'arrêt, fiche et repères`, (await titles(page)).join(' | '));
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-trafic-guidage.png`) });
+      for (let i = 5; i <= 7; i += 1) { await setGeo(page, { lon: line[i][0], lat: line[i][1], accuracy: 5, speed: 14 }); await page.waitForTimeout(1000); }
+      check(await page.isHidden('#traffic-panel') && await markers(page) === 0, `${tag} guidage : fiche et repères fermés dès que le véhicule roule`);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((x) => /trafic|bouchon|fermeture|chantier|accident|Bison/i.test(x)), `${tag} : rien dit à voix haute`, spoken.join(' | '));
+      await stopGuidance(page);
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function fuelCheck(browser, base) {
   const nav = fixture('ors-directions-nav.json');
   const line = nav.features[0].geometry.coordinates;
@@ -6317,7 +6491,7 @@ try {
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, dialog: dialogCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
-    carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
+    carburant: fuelCheck, trafic: trafficCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
     repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck, reglages: settingsSectionsCheck, 'fiche-infos': tripInfoCheck };
   for (const [name, fn] of Object.entries(all)) {

@@ -210,8 +210,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   drapeaux 1 période / 2 dérogation, coordonnées 1e-5° en écarts]) ; grille France reprise de `data/poids-osm/index.json`.
   Dossier remplacé d'un coup, échec → ancien gardé. Tests `dialog-convert.test.js` (même fixture, complétée : cas du
   type boîte Vosges, expirée, période, dérogation seule, MultiLineString). Hors des `paths` d'osm-data.yml.
-- `tools/trafic-update.mjs` + `.github/workflows/trafic.yml` (Action « Trafic », phase 10 A ; PR 1 : manuelle
-  seulement, `contents: write`, `concurrency` trafic, 10 min) : télécharge `content.xml` du flux « tipi » de Bison Futé
+- `tools/trafic-update.mjs` + `.github/workflows/trafic.yml` (Action « Trafic », phase 10 A ; toutes les heures à :30
+  UTC depuis v88 + manuelle, `contents: write`, `concurrency` trafic, 10 min) : télécharge `content.xml` du flux « tipi » de Bison Futé
   (DIR, DATEX II v2 en enveloppe SOAP ; https, domaine `tipi.bison-fute.gouv.fr` seulement, 20 Mo au plus, gzip et
   UTF-8 strict), compte la liste du dossier (complétude ; fichiers par événement jamais lus), convertit par
   `tools/trafic-convert.mjs` (`collectXml` avec `createXmlReader` de `dialog-etude.mjs`, `convertTraffic`,
@@ -223,7 +223,9 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `--force`, jamais sur main), puis mesure les en-têtes CORS de raw.githubusercontent.com. Flux illisible →
   avertissement, sortie 0, ancien JSON gardé. Journal (aussi dans le résumé du run) sans coordonnée. Tests
   `trafic-convert.test.js` (fixtures synthétiques `trafic-datex.xml`, `trafic-malformed.xml`). Hors des `paths`
-  d'osm-data.yml.
+  d'osm-data.yml. Appli (v88) : `src/lib/traffic.js` (`parseTrafficJson`, `eventsNearRoute` avec `indexRoute`,
+  `trafficDirection`, `isOld`, textes), `src/ui/traffic.js` (`createTrafficPanel`), `TRAFFIC_URL` de `config.js`,
+  repères `map.showTraffic` ; tests `traffic.test.js`, ui-check `trafic`. Règles : skill `gabarit-trafic`.
 - `tools/audit-osm.mjs` + `.github/workflows/audit-osm.yml` (Action « Audit OSM », manuelle seulement, input
   `niveaux` 1-2 ou 1-3, lecture seule, aucun appel d'écriture OSM) : extrait France Geofabrik, en secours (v72)
   download.openstreetmap.fr après 5 échecs (`downloadWithFallback`, source au journal, au rapport et dans

@@ -178,6 +178,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let reportItems = []; // phase 3a : mes signalements [{ id, lonlat, label, confirmed }]
   let reportMarkers = [];
   let onReport = null;
+  let trafficItems = []; // phase 10 A : événements de trafic du tracé, fiche ouverte à l'arrêt [{ key, lonlat, glyph, kind, label }]
+  let trafficMarkers = [];
+  let onTraffic = null;
   let onBridge = null;
   let onArea = null;
   /** ZFE affichées (phase 5) : [{ name, banned, polygons }]. */
@@ -588,7 +591,34 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     drawBridges({ force: true });
     drawStops();
     drawReports();
+    drawTraffic();
     if (replay.takeFit()) fitRoute(0); // v85 : itinéraire montré avant la carte : cadré une fois, sans animation
+  }
+
+  /**
+   * Phase 10 A : repères des événements de trafic (fiche « Trafic » ouverte, à l'arrêt seulement, hors guidage et en
+   * guidage) : bord pointillé (à vérifier), texte court, jamais rouge ; toucher → ligne de la fiche.
+   */
+  function drawTraffic() {
+    for (const m of trafficMarkers) m.remove();
+    trafficMarkers = [];
+    if (!map) return;
+    for (const item of trafficItems) {
+      const node = document.createElement('button');
+      node.type = 'button';
+      node.className = `traffic-marker kind-${item.kind}`;
+      node.dataset.key = item.key;
+      node.textContent = item.glyph;
+      node.setAttribute('aria-label', item.label);
+      node.title = item.label;
+      for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+      node.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onTraffic?.(item.key);
+      });
+      trafficMarkers.push(new lib.Marker({ element: node, anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
+    }
   }
 
   /** Phase 3a : repères de mes signalements (hors guidage et en guidage) ; toucher → fiche (à l'arrêt, app.js). */
@@ -1018,10 +1048,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       }
     },
     /** Montre une aire (geste, à l'arrêt seulement : décidé par l'écran de guidage). */
-    showPlace(lonlat) {
+    /** Centre la carte sur un lieu (suivi du véhicule suspendu) ; phase 10 A : zoom et décalage facultatifs. */
+    showPlace(lonlat, { zoom = null, offset = null } = {}) {
       if (!map || !Array.isArray(lonlat)) return;
       if (anim) anim.follow = false;
-      map.easeTo({ center: lonlat, duration: 600 });
+      map.easeTo({ center: lonlat, duration: 600, ...(Number.isFinite(zoom) ? { zoom } : {}), ...(Array.isArray(offset) ? { offset } : {}) });
     },
     showRoutes,
     /** v62 : nombre de fois où les repères des aires ont été recréés (contrôle d'ui-check : 0 en suivant le véhicule). */
@@ -1071,6 +1102,15 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     /** Appelé avec l'identifiant du signalement touché. */
     onReportPick(cb) {
       onReport = cb;
+    },
+    /** Phase 10 A : repères des événements de trafic (liste vide = aucun). */
+    showTraffic(items) {
+      trafficItems = (Array.isArray(items) ? items : []).filter((i) => Array.isArray(i?.lonlat) && typeof i.key === 'string');
+      drawTraffic();
+    },
+    /** Appelé avec la clé de l'événement de trafic touché. */
+    onTrafficPick(cb) {
+      onTraffic = cb;
     },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
