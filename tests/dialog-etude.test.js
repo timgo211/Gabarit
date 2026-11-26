@@ -21,41 +21,42 @@ test('fixture : comptes, opérateurs, permanent / temporaire / en vigueur', asyn
   const { stats: s, bytes } = await readStream(chunks(XML, 7), { now: NOW });
   assert.equal(bytes, XML.length);
   assert.equal(s.publicationTime, '2026-11-25T06:00:00+01:00');
-  assert.equal(s.orders, 2);
-  assert.equal(s.measures, 4);
-  assert.deepEqual(s.dims, { hauteur: 1, poids: 2, largeur: 0, longueur: 0 });
-  assert.deepEqual(s.dimsPermanent, { hauteur: 1, poids: 1, largeur: 0, longueur: 0 });
-  assert.deepEqual(s.dimsTemporary, { hauteur: 0, poids: 1, largeur: 0, longueur: 0 });
-  assert.deepEqual(s.dimsActive, { hauteur: 1, poids: 1, largeur: 0, longueur: 0 });
-  assert.equal(s.hw, 3);
+  assert.equal(s.orders, 8);
+  assert.equal(s.measures, 10);
+  assert.deepEqual(s.dims, { hauteur: 3, poids: 5, largeur: 0, longueur: 0 });
+  assert.deepEqual(s.dimsPermanent, { hauteur: 2, poids: 3, largeur: 0, longueur: 0 });
+  assert.deepEqual(s.dimsTemporary, { hauteur: 1, poids: 2, largeur: 0, longueur: 0 });
+  assert.deepEqual(s.dimsActive, { hauteur: 2, poids: 3, largeur: 0, longueur: 0 });
+  assert.equal(s.hw, 8);
   assert.equal(s.hwNoGeometry, 1);
   assert.deepEqual(Object.fromEntries(s.operators), {
-    'hauteur lessThanOrEqualTo': 1, 'poids greaterThan': 1, 'poids lessThanOrEqualTo': 1,
+    'hauteur lessThanOrEqualTo': 3, 'poids greaterThan': 1, 'poids lessThanOrEqualTo': 4,
+    'hauteur (dérogation) lessThanOrEqualTo': 1,
   });
-  assert.deepEqual(Object.fromEntries(s.regulationTypes), { 'AccessRestriction/noEntry': 3, SpeedLimit: 1 });
-  assert.equal(s.vehicleTargets.get('poids lourd seul'), 2);
-  assert.equal(s.vehicleTargets.get('poids lourd et/ou gabarit'), 1);
-  assert.equal(s.vehicleTargets.get('tous véhicules (aucun type visé)'), 1);
+  assert.deepEqual(Object.fromEntries(s.regulationTypes), { 'AccessRestriction/noEntry': 9, SpeedLimit: 1 });
+  assert.equal(s.vehicleTargets.get('poids lourd seul'), 3);
+  assert.equal(s.vehicleTargets.get('poids lourd et/ou gabarit'), 5);
+  assert.equal(s.vehicleTargets.get('tous véhicules (aucun type visé)'), 2);
 });
 
 test('fixture : géométrie, cellules, organisations, Vosges, entités et CDATA', async () => {
   const { stats: s } = await readStream([XML], { now: NOW });
-  assert.equal(s.withGeometry, 3);
-  assert.deepEqual(Object.fromEntries(s.geometryTypes), { LineString: 1, Polygon: 1, Point: 1 });
-  assert.deepEqual(Object.fromEntries(s.hwCells), { '48N 6E': 1, '48N 2E': 1 });
-  assert.deepEqual(s.hwBox, { south: 48.2, north: 48.9, west: 2.3, east: 6.42 });
-  assert.equal(s.organizations.size, 2);
+  assert.equal(s.withGeometry, 9);
+  assert.deepEqual(Object.fromEntries(s.geometryTypes), { LineString: 6, Polygon: 1, Point: 1, MultiLineString: 1 });
+  assert.deepEqual(Object.fromEntries(s.hwCells), { '48N 6E': 6, '48N 2E': 1 });
+  assert.deepEqual(s.hwBox, { south: 48.1, north: 48.9, west: 2.3, east: 6.61 });
+  assert.equal(s.organizations.size, 8);
   assert.deepEqual(s.organizations.get('Commune A'), { measures: 2, hw: 2 });
   assert.deepEqual(s.organizations.get('Département B'), { measures: 2, hw: 1 });
-  assert.equal(s.vosges, 1);
+  assert.equal(s.vosges, 6);
   assert.equal(s.vosgesExamples[0].titre, "Arrêté permanent pont de l'Exemple & RD 1");
   assert.equal(s.vosgesExamples[0].conditions, 'hauteur lessThanOrEqualTo 3.5');
   assert.equal(s.exWeight[1].fin, '2026-04-01T00:00:00+02:00');
   assert.equal(s.exWeight[1].centre, '(sans géométrie)');
   const report = formatReport(s, { bytes: XML.length, readAt: '2026-11-25T12:00:00.000Z' });
-  assert.match(report, /règlements \(trafficRegulationOrder\) 2, mesures \(trafficRegulation\) 4/);
-  assert.match(report, /ex\. 3 : poids lessThanOrEqualTo 19/);
-  assert.match(report, /Commune A 2\/2 ; Département B 1\/2/);
+  assert.match(report, /règlements \(trafficRegulationOrder\) 8, mesures \(trafficRegulation\) 10/);
+  assert.match(report, /ex\. 5 : poids lessThanOrEqualTo 19/);
+  assert.match(report, /Commune A 2\/2 ; Commune C 1\/1 ; .*Département B 1\/2/);
   assert.ok(report.split('\n').length < 40, 'journal court');
 });
 

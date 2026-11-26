@@ -100,5 +100,151 @@
         </condition>
       </trafficRegulation>
     </trafficRegulationOrder>
+    <!-- 3 à 8 : ajoutés pour la copie (phase 12c). Cas du type de l'étude (boîte Vosges), titres et organisations
+         inventés, coordonnées arrondies à 2 décimales. -->
+    <trafficRegulationOrder id="o3" version="1">
+      <description><com:values><com:value>Arrêté permanent passage sous le beffroi (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune C</com:value></com:values></issuingAuthority>
+      <regulationId>O3</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2025-05-01T00:00:00+02:00</com:overallStartTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.33,48.59],[6.34,48.59]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics><com:heightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:vehicleHeight>3.4</com:vehicleHeight></com:heightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <trafficRegulationOrder id="o4" version="1">
+      <description><com:values><com:value>PONT FRAGILE (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune D</com:value></com:values></issuingAuthority>
+      <regulationId>O4</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2024-01-01T00:00:00+01:00</com:overallStartTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;MultiLineString&quot;,&quot;coordinates&quot;:[[[6.37,48.29],[6.38,48.29]],[[6.38,48.29],[6.38,48.30]]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics><com:vehicleType>heavyGoodsVehicle</com:vehicleType><com:grossWeightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:grossVehicleWeight>3.5</com:grossVehicleWeight></com:grossWeightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <trafficRegulationOrder id="o5" version="1">
+      <description><com:values><com:value>Travaux réseau (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune E</com:value></com:values></issuingAuthority>
+      <regulationId>O5</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2026-09-01T00:00:00+02:00</com:overallStartTime>
+        <com:overallEndTime>2027-01-01T00:00:00+01:00</com:overallEndTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.60,48.10],[6.61,48.10]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics><com:grossWeightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:grossVehicleWeight>3,5</com:grossVehicleWeight></com:grossWeightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <trafficRegulationOrder id="o6" version="1">
+      <description><com:values><com:value>Travaux terminés (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune F</com:value></com:values></issuingAuthority>
+      <regulationId>O6</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2026-03-01T00:00:00+01:00</com:overallStartTime>
+        <com:overallEndTime>2026-06-30T23:59:59+02:00</com:overallEndTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.50,48.40],[6.51,48.40]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics><com:heightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:vehicleHeight>3.0</com:vehicleHeight></com:heightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <trafficRegulationOrder id="o7" version="1">
+      <description><com:values><com:value>Interdiction de nuit à venir (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Département G</com:value></com:values></issuingAuthority>
+      <regulationId>O7</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2026-11-01T00:00:00+01:00</com:overallStartTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.20,48.50],[6.21,48.50]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ValidityCondition"><validityByOrder><com:validityTimeSpecification>
+            <com:overallStartTime>2027-02-01T00:00:00+01:00</com:overallStartTime>
+            <com:validPeriod><com:recurringTimePeriodOfDay><com:startTimeOfPeriod>22:00:00+01:00</com:startTimeOfPeriod><com:endTimeOfPeriod>06:00:00+01:00</com:endTimeOfPeriod></com:recurringTimePeriodOfDay></com:validPeriod>
+          </com:validityTimeSpecification></validityByOrder></conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>false</negate>
+              <vehicleCharacteristics><com:grossWeightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:grossVehicleWeight>12</com:grossVehicleWeight></com:grossWeightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
+    <trafficRegulationOrder id="o8" version="1">
+      <description><com:values><com:value>Dérogation seule (essai)</com:value></com:values></description>
+      <issuingAuthority><com:values><com:value>Commune H</com:value></com:values></issuingAuthority>
+      <regulationId>O8</regulationId>
+      <validityByOrder><com:validityTimeSpecification>
+        <com:overallStartTime>2026-01-01T00:00:00+01:00</com:overallStartTime>
+      </com:validityTimeSpecification></validityByOrder>
+      <trafficRegulation>
+        <typeOfRegulation xsi:type="AccessRestriction"><accessRestrictionType>noEntry</accessRestrictionType></typeOfRegulation>
+        <condition xsi:type="ConditionSet"><operator>and</operator>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="LocationCondition"><locationByOrder xsi:type="loc:LinearLocation">
+              <dx:geoJsonGeometry>{&quot;type&quot;:&quot;LineString&quot;,&quot;coordinates&quot;:[[6.10,48.30],[6.11,48.30]]}</dx:geoJsonGeometry>
+            </locationByOrder></conditions>
+          </conditions>
+          <conditions xsi:type="ConditionSet"><operator>or</operator>
+            <conditions xsi:type="VehicleCondition"><negate>true</negate>
+              <vehicleCharacteristics><com:heightCharacteristic><com:comparisonOperator>lessThanOrEqualTo</com:comparisonOperator><com:vehicleHeight>2.5</com:vehicleHeight></com:heightCharacteristic></vehicleCharacteristics>
+            </conditions>
+          </conditions>
+        </condition>
+      </trafficRegulation>
+    </trafficRegulationOrder>
   </trafficRegulationsFromCompetentAuthorities>
 </d2:payload>

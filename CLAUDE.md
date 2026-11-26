@@ -159,6 +159,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »
+- Copie DiaLog (12c, Action « DiaLog (copie) », `tools/dialog-convert.mjs`, `data/dialog/` jamais précachée, 5 Mo / 30 Mo) :
+  noEntry + hauteur ou poids hors negate, géométrie linéaire ; valeur = maximum ; fin passée ignorée. Détail : skill structure.
 - Textes officiels illisibles depuis le conteneur : Action « Textes officiels » (`tools/textes-officiels.json`, journal
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +

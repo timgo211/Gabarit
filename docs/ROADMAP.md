@@ -562,6 +562,16 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   temps d'horloge → bornée en travail) ; ✘ « nav-toast » du scénario `guidage` à 412×900 dû à l'environnement
   (wake lock refusée par Chromium sans écran).
 
+- [ ] **Phase 12c — Limites officielles DiaLog (hauteur, poids)** (PR 1 : copie ; PR 2 : interface, v86)
+  Action « DiaLog (copie) » (`.github/workflows/dialog.yml`, lundi + manuelle, `contents: write`, aucun secret) :
+  XML DATEX II de la Base nationale de la réglementation de circulation (Licence Ouverte 2.0), lu en flux
+  (`tools/dialog-update.mjs`, lecteur de `tools/dialog-etude.mjs`), mesures gardées par `tools/dialog-convert.mjs` :
+  interdiction d'accès (noEntry) avec hauteur ou poids hors dérogation (negate), géométrie linéaire. Valeur = maximum
+  autorisé, opérateur ignoré (toujours lessThanOrEqualTo). Fin passée → ignorée ; période récurrente → « sur
+  période » ; début futur → « à partir du ». Cases de 1° `data/dialog/` (5 Mo / 30 Mo, simplification 3 → 8 → 20 m),
+  index avec date de publication, date de copie, nombre de mesures ; échec → anciens fichiers gardés. Jamais précachés.
+  PR 2 : fiche et repères à l'arrêt seulement (« à vérifier — seul l'arrêté fait foi — la signalisation fait foi »),
+  jamais dit ni dans le guidage.
 - [x] **v43 — Ne jamais recommander un itinéraire par un tunnel interdit**
   « Recommandé » (2g) écarte tout itinéraire calculé qui traverse un tunnel dont l'interdiction est confirmée pour le
   profil (classe Euro : texte officiel ou exploitant ; ADR quand le profil a des matières dangereuses), si une autre
