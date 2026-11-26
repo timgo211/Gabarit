@@ -9,6 +9,10 @@
 //             examinés, aucun pont n'est gardé en mémoire (journal : mémoire max et durée de chaque passe).
 // Écrit : data/axes-osm/ (si la taille le permet, sinon ancienne copie gardée, ⚠ au journal), data/audit-osm/,
 // docs/audit-osm-axes.md. Téléchargement ou osmium en échec : rien n'est écrit, code de sortie 1.
+// Niveau 3 (grandes départementales, sur demande) : fiches de priorité 1 et 2 seulement (osm-audit.js, keepCard) ;
+// data/axes-osm/ ne change pas avec les niveaux (axes-convert.js : motorway, trunk, primary seulement).
+// Plafond de data/audit-osm/ : 5 Mo par fichier, 30 Mo en tout ; dépassé → ⚠ au journal avec les chiffres, rien n'est
+// écrit (ni audit, ni axes, ni points sensibles, ni rapport : anciens fichiers gardés), code de sortie 1.
 //
 //   node tools/audit-osm.mjs [--levels 1,2,3]                 télécharge l'extrait et audite (niveaux 1-2 par défaut)
 //   node tools/audit-osm.mjs [--levels …] fichier.osm.pbf [france.poly]     extrait local (osmium nécessaire)
@@ -25,7 +29,7 @@ import { buildCoverage, parseGeojsonLine, parsePoly } from '../src/lib/areas-osm
 import { axisFromFeature, convertAxes } from '../src/lib/axes-convert.js';
 import { writeSensitivePoints } from './points-sensibles.mjs';
 import {
-  AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, axisCards, bridgeCards, bridgeCrossings,
+  AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, auditSize, axisCards, bridgeCards, bridgeCrossings,
   bridgeNearAxis, buildAxisIndex, placeFromFeature, placeIndex, restrictionCards, splitCards,
 } from '../src/lib/osm-audit.js';
 
@@ -229,6 +233,17 @@ async function main() {
     // Écriture (rien avant ce point).
     const files = splitCards(cards);
     const idx = auditIndex(cards, files, { updated: day, levels: args.levels, extra: { sourceExtrait: source } });
+    const perLevel = args.levels.map((n) => `niveau ${n} : ${idx.parNiveau[n] ?? 0}`).join(', ');
+    say(`Fiches par niveau : ${perLevel}${args.levels.includes(3) ? ' (niveau 3 : priorités 1 et 2 seulement, aucune fiche '
+      + '« pont sans hauteur » ni « tunnel sans hauteur »)' : ''}.`);
+    const size = auditSize(files, idx);
+    if (size.problem) {
+      say(`⚠ data/audit-osm/ non modifié : ${size.problem} ; ${cards.length} fiches, ${files.size} fichiers + index.json `
+        + `(${(size.total / 1024 / 1024).toFixed(2)} Mo, plus gros ${size.biggest[0]} : ${(size.biggest[1] / 1024 / 1024).toFixed(2)} Mo). `
+        + 'Rien n\'est enregistré : data/audit-osm/, data/axes-osm/, data/points-sensibles/ et docs/audit-osm-axes.md inchangés.');
+      process.exitCode = 1;
+      return;
+    }
     const auditBytes = writeDir(AUDIT_DIR, [...files.entries(), ['index.json', idx]]);
     say(`data/audit-osm/ : ${cards.length} fiches, ${files.size} fichiers + index.json, ${(auditBytes / 1024 / 1024).toFixed(2)} Mo.`);
     if (!ax.problem) {

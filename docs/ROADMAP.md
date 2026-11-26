@@ -691,6 +691,15 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     Raon-l'Étape) n'avaient donc aucun point. v82 : voies déjà étiquetées gardées à part (`restrictionCards(...).tagged`,
     marque `dejaEtiquetee`, 9e champ = 1 dans la copie), points de section seulement, jamais des fiches (data/audit-osm/
     sans changement de logique) ; une exécution de l'Action « Audit OSM » (accord du 26/11/2026).
+  - [x] **v90 — Niveau 3 préparé (grandes départementales, lecture seule)** : niveau 3 = `primary` ou `secondary`
+    à référence D… (`axisLevel`, sans `_link`, sans tertiaire). Garde-fou (`keepCard`) : fiches de priorité 1
+    (interdiction PL absente) et 2 (hauteur basse connue, hauteur sur le pont seulement < 4,30 m) seulement ; aucune
+    fiche « pont sans hauteur » ni « tunnel sans hauteur » ; niveaux 1-2 inchangés. Plafond `data/audit-osm/` 5 Mo par
+    fichier (découpe `niveau-3-1.json`…) et 30 Mo en tout (`auditSize`) : dépassé → ⚠ avec les chiffres, rien n'est
+    écrit, code de sortie 1. `data/axes-osm/` non élargie (motorway / trunk / primary seulement). Points sensibles :
+    plafond abaissé à 300 Ko (copie du 24/11/2026 : 93 Ko) ; secondary hors copie des axes → points écartés faute de cap.
+    Estimation (non mesurée, Overpass bloqué depuis le conteneur) : 2 000 à 6 000 fiches de niveau 3, 1 à 3,5 Mo ;
+    points sensibles + 650 à 2 000 (≈ 120 à 180 Ko). Action à lancer avec « 1-3 » (accord du propriétaire).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

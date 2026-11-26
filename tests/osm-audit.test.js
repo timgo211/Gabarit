@@ -103,10 +103,12 @@ test('fiches niveaux 1-2 : ponts sans hauteur, hauteur sur le pont, tunnel, haut
   }
 });
 
-test('niveau 3 : pont au-dessus d\'une grande départementale', () => {
-  const { cards } = run([1, 2, 3]);
-  assert.equal(cards.filter((c) => c.way === 15 && c.niveau === 3).length, 1);
-  assert.equal(cards.length, 7);
+test('niveau 3 : pont sans hauteur au-dessus d\'une grande départementale jamais en fiche (v90, priorités 1 et 2 seulement)', () => {
+  const { cards, axes, near } = run([1, 2, 3]);
+  assert.ok(axes.some((a) => a.id === 15 && a.level === 3), 'D 306 auditée au niveau 3');
+  assert.equal(near, 4, 'pont 105 examiné');
+  assert.equal(cards.filter((c) => c.way === 15).length, 0);
+  assert.equal(cards.length, 6);
 });
 
 test('sections : communes homonymes et lignes non localisables jamais devinées', () => {

@@ -9,7 +9,9 @@
 // (horaires, poids) et `hgv=destination` ne bloquent rien.
 //
 // Niveaux : 1 autoroutes (motorway, motorway_link) ; 2 nationales (trunk, trunk_link, ou primary à référence N…) ;
-// 3 grandes départementales (primary ou secondary à référence D…), audité seulement sur demande.
+// 3 grandes départementales (primary ou secondary à référence D…), audité seulement sur demande. Niveau 3 : fiches de
+// priorité 1 (interdiction PL absente) et 2 (hauteur basse connue, hauteur sur le pont seulement) seulement ; aucune
+// fiche « pont sans hauteur » ni « tunnel sans hauteur » (réseau trop vaste pour des fiches de hauteur inconnue).
 // Constats, par priorité : 1 interdiction PL connue (tools/audit-osm-interdictions.json, tableau 4 de l'étude) sans
 // l'étiquette correspondante ; 2 hauteur basse connue (< LOW_HEIGHT_M, seuil de tri et non une règle : valeur et sens à
 // vérifier) ; 3 hauteur inconnue (pont au-dessus d'un axe ou tunnel d'un axe sans maxheight sur la voie de l'axe).
@@ -30,6 +32,11 @@ export const AUDIT = Object.freeze({
   CELL_DEG: 0.01,
   NEAR_M: 50,
   MAX_FILE_BYTES: 5 * 1024 * 1024,
+  /** data/audit-osm/ en tout (fichiers + index.json) : au-delà, rien n'est écrit (anciens fichiers gardés). */
+  MAX_TOTAL_BYTES: 30 * 1024 * 1024,
+  /** Niveau 3 : priorités et types de fiche gardés (garde-fou, les niveaux 1-2 ne changent pas). */
+  LEVEL3_PRIORITIES: Object.freeze([1, 2]),
+  LEVEL3_TYPES: Object.freeze(['interdiction PL absente', 'hauteur basse connue', 'hauteur sur le pont seulement']),
   /** Fiches listées par priorité dans le rapport. */
   REPORT_TOP: 50,
   /** Étiquettes recopiées dans « étiquettes actuelles » (utiles à la correction seulement). */
@@ -233,6 +240,15 @@ export function auditCard({ axis, priority, type, proposed, source, confidence, 
   };
 }
 
+/** Type d'une fiche sans la section entre parenthèses (« interdiction PL absente (n59) » → « interdiction PL absente »). */
+const baseType = (c) => String(c?.type ?? '').replace(/ \(.*\)$/, '');
+
+/** Fiche gardée ? Niveaux 1-2 : toujours ; niveau 3 : priorités 1 et 2 et types AUDIT.LEVEL3_TYPES seulement. */
+export function keepCard(card) {
+  if (card?.niveau !== 3) return true;
+  return AUDIT.LEVEL3_PRIORITIES.includes(card.priorite) && AUDIT.LEVEL3_TYPES.includes(baseType(card));
+}
+
 const axisHeight = (ax) => parseHeight(ax.tags['maxheight:physical'] ?? ax.tags.maxheight ?? '');
 const hasHeightText = (ax) => Boolean(ax.tags['maxheight:physical'] || ax.tags.maxheight);
 
@@ -254,7 +270,7 @@ export function axisCards(axes) {
       }));
     }
   }
-  return cards;
+  return cards.filter(keepCard);
 }
 
 /** Fiches d'un pont au-dessus d'axes (croisements de bridgeCrossings). */
@@ -280,7 +296,7 @@ export function bridgeCards(bridge, crossings, axes) {
       }));
     }
   }
-  return cards;
+  return cards.filter(keepCard);
 }
 
 // ───────── Interdictions connues (tableau 4 de l'étude) ─────────
@@ -440,6 +456,25 @@ export function splitCards(cards, maxBytes = AUDIT.MAX_FILE_BYTES) {
   return files;
 }
 
+/**
+ * Taille de data/audit-osm/ telle qu'elle serait écrite (même texte que l'écriture : JSON + saut de ligne) ; problem
+ * non nul → rien n'est écrit (ni copie partielle) et les anciens fichiers restent.
+ * @returns {{ total:number, biggest:[string, number], problem:string|null }}
+ */
+export function auditSize(files, index, { maxFile = AUDIT.MAX_FILE_BYTES, maxTotal = AUDIT.MAX_TOTAL_BYTES } = {}) {
+  let total = 0; let biggest = ['', 0];
+  for (const [name, content] of [...files.entries(), ['index.json', index]]) {
+    const n = Buffer.byteLength(`${JSON.stringify(content)}\n`);
+    total += n;
+    if (n > biggest[1]) biggest = [name, n];
+  }
+  const mo = (n) => (n / 1024 / 1024).toFixed(2).replace('.', ',');
+  let problem = null;
+  if (biggest[1] > maxFile) problem = `fichier ${biggest[0]} de ${mo(biggest[1])} Mo (plafond ${mo(maxFile)} Mo par fichier)`;
+  else if (total > maxTotal) problem = `${mo(total)} Mo en tout (plafond ${mo(maxTotal)} Mo)`;
+  return { total, biggest, problem };
+}
+
 /** Comptes de l'audit (index.json). */
 export function auditIndex(cards, files, { updated = null, levels = AUDIT.LEVELS, extra = {} } = {}) {
   const count = (f) => { const o = {}; for (const c of cards) { const k = f(c); o[k] = (o[k] ?? 0) + 1; } return o; };
@@ -451,7 +486,7 @@ export function auditIndex(cards, files, { updated = null, levels = AUDIT.LEVELS
     total: cards.length,
     parNiveau: count((c) => c.niveau),
     parPriorite: count((c) => c.priorite),
-    parType: count((c) => c.type.replace(/ \(.*\)$/, '')),
+    parType: count(baseType),
     files: Object.fromEntries([...files.entries()].map(([k, v]) => [k, v.fiches.length])),
     note: `${AUDIT.NOTE} ; la signalisation fait foi`,
     ...extra,
@@ -484,7 +519,12 @@ export function auditReport(index, cards, { located = [], unlocated = [], axesLo
   L.push('Règles :', '- rien n\'est écrit dans OpenStreetMap : chaque fiche est une proposition, **à vérifier sur place** ;',
     '- **la signalisation fait foi** ; seul l\'arrêté fait foi pour la règle ; « en vigueur : à vérifier » ;',
     '- une correction faite dans OSM met 2 à 3 semaines à atteindre l\'API publique d\'ORS (étude, section 1) ;',
-    '- données © contributeurs OpenStreetMap, licence ODbL ; fiches complètes dans `data/audit-osm/`.', '');
+    '- données © contributeurs OpenStreetMap, licence ODbL ; fiches complètes dans `data/audit-osm/`.');
+  if (index.levels.includes(3)) {
+    L.push('- niveau 3 (grandes départementales : primary ou secondary à référence D…) : fiches de priorité 1 et 2 '
+      + 'seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur ».');
+  }
+  L.push('');
   L.push('## Chiffres', '');
   L.push(`Fiches : **${index.total}**.`, '');
   L.push('| Priorité | Fiches |', '|---|---|');
