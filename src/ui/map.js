@@ -27,6 +27,7 @@ import { photoCoverPatches } from '../lib/photo-cover.js';
 import { ROUTE_ARROWS } from '../lib/nav-layout.js';
 import { CHEVRON_IMAGE, TURN_IMAGE, chevronImage, turnImage } from './route-arrows.js';
 import { symbolSvg } from './nav-symbols.js';
+import { createRouteReplay } from '../lib/route-replay.js';
 
 const EMPTY_FC = Object.freeze({ type: 'FeatureCollection', features: [] });
 
@@ -113,6 +114,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   let routes = []; // [{ coordinates, bbox }] : itinéraires affichés
   let selected = 0; // indice de l'itinéraire choisi (couleur vive)
   let routeBbox = null;
+  const replay = createRouteReplay(); // v85 : cadrage d'un itinéraire montré avant la création de la carte
   let theme = initialTheme;
   /** Luminosité de la carte la nuit (phase 2d) : 'dark' | 'normal' | 'light'. */
   let nightLevel = sanitizeNightLevel(opts.nightLevel);
@@ -586,6 +588,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     drawBridges({ force: true });
     drawStops();
     drawReports();
+    if (replay.takeFit()) fitRoute(0); // v85 : itinéraire montré avant la carte : cadré une fois, sans animation
   }
 
   /** Phase 3a : repères de mes signalements (hors guidage et en guidage) ; toucher → fiche (à l'arrêt, app.js). */
@@ -952,13 +955,22 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
         markers[key] = null;
         marks[key] = null;
       }
+      replay.shown();
       return;
     }
-    if (!map) return;
+    const line = routes[selected].coordinates;
+    if (!map) {
+      // v85 : carte pas encore créée (style en chargement, ex. itinéraire repris v53) : repères retenus (`marks`),
+      // tracés ajoutés par build() sur « style.load », cadrage fait une fois à la création (replay.takeFit).
+      marker('start', line[0], MARK_COLORS.start);
+      marker('end', line[line.length - 1], MARK_COLORS.end);
+      replay.deferred(fit);
+      return;
+    }
+    replay.shown();
     removeRouteLayers();
     if (styleReady()) addRouteLayers();
     else map.once('style.load', addRouteLayers);
-    const line = routes[selected].coordinates;
     marker('start', line[0], MARK_COLORS.start);
     marker('end', line[line.length - 1], MARK_COLORS.end);
     if (fit) fitRoute();

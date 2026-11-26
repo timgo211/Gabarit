@@ -158,6 +158,8 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
     (symbol-placement line, 90 px, zoom ≥ 13) et pastilles des manœuvres `route-turns` (source `route-turns`,
     `maneuverMarks` calculé une fois par itinéraire, `map.showTurns`), sous la partie parcourue, guidage seulement ;
   - compteur 57 px (police 1,43 rem) ; panneau de limitation et mention « règle » inchangés ;
+  - v85 : itinéraire montré avant la création de la carte (reprise pendant le chargement du style) : repères et cadrage
+    rejoués une fois par `build()` (`src/lib/route-replay.js`), aucun doublon ;
   - mémoire de l'itinéraire (`src/lib/route-save.js` + `src/ui/route-save.js`, IndexedDB `gabarit-route`) : itinéraire
     en préparation et guidage GPS (jamais la simulation) gardés sur visibilitychange / pagehide et à chaque
     changement, 30 s au plus en guidage ; profil par identifiant, aucune clé ; < 12 h → repris tel quel (guidage :
