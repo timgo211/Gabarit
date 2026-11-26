@@ -24,7 +24,8 @@ node --test
 (lancé aussi par `.github/workflows/tests.yml` à chaque push). Doit rester 100 % vert. Un hook Stop le relance tout seul à la fin de chaque tour où le code a changé.
 
 Interface : `node tools/ui-check.mjs [scénario]` (Playwright, hors CI, à relancer après toute modif d'interface) — mode d'emploi et scénarios : skill `gabarit-tests-interface`.
-Rouge connu du conteneur (Chromium sans carte graphique), toléré, ne pas s'arrêter dessus : `ui-check context`, « contexte WebGL perdu puis restauré : carte redessinée » (magenta 255,0,255, aussi sur main).
+Rouge connu du conteneur (Chromium sans carte graphique), toléré, ne pas s'arrêter dessus : `ui-check context`, « contexte WebGL perdu puis restauré : carte redessinée » (magenta 255,0,255, aussi sur main). Aussi toléré : `ui-check overview`.
+`draw` et `sensibles` : verts (tests mis à jour pour v53 et v81). Défaut connu, non corrigé : itinéraire repris (v53) avant la création de la carte → vue France sans cadrage (skill `gabarit-tests-interface`).
 Aucun test sur le temps d'horloge (machine chargée = échec au hasard) : mesurer le travail (compteur) à la place ;
 adresse d'import unique = compteur, jamais `Date.now()`.
 
