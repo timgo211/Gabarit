@@ -20,6 +20,7 @@ import { sanitizePlaces } from './saved-places.js';
 import { sanitizeNightLevel, DEFAULT_NIGHT_LEVEL } from './map-palette.js';
 import { sanitizeWindGust, WIND } from './wind.js';
 import { emptyAdrSettings, migrateAdrSettings, withAdr } from './adr-settings.js';
+import { sanitizeSectionsOpen } from './settings-sections.js';
 
 export const DATA_KEY = 'gabarit.data';
 export const API_KEY_KEY = 'gabarit.orsKey';
@@ -73,7 +74,7 @@ export function emptyData() {
       autoBypass: true,
       weightWarnings: true,
       panelCollapsed: false,
-      creditsOpen: false,
+      sectionsOpen: {},
       adr: emptyAdrSettings(),
     },
   };
@@ -138,7 +139,9 @@ export function sanitizeData(raw) {
       autoBypass: s.autoBypass !== false, // v77 : contournement automatique des interdictions, activé par défaut
       weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
       panelCollapsed: s.panelCollapsed === true, // v62 : panneau de préparation replié (carte seule), déplié par défaut
-      creditsOpen: s.creditsOpen === true, // v64 : « Sources et licences » de Réglages dépliée ; repliée par défaut
+      // v84 : sections de Réglages ouvertes (seule source d'état, « Sources et licences » comprise), tout replié par
+      // défaut ; ancienne sauvegarde v64 : creditsOpen repris pour « Sources et licences ».
+      sectionsOpen: sanitizeSectionsOpen(s.sectionsOpen, s.creditsOpen === true),
       // Matières dangereuses (phase 5b, réglage global depuis la v19) ; ancien fichier : repris des profils.
       adr: migrateAdrSettings(s.adr, raw.vehicles, raw.activeVehicleId),
     },

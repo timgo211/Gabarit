@@ -177,6 +177,7 @@ export function summarizeKeyTest({ directions, geocode }, apiKey = '') {
     return {
       level: 'err',
       saveKey: false,
+      invalidKey: true, // v84 : « Clé : manquante » dans le titre de la section de Réglages
       message: `Clé refusée par HeiGIT (${formatDiagnostic(d, apiKey)}). Vérifie qu'elle est copiée en entier, sans espace, depuis account.heigit.org (Dashboard).`,
     };
   }

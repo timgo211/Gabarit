@@ -184,3 +184,13 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
 - `ami` (3c, v68) : fichier téléchargé (navigator.share retiré) = confirmés seulement, jour seulement, sans note ni
   lieu ; fichier piégé (note HTML, champs inconnus, type inconnu, doublon) : aperçu, refus → rien, accepté → 2 importés
   non confirmés, note en texte brut, aucun élément créé ; 412×900 jour, 1280×800 nuit.
+- `reglages` (v84) : 412×900 et 900×412, jour et nuit : 18 sections repliées au premier affichage, contenu caché et non
+  focusable, titres ≥ 48 px, valeurs sous les titres sur une ligne ; « Guidage vocal » d'un toucher, ADR à Entrée,
+  Interdictions à Espace (plusieurs ouvertes), sans chevauchement ; état gardé au rechargement ; clé vide → « Clé :
+  manquante » dans le titre ; « Gabarit vNN » visible. Les autres scénarios ouvrent Réglages par `openSettings(page)`
+  (tout déplié sauf « Sources et licences »).
+- `fiche-infos` (v84) : mêmes tailles et thèmes ; cas sans alerte (accès lus, ponts et poids non signalés → « Aucune
+  alerte »), défaut, interdit (ZFE Testville), plusieurs pays (Suisse, Italie) : menu replié après chaque calcul, en-tête
+  ≥ 48 px, récap = niveaux `li[data-sev]`, pire niveau symbole + mot, contraste ≥ 4,5:1, ni coupé ni « … » ; cartes,
+  question et boutons hors du menu ; ouvert : ordre interdit → info, fiches pays dedans ; autre fiche gardée ouverte,
+  nouveau calcul replié, Entrée ouvre. Autres scénarios : `openTripInfo(page)` avant de vérifier une ligne à l'écran.

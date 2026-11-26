@@ -284,7 +284,7 @@ function limitItems(data, vehicle, push, card, segment) {
     push('Poids et hauteur', height, `${height.text}${over ? ` Votre profil indique ${meters(h)} : au-delà de la hauteur maximale (${meters(height.max)}).` : ''}`,
       { confirmed: ok, level: over ? 'warn' : 'info' });
     if (over) card.heightOver = true;
-    if (over) card.warnings.push(`${segment.name} : hauteur maximale ${meters(height.max)}, votre profil indique ${meters(h)} (${kmOf(segment.enter)} → ${kmOf(segment.exit)}). ${COUNTRY_RULES.FOOTER}`);
+    if (over) card.warnings.push(card.heightWarning = `${segment.name} : hauteur maximale ${meters(height.max)}, votre profil indique ${meters(h)} (${kmOf(segment.enter)} → ${kmOf(segment.exit)}). ${COUNTRY_RULES.FOOTER}`);
   }
 }
 
@@ -447,7 +447,8 @@ export function countryRules(route, { vehicle, departure = new Date(), elapsed =
       vehicle, now: now ?? departure, tunnels, status: entry?.status ?? 'failed',
     });
     out.cards.push(card);
-    for (const w of card.warnings) out.lines.push({ level: 'warn', text: w });
+    // v84 : hauteur au-delà du maximum du pays = interdit (menu « Informations du trajet ») ; autres = alerte.
+    for (const w of card.warnings) out.lines.push({ level: 'warn', text: w, ...(w === card.heightWarning ? { sev: 'ban' } : {}) });
     if (card.warnings.length > (card.heightOver ? 1 : 0)) out.short.push(`Interdiction PL ${s.name}`);
     if (card.heightOver) out.short.push(`Hauteur max ${s.name}`);
   }

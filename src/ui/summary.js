@@ -3,6 +3,8 @@
 // Affiché à l'arrêt uniquement : pendant le guidage ce panneau est masqué (aucun choix en roulant).
 
 import { el } from './dom.js';
+import { makeCollapsible } from './collapsible.js';
+import { sortLines, lineSeverity, recapText, worstSeverity, createTripInfoState, SEV_LABEL, TRIP_INFO } from '../lib/route-info.js';
 import { describeOption, failureText, VARIANTS } from '../lib/route-options.js';
 import { STOPS } from '../lib/stops.js';
 import { LYON_BYPASS, LYON_AUTO } from '../lib/lyon-bypass.js';
@@ -114,7 +116,7 @@ function rulesBlock(rules, {
   source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed = false, onAvoidLocal, localBusy,
   onBypass = null, bypassBusy = false, onLocalAnswer = null,
 }) {
-  if (!rules) return [];
+  if (!rules) return { visible: [], info: [], sources: [] };
   // v78 : « Desserte locale dans la zone … ? » (Non par défaut), à l'arrêt seulement (grisé sinon).
   const questions = onLocalAnswer ? (rules.localQuestions ?? []).map((q) => el('div', { class: 'local-question', role: 'group', 'aria-label': q.text }, [
     el('p', { class: 'local-question-text', text: q.text }),
@@ -130,14 +132,14 @@ function rulesBlock(rules, {
     ]),
     tunnelAllowed ? null : el('p', { class: 'hint', text: 'Réponse possible à l\'arrêt seulement.' }),
   ])) : [];
-  const items = rules.lines.map((l) => el('li', { class: l.level }, [
+  // v84 : lignes triées par niveau (interdits, alertes, à vérifier, infos), textes inchangés ; niveau en data-sev.
+  const items = sortLines(rules.lines).map((l) => el('li', { class: l.level, 'data-sev': lineSeverity(l) }, [
     l.text,
     l.url ? el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer', text: l.linkText ?? 'Arrêté' }) : null,
   ]));
-  return [
+  // Toujours visibles (hors du menu) : question « desserte locale » et boutons d'action.
+  const visible = [
     ...questions,
-    items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,
-    countryCards(rules.countries),
     canAvoid && rules.banned.length ? el('button', {
       type: 'button', class: 'btn btn-avoid-zfe', disabled: !!avoidBusy, onclick: onAvoidZfe,
       text: avoidBusy ? 'Calcul sans ZFE…' : '⛔ Éviter la ZFE',
@@ -160,6 +162,12 @@ function rulesBlock(rules, {
       type: 'button', class: 'btn btn-avoid-local', disabled: !!localBusy, onclick: onAvoidLocal,
       text: localBusy ? 'Calcul du contournement…' : '⛔ Éviter la desserte locale',
     }) : null,
+  ].filter(Boolean);
+  const info = [
+    items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,
+    countryCards(rules.countries),
+  ].filter(Boolean);
+  const sources = [
     source ? el('p', { class: 'rules-source', text: source }) : null,
     // Licence CC BY 4.0 des données Open-Meteo : attribution avec un lien (open-meteo.com/en/licence).
     windCredit ? el('p', { class: 'rules-source wind-credit' }, [
@@ -170,6 +178,28 @@ function rulesBlock(rules, {
       ').',
     ]) : null,
   ].filter(Boolean);
+  return { visible, info, sources };
+}
+
+/**
+ * v84 : menu « Informations du trajet » (composant commun src/ui/collapsible.js) : en-tête toujours visible (pire
+ * niveau : symbole + mot, titre, récap, chevron), replié à chaque nouveau calcul, jamais ouvert tout seul ; état
+ * gardé pendant le même calcul seulement (redessin, changement de fiche), rien sauvegardé. Contenu inchangé.
+ */
+const tripInfoStates = new WeakMap();
+function tripInfoMenu(notesNode, calcId, lines, body) {
+  let state = tripInfoStates.get(notesNode);
+  if (!state) tripInfoStates.set(notesNode, state = createTripInfoState());
+  const worst = worstSeverity(lines);
+  const lab = SEV_LABEL[worst];
+  const lead = el('span', { class: `trip-info-level sev-${worst}` }, [
+    el('span', { class: 'trip-info-icon', 'aria-hidden': 'true', text: lab.icon }),
+    el('span', { class: 'trip-info-word', text: lab.word }),
+  ]);
+  return makeCollapsible({
+    id: `${notesNode.id || 'route-notes'}-info`, className: `trip-info sev-${worst}`, title: TRIP_INFO.TITLE,
+    sub: recapText(lines), lead, body, open: state.isOpen(calcId), onToggle: (o) => state.set(calcId, o),
+  }).node;
 }
 
 // Bloc du diagnostic ouvert : gardé ouvert quand la fiche est redessinée (cases chargées, passage à l'arrêt).
@@ -288,13 +318,18 @@ export function renderRouteChoice(node, notesNode, {
     failures.length ? el('p', { class: 'route-failures', text: failures.map(failureText).join(' ') }) : null,
   ].filter(Boolean));
   node.hidden = false;
+  const block = rulesBlock(rules?.[selected], {
+    source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed,
+    onAvoidLocal, localBusy, onBypass, bypassBusy, onLocalAnswer,
+  });
   notesNode.replaceChildren(
-    ...rulesBlock(rules?.[selected], {
-      source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed,
-      onAvoidLocal, localBusy, onBypass, bypassBusy, onLocalAnswer,
-    }),
-    el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
-    diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : '', tunnelAllowed),
+    ...block.visible,
+    tripInfoMenu(notesNode, choice.calcId, rules?.[selected]?.lines ?? [], [
+      ...block.info,
+      el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
+      diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : '', tunnelAllowed),
+      ...block.sources,
+    ]),
   );
   notesNode.hidden = false;
 }

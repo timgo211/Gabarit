@@ -409,7 +409,7 @@ export function sensitiveRules(route, { vehicle = null, copy = null, geo = null,
   if (!copy) return out;
   if (copy.status === 'idle' || copy.status === 'loading') { out.tech = 'Points sensibles : copie en cours de lecture'; return out; }
   if (copy.status !== 'ok') {
-    out.lines.push({ level: 'info', text: SENSITIVE_UNAVAILABLE_TEXT });
+    out.lines.push({ level: 'info', sev: 'check', text: SENSITIVE_UNAVAILABLE_TEXT }); // v84 : donnée manquante = à vérifier
     out.tech = 'Points sensibles : données non chargées';
     return out;
   }
@@ -426,10 +426,11 @@ export function sensitiveRules(route, { vehicle = null, copy = null, geo = null,
   // v81 : la ligne garde sa section (`section`, indice dans meta.sections) : une interdiction connue active la remplace
   // par sa ligne unique (route-bans.js).
   const shown = out.items.slice(0, SENSITIVE.MAX_SHOWN).map((it) => ({
-    level: 'warn', text: it.text, ...(it.type <= SENSITIVE.TYPES.BAN_BF ? { section: it.section } : {}),
+    // v84 : interdiction (arrêté, Bison Futé) et hauteur basse = interdit ; tunnel sans hauteur = à vérifier.
+    level: 'warn', sev: it.type === SENSITIVE.TYPES.TUNNEL ? 'check' : 'ban', text: it.text, ...(it.type <= SENSITIVE.TYPES.BAN_BF ? { section: it.section } : {}),
   }));
   const more = out.items.length - shown.length;
-  if (more > 0) shown.push({ level: 'warn', text: `+${more} point${more > 1 ? 's' : ''} sensible${more > 1 ? 's' : ''} à vérifier (voir la carte).` });
+  if (more > 0) shown.push({ level: 'warn', sev: 'check', text: `+${more} point${more > 1 ? 's' : ''} sensible${more > 1 ? 's' : ''} à vérifier (voir la carte).` });
   out.lines = shown;
   const n = out.items.length;
   if (n) out.short.push(`${n} point${n > 1 ? 's' : ''} sensible${n > 1 ? 's' : ''} à vérifier`);

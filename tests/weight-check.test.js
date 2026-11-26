@@ -107,7 +107,7 @@ test('fiche : 5 lignes au plus puis « +N », résumé, ligne technique, réglag
   assert.ok(ok.lines.every((l) => l.level === 'warn' && /à vérifier\. La signalisation fait foi\./.test(l.text)));
   assert.equal(weightRules(route, { vehicle, weights: { status: 'ok', data }, enabled: false }).lines.length, 0);
   const off = weightRules(route, { vehicle, weights: { status: 'failed', data: { ways: [] } } });
-  assert.deepEqual(off.lines, [{ level: 'info', text: WEIGHT_UNAVAILABLE_TEXT }]);
+  assert.deepEqual(off.lines, [{ level: 'info', sev: 'check', text: WEIGHT_UNAVAILABLE_TEXT }]);
   assert.equal(off.tech, 'Limites de poids : données non chargées');
   // Réglementation complète et diagnostic : ligne technique « Limites de poids : N ».
   const rules = routeRules(route, { vehicle, weightLimits: { status: 'ok', data }, weightWarnings: true });

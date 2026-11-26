@@ -53,6 +53,7 @@ import {
 } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor, avoidForReroute } from './lib/zfe.js';
 import { routeRules, rulesSourceText, confirmedTunnelBans } from './lib/route-rules.js';
+import { toggleSection } from './lib/settings-sections.js';
 import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
@@ -100,6 +101,9 @@ const fuelBtn = $('#btn-fuel'); // phase 4 : carburant sur le trajet
  * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, fromLabel, toLabel, startIsMyPosition }.
  */
 let choice = null;
+// v84 : numéro du calcul (menu « Informations du trajet » replié à chaque nouveau calcul) : compteur, jamais l'horloge.
+let calcSeq = 0;
+const nextCalcId = () => { calcSeq += 1; return calcSeq; };
 /** Dernière position GPS connue [lon, lat] (partage « Ma position »). */
 let myPosition = null;
 /** Lien de partage reçu : variante à présélectionner au prochain calcul vers la même arrivée. */
@@ -186,7 +190,7 @@ navigation = createNavigation({
     // v76 : points de passage techniques (« Rocade Est ») gardés par la fiche recalculée, jamais comptés comme étapes.
     const rerouted = reroutedOption(choice.options[choice.selected], route);
     choice = {
-      ...choice, options: [left.some((x) => x.via === true) ? { ...rerouted, stops: left } : rerouted], failures: [], selected: 0,
+      ...choice, options: [left.some((x) => x.via === true) ? { ...rerouted, stops: left } : rerouted], failures: [], selected: 0, calcId: nextCalcId(),
       start: route.coordinates[0], startIsMyPosition: true, // recalcul depuis la position GPS
       stops: left.filter((x) => x.via !== true), // v55 : étapes non atteintes, celles du nouveau tracé
     };
@@ -485,7 +489,7 @@ function choiceRules(c = choice) {
   const list = c.options.map((o) => {
     const r = { ...rulesOf(o.route, c.vehicle, departure) };
     r.lines = [...r.lines];
-    if (zfeFailed) r.lines.unshift({ level: 'info', text: 'Zones à faibles émissions indisponibles (fichier non chargé) : vérifie la signalisation.' });
+    if (zfeFailed) r.lines.unshift({ level: 'info', sev: 'check', text: 'Zones à faibles émissions indisponibles (fichier non chargé) : vérifie la signalisation.' });
     // Phase 12b : « Évite N restrictions saisies par toi », trajet trop long pour ORS, passage proche (à vérifier).
     const rl = restrictionLines(o.route, c.restr);
     if (rl.length) {
@@ -502,7 +506,7 @@ function choiceRules(c = choice) {
       && (c.lyonAuto === 'failed' || c.lyonAuto === 'none');
     if (r.lyonBanned) {
       const why = c.lyonAuto === 'failed' ? LYON_AUTO.FAIL_REASONS[c.lyonAutoReason] : '';
-      r.lines.unshift({ level: 'warn', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
+      r.lines.unshift({ level: 'warn', sev: 'ban', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
     }
     // v78 : autres interdictions connues (route-bans.js) : fiche rouge, confirmation, question « desserte locale ».
     // v81 : plage km = points de la copie ∪ plages « Accès PL limité » qui touchent la section (même zone que le
@@ -524,9 +528,9 @@ function choiceRules(c = choice) {
       r.lines = r.lines.filter((l) => !(l.plage && absorbed.has(l.plage)) && !(Number.isInteger(l.section) && sectionsShown.has(l.section)));
     }
     r.banFail = active.length && c.banAuto === 'failed' ? detourFailText(c.banAutoReason) : '';
-    if (r.banFail) r.lines.unshift({ level: 'warn', text: r.banFail });
+    if (r.banFail) r.lines.unshift({ level: 'warn', sev: 'ban', text: r.banFail });
     for (const b of bans) if (!active.includes(b)) r.lines.unshift({ level: 'info', text: declaredText(b) });
-    for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', text: b.text });
+    for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', sev: 'ban', text: b.text });
     r.blocked = r.lyonBanned || active.length > 0; // (r.banned = passages ZFE interdits, ne pas confondre)
     // v81 : une ligne courte par section sur la fiche (plus le texte générique), Lyon compris.
     r.bannedLines = [...(r.lyonBanned ? [LYON_AUTO.BANNED_SHORT] : []), ...active.map((b) => b.short)];
@@ -567,7 +571,7 @@ function choiceRules(c = choice) {
     const hint = avoidingOptionsText(counts, i);
     if (hint) {
       const at = r.lines.findLastIndex((l) => l.level === 'warn' && r.forbiddenTunnels.some((p) => l.text.startsWith(tunnelName(p))));
-      r.lines.splice(at + 1, 0, { level: 'warn', text: hint });
+      r.lines.splice(at + 1, 0, { level: 'warn', sev: 'ban', text: hint });
     }
   });
   return list;
@@ -1237,7 +1241,7 @@ async function openAlternatives(from, extraStop = null) {
     });
     if (my !== altTicket || !navigation.active) return;
     altChoice = {
-      ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position',
+      ...choice, options, failures, selected: 0, vehicle, start: from, restr, startIsMyPosition: true, fromLabel: 'Ma position', calcId: nextCalcId(),
       stops, touched: false, autoId: undefined,
       // v77 : rien d'automatique ici ; fiche par Lyon (A6 / A7) en rouge, confirmation avant de la guider.
       lyonAuto: 'none', lyonAutoReason: undefined,
@@ -1403,7 +1407,7 @@ const settings = createSettings({
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
   onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
-  onCreditsToggle: (open) => setSetting({ creditsOpen: open }), // v64
+  onSectionToggle: (key, open) => setSetting({ sectionsOpen: toggleSection(data.settings.sectionsOpen, key, open) }), // v84
   recent: recentPlaces, // v64 : effacer, exporter, importer
   recentEditAllowed: () => recentAllowed(), // v64 : en guidage, à l'arrêt seulement
 });
@@ -1451,7 +1455,7 @@ const form = createRouteForm({
       choice = {
         options, failures, selected, vehicle, start: p.start, end: p.end, restr,
         avoidTolls: p.avoidTolls, avoidFerries: p.avoidFerries, fromLabel: p.fromLabel, toLabel: p.toLabel,
-        startIsMyPosition: p.startIsMyPosition, stops,
+        startIsMyPosition: p.startIsMyPosition, stops, calcId: nextCalcId(),
       };
       showChoice(selected);
       routeSaveOn = true;

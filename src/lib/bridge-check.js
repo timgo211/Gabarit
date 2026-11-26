@@ -240,11 +240,11 @@ export function bridgesAlongRoute(route, data, { vehicleHeight = null } = {}) {
 export function bridgeLines(items) {
   const km = (m) => `km ${Math.round(m / 1000)}`;
   const shown = (items ?? []).slice(0, BRIDGE.MAX_SHOWN).map((it) => ({
-    level: 'warn',
+    level: 'warn', sev: 'check',
     text: `${it.text} (${km(it.along)}${it.name ? `, ${it.name}` : ''}${it.kind === 'rail' ? ', pont ferroviaire' : ''} ; priorité ${it.level === 'high' ? 'haute' : 'moyenne'})`,
   }));
   const more = (items?.length ?? 0) - shown.length;
-  if (more > 0) shown.push({ level: 'warn', text: `+${more} pont${more > 1 ? 's' : ''} à vérifier (voir la carte).` });
+  if (more > 0) shown.push({ level: 'warn', sev: 'check', text: `+${more} pont${more > 1 ? 's' : ''} à vérifier (voir la carte).` });
   return shown;
 }
 
@@ -268,7 +268,7 @@ export function bridgeRules(route, { vehicle = null, bridges = null, enabled = t
   if (!enabled) { out.tech = 'Ponts sans hauteur : signalement désactivé dans Réglages'; return out; }
   if (!bridges || bridges.status === 'idle' || bridges.status === 'loading') { out.tech = 'Ponts sans hauteur : copie en cours de lecture'; return out; }
   if (bridges.status !== 'ok') {
-    out.lines.push({ level: 'info', text: BRIDGE_UNAVAILABLE_TEXT });
+    out.lines.push({ level: 'info', sev: 'check', text: BRIDGE_UNAVAILABLE_TEXT }); // v84 : donnée manquante = à vérifier
     out.tech = 'Ponts sans hauteur : données non chargées';
     return out;
   }
@@ -277,7 +277,7 @@ export function bridgeRules(route, { vehicle = null, bridges = null, enabled = t
   out.counts = res.counts;
   out.tech = bridgeTechText(res);
   out.lines.push(...bridgeLines(res.items));
-  if (bridges.uncovered) out.lines.push({ level: 'info', text: BRIDGE_UNCOVERED_TEXT });
+  if (bridges.uncovered) out.lines.push({ level: 'info', sev: 'check', text: BRIDGE_UNCOVERED_TEXT });
   if (res.items.length) out.short.push(`${res.items.length} pont${res.items.length > 1 ? 's' : ''} à vérifier`);
   return out;
 }

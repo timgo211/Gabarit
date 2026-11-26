@@ -43,6 +43,9 @@ const TEXT = [
   // --card), vitesse dépassée (--danger sur --card), boutons choisis (--primary-fg sur --primary).
   ['--street-fg', '--street-bg'],
   ['--nav-off-fg', '--nav-off-bg'], // phase 2e : bouton rond indisponible, gris opaque
+  // v84 : niveaux du menu « Informations du trajet » (symbole + mot sur la carte et le panneau).
+  ['--lvl-ban', '--card'], ['--lvl-ban', '--panel'], ['--lvl-alert', '--card'], ['--lvl-alert', '--panel'],
+  ['--lvl-check', '--card'], ['--lvl-check', '--panel'], ['--lvl-info', '--card'], ['--lvl-info', '--panel'],
 ];
 const LARGE = [
   ['--border', '--panel'], ['--border', '--card'], ['--border', '--bg'],
