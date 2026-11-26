@@ -556,6 +556,10 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   et la fiche le dit, « à vérifier ». Fiche : « Évite N restrictions saisies par toi » ; échec : « Une restriction saisie
   bloque peut-être le seul passage. » Rien dans le guidage ni dans la voix.
 
+  - [ ] **Ponts au-dessus des autoroutes** (règle de Timothée : pas un point sensible, sauf en Île-de-France et dans
+    les grandes agglomérations). PR 1 sur 3 (contours seulement, codée) : `tools/zones-agglo.mjs` + Action « Contours
+    IGN » → `data/zones-agglo.json` (Île-de-France, Métropoles du Grand Paris, d'Aix-Marseille-Provence, Européenne de
+    Lille, Bordeaux, Toulouse, Nantes ; cherchées par leur nom, noms à vérifier au run de l'Action). PR 3 : la règle.
 - [x] **Phase 12a bis — Limites de poids d'après OSM** (v42)
   L'Action « Données OSM » copie aussi, pour la France, les tronçons routiers portant maxweight ou maxweight:hgv en
   tonnes (valeurs illisibles ignorées ; drapeau « desserte possible » si hgv=destination|delivery ou
