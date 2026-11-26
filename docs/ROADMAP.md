@@ -699,7 +699,15 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     écrit, code de sortie 1. `data/axes-osm/` non élargie (motorway / trunk / primary seulement). Points sensibles :
     plafond abaissé à 300 Ko (copie du 24/11/2026 : 93 Ko) ; secondary hors copie des axes → points écartés faute de cap.
     Estimation (non mesurée, Overpass bloqué depuis le conteneur) : 2 000 à 6 000 fiches de niveau 3, 1 à 3,5 Mo ;
-    points sensibles + 650 à 2 000 (≈ 120 à 180 Ko). Action à lancer avec « 1-3 » (accord du propriétaire).
+    points sensibles + 650 à 2 000 (≈ 120 à 180 Ko).
+  - [x] **Audit niveaux 1-3 lancé** (run 4 du 26/11/2026, depuis `main`, accord du propriétaire) : source de secours
+    download.openstreetmap.fr (extrait du 23/11/2026), 15 min, aucun ⚠. 23 736 fiches : niveau 1 12 924, niveau 2
+    9 007, niveau 3 1 805 (toutes « hauteur basse connue », priorité 2 ; aucune interdiction connue sur une D, aucune
+    hauteur sur le pont seulement < 4,30 m) ; priorités 1 : 526, 2 : 2 270, 3 : 20 940. `data/audit-osm/` 12,83 Mo
+    (4 fichiers + index), `data/axes-osm/` 9,54 Mo (inchangée en classes). Points sensibles : 2 653 (hauteurs basses
+    415 → 989), 77 cases, 119 Ko ; 1 267 hauteurs basses écartées faute de cap (secondary hors copie des axes).
+    Écarts des niveaux 1-2 (+430, +89 fiches) : autre extrait, pas le code. À revoir : 45 ponts de l'audit absents de
+    `data/ponts-osm/`.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
