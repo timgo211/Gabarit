@@ -212,10 +212,50 @@ la lecture de la licence allemande pour l'Allemagne.
 
 ## 6. À vérifier (récapitulatif)
 
-- Codes DATEX des fermetures et du sens (DIR) ; complétude de `content.xml`.
-- Règles d'usage des Actions GitHub pour une tâche horaire.
+- ~~Codes DATEX des fermetures et du sens (DIR) ; complétude de `content.xml`.~~ Répondu au § 7 (complétude : non
+  prouvée, rien n'indique un manque).
+- ~~Règles d'usage des Actions GitHub pour une tâche horaire.~~ Répondu au § 7 (aucune interdiction ; zone grise
+  signalée, plan B).
 - CORS du flux CITA v3.6 (`situationrecord36`) ; l'ancien flux a `*`.
 - Licence des données Autobahn GmbH (et des alertes INRIX).
 - Flandre : texte de licence du producteur (seule la fiche NAP dit CC-BY). DGT : licence (CORS non).
 - `api.heigit.org` : profils de vitesse HERE chargés ou non (sans effet sur les options).
 - Autoroutes concédées : conditions de demande d'identifiants (si le propriétaire le souhaite un jour).
+
+## 7. Résultats de l'option A (Action « Trafic », 26/11/2026)
+
+Lancements à la main sur main : run 1 (<https://github.com/timgo211/Gabarit/actions/runs/45859376295>) et run 2 après
+la petite correction de la PR #108 (<https://github.com/timgo211/Gabarit/actions/runs/45860120224>). Journal en chiffres,
+sans coordonnée.
+
+- Flux : `content.xml` lu, 3,0 Mo décodés (gzip), `last-modified` 16:24:35 GMT, `publicationTime` 17:24:34 +01:00 :
+  le flux change bien vers :24 (§ 2) → Action planifiée à :30 UTC.
+- Contenu : 340 situations, 543 enregistrements DATEX II v2 (format conforme à l'étude). Types : MaintenanceWorks 160,
+  RoadOrCarriagewayOrLaneManagement 118, AbnormalTraffic 54, ReroutingManagement 39, VehicleObstruction 32,
+  ConstructionWorks 29, GeneralNetworkManagement 25, SpeedManagement 22, GeneralObstruction 19, autres < 15.
+- Positions : `Linear` 394 (droite départ → arrivée : 393), `Point` 149 ; aucun enregistrement sans position.
+- Dates : début et fin 336, début seul 207 ; `validityStatus` `definedByValidityTimeSpec` 539, `suspended` 4.
+- Gardés (run 2) : 309 (chantier 172, bouchon 53, obstacle 52, fermeture 24, accident 8) ; JSON de 94 Ko.
+- CORS : `raw.githubusercontent.com/…/trafic-data/trafic.json` → `HTTP/2 200`, `access-control-allow-origin: *`,
+  `cache-control: max-age=300` (une copie peut donc avoir jusqu'à 5 min de retard sur la branche).
+
+Réponses aux « À vérifier » :
+- **Codes des fermetures** : les DIR publient `roadClosed` (21) et `closedPermanentlyForTheWinter` (7, route fermée
+  pour l'hiver) ; `carriagewayClosures` n'apparaît pas. Les autres codes de gestion de voies (`laneClosures` 59,
+  `singleAlternateLineTraffic` 17, `contraflow` 6, `narrowLanes` 4, `weightRestrictionInOperation` 4) ne sont pas
+  des fermetures : écartés.
+- **Sens** : `tpegDirection` est toujours présent : `bothWays` 148, `southBound` 102, `eastBound` 89, `northBound` 88,
+  `westBound` 87, `innerRing` 15, `outerRing` 14. La droite départ → arrivée va dans le sens cardinal publié dans 209
+  cas sur 245 (17 à l'inverse, 19 flous) : l'appli ne dit « votre sens » ou « sens opposé » que si les deux
+  concordent, et toujours « d'après la source ».
+- **Complétude de `content.xml`** : non prouvée, rien n'indique un manque. Le dossier contient environ 3 300 fichiers
+  `.xml` numérotés (`3692275.xml`…), datés des dernières 24 h (environ 700 de la dernière heure), sans lien avec les
+  identifiants de `content.xml` (`260122-001707-2`…) : c'est un historique des messages, pas la liste des événements
+  en cours. Ces fichiers ne sont pas lus.
+- **Règles GitHub** (docs.github.com lues le 26/11/2026 dans les sources `github/docs`) : intervalle minimal de 5 min,
+  retards possibles en haut d'heure (d'où :30), désactivation après 60 jours sans activité sur un dépôt public (la doc
+  ne dit pas si un push du GITHUB_TOKEN compte ; réactivation : Actions › Trafic › Enable workflow). Conditions des
+  Actions : pas de « content delivery network » ni de « serverless application », mais « a low benefit Action could be
+  ok if it's also low burden » : aucune interdiction d'une tâche horaire ; charge faible (un job d'une minute par heure).
+  Plan B : retirer la ligne `schedule` ; l'appli affiche alors « Ancien ».
+

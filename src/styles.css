@@ -998,6 +998,40 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .resume-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .resume-btns .btn { flex: 1 1 140px; min-height: 56px; }
 
+/* Phase 10 A : « Trafic sur le trajet » (préparation et guidage, à l'arrêt seulement). Fiche en bas (portrait) ou à
+   gauche (paysage) : la carte et ses repères restent visibles. Repères au bord pointillé (à vérifier), jamais rouges. */
+.btn-traffic { margin-top: 10px; width: 100%; }
+.btn-traffic[aria-disabled="true"], #btn-nav-traffic[aria-disabled="true"] {
+  background: var(--nav-off-bg, var(--panel)); color: var(--nav-off-fg, var(--muted)); border-color: var(--nav-off-border, var(--border));
+}
+.traffic-panel {
+  position: fixed; left: 12px; right: 12px; bottom: 12px; max-height: 50vh; z-index: 45; overflow-y: auto;
+  overscroll-behavior: contain; min-width: 0; display: grid; align-content: start; gap: 8px; padding: 12px;
+  border-radius: 20px; background: var(--bg); color: var(--fg); border: 2px solid var(--border); box-shadow: 0 8px 30px rgba(0,0,0,.5);
+}
+@media (orientation: landscape) {
+  .traffic-panel { top: 12px; right: auto; width: min(42vw, 520px); max-height: none; }
+}
+.traffic-panel[hidden], .traffic-panel [hidden] { display: none; }
+.traffic-panel .fuel-head .btn { min-height: var(--tap); }
+.traffic-note { margin: 0; color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+.traffic-old { margin-left: 6px; font-size: .85rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--fg); vertical-align: middle; }
+.traffic-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.traffic-pick {
+  width: 100%; min-width: 0; min-height: var(--tap); display: grid; gap: 2px; text-align: left; padding: 10px 12px;
+  border-radius: var(--radius); border: 2px dashed var(--accent); background: var(--card); color: var(--fg); font: inherit;
+}
+.traffic-row.selected .traffic-pick { border-style: solid; border-width: 3px; }
+.traffic-title { font-weight: 800; overflow-wrap: anywhere; }
+.traffic-facts, .traffic-dates { color: var(--muted); font-size: .95rem; overflow-wrap: anywhere; }
+.traffic-comment { font-size: .95rem; overflow-wrap: anywhere; }
+.traffic-marker {
+  min-width: 44px; height: 30px; border-radius: 15px; padding: 0 8px; display: grid; place-items: center; cursor: pointer;
+  font-size: 13px; font-weight: 800; line-height: 1; white-space: nowrap;
+  background: var(--card); color: var(--fg); border: 3px dashed var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.4);
+}
+.maplibregl-marker.traffic-marker { z-index: 3; }
+
 /* Phase 4 : « Carburant sur le trajet » (préparation et guidage, à l'arrêt seulement). Variables de la palette seulement. */
 .btn-fuel { margin-top: 10px; width: 100%; }
 .btn-fuel[aria-disabled="true"], #btn-nav-fuel[aria-disabled="true"] {

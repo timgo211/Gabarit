@@ -40,6 +40,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - `gabarit-zfe-acces-hiver-taxes` : ZFE et interdictions PL (5), accès (5d), hiver (5f), taxes PL (5h)
 - `gabarit-tunnels-frontieres-poids` : ADR (5b), frontières (5c), poids (5e), normes Euro (5g)
 - `gabarit-conduite-vent` : temps de conduite et vent fort (5 B)
+- `gabarit-trafic` : trafic Bison Futé (10 A) : Action, branche `trafic-data`, bouton « Trafic » à l'arrêt
 - Nouvelle règle propre à un domaine → l'écrire dans le skill du domaine (nouveau skill si nouveau domaine), pas ici. Ce fichier reste court : il est relu à chaque message.
 
 ## Conventions
@@ -164,10 +165,12 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   noEntry + hauteur ou poids hors negate, géométrie linéaire ; valeur = maximum ; fin passée ignorée. Détail : skill structure.
   v86 (`dialog-limits.js`) : tronçon suivi 15 m, hauteur + 0,1 ≥ valeur, PTAC > valeur ; fiche et repères pointillés à
   l'arrêt, jamais dits ; « à vérifier — seul l'arrêté fait foi » ; doublon OSM = une ligne ; copie absente = rien.
-- Trafic (10 A, PR 1, Action « Trafic », `tools/trafic-update.mjs` / `trafic-convert.mjs`) : `content.xml` des DIR
+- Trafic (10 A, Action « Trafic » horaire à :30, `tools/trafic-*.mjs` ; v88 `traffic.js`) : `content.xml` des DIR
   (Bison Futé, Licence Ouverte Etalab 2.0) → `trafic.json` (≤ 1 Mo, ≤ 3 000) sur la branche orpheline `trafic-data`
-  réécrite à chaque lancement, jamais sur main ; ligne = droite départ → arrivée seulement ; flux illisible = ancien
-  gardé ; journal sans coordonnée. Détail : skill structure.
+  réécrite à chaque lancement, jamais sur main ; journal sans coordonnée. Appli : bouton « Trafic » à l'arrêt seulement,
+  une requête au toucher (raw.githubusercontent.com, aucune position, jamais en cache), événements à 100 m du tracé
+  (droite départ → arrivée = « tracé approximatif »), fiche et repères pointillés, fermés en roulant ; « à vérifier,
+  la signalisation fait foi », « Ancien » > 3 h ; jamais dit ni dans le guidage, aucun effet sur le calcul. Détail : skill trafic.
 - Textes officiels illisibles depuis le conteneur : Action « Textes officiels » (`tools/textes-officiels.json`, journal
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +

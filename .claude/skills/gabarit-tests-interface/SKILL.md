@@ -19,7 +19,7 @@ node tools/ui-check.mjs            # ou un scénario : layout | long | satellite
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
                                    #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | dialog | recommande | autres | camion
                                    #   | carburant | etapes | historique | limites | preparation | suggestions
-                                   #   | signalements | lieux | ami
+                                   #   | signalements | lieux | ami | trafic
 ```
 Largeur 360 / 412 / 800 / 1280 px sans défilement horizontal, textes du guidage dans leurs cases, satellite après
 changement de thème (7d : une tuile de couleur par hôte, une position par source codée — LU, Bruxelles, Berne, Madrid,
@@ -210,3 +210,11 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
 - Corrigé en v85 (révélé par `draw`) : itinéraire repris (v53) avant la création de la carte (style en asynchrone,
   `loadStyle` → `build` de `map.js`) : `showRoutes` retient les repères (`marks`) et le cadrage (`createRouteReplay` de
   `src/lib/route-replay.js`) ; `build()` rejoue tracés (« style.load »), repères et `fitRoute(0)` une seule fois.
+- `trafic` (phase 10 A, v88) : fichier national simulé (option `traffic` d'`open`, réponse de raw.githubusercontent.com
+  en text/plain, `stats.traffic`) autour de `ors-directions-nav.json` : fermeture en droite (commentaire piégé en HTML),
+  bouchon à ≈ 33 m, accident à ≈ 1,1 km du tracé (le tracé d'essai repasse à 10 m de `line[15]` décalé de +0,01° :
+  décalage −0,02°), chantier terminé. 412×900 et 900×412, jour et nuit : grisé en roulant, message, aucune requête ;
+  à l'arrêt une requête sans paramètre, 2 lignes dans l'ordre, source et heure, couverture, « tracé approximatif »,
+  texte brut, 2 repères pointillés, fiche dans l'écran et carte visible, toucher = zoom 15, aucune requête ORS ; fermé en
+  roulant. 412×900 jour : « Ancien », liste vide (phrase fixe), hors ligne, 503, crédit avec la date ; guidage
+  (412×900 jour, 900×412 nuit) : puce grisée en roulant, fiche et repères à l'arrêt, fermés en roulant, rien dit.

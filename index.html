@@ -86,6 +86,8 @@
           <button type="button" id="btn-nav-layer" class="nav-chip" aria-label="Passer en vue satellite"></button>
           <!-- Phase 4 : prix du gazole sur le trajet, à l'arrêt seulement. -->
           <button type="button" id="btn-nav-fuel" class="nav-chip" aria-disabled="true" aria-label="Carburant sur le trajet (à l'arrêt)">Carburant</button>
+          <!-- Phase 10 A : trafic sur le trajet, à l'arrêt seulement ; jamais dit. -->
+          <button type="button" id="btn-nav-traffic" class="nav-chip" aria-disabled="true" aria-label="Trafic sur le trajet (à l'arrêt)">Trafic</button>
         </div>
         <!-- Liste défilante des aires et parkings PL (phase 2d) : un doigt pour défiler, aucune saisie (R412-6-2). -->
         <section id="nav-areas" class="nav-areas" aria-label="Aires et parkings PL" hidden>
@@ -186,6 +188,18 @@
         </div>
         <p id="report-status" class="status" role="status"></p>
       </section>
+      <!-- Phase 10 A : trafic Bison Futé (DIR) à 100 m du tracé, à l'arrêt seulement ; textes de la source en textContent ;
+           jamais dit, rien dans le guidage, aucun effet sur le calcul. La carte reste visible (fiche en bas ou à gauche). -->
+      <section id="traffic-panel" class="traffic-panel" role="dialog" aria-labelledby="traffic-title" hidden>
+        <div class="fuel-head">
+          <h2 id="traffic-title">Trafic sur le trajet <span id="traffic-old" class="traffic-old" hidden>Ancien</span></h2>
+          <button type="button" id="btn-traffic-close" class="btn">Fermer</button>
+        </div>
+        <p id="traffic-source" class="traffic-note" hidden></p>
+        <p id="traffic-coverage" class="traffic-note"></p>
+        <p id="traffic-status" class="status" role="status" hidden></p>
+        <ol id="traffic-list" class="traffic-list" aria-label="Événements le long du trajet, du départ à l'arrivée"></ol>
+      </section>
       <section id="fuel-panel" class="fuel-panel" role="dialog" aria-labelledby="fuel-title" hidden>
         <div class="fuel-head">
           <h2 id="fuel-title">Carburant sur le trajet</h2>
@@ -269,6 +283,8 @@
       </div>
       <!-- Phase 4 : stations à moins de 2 km du tracé, prix du gazole (à l'arrêt seulement). -->
       <button type="button" id="btn-fuel" class="btn btn-big btn-fuel" aria-disabled="true" hidden>⛽ Carburant sur le trajet</button>
+      <!-- Phase 10 A : événements Bison Futé (DIR) près du tracé, à l'arrêt seulement ; aucun effet sur le calcul. -->
+      <button type="button" id="btn-traffic" class="btn btn-big btn-traffic" aria-disabled="true" aria-label="Trafic sur le trajet (à l'arrêt)" hidden>Trafic</button>
       <div id="route-notes" class="route-notes" hidden></div>
       <section id="areas" class="areas" aria-label="Aires du trajet" hidden>
         <h2 class="areas-title">Aires du trajet <span id="areas-count" class="areas-count"></span></h2>
@@ -615,6 +631,11 @@
           <a href="https://www.data.gouv.fr/datasets/64947a4af5faf2f1f9eee299/" target="_blank" rel="noopener noreferrer">Base nationale de la réglementation de circulation (DiaLog)</a>,
           <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte 2.0</a>.<span id="dialog-copy-date"></span>
           DiaLog n'a pas de valeur juridique : seul l'arrêté fait foi. La signalisation fait foi.</p>
+        <!-- Phase 10 A : trafic (copie trafic-data de l'Action « Trafic »), date de la dernière copie lue. -->
+        <p class="hint" id="traffic-credit">Trafic : événements du réseau routier national non concédé publiés par les DIR sur
+          <a href="https://www.bison-fute.gouv.fr/donnees-sur-le-rrn.html" target="_blank" rel="noopener noreferrer">Bison Futé</a>,
+          <a href="https://www.etalab.gouv.fr/licence-ouverte-open-licence/" target="_blank" rel="noopener noreferrer">Licence Ouverte Etalab 2.0</a>.<span id="traffic-copy-date"></span>
+          Les autoroutes à péage ne sont pas couvertes. À vérifier : la signalisation fait foi.</p>
         <!-- Phase 11c : lieux « vers X » des consignes (copie data/lieux-osm/), affichés seulement, jamais dits. -->
         <p class="hint" id="places-credit">Consignes « vers X » : commune la plus proche le long du trajet quand aucun
           panneau n'est connu, d'après les lieux © contributeurs OpenStreetMap

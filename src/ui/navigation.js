@@ -135,6 +135,7 @@ export function createNavigation(ctx) {
     toast: $('#nav-toast'),
     areasBtn: $('#btn-nav-areas'),
     fuel: $('#btn-nav-fuel'), // phase 4 : carburant sur le trajet, à l'arrêt seulement
+    traffic: $('#btn-nav-traffic'), // phase 10 A : trafic sur le trajet, à l'arrêt seulement
     areas: $('#nav-areas'),
     areasList: $('#nav-areas-list'),
     areasEmpty: $('#nav-areas-empty'),
@@ -721,7 +722,7 @@ export function createNavigation(ctx) {
   /** « Y aller » et « Fiche complète » : actifs seulement à l'arrêt (moins de 5 km/h pendant 3 s). */
   function renderAreaButtons() {
     const off = String(!s?.park?.parked);
-    for (const b of [ui.areaGo, ui.areaSheet, ui.fuel]) if (b.getAttribute('aria-disabled') !== off) b.setAttribute('aria-disabled', off);
+    for (const b of [ui.areaGo, ui.areaSheet, ui.fuel, ui.traffic]) if (b && b.getAttribute('aria-disabled') !== off) b.setAttribute('aria-disabled', off);
   }
 
   /** Ouvre ou ferme la liste ; fermée seule au bout de 20 s sans toucher. */
@@ -1156,6 +1157,13 @@ export function createNavigation(ctx) {
     if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
     ctx.onFuel?.(s.lastFix ?? s.view?.position ?? null);
   });
+  // Phase 10 A : « Trafic » (rangée de la loupe), à l'arrêt seulement ; rien dit, rien dans le guidage.
+  ui.traffic?.addEventListener('click', () => {
+    if (!s) return;
+    setSearch(false);
+    if (!s.park?.parked) { toast('Disponible à l\'arrêt'); return; }
+    ctx.onTraffic?.();
+  });
   ui.areasList.addEventListener('click', (e) => {
     const b = e.target.closest('.nav-area');
     if (b?.dataset.id) pickArea(b.dataset.id);
@@ -1251,6 +1259,10 @@ export function createNavigation(ctx) {
     /** v55 : dernière position reçue [lon, lat] (étape ajoutée depuis la fiche carburant), null sinon. */
     get lastFix() {
       return s ? (s.lastFix ?? s.view?.position ?? null) : null;
+    },
+    /** Phase 10 A : tracé suivi en ce moment (recalculs compris) [[lon, lat], …], null hors guidage. */
+    get routeCoordinates() {
+      return s ? (s.state.route?.line?.coords ?? null) : null;
     },
     /** v55 : étapes pas encore atteintes ({ label, lon, lat }), [] hors guidage. */
     get remainingStops() {

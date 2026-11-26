@@ -78,6 +78,8 @@ import { createHistoryStore } from './ui/trip-history.js';
 import { createHistoryPanel } from './ui/history.js';
 import { buildTrip } from './lib/trip-history.js';
 import { FUEL, lazyLoader, toggleFuelStation } from './lib/fuel-stations.js';
+import { TRAFFIC, whenText } from './lib/traffic.js';
+import { createTrafficPanel } from './ui/traffic.js';
 
 function pickStorage() {
   try {
@@ -98,6 +100,8 @@ const summaryNode = $('#summary');
 const notesNode = $('#route-notes');
 const navStartBtn = $('#btn-nav-start');
 const fuelBtn = $('#btn-fuel'); // phase 4 : carburant sur le trajet
+const trafficBtn = $('#btn-traffic'); // phase 10 A : trafic sur le trajet (à l'arrêt seulement)
+let trafficPanel = null; // fiche « Trafic » (créée au premier toucher ; déclarée ici : appelée par renderChoice)
 /**
  * Itinéraires proposés au dernier calcul (sert au guidage et à la simulation) :
  * { options, failures, selected, vehicle, start, end, avoidTolls, avoidFerries, fromLabel, toLabel, startIsMyPosition }.
@@ -219,13 +223,14 @@ navigation = createNavigation({
   // v44 : « Autres itinéraires » à l'arrêt ; le choix se ferme dès que le véhicule roule (R412-6-2).
   onAlternatives: (from) => openAlternatives(from),
   onParkChange: (parked) => {
-    if (!parked) { closeAlternatives('moving'); closeFuel('moving'); reportsUi?.close(); } // phase 3a : fiche fermée en roulant
+    if (!parked) { closeAlternatives('moving'); closeFuel('moving'); closeTraffic('moving'); reportsUi?.close(); } // phase 3a : fiche fermée en roulant
     reportsUi?.render();
   },
   // Phase 3a : « Signaler » (un appui) ; le moteur pose le repère, la liste est gardée sur l'appareil.
   getReports: () => data.reports ?? [],
   setReports: (list) => saveReports(list, { fromGuidance: true }),
   onFuel: (from) => openFuel(from), // phase 4 : à l'arrêt seulement
+  onTraffic: () => openTraffic(), // phase 10 A : à l'arrêt seulement, jamais dit
   // Mode nuit automatique (phase 2c) : lever et coucher du soleil à la position du guidage, revue toutes les 5 min.
   onPosition: (lonlat) => theme.setPosition(lonlat, { throttle: true }),
   // Temps de conduite (phase 5) : décompte gardé sur l'appareil, hors des données exportées.
@@ -666,7 +671,7 @@ async function avoidZfe() {
  */
 const planPark = createPlanPark({
   onChange: (parked) => {
-    if (!parked && !navigation.active) closeFuel('moving');
+    if (!parked && !navigation.active) { closeFuel('moving'); closeTraffic('moving'); }
     renderChoice();
     areas.refreshDrive(); // v56 : « Ma note » grisée / active selon l'arrêt
   },
@@ -1072,6 +1077,9 @@ function renderChoice() {
   planPark.watch(!navigation.active);
   fuelBtn.hidden = navigation.active;
   fuelBtn.setAttribute('aria-disabled', String(!planPark.parked));
+  trafficBtn.hidden = navigation.active;
+  trafficBtn.setAttribute('aria-disabled', String(!planPark.parked));
+  if (!navigation.active) trafficPanel?.setRoute(choice.options[choice.selected]?.route); // autre fiche : nouveau tri, sans requête
   showZfeOnMap(rules);
   showBridgesOnMap(rules?.[choice.selected], choice.options[choice.selected]?.route);
 }
@@ -1140,6 +1148,8 @@ function startGuidance(simulate = null, resume = null, carry = null) {
   syncReportPark();
   closeFuel();
   fuelBtn.hidden = true;
+  closeTraffic();
+  trafficBtn.hidden = true;
   navigation.start({
     route: option.route,
     vehicle: choice.vehicle,
@@ -1367,6 +1377,47 @@ function closeFuel(reason = '') {
 }
 fuelBtn.addEventListener('click', () => openFuel(null));
 
+// ───────── Phase 10 A : « Trafic », à l'arrêt seulement (préparation et guidage) ─────────
+// Une requête au toucher vers le fichier national (raw.githubusercontent.com, sans paramètre : aucune position
+// envoyée), tri sur la tablette (événements à 100 m du tracé suivi), aucune requête ORS. Fiche et repères fermés dès
+// que le véhicule roule (R412-6-2). Rien dans le guidage ni à voix haute ; aucun effet sur le calcul.
+const trafficParked = () => (navigation.active ? navigation.parked : planPark.parked);
+function trafficRoute() {
+  if (navigation.active) {
+    const coordinates = navigation.routeCoordinates;
+    return coordinates ? { coordinates } : null;
+  }
+  return choice?.options[choice.selected]?.route ?? null;
+}
+function openTraffic() {
+  const route = trafficRoute();
+  if (!route) return;
+  if (!trafficParked()) { fuelMessage(TRAFFIC.PARKED_TEXT); return; }
+  trafficPanel ??= createTrafficPanel({
+    root: $('#traffic-panel'),
+    isParked: trafficParked,
+    onShow: (items) => map.showTraffic(items),
+    onZoom: (lonlat) => {
+      const r = $('#traffic-panel').getBoundingClientRect();
+      const bottomSheet = r.width > window.innerWidth * 0.6;
+      map.showPlace(lonlat, { zoom: 15, offset: bottomSheet ? [0, -Math.round(r.height / 2)] : [Math.round(r.width / 2), 0] });
+    },
+    // Licence Ouverte : date de la dernière mise à jour lue, aussi dans Réglages › Sources et licences.
+    onData: (d) => {
+      const node = $('#traffic-copy-date');
+      if (node) node.textContent = Number.isFinite(d.publication) ? TRAFFIC.CREDIT_DATE_TEXT(whenText(d.publication, null)) : '';
+    },
+  });
+  trafficPanel.open({ route });
+}
+function closeTraffic(reason = '') {
+  if (!trafficPanel?.isOpen) return;
+  trafficPanel.close();
+  if (reason === 'moving') fuelMessage(TRAFFIC.PARKED_TEXT);
+}
+trafficBtn.addEventListener('click', () => openTraffic());
+map.onTrafficPick((id) => trafficPanel?.focus(id));
+
 /**
  * v55 : « Ajouter comme étape » (fiche carburant, à l'arrêt seulement). Préparation : étape rangée selon sa place sur
  * le tracé, nouveau calcul (budget de 3 requêtes). Guidage : « Autres itinéraires » avec cette étape, choix à l'arrêt.
@@ -1503,6 +1554,8 @@ const form = createRouteForm({
       navStartBtn.hidden = true;
       fuelBtn.hidden = true;
       closeFuel();
+      trafficBtn.hidden = true;
+      closeTraffic();
       planPark.watch(false); // plus de bouton réservé à l'arrêt
       choice = null;
       areas.clear();

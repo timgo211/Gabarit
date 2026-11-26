@@ -745,11 +745,14 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   seulement si une source le permet. Présenter les options avant de coder.
   Étude faite le 24/11/2026 (`docs/etude-trafic.md`) ; option A retenue (événements DIR affichés à l'arrêt, calcul
   inchangé), en deux PR :
-  - [ ] **10 A, PR 1 — Action « Trafic » et données** : `tools/trafic-update.mjs`, `tools/trafic-convert.mjs`,
-    `.github/workflows/trafic.yml` (manuelle seulement) ; JSON national (≤ 1 Mo, ≤ 3 000 événements) sur la branche
-    orpheline `trafic-data` réécrite à chaque lancement, jamais sur main ; journal chiffré sans coordonnée.
-  - [ ] **10 A, PR 2 — Interface** : bouton « Trafic » à l'arrêt, une requête au toucher, événements à 100 m du tracé,
-    lancement horaire (:30 UTC).
+  - [x] **10 A, PR 1 — Action « Trafic » et données** (PR #107 et #108) : `tools/trafic-update.mjs`,
+    `tools/trafic-convert.mjs`, `.github/workflows/trafic.yml` ; JSON national (≤ 1 Mo, ≤ 3 000 événements) sur la
+    branche orpheline `trafic-data` réécrite à chaque lancement, jamais sur main ; journal chiffré sans coordonnée.
+    Run 2 : 309 événements gardés sur 543 enregistrements, 94 Ko, CORS `*` (chiffres : `docs/etude-trafic.md` § 7).
+  - [x] **10 A, PR 2 — Interface (v88)** : bouton « Trafic » à l'arrêt (préparation et guidage), une requête au
+    toucher, événements à 100 m du tracé (fiche et repères pointillés), « Ancien » > 3 h, crédit ; lancement horaire
+    (:30 UTC). Jamais dit, aucun effet sur le calcul. Plus tard : option B (contourner une fermeture confirmée), option C
+    (pays voisins).
 
 ## Tout à la fin
 
