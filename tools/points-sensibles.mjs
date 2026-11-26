@@ -17,10 +17,10 @@ const readJson = (p) => JSON.parse(readFileSync(p, 'utf8'));
 const tilesOf = (dir) => (existsSync(dir) ? readdirSync(dir).filter((f) => f.endsWith('.json') && f !== 'index.json').sort() : []);
 
 /**
- * @param {{ root?:string, say?:(line:string)=>void }} opts
+ * @param {{ root?:string, say?:(line:string)=>void, tagged?:object[]|null }} opts tagged : voies déjà étiquetées (v82)
  * @returns {{ written:boolean, log:string[] }}
  */
-export function writeSensitivePoints({ root = ROOT, say = (l) => console.log(l) } = {}) {
+export function writeSensitivePoints({ root = ROOT, say = (l) => console.log(l), tagged = null } = {}) {
   const auditDir = join(root, 'data', 'audit-osm');
   const axesDir = join(root, 'data', 'axes-osm');
   const pontsDir = join(root, 'data', 'ponts-osm');
@@ -35,7 +35,9 @@ export function writeSensitivePoints({ root = ROOT, say = (l) => console.log(l) 
     pontsIds = new Set();
     for (const f of tilesOf(pontsDir)) for (const r of readJson(join(pontsDir, f)).b ?? []) if (Number.isInteger(r?.[0])) pontsIds.add(r[0]);
   }
-  const res = buildSensitivePoints(cards, sections, axes, { pontsIds, updated: auditIndex.updated ?? null, grid: axesIndex.grid ?? null });
+  // v82 : voies déjà étiquetées des sections (restrictionCards(...).tagged), passées par l'audit ; jamais dans les fiches.
+  if (!Array.isArray(tagged)) say('Voies déjà étiquetées des sections : non fournies (lancé seul) : seules les fiches comptent.');
+  const res = buildSensitivePoints([...cards, ...(tagged ?? [])], sections, axes, { pontsIds, updated: auditIndex.updated ?? null, grid: axesIndex.grid ?? null });
   for (const l of res.log) say(l);
   if (res.problem) return { written: false, log: res.log };
   const tmp = `${outDir}.tmp`;

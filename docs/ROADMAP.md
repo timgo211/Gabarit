@@ -658,10 +658,11 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     raison gardée par la mémoire ; contournement sur la zone élargie (copie ∪ plages OSM, A avant la zone) ; fiche rouge
     → « X évite … » (jamais promue, choix du 26/11/2026) ; veto du nom d'étape levé par la géométrie (tous les tronçons,
     `geoRoadsAll` : « A 46 » sur l'A7 après Ternay). Non vérifié sur ORS réel.
-  - [ ] **Copie des points sensibles : sections entières** (PR à part) : l'audit (`restrictionCards`, `osm-audit.js`)
+  - [x] **v82 — Copie des points sensibles : sections entières** : l'audit (`restrictionCards`, `osm-audit.js`)
     ne garde que les voies SANS l'étiquette attendue ; les voies déjà étiquetées `hgv:conditional` (N59 Lunéville →
-    Raon-l'Étape) n'ont donc aucun point. Garder aussi les voies étiquetées des sections (jamais une fiche à corriger) ;
-    ~30 lignes + tests, une exécution de l'Action « Audit OSM », quelques centaines de points, 0 requête ORS.
+    Raon-l'Étape) n'avaient donc aucun point. v82 : voies déjà étiquetées gardées à part (`restrictionCards(...).tagged`,
+    marque `dejaEtiquetee`, 9e champ = 1 dans la copie), points de section seulement, jamais des fiches (data/audit-osm/
+    sans changement de logique) ; une exécution de l'Action « Audit OSM » (accord du 26/11/2026).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

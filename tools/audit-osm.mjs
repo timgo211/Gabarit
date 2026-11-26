@@ -216,7 +216,8 @@ async function main() {
     const rules = JSON.parse(readFileSync(RULES, 'utf8'));
     const r = restrictionCards(rules.sections, axes, placeIndex(places));
     cards.push(...r.cards);
-    say(`Interdictions : ${r.located.length} sections localisées, ${r.unlocated.length} non localisées, ${r.cards.length} fiches.`);
+    say(`Interdictions : ${r.located.length} sections localisées, ${r.unlocated.length} non localisées, ${r.cards.length} fiches, ${r.tagged.length} voies déjà étiquetées (points de section, pas des fiches).`);
+    for (const l of r.located) say(`  ${l.entry.id} : ${l.ways} voies, sans étiquette ${l.missing}, déjà étiquetées ${l.tagged}.`);
 
     // Copie des axes.
     let grid = polyText ? buildCoverage([parsePoly(polyText)]) : null;
@@ -236,7 +237,7 @@ async function main() {
     }
     // PR 3b : points sensibles (data/points-sensibles/) tirés des fiches et de la copie des axes qui viennent d'être
     // écrites ; ponts recoupés avec data/ponts-osm/ (déjà signalés par la phase 12a).
-    writeSensitivePoints({ root: ROOT, say });
+    writeSensitivePoints({ root: ROOT, say, tagged: r.tagged });
     say(`Durée totale : ${Math.round((Date.now() - start) / 60000)} min.`);
     mkdirSync(dirname(REPORT), { recursive: true });
     writeFileSync(REPORT, auditReport(idx, cards, { located: r.located, unlocated: r.unlocated, axesLog: ax.log, runLog: log }));

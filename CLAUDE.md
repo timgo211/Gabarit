@@ -144,6 +144,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   (titre · règle · plage km · source), plages OSM à ≤ 5 km absorbées, même zone pour le contournement (A avant) ; trait
   rouge fin sur la carte, ponts regroupés à zoom < 11 ; fiche rouge : raison de l'échec et « X évite … » (jamais promue) ;
   veto du nom d'étape levé par la géométrie seulement (`geoRoadsAll`). Jamais dit. Détail : skill zfe.
+  v82 : copie des points = section entière (voies déjà étiquetées gardées, marquées, jamais des fiches d'audit).
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

@@ -100,7 +100,8 @@ function segmentGrid(lines, marginDeg, maxCells = 400) {
 /** Type d'une fiche d'audit gardée, ou null. */
 export function sensitiveType(card, sectionsById) {
   if (typeof card?.type !== 'string') return null;
-  if (card.type.startsWith('interdiction PL absente')) {
+  // v82 : « déjà étiquetée » = voie de la section qui porte déjà l'étiquette (point de la section, jamais une fiche).
+  if (card.type.startsWith('interdiction PL absente') || card.type.startsWith('interdiction PL déjà étiquetée')) {
     const s = sectionsById.get(card.section);
     if (!s || s.localisable === false) return null;
     return s.lu === 'arrêté' ? SENSITIVE.TYPES.BAN : SENSITIVE.TYPES.BAN_BF;
@@ -152,6 +153,7 @@ export function buildSensitivePoints(cards, sections, axes, { pontsIds = null, u
   const capGrid = segmentGrid(lines, SENSITIVE.CAP_NEAR_M / KY * 2);
   const kept = [0, 0, 0, 0];
   const noCap = [0, 0, 0, 0];
+  const bySection = new Map(); // v82 : points gardés par section { missing, tagged }
   const usedSections = new Map();
   const tiles = new Map();
   const seen = new Set();
@@ -181,11 +183,22 @@ export function buildSensitivePoints(cards, sections, axes, { pontsIds = null, u
     const t = tiles.get(tk);
     let ri = -1;
     if (ref) { if (!t.refs.has(ref)) t.refs.set(ref, t.refs.size); ri = t.refs.get(ref); }
-    t.p.push([type, Math.round(p[0] * 1e5), Math.round(p[1] * 1e5), cap, ri, value, si, Number.isInteger(c.way) ? c.way : 0]);
+    const row = [type, Math.round(p[0] * 1e5), Math.round(p[1] * 1e5), cap, ri, value, si, Number.isInteger(c.way) ? c.way : 0];
+    // v82 : 9e champ = 1 pour une voie déjà étiquetée dans OSM (point de la section, pas une correction à saisir).
+    if (c.dejaEtiquetee === true) row.push(1);
+    t.p.push(row);
     kept[type] += 1;
+    if (si >= 0) {
+      const b = bySection.get(c.section) ?? { missing: 0, tagged: 0 };
+      if (c.dejaEtiquetee === true) b.tagged += 1; else b.missing += 1;
+      bySection.set(c.section, b);
+    }
   }
   const names = SENSITIVE.TYPE_NAMES;
   log.push(`Points sensibles gardés : ${kept.reduce((a, b) => a + b, 0)} (${names.map((n, i) => `${n} ${kept[i]}`).join(', ')}).`);
+  for (const [id, b] of [...bySection.entries()].sort(([a], [z]) => (a < z ? -1 : 1))) {
+    log.push(`  section ${id} : ${b.missing + b.tagged} points (sans étiquette ${b.missing}, déjà étiquetées ${b.tagged}).`);
+  }
   log.push(`Écartés faute de cap (aucune voie des axes de même référence à ${SENSITIVE.CAP_NEAR_M} m, ou voies de caps différents) : `
     + `${noCap.reduce((a, b) => a + b, 0)} (${names.map((n, i) => `${n} ${noCap[i]}`).join(', ')}).`);
   // Ponts : déjà signalés par la phase 12a s'ils sont dans data/ponts-osm/.
@@ -218,6 +231,7 @@ export function buildSensitivePoints(cards, sections, axes, { pontsIds = null, u
     updated,
     count: kept.reduce((a, b) => a + b, 0),
     counts: Object.fromEntries(names.map((n, i) => [n, kept[i]])),
+    taggedCount: [...bySection.values()].reduce((a, b) => a + b.tagged, 0),
     grid,
     tiles: Object.fromEntries([...out.entries()].map(([k, t]) => [k, t.p.length])),
     sections: sectionList,
@@ -254,6 +268,7 @@ export function parseSensitiveTile(json) {
       type: r[0], point: [r[1] / 1e5, r[2] / 1e5], cap: r[3],
       ref: r[4] >= 0 && typeof json.r[r[4]] === 'string' ? json.r[r[4]] : '',
       value: isNum(r[5]) ? r[5] : null, section: Number.isInteger(r[6]) ? r[6] : -1, way: Number.isInteger(r[7]) ? r[7] : 0,
+      ...(r[8] === 1 ? { tagged: true } : {}), // v82 : voie déjà étiquetée dans OSM
     });
   }
   return { points };
@@ -370,7 +385,8 @@ export function sensitiveText(item, section, { updated = null } = {}) {
   const osm = `OpenStreetMap way/${item.way}, audit Gabarit du ${shortDate(updated)}`;
   if (item.type <= SENSITIVE.TYPES.BAN_BF) {
     const transit = section?.nature === 'transit' ? ' Transit seulement : desserte locale possible, à vérifier.' : '';
-    const src = item.type === SENSITIVE.TYPES.BAN ? `Source : ${section?.arrete ?? 'arrêté'} ; ${osm}.` : `Source Bison Futé, arrêté non lu ; ${osm}.`;
+    const osmTxt = item.tagged ? `${osm}, voie déjà étiquetée dans OSM` : osm;
+    const src = item.type === SENSITIVE.TYPES.BAN ? `Source : ${section?.arrete ?? 'arrêté'} ; ${osmTxt}.` : `Source Bison Futé, arrêté non lu ; ${osmTxt}.`;
     return `Point sensible (${where}) : ${section?.texte ?? 'interdiction PL'}. En vigueur : à vérifier.${transit} La signalisation fait foi. ${src}`;
   }
   if (item.type === SENSITIVE.TYPES.LOW) {
