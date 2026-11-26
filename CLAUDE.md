@@ -125,7 +125,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   dans OSM ; extrait Geofabrik, secours download.openstreetmap.fr (v72) ; fiches « à vérifier sur place » ; copie `data/axes-osm/` (≤ 5 Mo / 30 Mo, jamais précachée). Détail : skill `gabarit-structure`.
   v90 : niveau 3 (primary / secondary à réf. D…) = priorités 1 et 2 seulement (`keepCard`) ; `data/audit-osm/` ≤ 5 Mo /
   30 Mo (`auditSize`, dépassé = rien écrit) ; `data/axes-osm/` jamais élargie aux départementales ; points sensibles ≤ 300 Ko.
-  Run 4 (niveaux 1-3) du 26/11/2026 : 23 736 fiches (niveau 3 : 1 805), 12,83 Mo ; points sensibles 2 653, 119 Ko.
+  Run 5 (niveaux 1-3, règle v91) du 26/11/2026 : 14 002 fiches (niveau 1 : 3 190, dont 2 335 ponts en zone), 7,38 Mo ; points sensibles 2 653, 119 Ko.
 - Repli par la géométrie (PR 3a, v73, `axis-match.js`, copie `data/axes-osm/`) : ref des étapes ORS sans nom seulement
   (étape nommée jamais réécrite), 15 m, cap ≤ 30° modulo 180°, séries ≥ 300 m, ambigu = inconnu, copie simplifiée > 3 m
   = désactivé ; règles fondées sur la ref (week-end IdF, AURA), ligne A/N de la fiche et diagnostic, jamais le « Recommandé » ni le
