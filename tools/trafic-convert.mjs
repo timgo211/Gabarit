@@ -35,8 +35,9 @@ export const TRAFIC = Object.freeze({
   BOX: Object.freeze({ south: 41.2, north: 51.2, west: -5.3, east: 9.7 }),
 });
 
-// Codes DATEX II v2 (RoadOrCarriagewayOrLaneManagementTypeEnum) lus comme une fermeture.
-export const CLOSURE_CODES = Object.freeze(['roadClosed', 'carriagewayClosures']);
+// Codes DATEX II v2 (RoadOrCarriagewayOrLaneManagementTypeEnum) lus comme une fermeture. Run 1 de l'Action (26/11/2026) :
+// les DIR publient roadClosed et closedPermanentlyForTheWinter (route fermée pour l'hiver) ; carriagewayClosures non vu.
+export const CLOSURE_CODES = Object.freeze(['roadClosed', 'carriagewayClosures', 'closedPermanentlyForTheWinter']);
 
 // Ordre de priorité si plus de MAX_EVENTS événements.
 export const KINDS = Object.freeze(['fermeture', 'accident', 'obstacle', 'bouchon', 'chantier']);
@@ -49,6 +50,11 @@ const SUBTYPE_TAGS = [
 ];
 const DIRECTION_TAGS = ['tpegDirection', 'alertCDirectionCoded', 'directionRelative', 'directionBound'];
 const BOTH = new Set(['bothWays', 'allDirections', 'both']);
+// Sens TPEG par point cardinal (cap de la circulation concernée, degrés) : sert à vérifier l'ordre départ → arrivée.
+export const COMPASS = Object.freeze({
+  northBound: 0, northEastBound: 45, eastBound: 90, southEastBound: 135,
+  southBound: 180, southWestBound: 225, westBound: 270, northWestBound: 315,
+});
 const UNKNOWN_DIR = new Set(['unknown', 'other', '']);
 
 const strip = (v) => (typeof v === 'string' ? v.slice(v.indexOf(':') + 1).trim() : '');
@@ -66,6 +72,7 @@ function emptyStats() {
     publicationTime: null, situations: 0, records: 0, truncated: 0,
     recordTypes: {}, roclmTypes: {}, abnormalTypes: {}, groupTypes: {}, positions: { point: 0, ligne: 0, aucune: 0 },
     indexedItineraries: 0, directions: {}, dirKept: { both: 0, one: 0, inconnu: 0 },
+    dirCheck: { suit: 0, inverse: 0, flou: 0 },
     times: { debut: 0, fin: 0, lesDeux: 0, aucun: 0 }, validity: {}, probability: {}, sources: {},
     skipped: { autres: 0, sansPosition: 0, horsFrance: 0, termine: 0, suspendu: 0, futur: 0, doublonId: 0, doublonLieu: 0, dateIllisible: 0 },
     future: 0, withRoad: 0, withComment: 0, tags: {}, otherTags: 0,
@@ -232,17 +239,37 @@ export function positionOf(group, stats) {
   return { p, l, kind: l ? 'ligne' : p ? 'point' : 'aucune', out };
 }
 
+/** Sens : { d: both | one | null, raw: valeur brute (≤ 30 car.) ou null }. */
 function directionOf(tree, stats) {
   for (const tag of DIRECTION_TAGS) {
     const node = find(tree, tag);
     if (!node) continue;
     const v = textOf(node);
     inc(stats.directions, `${tag}=${v || '(vide)'}`);
-    if (BOTH.has(v)) return 'both';
-    if (UNKNOWN_DIR.has(v)) return null;
-    return 'one';
+    const raw = v ? v.slice(0, 30) : null;
+    if (BOTH.has(v)) return { d: 'both', raw };
+    if (UNKNOWN_DIR.has(v)) return { d: null, raw };
+    return { d: 'one', raw };
   }
-  return null;
+  return { d: null, raw: null };
+}
+
+/** Cap initial (degrés, 0 = nord) de a vers b ([lon, lat]). */
+export function bearingDeg(a, b) {
+  const rad = Math.PI / 180;
+  const y = Math.sin((b[0] - a[0]) * rad) * Math.cos(b[1] * rad);
+  const x = Math.cos(a[1] * rad) * Math.sin(b[1] * rad) - Math.sin(a[1] * rad) * Math.cos(b[1] * rad) * Math.cos((b[0] - a[0]) * rad);
+  return (Math.atan2(y, x) / rad + 360) % 360;
+}
+
+/**
+ * La droite départ → arrivée va-t-elle dans le sens cardinal publié ? « suit » (écart < 60°), « inverse » (> 120°),
+ * sinon « flou » ; null si le sens n'est pas cardinal ou sans ligne.
+ */
+export function lineFollowsCompass(l, raw) {
+  if (!l || !(raw in COMPASS)) return null;
+  const diff = Math.abs(((bearingDeg(l[0], l[1]) - COMPASS[raw]) % 360 + 540) % 360 - 180);
+  return diff < 60 ? 'suit' : diff > 120 ? 'inverse' : 'flou';
 }
 
 function roadOf(tree) {
@@ -319,7 +346,10 @@ export function readRecord(record, { now, stats, index = 0 }) {
   if (group) inc(stats.groupTypes, group.ty || '(sans type)');
   const pos = positionOf(group, stats);
   stats.positions[pos.kind] += 1;
-  const d = directionOf(tree, stats);
+  const dir = directionOf(tree, stats);
+  const d = dir.d;
+  const follows = lineFollowsCompass(pos.l, dir.raw);
+  if (follows) stats.dirCheck[follows] += 1;
 
   const k = kindOf(type, sub);
   if (!k) { stats.skipped.autres += 1; return { skip: 'autres' }; }
@@ -337,7 +367,7 @@ export function readRecord(record, { now, stats, index = 0 }) {
   const id = safeId(tree.id || (situation?.id ? `${situation.id}-${index}` : `sans-id-${index}`));
   const ev = { id, k, st: sub, p: pos.p };
   if (pos.l) ev.l = pos.l;
-  Object.assign(ev, { s, e, d, r, c, v: isoOf(textOf(find(tree, 'situationRecordVersionTime')), stats) });
+  Object.assign(ev, { s, e, d, dv: dir.raw, r, c, v: isoOf(textOf(find(tree, 'situationRecordVersionTime')), stats) });
   return { ev, version: Number(tree.version) || 0 };
 }
 
@@ -401,22 +431,51 @@ export function convertTraffic(records, { now, stats, lastModified = null, maxEv
   return { json, text, bytes, problem, beyond, lines, reductions };
 }
 
+const MONTHS = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+/** Date d'une ligne de liste de dossier (« 2026-11-26 16:24 » ou « 26-Nov-2026 16:24 »), lue en UTC, ou null. */
+function listingDate(seg) {
+  let m = /(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/.exec(seg);
+  if (m) return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  m = /(\d{2})-([A-Z][a-z]{2})-(\d{4}) (\d{2}):(\d{2})/.exec(seg);
+  if (m && m[2] in MONTHS) return Date.UTC(+m[3], MONTHS[m[2]], +m[1], +m[4], +m[5]);
+  return null;
+}
+const minuteText = (ms) => new Date(ms).toISOString().slice(0, 16).replace('T', ' ');
+
 /**
- * Dossier du flux (page de liste) : nombre de fichiers .xml autres que content.xml, et combien portent un id connu.
- * Les fichiers par événement ne sont jamais lus ici.
+ * Dossier du flux (page de liste) : nombre de fichiers .xml autres que content.xml, combien portent un id connu, et
+ * leur âge d'après la date de la liste (heure du serveur lue comme UTC : ± 2 h). Les fichiers par événement ne sont
+ * jamais lus ici.
  */
-export function listingStats(html, ids) {
+export function listingStats(html, ids, now = null) {
   if (typeof html !== 'string') return null;
-  const names = [...new Set([...html.matchAll(/href\s*=\s*["']([^"'?#]+\.xml)["']/gi)].map((m) => decodeURIComponent(m[1].split('/').pop())))]
-    .filter((n) => n.toLowerCase() !== 'content.xml');
-  if (!names.length) return { files: 0, matched: 0, examples: [] };
+  const hits = [...html.matchAll(/href\s*=\s*["']([^"'?#]+\.xml)["']/gi)];
+  const files = new Map();
+  hits.forEach((m, i) => {
+    const name = decodeURIComponent(m[1].split('/').pop());
+    if (name.toLowerCase() === 'content.xml' || files.has(name)) return;
+    const seg = html.slice(m.index + m[0].length, i + 1 < hits.length ? hits[i + 1].index : html.length);
+    files.set(name, listingDate(seg));
+  });
+  if (!files.size) return { files: 0, matched: 0, examples: [], ages: null };
   const known = new Set([...ids].filter(Boolean).map(String));
   let matched = 0;
-  for (const n of names) {
+  for (const n of files.keys()) {
     const base = n.replace(/\.xml$/i, '');
-    if (known.has(base) || [...base.split(/[_\-.]/)].some((part) => known.has(part))) matched += 1;
+    if (known.has(base) || base.split(/[_\-.]/).some((part) => known.has(part))) matched += 1;
   }
-  return { files: names.length, matched, examples: names.slice(0, 3).map((n) => n.slice(0, 60)) };
+  let ages = null;
+  const dates = [...files.values()].filter((d) => d != null);
+  if (Number.isFinite(now)) {
+    ages = { h2: 0, h24: 0, j7: 0, plus: 0, sansDate: files.size - dates.length };
+    for (const d of dates) {
+      const age = now - d;
+      if (age <= 2 * 3600e3) ages.h2 += 1; else if (age <= 24 * 3600e3) ages.h24 += 1;
+      else if (age <= 7 * 24 * 3600e3) ages.j7 += 1; else ages.plus += 1;
+    }
+    if (dates.length) { ages.oldest = minuteText(Math.min(...dates)); ages.newest = minuteText(Math.max(...dates)); }
+  }
+  return { files: files.size, matched, examples: [...files.keys()].slice(0, 3).map((n) => n.slice(0, 60)), ages };
 }
 
 // ── Journal (aucune coordonnée) ─────────────────────────────────────────────────────────────────────────────────────
@@ -447,24 +506,27 @@ export function trafficLog(stats, result, { bytesRead = null, lastModified = nul
   if (result) {
     L.push(`Gardés : ${result.json.count} (${fmt(result.json.counts)}) ; dont lignes droites ${result.lines} ; à venir (≤ 7 j) ${stats.future} ; avec route ${stats.withRoad} ; avec commentaire ${stats.withComment}${result.beyond ? ` ; au-delà de ${TRAFIC.MAX_EVENTS} : ${result.beyond} écartés` : ''}`);
     L.push(`Sens des gardés : deux sens ${stats.dirKept.both} ; un sens ${stats.dirKept.one} ; inconnu ${stats.dirKept.inconnu}`);
+    L.push(`Ordre départ → arrivée des lignes à sens cardinal (tous enregistrements) : suit le sens ${stats.dirCheck.suit} ; inverse ${stats.dirCheck.inverse} ; flou (60 à 120°) ${stats.dirCheck.flou}`);
     L.push(`JSON : ${(result.bytes / 1024).toFixed(1)} Ko${result.reductions.length ? ` (${result.reductions.join(', ')})` : ''}${result.problem ? ` — REFUSÉ : ${result.problem}` : ''}`);
   }
   L.push(`Carte des balises dans situationRecord (noms seulement) : ${fmt(stats.tags, 80)}${stats.otherTags ? ` ; autres noms ${stats.otherTags}` : ''}`);
   const lst = listing == null ? 'non mesurée'
     : listing.error ? `non mesurable (${listing.error})`
-      : `${listing.files} fichiers .xml listés dans le dossier, ${listing.matched} portent un id de content.xml${listing.examples?.length ? ` (ex. ${listing.examples.join(', ')})` : ''}`;
+      : `${listing.files} fichiers .xml listés dans le dossier, ${listing.matched} portent un id de content.xml${listing.examples?.length ? ` (ex. ${listing.examples.join(', ')})` : ''}${listing.ages ? ` ; dates de la liste (± 2 h) : ≤ 2 h ${listing.ages.h2}, ≤ 24 h ${listing.ages.h24}, ≤ 7 j ${listing.ages.j7}, plus ancien ${listing.ages.plus}, sans date ${listing.ages.sansDate}${listing.ages.newest ? ` (du ${listing.ages.oldest} au ${listing.ages.newest})` : ''}` : ''}`;
   L.push(`Dossier du flux : ${lst}`);
   L.push('');
   L.push('████ Réponses aux « À vérifier » de l\'étude (docs/etude-trafic.md § 6)');
   const closures = CLOSURE_CODES.map((c) => `${c} ${stats.roclmTypes[c] ?? 0}`).join(', ');
   L.push(`- Codes des fermetures : ${closures} ; autres codes de gestion de voies (non gardés) : ${fmt(Object.fromEntries(Object.entries(stats.roclmTypes).filter(([k]) => !CLOSURE_CODES.includes(k))), 10)}.`);
-  L.push(`- Sens : ${fmt(stats.directions, 10)}${Object.keys(stats.directions).length ? '' : ' — aucune balise de sens trouvée'}.`);
+  const dc = stats.dirCheck;
+  const dcTotal = dc.suit + dc.inverse + dc.flou;
+  L.push(`- Sens : ${fmt(stats.directions, 10)}${Object.keys(stats.directions).length ? '' : ' — aucune balise de sens trouvée'}.${dcTotal ? ` Droite départ → arrivée dans le sens cardinal publié : ${dc.suit}/${dcTotal} (inverse ${dc.inverse}, flou ${dc.flou}).` : ''}`);
   L.push(`- Positions : point ${stats.positions.point}, ligne droite ${stats.positions.ligne}, aucune ${stats.positions.aucune}.`);
   let complete = 'non mesurable';
   if (listing && !listing.error) {
     if (listing.files === 0) complete = 'aucun fichier par événement listé : content.xml seul';
     else if (listing.matched >= listing.files) complete = `complet (${listing.files} fichiers listés, tous dans content.xml)`;
-    else complete = `incomplet ou noms différents (${listing.files} fichiers listés, ${listing.matched} reconnus, ${stats.records} enregistrements dans content.xml)`;
+    else complete = `non établie : noms de fichiers sans lien avec les id (${listing.files} fichiers listés, ${listing.matched} reconnus ; ${stats.situations} situations, ${stats.records} enregistrements dans content.xml${listing.ages ? ` ; ${listing.ages.h2} fichiers datés de moins de 2 h` : ''})`;
   }
   L.push(`- Complétude de content.xml : ${complete}.`);
   return L.join('\n');

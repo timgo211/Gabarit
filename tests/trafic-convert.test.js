@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { gzipSync } from 'node:zlib';
 
 import {
-  CLOSURE_CODES, KINDS, TRAFIC, collectXml, convertTraffic, kindOf, listingStats, trafficLog,
+  CLOSURE_CODES, KINDS, TRAFIC, bearingDeg, collectXml, convertTraffic, kindOf, lineFollowsCompass, listingStats, trafficLog,
 } from '../tools/trafic-convert.mjs';
 import { checkUrl, convertText, decodeBody } from '../tools/trafic-update.mjs';
 
@@ -46,7 +46,8 @@ test('fixture : événements gardés, ordre de priorité, types', () => {
 });
 
 test('fermeture : codes roadClosed / carriagewayClosures seulement ; voies réduites écartées', () => {
-  assert.deepEqual(CLOSURE_CODES, ['roadClosed', 'carriagewayClosures']);
+  assert.deepEqual(CLOSURE_CODES, ['roadClosed', 'carriagewayClosures', 'closedPermanentlyForTheWinter']);
+  assert.equal(kindOf('RoadOrCarriagewayOrLaneManagement', 'closedPermanentlyForTheWinter'), 'fermeture', 'route fermée pour l\'hiver (run 1)');
   assert.equal(kindOf('RoadOrCarriagewayOrLaneManagement', 'roadClosed'), 'fermeture');
   assert.equal(kindOf('RoadOrCarriagewayOrLaneManagement', 'carriagewayClosures'), 'fermeture');
   assert.equal(kindOf('RoadOrCarriagewayOrLaneManagement', 'laneClosures'), null);
@@ -95,6 +96,10 @@ test('sens : un sens, deux sens, inconnu', () => {
   assert.equal(byId(result, 'r3').d, null, 'tpegDirection unknown');
   assert.equal(byId(result, 'r5').d, null, 'aucune balise de sens');
   assert.deepEqual(stats.dirKept, { both: 2, one: 1, inconnu: 4 });
+  assert.equal(byId(result, 'r1').dv, 'northBound', 'valeur brute gardée');
+  assert.equal(byId(result, 'r4').dv, 'bothWays');
+  assert.equal(byId(result, 'r5').dv, null);
+  assert.deepEqual(stats.dirCheck, { suit: 1, inverse: 0, flou: 0 }, 'r1 : droite sud → nord, northBound');
   assert.equal(stats.directions['tpegDirection=northBound'], 1);
   assert.equal(stats.directions['alertCDirectionCoded=both'], 1);
 });
@@ -132,7 +137,7 @@ test('JSON national : format, licence, dates de la source, taille', () => {
   assert.ok(result.bytes < TRAFIC.MAX_JSON_BYTES);
   assert.equal(result.problem, null);
   for (const ev of j.events) {
-    assert.deepEqual(Object.keys(ev).filter((k) => k !== 'l'), ['id', 'k', 'st', 'p', 's', 'e', 'd', 'r', 'c', 'v']);
+    assert.deepEqual(Object.keys(ev).filter((k) => k !== 'l'), ['id', 'k', 'st', 'p', 's', 'e', 'd', 'dv', 'r', 'c', 'v']);
     assert.ok(KINDS.includes(ev.k));
     assert.ok(ev.p.every(Number.isFinite));
   }
@@ -190,15 +195,28 @@ test('flux sans enregistrement : copie refusée', () => {
   assert.match(res.log, /sans aucun enregistrement/);
 });
 
+test('sens : la droite départ → arrivée suit-elle le sens cardinal publié ?', () => {
+  assert.equal(Math.round(bearingDeg([2, 45], [2, 46])), 0);
+  assert.equal(Math.round(bearingDeg([2, 45], [3, 45])), 90);
+  assert.equal(lineFollowsCompass([[2, 45], [2, 46]], 'northBound'), 'suit');
+  assert.equal(lineFollowsCompass([[2, 45], [2, 46]], 'southBound'), 'inverse');
+  assert.equal(lineFollowsCompass([[2, 45], [2, 46]], 'eastBound'), 'flou');
+  assert.equal(lineFollowsCompass([[2, 45], [2, 46]], 'bothWays'), null);
+  assert.equal(lineFollowsCompass(null, 'northBound'), null);
+});
+
 test('convertText : journal et complétude par la liste du dossier', () => {
-  const html = '<html><body><a href="content.xml">content.xml</a> <a href="r1.xml">r1.xml</a> <a href="./r2.xml">r2</a> <a href="inconnu.xml">x</a> <a href="autre.txt">t</a></body></html>';
-  const res = convertText(XML, { now: NOW, bytesRead: 12345, listing: (ids) => listingStats(html, ids) });
+  const html = '<html><body><pre><a href="content.xml">content.xml</a> 2026-11-26 12:24 3M\n<a href="r1.xml">r1.xml</a> 2026-11-26 11:40 4K\n'
+    + '<a href="./r2.xml">r2</a> 26-Nov-2026 02:00 4K\n<a href="inconnu.xml">x</a> 2026-11-10 08:00 4K\n<a href="sansdate.xml">y</a>\n<a href="autre.txt">t</a></pre></body></html>';
+  const res = convertText(XML, { now: NOW, bytesRead: 12345, listing: (ids, now) => listingStats(html, ids, now) });
   assert.equal(res.ok, true);
-  assert.match(res.log, /3 fichiers \.xml listés dans le dossier, 2 portent un id de content\.xml/);
-  assert.match(res.log, /Complétude de content\.xml : incomplet ou noms différents/);
+  assert.match(res.log, /4 fichiers \.xml listés dans le dossier, 2 portent un id de content\.xml/);
+  assert.match(res.log, /≤ 2 h 1, ≤ 24 h 1, ≤ 7 j 0, plus ancien 1, sans date 1 \(du 2026-11-10 08:00 au 2026-11-26 11:40\)/);
+  assert.match(res.log, /Complétude de content\.xml : non établie : noms de fichiers sans lien avec les id/);
+  assert.match(res.log, /Droite départ → arrivée dans le sens cardinal publié : 1\/1/);
   assert.match(res.log, /Codes des fermetures : roadClosed 1, carriagewayClosures 1/);
   assert.match(res.log, /ligne droite départ → arrivée 2/);
-  assert.deepEqual(listingStats('<p>rien</p>', new Set()), { files: 0, matched: 0, examples: [] });
+  assert.deepEqual(listingStats('<p>rien</p>', new Set()), { files: 0, matched: 0, examples: [], ages: null });
   assert.equal(listingStats(null, new Set()), null);
   const unreachable = convertText(XML, { now: NOW, listing: { error: 'HTTP 403' } });
   assert.match(unreachable.log, /Dossier du flux : non mesurable \(HTTP 403\)/);
