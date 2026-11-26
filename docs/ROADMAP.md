@@ -646,7 +646,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [x] **v78 — PR B** : interdictions connues hors Lyon (`route-bans.js`) : fiche rouge + confirmation, question
     « Desserte locale dans la zone ? » (Non par défaut, trajet seulement) ; sens « nord → sud » de la N7 lu par le tracé.
     Scénario `ui-check interdictions` (tracé simulé : **non vérifié sur ORS réel**).
-  - [ ] **PR C** : contournement par tronçons des nationales (n7-vienne, n59, n66, rn524, le-puy).
+  - [x] **v79 — PR C** : contournement par tronçons des nationales (n7-vienne, n59, n66, rn524, le-puy) :
+    `ban-detour.js` (tronçon A → B avec carrés de 80 m, puis trajet complet avec points de passage). Non vérifié sur
+    ORS réel : à vérifier sur la tablette (Nancy → Colmar 44 t : pas de N59, pas de demi-tour).
   - [ ] **PR D** : hauteurs (Mont-Blanc, Fréjus, hauteurs basses ≤ véhicule).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 

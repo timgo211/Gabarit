@@ -207,3 +207,24 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   prudent : une autre fiche qui l'évite n'est ni promue ni utilisée pour masquer (données Bison Futé non lues en
   arrêté) ; le contournement automatique vient en PR C. Réglage désactivé : rien de tout ça. Interface :
   `ui-check interdictions` (tracé simulé par les points de la N59, `simulatedThrough`).
+- Contournement par tronçons (v79, PR C, `src/lib/ban-detour.js`) : déclenché dans `renderChoice` (`maybeBanDetour`)
+  quand le Recommandé (`options[0]`) a des interdictions v78 actives (`rules.bans`), après la décision de Lyon (v77 :
+  pas pendant `lyonAuto` 'pending', ni si Lyon concerné non décidé, ni si `lyonBanned`). Une fois par calcul :
+  `choice.banAuto` 'pending' (non gardé) | 'done' | 'failed' (+ `banAutoReason`, non gardé : « calcul impossible » à la
+  reprise) | 'declared' | 'off' (« Autres itinéraires » : rien d'auto) ; ticket `banSeq` / `choice.banId`. Méthode
+  (`planDetour`, requêtes injectées) : entrée / sortie de la section sur le tracé (`sectionSpan`, chaque point de la
+  copie à 15 m, cap ≤ 30°), A / B à 15 km (`cutPoints`, départ / arrivée sous 2 km), A → B ≤ 150 km à vol d'oiseau
+  (sinon 'far'), requête A → B avec `sectionSquares` (80 m par point, ≈ 0,006 km² chacun : limites ORS 200 km² /
+  20 km lues polygone par polygone, `ApiService.validateAreaLimits`) + zones déjà évitées (`legAvoid`) ; points de
+  passage = plus longue suite du tronçon à > 200 m du tracé initial, milieu (ou tiers au-delà de 20 km), ≥ 2 km de tout
+  point de la section (`detourVias`) ; A et B jamais gardés ; étapes rangées (`withDetourStops`, 10 au plus → 'full') ;
+  trajet final départ → arrivée avec `via`, zones de la fiche si ≤ 150 km (`avoidForReroute`), sans diagnostic 2009 ;
+  vérifs : `routeBans` relancé (section encore là → 'still'), consigne 9 à 1 km ou boucle (repasse à 150 m après 2 km
+  le long du tracé, `passesTwice`) → 'uturn'. `continue_straight` non envoyé (effet sur driving-hgv non vérifié).
+  Réussite : fiche `detourOption` (clé `detour`, « Recommandé », aussi « Contournement », `avoided` pour la question
+  desserte), `applyDetour` retire les fiches qui passent par une interdiction contournée (rocade comprise) ;
+  `detourNote` (zones, « À vérifier. La signalisation fait foi. », sources, écart avec le direct sans seuil).
+  « Oui » pour toutes les zones contournées (`allDeclared`) → `choice.banBefore` remis (aucune requête ; absent après
+  une reprise → message « refais le calcul ») ; « Non » ensuite → recalcul. Coût : 1 + 1 requête pour une
+  interdiction (2n + 1 pour n), à part du budget de 3. Non vérifié sur ORS réel (réponses simulées : tests et
+  `ui-check contournement`).

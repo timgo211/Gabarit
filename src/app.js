@@ -23,6 +23,9 @@ import {
 import {
   BANS, routeBans, activeBans, localQuestions, declaredText, confirmText,
 } from './lib/route-bans.js';
+import {
+  DETOUR, planDetour, detourNote, detourCost, detourFailText, detourOption, applyDetour, allDeclared, legAvoid,
+} from './lib/ban-detour.js';
 import { prepareLine, locateOnLine } from './lib/nav-geo.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
@@ -504,6 +507,9 @@ function choiceRules(c = choice) {
     const active = activeBans(bans, c.localAnswers);
     r.bans = active;
     r.localQuestions = localQuestions(bans, c.localAnswers);
+    // v79 : fiche du contournement : question « desserte locale » des zones contournées (« Oui » remet le direct).
+    if (o.key === DETOUR.OPTION_KEY && Array.isArray(o.avoided)) r.localQuestions = [...r.localQuestions, ...localQuestions(o.avoided, c.localAnswers)];
+    if (active.length && c.banAuto === 'failed') r.lines.unshift({ level: 'warn', text: detourFailText(c.banAutoReason) });
     for (const b of bans) if (!active.includes(b)) r.lines.unshift({ level: 'info', text: declaredText(b) });
     for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', text: b.text });
     r.blocked = r.lyonBanned || active.length > 0; // (r.banned = passages ZFE interdits, ne pas confondre)
@@ -860,6 +866,69 @@ async function runAutoBypass(plan) {
   saveRoute({ force: true });
 }
 
+// ───────── v79 : contournement par tronçons des autres interdictions connues (route-bans.js, ban-detour.js) ─────────
+// Recommandé (options[0]) par une interdiction encore en vigueur (desserte non déclarée) : un tronçon A → B par
+// interdiction avec un carré de 80 m sur chaque point de la section, puis un trajet complet avec les points de passage
+// trouvés (requêtes à part du budget de 3, sans diagnostic 2009). Une seule fois par calcul (choice.banAuto, mémoire
+// v53), après la décision de Lyon (v77). Réglage désactivé : rien. Jamais dit, rien dans le guidage.
+let banSeq = 0; // identifiant du calcul en cours : compteur, jamais l'horloge
+/** @returns {boolean} vrai si l'état a changé (la fiche vient d'être redessinée). */
+function maybeBanDetour(rules) {
+  if (!choice || navigation.active || !autoBypassOn() || choice.banAuto) return false;
+  if (sensitive.state.status !== 'ok' || choice.lyonAuto === 'pending') return false;
+  const head = rules?.[0];
+  if (!head?.bans?.length || head.lyonBanned) return false; // rien à contourner, ou Lyon sans solution (fiche rouge)
+  if (head.lyonBypass?.concerned && !choice.lyonAuto) return false; // Lyon pas encore décidé
+  choice.banAuto = 'pending';
+  runBanDetour(head.bans);
+  renderChoice();
+  return true;
+}
+async function runBanDetour(bans) {
+  const id = ++banSeq;
+  choice.banId = id;
+  const option = choice.options[0];
+  const had = option.request?.avoidPolygons ?? null;
+  const base = {
+    apiKey: store.getApiKey(), vehicle: choice.vehicle, avoidTolls: option.request?.avoidTolls,
+    avoidFerries: choice.avoidFerries, preference: option.request?.preference ?? null, diagnose: false,
+  };
+  let finalAvoid = null;
+  const out = await planDetour({
+    route: option.route, bans, copy: sensitive.state, vehicle: choice.vehicle, stops: optionStops(option, choice.stops),
+    fetchLeg: (a, b, avoid) => fetchAvoidRoute({ ...base, start: a, end: b, avoidPolygons: legAvoid(avoid, had) }),
+    fetchFinal: (stops) => {
+      finalAvoid = avoidForReroute(had, choice.start, choice.end, stopPoints(stops));
+      return fetchAvoidRoute({ ...base, start: choice.start, end: choice.end, avoidPolygons: finalAvoid, via: stopPoints(stops) });
+    },
+  });
+  if (!choice || choice.banId !== id || navigation.active) return;
+  if (!autoBypassOn()) { choice = { ...choice, banAuto: undefined }; renderChoice(); return; } // réglage coupé entre-temps
+  if (!out.ok) {
+    choice = { ...choice, banAuto: 'failed', banAutoReason: out.reason };
+    if (out.error) showMessage(messageNode, `Contournement de l'interdiction : ${errorText(out.error) || 'calcul impossible.'}`, 'info', serviceDetailText(out.error, store.getApiKey() ?? ''));
+    renderChoice();
+    saveRoute({ force: true });
+    return;
+  }
+  const extra = had && !finalAvoid ? LYON_BYPASS.ZONES_DROPPED_TEXT : '';
+  const det = {
+    ...detourOption(option, out.route, out.stops, detourNote(bans, detourCost(option.route, out.route), extra), bans),
+    request: { ...option.request, avoidPolygons: finalAvoid },
+  };
+  const ids = new Set(bans.map((b) => b.id));
+  const rules = choiceRules();
+  const crosses = choice.options.map((_, i) => (rules?.[i]?.bans ?? []).some((b) => ids.has(b.id)));
+  const before = choice.options;
+  const next = applyDetour({ options: before, crosses, detour: det, selected: choice.selected, manual: choice.touched === true });
+  choice = { ...choice, options: next.options, selected: next.selected, banAuto: 'done', banBefore: before };
+  map.showRoutes(next.options.map((o) => o.route), next.selected); // une seule fois : pas de clignotement
+  extendRoute(out.route);
+  if (next.replaced) showMessage(messageNode, 'Itinéraire remplacé par le contournement d\'une interdiction connue (à vérifier).', 'info');
+  renderChoice();
+  saveRoute({ force: true });
+}
+
 /**
  * v78 : réponse à « Desserte locale dans la zone … ? » (à l'arrêt seulement, comme « Éviter le tunnel ») : gardée pour
  * ce trajet seulement (choice.localAnswers, mémoire v53), jamais dans les réglages ni l'export.
@@ -868,6 +937,19 @@ function answerLocal(id, yes) {
   if (!choice || navigation.active) return;
   if (!tunnelAllowed()) { showMessage(messageNode, 'Desserte locale : réponse possible à l\'arrêt seulement.', 'info'); return; }
   choice = { ...choice, localAnswers: { ...(choice.localAnswers ?? {}), [id]: yes === true } };
+  // v79 : desserte déclarée pour toutes les zones contournées → trajet direct remis (gardé, aucune requête) ;
+  // « Non » de nouveau → contournement recalculé.
+  const head = choice.options[0];
+  if (choice.banAuto === 'done' && head?.key === DETOUR.OPTION_KEY && allDeclared(head.avoided, choice.localAnswers)) {
+    if (Array.isArray(choice.banBefore)) {
+      choice = { ...choice, options: choice.banBefore, selected: 0, banAuto: 'declared', banBefore: undefined };
+      map.showRoutes(choice.options.map((o) => o.route), 0);
+    } else {
+      showMessage(messageNode, 'Desserte locale déclarée : refais le calcul pour retrouver le trajet direct.', 'info');
+    }
+  } else if (choice.banAuto === 'declared' && yes !== true) {
+    choice = { ...choice, banAuto: undefined };
+  }
   renderChoice();
   saveRoute({ force: true });
 }
@@ -886,9 +968,10 @@ function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
   if (maybeAutoBypass(rules)) return; // v77 : état décidé, fiche déjà redessinée avec lui
-  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.blocked) hideStartConfirm();
+  if (maybeBanDetour(rules)) return; // v79 : idem pour les autres interdictions connues
+  const pending = choice.lyonAuto === 'pending' || choice.banAuto === 'pending';
+  if (pending || !rules?.[choice.selected]?.blocked) hideStartConfirm();
   // v77 : « Démarrer » grisé pendant le calcul du contournement (le trajet direct n'est pas proposé au départ).
-  const pending = choice.lyonAuto === 'pending';
   navStartBtn.disabled = pending;
   navStartBtn.setAttribute('aria-disabled', String(pending));
   renderRouteChoice(summaryNode, notesNode, {
@@ -996,7 +1079,7 @@ function startGuidance(simulate = null, resume = null, carry = null) {
   return null;
 }
 navStartBtn.addEventListener('click', () => {
-  if (!choice || choice.lyonAuto === 'pending') return;
+  if (!choice || choice.lyonAuto === 'pending' || choice.banAuto === 'pending') return;
   // v77 : itinéraire interdit sans alternative trouvée : confirmation d'abord (jamais le fait accompli).
   const cur = choiceRules()?.[choice.selected];
   if (cur?.blocked) {
@@ -1096,6 +1179,7 @@ async function openAlternatives(from, extraStop = null) {
       stops, touched: false, autoId: undefined,
       // v77 : rien d'automatique ici ; fiche par Lyon (A6 / A7) en rouge, confirmation avant de la guider.
       lyonAuto: 'none', lyonAutoReason: undefined,
+      banAuto: 'off', banAutoReason: undefined, banBefore: undefined, banId: undefined, // v79 : rien d'automatique ici non plus
     };
     altConfirm = false;
     for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }

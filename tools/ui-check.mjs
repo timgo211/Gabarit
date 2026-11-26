@@ -5747,6 +5747,118 @@ async function bansCheck(browser, base) {
   await off.ctx.close();
 }
 
+/**
+ * v79 : tracé de test N59 prolongé de 45 km au nord et au sud (points de la copie du dépôt) ; tronçon A → B et trajet
+ * final SIMULÉS (détour 0,15° à l'est). Jamais une vraie réponse d'ORS.
+ */
+function simulatedDetourRoutes() {
+  const through = simulatedThrough('n59');
+  const pts = through.features[0].geometry.coordinates;
+  const first = pts[0]; const last = pts[pts.length - 1];
+  const line = [[first[0], first[1] + 0.4], [first[0], first[1] + 0.2], ...pts, [last[0], last[1] - 0.2], [last[0], last[1] - 0.4]];
+  const f = through.features[0];
+  const shape = (coords, wp, extra = 0) => ({
+    ...through,
+    features: [{ ...f, geometry: { ...f.geometry, coordinates: coords }, properties: {
+      segments: wp.slice(1).map((b, i) => ({ distance: 70000, duration: 3000, steps: [
+        { distance: 70000, duration: 3000, type: i ? 0 : 11, instruction: 'Continuer', name: '-', way_points: [wp[i], b] },
+        { distance: 0, duration: 0, type: 10, instruction: 'Arrivée', name: '-', way_points: [b, b] }] })),
+      extras: {}, summary: { distance: 140000 + extra, duration: 6000 + extra / 20 }, way_points: wp } }],
+  });
+  const east = 0.15;
+  const mid = [(first[0] + last[0]) / 2 + east, (first[1] + last[1]) / 2];
+  return {
+    line,
+    initial: shape(line, [0, line.length - 1]),
+    leg: (body) => {
+      const [a, b] = body.coordinates;
+      return shape([a, [first[0] + east, first[1]], mid, [last[0] + east, last[1]], b], [0, 4]);
+    },
+    final: (body) => {
+      const via = body.coordinates.slice(1, -1);
+      const coords = [line[0], line[1], ...via, line.at(-2), line.at(-1)];
+      return shape(coords, [0, ...via.map((_, i) => 2 + i), coords.length - 1], 20000);
+    },
+  };
+}
+
+/**
+ * v79 : contournement automatique par tronçons (ban-detour.js) : N59 sur le Recommandé → « Calcul du contournement de
+ * l'interdiction… », « Démarrer » grisé, 1 tronçon avec carrés évités + 1 trajet final avec point de passage ; fiche
+ * « Recommandé » sans rouge, note « Contournement appliqué », question desserte ; « Oui » remet le direct ; échec
+ * (ORS 500) : rouge + raison ; rien dit, rien dans le guidage.
+ */
+async function detourCheck(browser, base) {
+  const sim = simulatedDetourRoutes();
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const run = async ({ width, height, theme = 'day', fail = false }) => {
+    const calls = { leg: [], final: [] };
+    const o = await open(browser, base, {
+      width, height, theme, voice: true, start: sim.line[0], overpass: () => ({ elements: [] }),
+      directions: async (body) => {
+        const n = (body.coordinates ?? []).length;
+        if (n === 2 && body.options?.avoid_polygons) {
+          calls.leg.push(body);
+          await wait(1200);
+          return fail ? { __status: 500, error: { code: 2099, message: 'erreur simulée' } } : sim.leg(body);
+        }
+        if (n > 2) { calls.final.push(body); return sim.final(body); }
+        return sim.initial;
+      },
+    });
+    return { ...o, calls };
+  };
+  const text = (page) => page.evaluate(() => `${document.querySelector('#summary')?.textContent ?? ''} ${document.querySelector('#route-notes')?.textContent ?? ''}`);
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, calls } = await run({ width, height, theme });
+    await computeRoute(page);
+    const pending = await page.waitForFunction(() => /Calcul du contournement de l'interdiction/.test(document.querySelector('#summary')?.textContent ?? ''), null, { timeout: 15000 }).then(() => true).catch(() => false);
+    check(pending, `${tag} : « Calcul du contournement de l'interdiction… »`);
+    check(pending && await page.locator('#btn-nav-start').isDisabled(), `${tag} : « Démarrer » grisé pendant le calcul`);
+    const done = await page.waitForFunction(() => /Contournement appliqué : N59/.test(`${document.querySelector('#summary')?.textContent ?? ''} ${document.querySelector('#route-notes')?.textContent ?? ''}`), null, { timeout: 15000 }).then(() => true).catch(() => false);
+    check(done, `${tag} : note « Contournement appliqué : N59 … »`);
+    check(calls.leg.length === 1 && calls.final.length === 1, `${tag} : 1 tronçon + 1 trajet final`, `${calls.leg.length} + ${calls.final.length}`);
+    const squares = calls.leg[0]?.options?.avoid_polygons?.coordinates?.length ?? 0;
+    check(squares === 55, `${tag} : tronçon avec un carré par point de la section`, String(squares));
+    check(!calls.final[0]?.options?.avoid_polygons, `${tag} : trajet final sans zone évitée`);
+    const t = await text(page);
+    check(await page.locator('.route-card.banned').count() === 0, `${tag} : plus de fiche rouge`);
+    check(/Recommandé/.test(await page.textContent('.route-card')), `${tag} : contournement en « Recommandé »`);
+    check(/À vérifier\. La signalisation fait foi\. Source : Bison Futé, arrêté non lu\./.test(t) && /par rapport au trajet direct/.test(t), `${tag} : source, « à vérifier », écart avec le direct`);
+    check(await page.locator('#btn-nav-start').isEnabled(), `${tag} : « Démarrer » actif après le calcul`);
+    await setGeo(page, { lon: sim.line[0][0], lat: sim.line[0][1], accuracy: 5, speed: 0 });
+    const parked = await page.waitForSelector('.local-question button:not([disabled])', { timeout: 20000 }).then(() => true).catch(() => false);
+    check(parked && /Desserte locale dans la zone N59/.test(await page.textContent('#route-notes')), `${tag} : question « Desserte locale » sur le contournement`);
+    await noHorizontalScroll(page, `${tag} contournement`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-contournement.png`) });
+    if (parked) {
+      await page.click('.local-question button:has-text("Oui")');
+      await page.waitForTimeout(400);
+      const t2 = await text(page);
+      check(!/Contournement appliqué/.test(t2) && /Desserte locale déclarée dans la zone N59/.test(t2), `${tag} : « Oui » remet le trajet direct (aucune requête)`);
+      check(calls.leg.length === 1 && calls.final.length === 1, `${tag} : « Oui » : aucune requête de plus`);
+    }
+    await page.click('#btn-nav-start');
+    const started = await page.waitForSelector('#nav:not([hidden])', { timeout: 5000 }).then(() => true).catch(() => false);
+    check(started, `${tag} : départ sans confirmation (desserte déclarée)`);
+    await page.waitForTimeout(1200);
+    check(!/N59|interdiction|desserte|contournement/i.test(await page.textContent('#nav')), `${tag} : rien dans le guidage`);
+    const spoken = await page.evaluate(() => window.__spoken ?? []);
+    check(!spoken.some((x) => /N59|interdi|desserte|contourn|passage/i.test(x)), `${tag} : rien dit`, spoken.join(' | '));
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  const bad = await run({ width: 412, height: 900, fail: true });
+  await computeRoute(bad.page);
+  const red = await bad.page.waitForFunction(() => /Contournement automatique impossible : calcul impossible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 20000 }).then(() => true).catch(() => false);
+  check(red && await bad.page.locator('.route-card.banned').count() === 1, 'échec ORS : fiche rouge et raison');
+  check(bad.calls.final.length === 0, 'échec ORS : aucun trajet final demandé');
+  await bad.page.click('#btn-nav-start');
+  check(await bad.page.locator('#start-confirm:not([hidden])').count() === 1, 'échec ORS : confirmation avant le départ');
+  await bad.ctx.close();
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5758,7 +5870,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);
