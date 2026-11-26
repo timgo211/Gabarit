@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture SYNTHÉTIQUE écrite à la main sur la structure DATEX II v2 (SituationPublication dans une enveloppe SOAP),
+     comme le flux « tipi » de Bison Futé (DIR). Routes, lieux, textes et identifiants inventés ; coordonnées arrondies
+     à 2 décimales ; aucune donnée réelle. -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" modelBaseVersion="2">
+      <exchange><supplierIdentification><country>fr</country><nationalIdentifier>DIR-ESSAI</nationalIdentifier></supplierIdentification></exchange>
+      <payloadPublication xsi:type="SituationPublication" lang="fr">
+        <publicationTime>2026-11-26T12:24:34+01:00</publicationTime>
+        <publicationCreator><country>fr</country><nationalIdentifier>DIR-ESSAI</nationalIdentifier></publicationCreator>
+
+        <!-- 1 : fermeture (roadClosed), ligne droite départ → arrivée, un sens, route par roadNumber -->
+        <situation id="s1" version="1">
+          <overallSeverity>high</overallSeverity>
+          <situationRecord xsi:type="RoadOrCarriagewayOrLaneManagement" id="r1" version="2">
+            <situationRecordCreationTime>2026-11-26T06:00:00+01:00</situationRecordCreationTime>
+            <situationRecordVersionTime>2026-11-26T11:00:00+01:00</situationRecordVersionTime>
+            <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+            <source><sourceName><values><value lang="fr">DIR Essai</value></values></sourceName></source>
+            <validity>
+              <validityStatus>definedByValidityTimeSpec</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-26T06:00:00+01:00</overallStartTime><overallEndTime>2026-11-27T18:00:00+01:00</overallEndTime></validityTimeSpecification>
+            </validity>
+            <generalPublicComment><comment><values><value lang="fr">Fermeture   de la N 85 &amp; déviation
+              par la D 1</value></values></comment></generalPublicComment>
+            <groupOfLocations xsi:type="Linear">
+              <locationForDisplay><latitude>45.10</latitude><longitude>5.70</longitude></locationForDisplay>
+              <tpegLinearLocation>
+                <tpegDirection>northBound</tpegDirection>
+                <tpegLinearLocationType>segment</tpegLinearLocationType>
+                <to xsi:type="TpegNonJunctionPoint"><pointCoordinates><latitude>45.11</latitude><longitude>5.70</longitude></pointCoordinates></to>
+                <from xsi:type="TpegNonJunctionPoint"><pointCoordinates><latitude>45.09</latitude><longitude>5.70</longitude></pointCoordinates></from>
+              </tpegLinearLocation>
+              <linearWithinLinearElement><linearElement><roadNumber>N85</roadNumber></linearElement></linearWithinLinearElement>
+            </groupOfLocations>
+            <roadOrCarriagewayOrLaneManagementType>roadClosed</roadOrCarriagewayOrLaneManagementType>
+          </situationRecord>
+        </situation>
+
+        <!-- 2 : bouchon (stationaryTraffic), point, deux sens (ALERT-C), route par descripteur linkName -->
+        <situation id="s2" version="1">
+          <situationRecord xsi:type="AbnormalTraffic" id="r2" version="1">
+            <situationRecordVersionTime>2026-11-26T12:10:00+01:00</situationRecordVersionTime>
+            <probabilityOfOccurrence>certain</probabilityOfOccurrence>
+            <validity><validityStatus>active</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-26T12:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point">
+              <alertCPoint xsi:type="AlertCMethod2Point">
+                <alertCLocationCountryCode>F</alertCLocationCountryCode>
+                <alertCDirection><alertCDirectionCoded>both</alertCDirectionCoded></alertCDirection>
+                <alertCMethod2PrimaryPointLocation><alertCLocation><specificLocation>1234</specificLocation></alertCLocation></alertCMethod2PrimaryPointLocation>
+              </alertCPoint>
+              <tpegPointLocation xsi:type="TpegSimplePoint">
+                <point xsi:type="TpegNonJunctionPoint">
+                  <name xsi:type="TpegOtherPointDescriptor"><descriptor><values><value lang="fr">N7</value></values></descriptor><tpegOtherPointDescriptorType>linkName</tpegOtherPointDescriptorType></name>
+                </point>
+              </tpegPointLocation>
+              <pointByCoordinates><pointCoordinates><latitude>45.20</latitude><longitude>4.80</longitude></pointCoordinates></pointByCoordinates>
+            </groupOfLocations>
+            <abnormalTrafficType>stationaryTraffic</abnormalTrafficType>
+          </situationRecord>
+          <!-- 11 : même type, même lieu, même début que 2 (autre id) → doublon -->
+          <situationRecord xsi:type="AbnormalTraffic" id="r11" version="1">
+            <validity><validityStatus>active</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-26T12:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><pointByCoordinates><pointCoordinates><latitude>45.20</latitude><longitude>4.80</longitude></pointCoordinates></pointByCoordinates></groupOfLocations>
+            <abnormalTrafficType>queuingTraffic</abnormalTrafficType>
+          </situationRecord>
+        </situation>
+
+        <!-- 3 : accident, point d'affichage seul, sens inconnu, sans fin -->
+        <situation id="s3" version="1">
+          <situationRecord xsi:type="Accident" id="r3" version="1">
+            <validity><validityStatus>active</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-26T11:50:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point">
+              <locationForDisplay><latitude>46.30</latitude><longitude>3.40</longitude></locationForDisplay>
+              <tpegPointLocation xsi:type="TpegSimplePoint"><tpegDirection>unknown</tpegDirection></tpegPointLocation>
+            </groupOfLocations>
+            <accidentType>collision</accidentType>
+          </situationRecord>
+        </situation>
+
+        <!-- 4 : chantier (MaintenanceWorks) à venir dans 3 jours, ligne -->
+        <situation id="s4" version="1">
+          <situationRecord xsi:type="MaintenanceWorks" id="r4" version="1">
+            <validity><validityStatus>definedByValidityTimeSpec</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-29T21:00:00+01:00</overallStartTime><overallEndTime>2026-11-30T06:00:00+01:00</overallEndTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Linear">
+              <tpegLinearLocation><tpegDirection>bothWays</tpegDirection>
+                <from xsi:type="TpegNonJunctionPoint"><pointCoordinates><latitude>47.00</latitude><longitude>2.00</longitude></pointCoordinates></from>
+                <to xsi:type="TpegNonJunctionPoint"><pointCoordinates><latitude>47.02</latitude><longitude>2.01</longitude></pointCoordinates></to>
+              </tpegLinearLocation>
+            </groupOfLocations>
+            <roadMaintenanceType>roadworks</roadMaintenanceType>
+          </situationRecord>
+        </situation>
+
+        <!-- 5 : obstacle (GeneralObstruction), point -->
+        <situation id="s5" version="1">
+          <situationRecord xsi:type="GeneralObstruction" id="r5" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T12:20:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>48.50</latitude><longitude>6.20</longitude></locationForDisplay></groupOfLocations>
+            <obstructionType>objectOnTheRoad</obstructionType>
+          </situationRecord>
+        </situation>
+
+        <!-- 6 : autre type (conditions) → compté, écarté -->
+        <situation id="s6" version="1">
+          <situationRecord xsi:type="PoorEnvironmentConditions" id="r6" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T08:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>44.00</latitude><longitude>4.00</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+          <!-- 7 : voies réduites (laneClosures) : pas une fermeture → compté, écarté -->
+          <situationRecord xsi:type="RoadOrCarriagewayOrLaneManagement" id="r7" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T08:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>44.10</latitude><longitude>4.10</longitude></locationForDisplay></groupOfLocations>
+            <roadOrCarriagewayOrLaneManagementType>laneClosures</roadOrCarriagewayOrLaneManagementType>
+          </situationRecord>
+        </situation>
+
+        <!-- 8 : accident sans position → écarté -->
+        <situation id="s8" version="1">
+          <situationRecord xsi:type="Accident" id="r8" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T12:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <accidentType>accident</accidentType>
+          </situationRecord>
+        </situation>
+
+        <!-- 9 : même enregistrement en deux versions → la plus récente (version 2) seulement -->
+        <situation id="s9" version="1">
+          <situationRecord xsi:type="Accident" id="r9" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T10:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <generalPublicComment><comment><values><value lang="fr">Version 1</value></values></comment></generalPublicComment>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>43.60</latitude><longitude>1.40</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+        </situation>
+        <situation id="s9b" version="2">
+          <situationRecord xsi:type="Accident" id="r9" version="2">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T10:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <generalPublicComment><comment><values><value lang="en">Version 2 (en)</value><value lang="fr">Version 2</value></values></comment></generalPublicComment>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>43.60</latitude><longitude>1.40</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+        </situation>
+
+        <!-- 10 : chantier terminé → écarté ; 12 : chantier dans 10 jours → écarté ; 13 : accident suspendu → écarté ;
+             14 : accident hors de France → écarté -->
+        <situation id="s10" version="1">
+          <situationRecord xsi:type="ConstructionWorks" id="r10" version="1">
+            <validity><validityStatus>definedByValidityTimeSpec</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-11-20T08:00:00+01:00</overallStartTime><overallEndTime>2026-11-25T18:00:00+01:00</overallEndTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>49.00</latitude><longitude>2.50</longitude></locationForDisplay></groupOfLocations>
+            <constructionWorkType>constructionWork</constructionWorkType>
+          </situationRecord>
+          <situationRecord xsi:type="ConstructionWorks" id="r12" version="1">
+            <validity><validityStatus>definedByValidityTimeSpec</validityStatus>
+              <validityTimeSpecification><overallStartTime>2026-12-06T08:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>49.10</latitude><longitude>2.60</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+          <situationRecord xsi:type="Accident" id="r13" version="1">
+            <validity><validityStatus>suspended</validityStatus></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>49.20</latitude><longitude>2.70</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+          <situationRecord xsi:type="Accident" id="r14" version="1">
+            <validity><validityStatus>active</validityStatus></validity>
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>40.00</latitude><longitude>2.70</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+        </situation>
+
+        <!-- 15 : fermeture d'une chaussée (carriagewayClosures), itinéraire indexé → point seulement, jamais une ligne -->
+        <situation id="s15" version="1">
+          <situationRecord xsi:type="RoadOrCarriagewayOrLaneManagement" id="r15" version="1">
+            <validity><validityStatus>active</validityStatus><validityTimeSpecification><overallStartTime>2026-11-26T09:00:00+01:00</overallStartTime></validityTimeSpecification></validity>
+            <groupOfLocations xsi:type="ItineraryByIndexedLocations">
+              <locationContainedInItinerary index="0"><location xsi:type="Point"><locationForDisplay><latitude>47.50</latitude><longitude>0.70</longitude></locationForDisplay></location></locationContainedInItinerary>
+              <locationContainedInItinerary index="1"><location xsi:type="Point"><locationForDisplay><latitude>47.60</latitude><longitude>0.80</longitude></locationForDisplay></location></locationContainedInItinerary>
+            </groupOfLocations>
+            <roadOrCarriagewayOrLaneManagementType>carriagewayClosures</roadOrCarriagewayOrLaneManagementType>
+          </situationRecord>
+        </situation>
+      </payloadPublication>
+    </d2LogicalModel>
+  </soapenv:Body>
+</soapenv:Envelope>

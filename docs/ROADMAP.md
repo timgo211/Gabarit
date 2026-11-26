@@ -743,6 +743,13 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   national (Bison Futé / DIR, événements DATEX II sur transport.data.gouv.fr), offres gratuites avec clé (HERE…)
   et leurs quotas. Commencer par afficher bouchons et événements sur le trajet ; recalcul selon le trafic
   seulement si une source le permet. Présenter les options avant de coder.
+  Étude faite le 24/11/2026 (`docs/etude-trafic.md`) ; option A retenue (événements DIR affichés à l'arrêt, calcul
+  inchangé), en deux PR :
+  - [ ] **10 A, PR 1 — Action « Trafic » et données** : `tools/trafic-update.mjs`, `tools/trafic-convert.mjs`,
+    `.github/workflows/trafic.yml` (manuelle seulement) ; JSON national (≤ 1 Mo, ≤ 3 000 événements) sur la branche
+    orpheline `trafic-data` réécrite à chaque lancement, jamais sur main ; journal chiffré sans coordonnée.
+  - [ ] **10 A, PR 2 — Interface** : bouton « Trafic » à l'arrêt, une requête au toucher, événements à 100 m du tracé,
+    lancement horaire (:30 UTC).
 
 ## Tout à la fin
 
