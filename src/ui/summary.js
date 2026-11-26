@@ -67,11 +67,11 @@ function restrictionsText(v) {
 
 function card(d, { checked, onSelect, rules, pending = false }) {
   const facts = [d.distance, d.arrival, d.toll, d.fuel].filter(Boolean);
-  const banned = rules?.lyonBanned === true; // v77 : interdit, aucune alternative trouvée
+  const banned = rules?.blocked === true; // v77 / v78 : interdit, aucune alternative trouvée
   return el('button', {
     type: 'button', class: banned ? 'route-card banned' : 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
   }, [
-    banned ? el('span', { class: 'route-card-banned', text: `⛔ ${LYON_AUTO.BANNED_SHORT}` }) : null,
+    banned ? el('span', { class: 'route-card-banned', text: `⛔ ${rules.bannedShort ?? LYON_AUTO.BANNED_SHORT}` }) : null,
     pending ? el('span', { class: 'route-card-pending hint', text: LYON_AUTO.PENDING_TEXT }) : null,
     el('span', { class: 'route-card-head' }, [
       el('span', { class: 'route-card-title' }, [
@@ -100,14 +100,30 @@ function card(d, { checked, onSelect, rules, pending = false }) {
  */
 function rulesBlock(rules, {
   source, onAvoidZfe, avoidBusy, canAvoid, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed = false, onAvoidLocal, localBusy,
-  onBypass = null, bypassBusy = false,
+  onBypass = null, bypassBusy = false, onLocalAnswer = null,
 }) {
   if (!rules) return [];
+  // v78 : « Desserte locale dans la zone … ? » (Non par défaut), à l'arrêt seulement (grisé sinon).
+  const questions = onLocalAnswer ? (rules.localQuestions ?? []).map((q) => el('div', { class: 'local-question', role: 'group', 'aria-label': q.text }, [
+    el('p', { class: 'local-question-text', text: q.text }),
+    el('div', { class: 'local-question-buttons' }, [
+      el('button', {
+        type: 'button', class: `btn${q.yes ? '' : ' btn-primary'}`, 'aria-pressed': String(!q.yes), disabled: !tunnelAllowed,
+        'aria-disabled': String(!tunnelAllowed), onclick: () => onLocalAnswer(q.id, false), text: 'Non',
+      }),
+      el('button', {
+        type: 'button', class: `btn${q.yes ? ' btn-primary' : ''}`, 'aria-pressed': String(q.yes), disabled: !tunnelAllowed,
+        'aria-disabled': String(!tunnelAllowed), onclick: () => onLocalAnswer(q.id, true), text: 'Oui',
+      }),
+    ]),
+    tunnelAllowed ? null : el('p', { class: 'hint', text: 'Réponse possible à l\'arrêt seulement.' }),
+  ])) : [];
   const items = rules.lines.map((l) => el('li', { class: l.level }, [
     l.text,
     l.url ? el('a', { href: l.url, target: '_blank', rel: 'noopener noreferrer', text: l.linkText ?? 'Arrêté' }) : null,
   ]));
   return [
+    ...questions,
     items.length ? el('ul', { class: 'rules-notes', 'aria-label': 'Réglementation' }, items) : null,
     countryCards(rules.countries),
     canAvoid && rules.banned.length ? el('button', {
@@ -227,7 +243,7 @@ function diagnosticBlock(route, rules, label, rawAllowed = false) {
 export function renderRouteChoice(node, notesNode, {
   choice, dieselPrice, now = new Date(), onSelect, rules = null, rulesSource = '', onAvoidZfe = null, avoidBusy = false,
   windCredit = false, onAvoidTunnel = null, tunnelBusy = false, tunnelAllowed = false, onAvoidLocal = null, localBusy = false,
-  onBypass = null, bypassBusy = false,
+  onBypass = null, bypassBusy = false, onLocalAnswer = null,
 }) {
   const { options, failures, selected, vehicle } = choice;
   const reference = options[0];
@@ -263,7 +279,7 @@ export function renderRouteChoice(node, notesNode, {
   notesNode.replaceChildren(
     ...rulesBlock(rules?.[selected], {
       source: rulesSource, onAvoidZfe, avoidBusy, canAvoid: !!onAvoidZfe, windCredit, onAvoidTunnel, tunnelBusy, tunnelAllowed,
-      onAvoidLocal, localBusy, onBypass, bypassBusy,
+      onAvoidLocal, localBusy, onBypass, bypassBusy, onLocalAnswer,
     }),
     el('ul', { class: 'summary-notes' }, notes.map((t) => el('li', { text: t }))),
     diagnosticBlock(current.route, rules?.[selected] ?? null, choice.toLabel ? `vers ${choice.toLabel}` : '', tunnelAllowed),

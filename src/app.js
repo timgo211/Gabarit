@@ -20,6 +20,9 @@ import {
   LYON_BYPASS, LYON_STILL_TEXT, lyonBypassPlan, withBypassStops, bypassCost, bypassNote,
   LYON_AUTO, autoBypassStart, autoCost, autoNote, applyAutoBypass,
 } from './lib/lyon-bypass.js';
+import {
+  BANS, routeBans, activeBans, localQuestions, declaredText, confirmText,
+} from './lib/route-bans.js';
 import { prepareLine, locateOnLine } from './lib/nav-geo.js';
 import { avoidLocalFor } from './lib/access-local.js';
 import { createAccess } from './ui/access.js';
@@ -496,6 +499,17 @@ function choiceRules(c = choice) {
       const why = c.lyonAuto === 'failed' ? LYON_AUTO.FAIL_REASONS[c.lyonAutoReason] : '';
       r.lines.unshift({ level: 'warn', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
     }
+    // v78 : autres interdictions connues (route-bans.js) : fiche rouge, confirmation, question « desserte locale ».
+    const bans = autoBypassOn() ? routeBans(o.route, r.sensitive?.items ?? [], sensitive.state.meta?.sections ?? []) : [];
+    const active = activeBans(bans, c.localAnswers);
+    r.bans = active;
+    r.localQuestions = localQuestions(bans, c.localAnswers);
+    for (const b of bans) if (!active.includes(b)) r.lines.unshift({ level: 'info', text: declaredText(b) });
+    for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', text: b.text });
+    r.blocked = r.lyonBanned || active.length > 0; // (r.banned = passages ZFE interdits, ne pas confondre)
+    r.bannedShort = r.lyonBanned ? LYON_AUTO.BANNED_SHORT : `${BANS.SHORT_TEXT}, à vérifier`;
+    r.confirmText = !active.length ? LYON_AUTO.CONFIRM_TEXT
+      : confirmText([...(r.lyonBanned ? [{ label: 'Lyon, A6 et A7' }] : []), ...active]);
     return r;
   });
   // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
@@ -846,6 +860,18 @@ async function runAutoBypass(plan) {
   saveRoute({ force: true });
 }
 
+/**
+ * v78 : réponse à « Desserte locale dans la zone … ? » (à l'arrêt seulement, comme « Éviter le tunnel ») : gardée pour
+ * ce trajet seulement (choice.localAnswers, mémoire v53), jamais dans les réglages ni l'export.
+ */
+function answerLocal(id, yes) {
+  if (!choice || navigation.active) return;
+  if (!tunnelAllowed()) { showMessage(messageNode, 'Desserte locale : réponse possible à l\'arrêt seulement.', 'info'); return; }
+  choice = { ...choice, localAnswers: { ...(choice.localAnswers ?? {}), [id]: yes === true } };
+  renderChoice();
+  saveRoute({ force: true });
+}
+
 // v77 : « Démarrer » sur une fiche interdite sans alternative : confirmation (Annuler / Démarrer quand même).
 const startConfirm = { panel: $('#start-confirm'), title: $('#start-confirm-title'), cancel: $('#btn-start-cancel'), go: $('#btn-start-anyway') };
 function hideStartConfirm() { startConfirm.panel.hidden = true; }
@@ -860,7 +886,7 @@ function renderChoice() {
   if (!choice) return;
   const rules = choiceRules();
   if (maybeAutoBypass(rules)) return; // v77 : état décidé, fiche déjà redessinée avec lui
-  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.lyonBanned) hideStartConfirm();
+  if (choice.lyonAuto === 'pending' || !rules?.[choice.selected]?.blocked) hideStartConfirm();
   // v77 : « Démarrer » grisé pendant le calcul du contournement (le trajet direct n'est pas proposé au départ).
   const pending = choice.lyonAuto === 'pending';
   navStartBtn.disabled = pending;
@@ -874,6 +900,7 @@ function renderChoice() {
     onAvoidZfe: avoidZfe, avoidBusy, onAvoidTunnel: avoidTunnel, tunnelBusy, tunnelAllowed: tunnelAllowed(),
     onAvoidLocal: avoidLocal, localBusy,
     onBypass: bypassLyon, bypassBusy, // v76
+    onLocalAnswer: answerLocal, // v78
     windCredit: weather.status === 'ok',
   });
   // v48 : relevés GPS hors guidage tant que la fiche propose un bouton réservé à l'arrêt : « Éviter le tunnel », et
@@ -971,8 +998,9 @@ function startGuidance(simulate = null, resume = null, carry = null) {
 navStartBtn.addEventListener('click', () => {
   if (!choice || choice.lyonAuto === 'pending') return;
   // v77 : itinéraire interdit sans alternative trouvée : confirmation d'abord (jamais le fait accompli).
-  if (choiceRules()?.[choice.selected]?.lyonBanned) {
-    startConfirm.title.textContent = LYON_AUTO.CONFIRM_TEXT;
+  const cur = choiceRules()?.[choice.selected];
+  if (cur?.blocked) {
+    startConfirm.title.textContent = cur.confirmText;
     startConfirm.panel.hidden = false;
     startConfirm.go.focus();
     return;
@@ -1107,9 +1135,10 @@ altUi.go.addEventListener('click', () => {
   if (!altChoice || !navigation.active) return;
   if (!navigation.parked) { closeAlternatives('moving'); return; }
   // v77 : itinéraire par Lyon (A6 / A7) interdit aux plus de 7,5 t en transit : un second appui confirme.
-  if (!altConfirm && choiceRules(altChoice)?.[altChoice.selected]?.lyonBanned) {
+  const altRules = choiceRules(altChoice)?.[altChoice.selected];
+  if (!altConfirm && altRules?.blocked) {
     altConfirm = true;
-    altUi.status.textContent = LYON_AUTO.CONFIRM_TEXT;
+    altUi.status.textContent = altRules.confirmText;
     renderAlternatives();
     return;
   }

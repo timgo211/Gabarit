@@ -643,7 +643,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     à part (sans diagnostic 2009) si le plan du Recommandé d'ORS est ok ; rocade « Recommandé », fiches par Lyon
     retirées, « Allonge … par rapport au trajet direct » toujours ; échec → direct en rouge + confirmation avant le
     départ. Scénario `ui-check lyon` écrit (rocade simulée : **non vérifié sur ORS réel**).
-  - [ ] **PR B** : affichage rouge + question « Desserte locale dans la zone ? » pour les autres sections localisées.
+  - [x] **v78 — PR B** : interdictions connues hors Lyon (`route-bans.js`) : fiche rouge + confirmation, question
+    « Desserte locale dans la zone ? » (Non par défaut, trajet seulement) ; sens « nord → sud » de la N7 lu par le tracé.
+    Scénario `ui-check interdictions` (tracé simulé : **non vérifié sur ORS réel**).
   - [ ] **PR C** : contournement par tronçons des nationales (n7-vienne, n59, n66, rn524, le-puy).
   - [ ] **PR D** : hauteurs (Mont-Blanc, Fréjus, hauteurs basses ≤ véhicule).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
