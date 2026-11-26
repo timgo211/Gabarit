@@ -43,6 +43,15 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - un lieu ou ma position : lien de carte OpenStreetMap ;
   - l'appli : son adresse, chacun avec sa propre clé HeiGIT gratuite.
   Le profil véhicule et la clé ne sont jamais partagés ; un lien reçu est validé et affiché en texte brut.
+  - [x] **v89 — GPX refusé par la feuille de partage Android** : liste officielle de Chromium lue le 26/11/2026
+    (`chrome/browser/webshare/share_service_impl.cc` et `components/browser_ui/webshare/android/.../ShareServiceImpl.java`,
+    branche main) : extension ET type doivent être permis ; `.gpx`, `.xml`, `application/gpx+xml`, `application/xml`,
+    `text/xml` absents (permis côté texte : `.txt`/`.text`, `.csv`, `.css`, `.htm(l)`, `text/plain`, `text/csv`,
+    `text/css`, `text/html`). Le nom `.gpx` est gardé (jamais `.txt`) : aucun type ne peut aider. `canShare` essaie
+    `GPX_SHARE_TYPES` (le type GPX seul, au cas où une version future l'accepte, `pickShareType`), sinon téléchargement
+    et « Fichier GPX téléchargé (dossier Téléchargements) : joins-le à ton message. » (autres fichiers inchangés).
+    Aide sous « Fichier GPX » : « Pour envoyer l'itinéraire dans un message, le lien est le plus simple. » ; contenu du
+    GPX inchangé ; ui-check `partage`.
   Pas de position en direct (il faudrait un serveur).
   Mes signalements en fichier à importer dans le Gabarit d'un ami : fait en phase 3c (v68).
   **Satellite hors de France :** voir phase 7d.

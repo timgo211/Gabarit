@@ -5656,6 +5656,85 @@ async function savedPlacesCheck(browser, base) {
  * text/plain) → navigator.share reçoit le .txt et le titre « Signalements Gabarit » ; sans partage → téléchargement du
  * même .txt + « Fichier téléchargé : joins-le à ton message. » ; import .txt, ancien .json, .txt invalide (rien ajouté).
  */
+/**
+ * v89 : partage du GPX. Navigateur simulé comme Chromium (listes de share_service_impl.cc : extension ET type ; .gpx,
+ * application/gpx+xml refusés) → aucun appel à navigator.share, fichier .gpx téléchargé (contenu GPX, jamais .txt) et
+ * « Fichier GPX téléchargé (dossier Téléchargements) : joins-le à ton message. » ; aide sous « Fichier GPX »,
+ * « 🔗 Lien de l'itinéraire » en premier ; navigateur qui accepterait le GPX → feuille de partage avec le .gpx.
+ * 412×900 jour, 1280×800 nuit, 360×760 jour.
+ */
+async function gpxShareCheck(browser, base) {
+  const FALLBACK = 'Fichier GPX téléchargé (dossier Téléchargements) : joins-le à ton message.';
+  for (const [width, height, theme] of [[412, 900, 'day'], [1280, 800, 'night'], [360, 760, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, { width, height, theme });
+    await computeRoute(page);
+    await page.evaluate(() => {
+      const ext = ['avif', 'bmp', 'css', 'csv', 'ehtml', 'flac', 'gif', 'htm', 'html', 'ico', 'jfif', 'jpeg', 'jpg', 'm4a', 'm4v',
+        'mp3', 'mp4', 'mpeg', 'mpg', 'oga', 'ogg', 'ogm', 'ogv', 'opus', 'pdf', 'pjp', 'pjpeg', 'png', 'shtm', 'shtml', 'svg',
+        'svgz', 'text', 'tif', 'tiff', 'txt', 'wav', 'weba', 'webm', 'webp', 'xbm'];
+      const types = ['application/pdf', 'audio/flac', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/wav', 'audio/webm',
+        'audio/x-m4a', 'image/avif', 'image/bmp', 'image/gif', 'image/jpeg', 'image/png', 'image/svg+xml', 'image/tiff',
+        'image/webp', 'image/x-icon', 'image/x-ms-bmp', 'image/x-xbitmap', 'text/comma-separated-values', 'text/css',
+        'text/csv', 'text/html', 'text/plain', 'video/mp4', 'video/mpeg', 'video/ogg', 'video/webm'];
+      window.__tried = [];
+      window.__shared = null;
+      window.__acceptGpx = false;
+      navigator.canShare = (d) => (d.files ?? []).every((f) => {
+        window.__tried.push(f.type);
+        if (window.__acceptGpx && f.type === 'application/gpx+xml') return true;
+        return ext.includes(f.name.split('.').pop().toLowerCase()) && types.includes(f.type);
+      });
+      navigator.share = async (d) => {
+        const f = d.files?.[0];
+        window.__shared = f ? { name: f.name, type: f.type, text: await f.text() } : { url: d.url };
+      };
+    });
+    await page.click('#btn-share');
+    const order = await page.evaluate(() => {
+      const row = document.querySelector('#btn-share-gpx').parentElement;
+      const hint = document.querySelector('#share-gpx-hint');
+      const b = document.querySelector('#btn-share-gpx').getBoundingClientRect();
+      const h = hint.getBoundingClientRect();
+      return { first: row.firstElementChild.id, text: hint.textContent, below: h.top >= b.bottom - 1, visible: h.height > 0,
+        plain: hint.children.length === 0 };
+    });
+    check(order.first === 'btn-share-route' && order.text === 'Pour envoyer l\'itinéraire dans un message, le lien est le plus simple.'
+      && order.below && order.visible && order.plain, `${tag} : aide sous « Fichier GPX », lien en premier`, JSON.stringify(order));
+    await noHorizontalScroll(page, `${tag} Partager`);
+    const askStart = await page.isVisible('#share-include-start-row');
+    // Chromium refuse le .gpx : téléchargement, aucun partage.
+    const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#btn-share-gpx')]);
+    const text = dl ? readFileSync(await dl.path(), 'utf8') : '';
+    const st = await page.evaluate(() => ({ shared: window.__shared, tried: window.__tried }));
+    check(!!dl && /^gabarit-[a-z0-9-]+\.gpx$/.test(dl.suggestedFilename()) && text.startsWith('<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1"')
+      && /<trkpt /.test(text) && st.shared === null && st.tried.length === 1 && st.tried[0] === 'application/gpx+xml',
+    `${tag} : .gpx refusé → fichier .gpx téléchargé, aucun partage, type GPX essayé une fois`, `${dl?.suggestedFilename()} ${JSON.stringify(st)}`);
+    check(await page.textContent('#share-status') === FALLBACK, `${tag} : texte de repli du GPX`, await page.textContent('#share-status'));
+    check(!/apiKey|api_key|vehicle|height|weight/i.test(text), `${tag} : ni clé ni profil dans le GPX`);
+    if (askStart) check(!/<name>Point de départ</.test(text), `${tag} : départ « Ma position » non partagé (case décochée)`);
+    // Lien : partage Android inchangé.
+    await page.click('#btn-share-route');
+    await page.waitForTimeout(200);
+    const linkShared = await page.evaluate(() => window.__shared);
+    check(/#v=1&/.test(linkShared?.url ?? ''), `${tag} : lien partagé par la feuille de partage`, JSON.stringify(linkShared));
+    // Navigateur qui accepterait le GPX : feuille de partage avec le .gpx, aucun téléchargement.
+    await page.evaluate(() => { window.__acceptGpx = true; window.__shared = null; });
+    const [noDl] = await Promise.all([page.waitForEvent('download', { timeout: 1500 }).catch(() => null), page.click('#btn-share-gpx')]);
+    const shared = await page.evaluate(() => window.__shared);
+    check(!noDl && /\.gpx$/.test(shared?.name ?? '') && shared.type === 'application/gpx+xml'
+      && shared.text.replace(/<time>[^<]*<\/time>/, '') === text.replace(/<time>[^<]*<\/time>/, '')
+      && await page.textContent('#share-status') === '', `${tag} : GPX accepté → partagé tel quel (.gpx, même contenu)`, JSON.stringify(shared)?.slice(0, 160));
+    // Sans partage du tout : téléchargement, même texte.
+    await page.evaluate(() => { navigator.share = undefined; });
+    const [dl2] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#btn-share-gpx')]);
+    check(!!dl2 && await page.textContent('#share-status') === FALLBACK, `${tag} : sans partage → téléchargement, même texte`);
+    await page.screenshot({ path: join(SHOTS, `partage-${width}-${theme}.png`) });
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 async function reportsShareCheck(browser, base) {
   const reports = [
     { id: 'm1', lon: 5.5, lat: 47.25, heading: 90, createdAt: '2026-11-20T08:15', type: 'low-bridge', note: 'note privée', confirmed: true, origin: 'mine' },
@@ -6492,7 +6571,7 @@ try {
     ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, dialog: dialogCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, trafic: trafficCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
-    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
+    preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck, partage: gpxShareCheck,
     repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck, reglages: settingsSectionsCheck, 'fiche-infos': tripInfoCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;

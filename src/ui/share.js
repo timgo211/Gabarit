@@ -6,7 +6,7 @@
 import { $, wireDialog } from './dom.js';
 import {
   encodeRouteLink, buildGpx, gpxFileName, osmLink, appShareText, appBaseUrl, pickShareMethod, shareResultText,
-  variantId, GPX_MIME, INSTALL_STEPS,
+  variantId, pickShareType, GPX_MIME, GPX_SHARE_TYPES, GPX_LINK_HINT, INSTALL_STEPS,
 } from '../lib/share.js';
 
 const isAbort = (err) => err?.name === 'AbortError'; // partage annulé par l'utilisateur
@@ -34,6 +34,7 @@ export function createShare({ getChoice, getMyPosition }) {
   }
 
   const baseUrl = () => appBaseUrl(window.location.href);
+  $('#share-gpx-hint').textContent = GPX_LINK_HINT;
   $('#install-steps').replaceChildren(...INSTALL_STEPS.map((step) => {
     const li = document.createElement('li');
     li.textContent = step;
@@ -80,13 +81,25 @@ export function createShare({ getChoice, getMyPosition }) {
     setTimeout(() => URL.revokeObjectURL(href), 10000);
   }
 
-  /** Partage d'un fichier : partage Android si le navigateur accepte ce type de fichier, sinon téléchargement. */
-  async function shareFile({ name, content, mime, title }) {
-    let file = null;
-    try { file = new File([content], name, { type: mime }); } catch { file = null; }
+  /**
+   * Partage d'un fichier : partage Android si le navigateur accepte l'un des types (`types`, dans l'ordre, nom
+   * inchangé), sinon téléchargement (type `mime`). `gpx` : texte de repli propre au GPX.
+   */
+  async function shareFile({ name, content, mime, title, types = [mime], gpx = false }) {
+    const fileOf = (type) => {
+      try { return new File([content], name, { type }); } catch { return null; }
+    };
+    const files = new Map();
+    const canShare = typeof navigator.canShare === 'function';
+    const type = canShare ? pickShareType(types, (t) => {
+      const f = fileOf(t);
+      if (!f) return false;
+      files.set(t, f);
+      return navigator.canShare({ files: [f] });
+    }) : null;
+    const file = type ? files.get(type) : null;
     const method = pickShareMethod({
-      kind: 'file', hasShare: typeof navigator.share === 'function',
-      canShareFiles: !!file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }),
+      kind: 'file', hasShare: typeof navigator.share === 'function', canShareFiles: !!file,
     });
     if (method === 'share') {
       try {
@@ -99,7 +112,7 @@ export function createShare({ getChoice, getMyPosition }) {
     }
     try {
       download(name, content, mime);
-      say(shareResultText('download'));
+      say(shareResultText('download', { gpx }));
     } catch {
       say(shareResultText('download', { failed: true }));
     }
@@ -136,7 +149,7 @@ export function createShare({ getChoice, getMyPosition }) {
     const c = getChoice();
     if (!c) return null;
     const r = routeData(c);
-    return shareFile({ name: gpxFileName(r.toLabel), content: buildGpx(r), mime: GPX_MIME, title: 'Itinéraire Gabarit (GPX)' });
+    return shareFile({ name: gpxFileName(r.toLabel), content: buildGpx(r), mime: GPX_MIME, types: GPX_SHARE_TYPES, gpx: true, title: 'Itinéraire Gabarit (GPX)' });
   }));
 
   const place = (getPoint, label) => guard(() => {
