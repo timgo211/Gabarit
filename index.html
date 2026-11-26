@@ -300,8 +300,11 @@
       <button type="button" class="btn btn-icon" data-close aria-label="Fermer">✕</button>
     </div>
     <div class="dialog-body">
-      <section class="card">
-        <h3>Clé OpenRouteService</h3>
+      <!-- v84 : chaque section repliable (src/ui/collapsible.js), toutes repliées au premier affichage, état gardé par
+           section dans settings.sectionsOpen ; valeur courante en petit sous le titre (src/lib/settings-sections.js). -->
+      <section class="card" data-section="key">
+        <h3><button type="button" id="btn-sec-key" class="section-toggle" aria-expanded="false" aria-controls="sec-key-body"><span class="section-toggle-text"><span class="section-title" id="sec-key-title">Clé OpenRouteService</span><span class="section-sub" id="sec-key-sub"></span></span></button></h3>
+        <div id="sec-key-body" class="collapsible-body" hidden>
         <p class="hint">Gratuite sur heigit.org. Elle reste uniquement sur cette tablette et n'est jamais exportée.</p>
         <div class="combo">
           <input id="key-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"
@@ -314,10 +317,12 @@
           <button type="button" id="btn-key-clear" class="btn btn-danger">Effacer</button>
         </div>
         <p id="key-status" class="status" role="status"></p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Affichage</h3>
+      <section class="card" data-section="display">
+        <h3><button type="button" id="btn-sec-display" class="section-toggle" aria-expanded="false" aria-controls="sec-display-body"><span class="section-toggle-text"><span class="section-title" id="sec-display-title">Affichage</span><span class="section-sub" id="sec-display-sub"></span></span></button></h3>
+        <div id="sec-display-body" class="collapsible-body" hidden>
         <p class="field-label" id="theme-label">Mode nuit</p>
         <div class="segmented" role="radiogroup" aria-labelledby="theme-label">
           <label><input type="radio" name="theme" value="auto"> Auto (20 h – 7 h)</label>
@@ -335,10 +340,12 @@
           <label><input type="radio" name="vehicle-icon" value="truck"> Camion</label>
           <label><input type="radio" name="vehicle-icon" value="arrow"> Flèche</label>
         </div>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Guidage vocal</h3>
+      <section class="card" data-section="voice">
+        <h3><button type="button" id="btn-sec-voice" class="section-toggle" aria-expanded="false" aria-controls="sec-voice-body"><span class="section-toggle-text"><span class="section-title" id="sec-voice-title">Guidage vocal</span><span class="section-sub" id="sec-voice-sub"></span></span></button></h3>
+        <div id="sec-voice-body" class="collapsible-body" hidden>
         <label class="toggle"><input type="checkbox" id="voice-enabled"> Annonces vocales en français</label>
         <label for="voice-name" class="field-label">Voix</label>
         <select id="voice-name"><option value="">Automatique (meilleure voix française)</option></select>
@@ -358,10 +365,12 @@
         <p class="hint" id="speed-hint">Limites d'après OpenStreetMap et règles générales : la signalisation fait foi.</p>
         <p id="voice-status" class="status" role="status"></p>
         <p id="voice-music" class="hint"></p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Flèche du camion</h3>
+      <section class="card" data-section="arrow">
+        <h3><button type="button" id="btn-sec-arrow" class="section-toggle" aria-expanded="false" aria-controls="sec-arrow-body"><span class="section-toggle-text"><span class="section-title" id="sec-arrow-title">Flèche du camion</span><span class="section-sub" id="sec-arrow-sub"></span></span></button></h3>
+        <div id="sec-arrow-body" class="collapsible-body" hidden>
         <div class="segmented segmented-colors" role="radiogroup" aria-label="Couleur de la flèche">
           <label><input type="radio" name="arrow-color" value="auto"> Auto (noir le jour, ambre la nuit)</label>
           <label><input type="radio" name="arrow-color" value="bleu"> <span class="swatch" style="--swatch:#0b57d0"></span> Bleu</label>
@@ -369,10 +378,12 @@
           <label><input type="radio" name="arrow-color" value="orange"> <span class="swatch" style="--swatch:#f08a00"></span> Orange</label>
           <label><input type="radio" name="arrow-color" value="violet"> <span class="swatch" style="--swatch:#7b2fbf"></span> Violet</label>
         </div>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Matières dangereuses (ADR)</h3>
+      <section class="card" data-section="adr">
+        <h3><button type="button" id="btn-sec-adr" class="section-toggle" aria-expanded="false" aria-controls="sec-adr-body"><span class="section-toggle-text"><span class="section-title" id="sec-adr-title">Matières dangereuses (ADR)</span><span class="section-sub" id="sec-adr-sub"></span></span></button></h3>
+        <div id="sec-adr-body" class="collapsible-body" hidden>
         <p class="hint">Dépend du chargement, pas du camion : vaut pour tous les véhicules.</p>
         <label class="toggle"><input type="checkbox" id="adr-enabled"> Je transporte des matières dangereuses</label>
         <div id="adr-fields" class="adr-settings" hidden>
@@ -385,10 +396,12 @@
           <p id="adr-tunnel-help" class="hint"></p>
         </div>
         <p id="adr-status" class="status" role="status"></p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Temps de conduite et vent</h3>
+      <section class="card" data-section="driving">
+        <h3><button type="button" id="btn-sec-driving" class="section-toggle" aria-expanded="false" aria-controls="sec-driving-body"><span class="section-toggle-text"><span class="section-title" id="sec-driving-title">Temps de conduite et vent</span><span class="section-sub" id="sec-driving-sub"></span></span></button></h3>
+        <div id="sec-driving-body" class="collapsible-body" hidden>
         <p class="hint">Temps de conduite et pauses d'après le règlement (CE) 561/2006 : 4 h 30 de conduite puis 45 min
           de pause (ou 15 min puis 30 min, dans cet ordre), 9 h par jour (10 h deux fois par semaine), 56 h par
           semaine. On conduit à partir de 5 km/h ; un arrêt compte comme pause à partir de 15 min. Compté seulement
@@ -408,28 +421,36 @@
           <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo.com</a>
           (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>).
           La signalisation et les consignes sur place font foi.</p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Interdictions</h3>
+      <section class="card" data-section="bans">
+        <h3><button type="button" id="btn-sec-bans" class="section-toggle" aria-expanded="false" aria-controls="sec-bans-body"><span class="section-toggle-text"><span class="section-title" id="sec-bans-title">Interdictions</span><span class="section-sub" id="sec-bans-sub"></span></span></button></h3>
+        <div id="sec-bans-body" class="collapsible-body" hidden>
         <label class="toggle"><input type="checkbox" id="auto-bypass"> Contournement automatique des interdictions</label>
         <p class="hint">Interdiction connue sur le trajet (Lyon, A6 et A7 aux plus de 7,5 t en transit ; nationales de l'audit OpenStreetMap) : un itinéraire qui l'évite est calculé seul et proposé en « Recommandé » quand c'est possible ; sinon le trajet interdit est marqué en rouge et une confirmation est demandée avant le départ. Interdiction en transit : question « Desserte locale dans la zone ? » (Non par défaut), réponse gardée pour le trajet seulement. Désactivé : bouton « Contourner » seulement, rien en rouge. À vérifier : la signalisation fait foi.</p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Ponts</h3>
+      <section class="card" data-section="bridges">
+        <h3><button type="button" id="btn-sec-bridges" class="section-toggle" aria-expanded="false" aria-controls="sec-bridges-body"><span class="section-toggle-text"><span class="section-title" id="sec-bridges-title">Ponts</span><span class="section-sub" id="sec-bridges-sub"></span></span></button></h3>
+        <div id="sec-bridges-body" class="collapsible-body" hidden>
         <label class="toggle"><input type="checkbox" id="bridge-warnings"> Signaler les ponts sans hauteur connue</label>
         <p class="hint">Ponts d'OpenStreetMap au-dessus du trajet sans hauteur renseignée : listés sur la fiche et repérés sur la carte avant le départ, jamais pendant le guidage ni à voix haute. À vérifier : la signalisation fait foi.</p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Limites de poids</h3>
+      <section class="card" data-section="weights">
+        <h3><button type="button" id="btn-sec-weights" class="section-toggle" aria-expanded="false" aria-controls="sec-weights-body"><span class="section-toggle-text"><span class="section-title" id="sec-weights-title">Limites de poids</span><span class="section-sub" id="sec-weights-sub"></span></span></button></h3>
+        <div id="sec-weights-body" class="collapsible-body" hidden>
         <label class="toggle"><input type="checkbox" id="weight-warnings"> Signaler les limites de poids</label>
         <p class="hint">Tronçons d'OpenStreetMap suivis par le trajet dont la limite de poids est inférieure au PTAC du profil (le calcul ne l'a peut-être pas prise en compte) : listés sur la fiche et repérés sur la carte avant le départ, jamais pendant le guidage ni à voix haute. À vérifier : la signalisation fait foi.</p>
+        </div>
       </section>
 
-      <section class="card" id="places-card">
-        <h3>Mes lieux</h3>
+      <section class="card" id="places-card" data-section="places">
+        <h3><button type="button" id="btn-sec-places" class="section-toggle" aria-expanded="false" aria-controls="sec-places-body"><span class="section-toggle-text"><span class="section-title" id="sec-places-title">Mes lieux</span><span class="section-sub" id="sec-places-sub"></span></span></button></h3>
+        <div id="sec-places-body" class="collapsible-body" hidden>
         <p class="hint" id="places-privacy"></p>
         <label for="place-kind" class="field-label">Catégorie</label>
         <select id="place-kind">
@@ -445,10 +466,12 @@
         </div>
         <p id="places-status" class="status" role="status"></p>
         <ul id="places-list" class="restr-list" aria-label="Mes lieux"></ul>
+        </div>
       </section>
 
-      <section class="card" id="reports-card">
-        <h3>Mes signalements</h3>
+      <section class="card" id="reports-card" data-section="reports">
+        <h3><button type="button" id="btn-sec-reports" class="section-toggle" aria-expanded="false" aria-controls="sec-reports-body"><span class="section-toggle-text"><span class="section-title" id="sec-reports-title">Mes signalements</span><span class="section-sub" id="sec-reports-sub"></span></span></button></h3>
+        <div id="sec-reports-body" class="collapsible-body" hidden>
         <p class="hint">En guidage, le bouton drapeau pose un repère d'un seul appui. Type, note et confirmation se règlent ici ou sur la fiche du repère, à l'arrêt seulement. Gardés seulement sur cet appareil. Inclus dans l'export.</p>
         <p id="reports-status" class="status" role="status"></p>
         <ul id="reports-list" class="restr-list" aria-label="Mes signalements"></ul>
@@ -469,10 +492,12 @@
           </div>
         </div>
         <p id="reports-share-status" class="status" role="status"></p>
+        </div>
       </section>
 
-      <section class="card" id="restrictions-card">
-        <h3>Mes restrictions</h3>
+      <section class="card" id="restrictions-card" data-section="restrictions">
+        <h3><button type="button" id="btn-sec-restrictions" class="section-toggle" aria-expanded="false" aria-controls="sec-restrictions-body"><span class="section-toggle-text"><span class="section-title" id="sec-restrictions-title">Mes restrictions</span><span class="section-sub" id="sec-restrictions-sub"></span></span></button></h3>
+        <div id="sec-restrictions-body" class="collapsible-body" hidden>
         <p class="hint" id="restrictions-help"></p>
         <label for="restr-type" class="field-label">Type</label>
         <select id="restr-type">
@@ -489,10 +514,12 @@
         </div>
         <p id="restr-status" class="status" role="status"></p>
         <ul id="restr-list" class="restr-list" aria-label="Restrictions enregistrées"></ul>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Coût du gazole</h3>
+      <section class="card" data-section="diesel">
+        <h3><button type="button" id="btn-sec-diesel" class="section-toggle" aria-expanded="false" aria-controls="sec-diesel-body"><span class="section-toggle-text"><span class="section-title" id="sec-diesel-title">Coût du gazole</span><span class="section-sub" id="sec-diesel-sub"></span></span></button></h3>
+        <div id="sec-diesel-body" class="collapsible-body" hidden>
         <p class="hint">Sert à estimer le coût de chaque itinéraire (consommation du véhicule × prix). Laisse vide pour
           n'afficher que les litres.</p>
         <label for="diesel-price">Prix du gazole (€/L)</label>
@@ -501,11 +528,13 @@
           <button type="button" id="btn-diesel-save" class="btn btn-primary">Enregistrer</button>
         </div>
         <p id="diesel-status" class="status" role="status"></p>
+        </div>
       </section>
 
       <!-- Phase 6 (v56) : trajets terminés (date, départ, arrivée, étapes, km, durée, profil), aucune coordonnée. -->
-      <section class="card" id="history-card">
-        <h3>Historique des trajets</h3>
+      <section class="card" id="history-card" data-section="history">
+        <h3><button type="button" id="btn-sec-history" class="section-toggle" aria-expanded="false" aria-controls="sec-history-body"><span class="section-toggle-text"><span class="section-title" id="sec-history-title">Historique des trajets</span><span class="section-sub" id="sec-history-sub"></span></span></button></h3>
+        <div id="sec-history-body" class="collapsible-body" hidden>
         <p id="history-privacy" class="hint"></p>
         <h4 class="history-sub">Par mois</h4>
         <ul id="history-stats" class="history-stats"></ul>
@@ -516,20 +545,24 @@
           <button type="button" id="btn-history-clear" class="btn">Effacer l'historique</button>
         </div>
         <p id="history-status" class="status" role="status"></p>
+        </div>
       </section>
 
       <!-- v64 : derniers lieux choisis dans les suggestions (src/lib/recent-places.js). -->
-      <section class="card" id="recent-card">
-        <h3>Recherches récentes</h3>
+      <section class="card" id="recent-card" data-section="recent">
+        <h3><button type="button" id="btn-sec-recent" class="section-toggle" aria-expanded="false" aria-controls="sec-recent-body"><span class="section-toggle-text"><span class="section-title" id="sec-recent-title">Recherches récentes</span><span class="section-sub" id="sec-recent-sub"></span></span></button></h3>
+        <div id="sec-recent-body" class="collapsible-body" hidden>
         <p class="hint">Gardé seulement sur cet appareil. Inclus dans l'export.</p>
         <div class="row">
           <button type="button" id="btn-recent-clear" class="btn">Effacer les recherches récentes</button>
         </div>
         <p id="recent-status" class="status" role="status"></p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Mes données</h3>
+      <section class="card" data-section="data">
+        <h3><button type="button" id="btn-sec-data" class="section-toggle" aria-expanded="false" aria-controls="sec-data-body"><span class="section-toggle-text"><span class="section-title" id="sec-data-title">Mes données</span><span class="section-sub" id="sec-data-sub"></span></span></button></h3>
+        <div id="sec-data-body" class="collapsible-body" hidden>
         <p class="hint">Véhicules, lieux, signalements, avis et notes sur les aires, historique des trajets, recherches récentes. Exporte régulièrement une sauvegarde.</p>
         <div class="row">
           <button type="button" id="btn-export" class="btn">Exporter (JSON)</button>
@@ -538,10 +571,12 @@
         </div>
         <p id="data-status" class="status" role="status"></p>
         <p id="persist-status" class="hint"></p>
+        </div>
       </section>
 
-      <section class="card">
-        <h3>Test</h3>
+      <section class="card" data-section="test">
+        <h3><button type="button" id="btn-sec-test" class="section-toggle" aria-expanded="false" aria-controls="sec-test-body"><span class="section-toggle-text"><span class="section-title" id="sec-test-title">Test</span><span class="section-sub" id="sec-test-sub"></span></span></button></h3>
+        <div id="sec-test-body" class="collapsible-body" hidden>
         <p class="hint">Fait avancer une fausse position GPS sur l'itinéraire calculé, avec le même guidage (voix, flèches,
           zoom, recalcul, arrivée). À utiliser véhicule à l'arrêt. « Sortir de la route » lance un vrai recalcul, qui compte
           dans le quota OpenRouteService.</p>
@@ -554,10 +589,11 @@
           <button type="button" id="btn-simulate" class="btn btn-primary btn-big">▶ Simuler le trajet</button>
         </div>
         <p id="sim-status" class="status" role="status"></p>
+        </div>
       </section>
 
-      <!-- v64 : section repliable (repliée par défaut, état dans settings.creditsOpen) ; contenu inchangé. -->
-      <section class="card" id="credits">
+      <!-- v64 : section repliable ; v84 : comme toutes les sections (état dans settings.sectionsOpen) ; contenu inchangé. -->
+      <section class="card" id="credits" data-section="credits">
         <h3><button type="button" id="btn-credits" class="section-toggle" aria-expanded="false" aria-controls="credits-body">Sources et licences</button></h3>
         <div id="credits-body" hidden>
         <p class="hint" id="winter-credit">Équipements d'hiver (loi Montagne) : liste des communes de la

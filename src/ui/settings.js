@@ -4,6 +4,7 @@
 
 import { $, wireDialog } from './dom.js';
 import { collapsible } from './collapsible.js';
+import { SECTION_KEYS, sectionSummary, KEY_MISSING_TEXT } from '../lib/settings-sections.js';
 import { satelliteCredits } from '../lib/map-layers.js';
 import { requestVersionLabel, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
@@ -38,7 +39,7 @@ function setStatus(node, text, ok) {
  *   onVoiceOptions:(o:{name,rate,volume})=>void, onArrowColor:(c:string)=>void,
  *   onAreaVoiceChange?:(on:boolean)=>void, onRuleVoiceChange?:(on:boolean)=>void,
  *   onDriveVoiceChange?:(on:boolean)=>void, onWindVoiceChange?:(on:boolean)=>void, onWindGustChange?:(g:number)=>void,
- *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void, onCreditsToggle?:(open:boolean)=>void,
+ *   onDrivingReset?:()=>void, onAdrChange?:(adr:object)=>void, onSectionToggle?:(key:string, open:boolean)=>void,
  *   recent?:{ list:()=>object[], clear:()=>void, merge:(l:object[])=>void }, recentEditAllowed?:()=>boolean }} ctx
  *   onTestVoice renvoie un message d'état ; onSimulate renvoie un message d'erreur, ou null si la simulation démarre.
  */
@@ -125,10 +126,41 @@ export function createSettings(ctx) {
     $('#voice-volume-out').textContent = volumeText(sanitizeVoiceVolume(voiceVolume.value));
   }
 
-  // v64 : « Sources et licences » repliable, repliée par défaut (settings.creditsOpen) ; contenu inchangé.
-  // v84 : composant commun (src/ui/collapsible.js).
-  const credits = collapsible({ button: $('#btn-credits'), body: $('#credits-body'), onToggle: (o) => ctx.onCreditsToggle?.(o) });
-  const applyCredits = credits.set;
+  // v64 : « Sources et licences » repliable ; v84 : comme toutes les sections ci-dessous.
+  // v84 : chaque section repliable (composant commun src/ui/collapsible.js), état par section dans
+  // settings.sectionsOpen (seule source d'état, « Sources et licences » comprise) ; valeur courante sous le titre.
+  // Les boutons grisés en roulant le restent (code de chaque module inchangé) : replier ne change aucun réglage.
+  let keyInvalid = false;
+  const sections = new Map();
+  for (const sec of dlg.querySelectorAll('section[data-section]')) {
+    const key = sec.dataset.section;
+    const button = sec.querySelector('.section-toggle');
+    const body = document.getElementById(button.getAttribute('aria-controls'));
+    sections.set(key, collapsible({ button, body, onToggle: (o) => ctx.onSectionToggle?.(key, o) }));
+  }
+  function syncSections(settings) {
+    const open = settings.sectionsOpen ?? {};
+    for (const [key, c] of sections) c.set(open[key] === true);
+    showSummaries(settings);
+  }
+  function showSummaries(settings = ctx.getData().settings) {
+    const hasKey = !!ctx.store.getApiKey().trim();
+    for (const key of SECTION_KEYS) {
+      const sub = document.getElementById(`sec-${key}-sub`);
+      if (!sub) continue;
+      const text = sectionSummary(key, settings, { hasKey, keyInvalid });
+      if (key === 'key') {
+        // Clé vide ou refusée : « Clé : manquante » dans le titre lui-même.
+        const missing = text === KEY_MISSING_TEXT;
+        $('#sec-key-title').textContent = missing ? `Clé OpenRouteService · ${KEY_MISSING_TEXT}` : 'Clé OpenRouteService';
+        sub.textContent = missing ? '' : text;
+      } else sub.textContent = text;
+      sub.hidden = !sub.textContent;
+    }
+  }
+  // Toute modification dans Réglages (case, bouton, curseur) : valeurs relues après l'enregistrement.
+  dlg.addEventListener('change', () => queueMicrotask(() => showSummaries()));
+  dlg.addEventListener('click', (e) => { if (e.target.closest('button')) queueMicrotask(() => showSummaries()); });
 
   // v64 : recherches récentes (src/lib/recent-places.js), effacées après confirmation.
   const recentStatus = $('#recent-status');
@@ -146,7 +178,7 @@ export function createSettings(ctx) {
   });
 
   function syncChoices(settings) {
-    applyCredits(settings.creditsOpen === true);
+    syncSections(settings);
     syncRecent();
     for (const r of dlg.querySelectorAll('input[name="theme"]')) r.checked = r.value === settings.theme;
     for (const r of dlg.querySelectorAll('input[name="night-level"]')) r.checked = r.value === settings.nightMapLevel;
@@ -236,11 +268,13 @@ export function createSettings(ctx) {
   });
 
   $('#btn-key-save').addEventListener('click', () => {
+    keyInvalid = false;
     ctx.store.setApiKey(keyInput.value);
     setStatus(keyStatus, keyInput.value.trim() ? 'Clé enregistrée sur cet appareil.' : 'Clé effacée.', true);
   });
 
   $('#btn-key-clear').addEventListener('click', () => {
+    keyInvalid = false;
     keyInput.value = '';
     ctx.store.setApiKey('');
     setStatus(keyStatus, 'Clé effacée de cet appareil.', true);
@@ -254,6 +288,8 @@ export function createSettings(ctx) {
     try {
       const res = summarizeKeyTest(await testKey(key), key);
       if (res.saveKey) ctx.store.setApiKey(key);
+      keyInvalid = res.invalidKey === true;
+      showSummaries();
       setStatus(keyStatus, res.message, res.level === 'ok' ? true : res.level === 'warn' ? 'warn' : false);
     } catch (err) {
       setStatus(keyStatus, err.message, false);

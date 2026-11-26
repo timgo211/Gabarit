@@ -575,15 +575,26 @@ const near = ([r, g, b], hex, tol = 6) => {
 };
 const isDay = ([r, g, b]) => r > 190 && g > 190 && b > 190;
 
-async function setTheme(page, mode) {
+/**
+ * v84 : ouvre Réglages et déplie toutes les sections sauf « Sources et licences » (repliées par défaut), pour que les
+ * scénarios d'avant touchent leurs réglages comme avant. Scénario `reglages` : sections repliées vérifiées à part.
+ */
+async function openSettings(page) {
   await page.click('#btn-settings');
+  await page.evaluate(() => {
+    for (const b of document.querySelectorAll('#dlg-settings section[data-section]:not([data-section="credits"]) .section-toggle[aria-expanded="false"]')) b.click();
+  });
+}
+
+async function setTheme(page, mode) {
+  await openSettings(page);
   await page.check(`input[name="theme"][value="${mode}"]`);
   await page.click('#dlg-settings [data-close]');
   await page.waitForTimeout(1500);
 }
 
 async function startSim(page) {
-  await page.click('#btn-settings');
+  await openSettings(page);
   await page.click('#btn-simulate');
   await page.waitForSelector('#nav:not([hidden])');
   await page.waitForTimeout(2500);
@@ -1226,7 +1237,7 @@ async function comfortCheck(browser, base) {
     const nav = fixture('ors-directions-nav.json');
     const { page, ctx, stats, errors } = await open(browser, base, { width, height, directions: () => nav });
     // Réglages : couleur de la flèche, voix, musique.
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.check('input[name="arrow-color"][value="violet"]');
     const fill = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--arrow-fill').trim());
     check(fill === '#7b2fbf', `${width} px : couleur de la flèche appliquée`, fill);
@@ -1253,7 +1264,7 @@ async function comfortCheck(browser, base) {
       const controller = { postMessage: (m, [port]) => { if (m.type === 'GET_VERSION') port.postMessage({ type: 'VERSION', version: v }); } };
       Object.defineProperty(navigator.serviceWorker, 'controller', { configurable: true, get: () => controller });
     }, swVersion);
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForTimeout(200);
     const verOk = await page.textContent('#app-version');
     check(verOk === `Gabarit ${swVersion}`, `${width} px : version du service worker actif affichée`, verOk);
@@ -1945,7 +1956,7 @@ async function adrCheck(browser, base) {
       && /Matières dangereuses \(ADR\) : dans Réglages/.test(await empty.page.textContent('.vehicle-form')), `${width} px : profil sans champs ADR (renvoi vers Réglages)`);
     await empty.page.click('#dlg-vehicles [data-close]');
     // Réglages : section « Matières dangereuses (ADR) », reprise de l'ancien profil (classe 3, UN 1202, code vide).
-    await empty.page.click('#btn-settings');
+    await openSettings(empty.page);
     await empty.page.locator('#adr-enabled').scrollIntoViewIfNeeded();
     const adrUi = await empty.page.evaluate(() => ({
       on: document.querySelector('#adr-enabled').checked, cls: document.querySelector('#adr-class').value,
@@ -1994,7 +2005,7 @@ async function adrCheck(browser, base) {
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload();
   await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 15000 });
-  await page.click('#btn-settings');
+  await openSettings(page);
   await page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
   const ver = await page.textContent('#app-version');
   check(ver === `Gabarit ${swVersion}`, `vrai service worker : « Gabarit ${swVersion} » en bas de Réglages (VERSION de sw.js)`, ver);
@@ -2195,7 +2206,7 @@ async function winterCheck(browser, base) {
       check(/PL avec remorque ou semi-remorque : chaînes à neige pour au moins deux roues motrices à bord, même avec des pneus hiver\./.test(t) && !/sans remorque : chaînes/.test(t),
         '360 px : après rechargement, consigne « avec remorque » seule');
       // Crédits de Réglages : liste du 22/10/2022, contours ODbL.
-      await page.click('#btn-settings');
+      await openSettings(page);
       await openCredits(page); // v64 : section repliée par défaut
       const credit = await page.textContent('#winter-credit');
       check(/22\/10\/2022/.test(credit) && /Contours administratifs/.test(credit) && /ODbL/.test(credit), '360 px : crédits ODbL des contours et date de la liste', credit);
@@ -2459,7 +2470,7 @@ async function tollsCheck(browser, base) {
     await sv.page.waitForTimeout(500);
     const txt = await sv.page.textContent('.route-diag-text');
     check(txt.startsWith(`Gabarit ${swVersion} — diagnostic du trajet`), `vrai service worker : diagnostic « Gabarit ${swVersion} » sans ouvrir Réglages`, txt.slice(0, 80));
-    await sv.page.click('#btn-settings');
+    await openSettings(sv.page);
     await sv.page.waitForFunction(() => /^Gabarit v/.test(document.querySelector('#app-version')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     check(await sv.page.textContent('#app-version') === `Gabarit ${swVersion}`, 'vrai service worker : même version en bas de Réglages');
     check(sv.errors.length === 0, 'vrai service worker : aucune erreur JavaScript', sv.errors.join(' | '));
@@ -2953,7 +2964,7 @@ async function weightsCheck(browser, base) {
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-poids.png`) });
     await page.click('#btn-bridge-close');
     if (width === 412) {
-      await page.click('#btn-settings');
+      await openSettings(page);
       await page.waitForSelector('#weight-warnings');
       check(await page.isChecked('#weight-warnings'), `${tag} : case « Signaler les limites de poids » cochée par défaut`);
       await page.keyboard.press('Escape');
@@ -3023,7 +3034,7 @@ async function speedsCheck(browser, base) {
       check(/Limites de vitesse : \d+ % \(OSM \d+ %/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique des limites de vitesse`);
       await noHorizontalScroll(page, `${tag} limites de vitesse`);
       if (!voiceOn) {
-        await page.click('#btn-settings');
+        await openSettings(page);
         await page.waitForSelector('#speed-voice');
         check(!(await page.isChecked('#speed-voice')), `${tag} : « Annoncer les dépassements de limite » désactivé par défaut`);
         check((await page.textContent('#speed-hint')).trim() === "Limites d'après OpenStreetMap et règles générales : la signalisation fait foi.", `${tag} : texte fixe dans Réglages`);
@@ -3364,7 +3375,7 @@ async function restrictionsCheck(browser, base) {
       `${tag} : recalcul avec avoid_polygons au point de croisement`, `${cx.toFixed(5)}, ${cy.toFixed(5)}`);
     check((await page.textContent('#route-notes')).includes('Évite 1 restriction saisie par toi.'), `${tag} : « Évite 1 restriction saisie par toi »`);
     // Réglages › Mes restrictions : liste.
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForSelector('#restr-list li.restr-item', { timeout: 5000 });
     check(/À éviter/.test(await page.textContent('#restr-list')) && /150 km/.test(await page.textContent('#restrictions-help')), `${tag} : liste et aide de Mes restrictions`);
     check(!(await page.isDisabled('#btn-restr-add')), `${tag} : « Ajouter » actif à l'arrêt`);
@@ -3511,7 +3522,7 @@ async function driveWindCheck(browser, base) {
   // Réglages, copie sur l'appareil, Open-Meteo en échec.
   {
     const { page, ctx, stats, errors } = await open(browser, base, { width: 412, height: 900, wind: () => 60 });
-    await page.click('#btn-settings');
+    await openSettings(page);
     check(await page.isChecked('#drive-voice') && await page.isChecked('#wind-voice') && (await page.inputValue('#wind-gust')) === '70',
       'Réglages : voix des pauses et du vent activées, seuil 70 km/h par défaut');
     await page.fill('#wind-gust', '55');
@@ -3816,7 +3827,7 @@ async function nightLevelsCheck(browser, base) {
     const colors = {};
     for (const level of NIGHT_LEVELS) {
       if (level !== 'dark') {
-        await page.click('#btn-settings');
+        await openSettings(page);
         await page.check(`input[name="night-level"][value="${level}"]`);
         await page.click('#dlg-settings [data-close]');
         // Pendant le changement : le fond reste sombre à chaque mesure (jamais d'éclair clair).
@@ -3841,7 +3852,7 @@ async function nightLevelsCheck(browser, base) {
     // Guidage de nuit à chaque niveau : captures (panneau du bas, boutons ronds, alertes), satellite assombri.
     for (const level of ['light', 'normal', 'dark']) {
       if (level !== 'light') {
-        await page.click('#btn-settings');
+        await openSettings(page);
         await page.check(`input[name="night-level"][value="${level}"]`);
         await page.click('#dlg-settings [data-close]');
         await page.waitForTimeout(1200);
@@ -4062,7 +4073,7 @@ async function paletteCheck(browser, base) {
       await page.screenshot({ path: file('accueil') });
 
       // Réglages : « Auto (noir le jour, ambre la nuit) » cochée par défaut, pastilles lisibles.
-      await page.click('#btn-settings');
+      await openSettings(page);
       const auto = await page.evaluate(() => {
         const r = document.querySelector('input[name="arrow-color"][value="auto"]');
         return { checked: r.checked, text: r.closest('label').textContent.trim() };
@@ -4810,7 +4821,7 @@ async function suggestionsCheck(browser, base) {
     rec = await recentSaved();
     check(await page.inputValue('#to-input') === 'Dépôt 3, Ville 3, France' && rec[0].name === 'Dépôt 3' && rec.length === 6, `${tag} : récent choisi → remonte en tête`);
     // Effacer (avec confirmation) ; section « Sources et licences » repliée au premier affichage, état gardé.
-    await page.click('#btn-settings');
+    await openSettings(page);
     const cr = await page.evaluate(() => {
       const b = document.querySelector('#btn-credits');
       return { exp: b.getAttribute('aria-expanded'), hidden: document.querySelector('#credits-body').hidden, h: b.getBoundingClientRect().height,
@@ -4834,7 +4845,7 @@ async function suggestionsCheck(browser, base) {
     await page.click('#dlg-settings [data-close]');
     await page.reload();
     await page.waitForSelector('#to-input');
-    await page.click('#btn-settings');
+    await openSettings(page);
     check(await page.getAttribute('#btn-credits', 'aria-expanded') === 'true' && !(await page.evaluate(() => document.querySelector('#credits-body').hidden)),
       `${tag} : dépliée, gardée après rechargement`);
     await page.click('#btn-credits');
@@ -4938,7 +4949,7 @@ async function historyCheck(browser, base) {
     check(!/"lon"|"lat"|4\.9[0-9]{3}|45\.7[0-9]{3}/.test(JSON.stringify(stored)), `${tag} : aucune coordonnée gardée`);
     await stopGuidance(page);
     // Réglages › Historique.
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForSelector('#dlg-settings[open]');
     await page.waitForTimeout(500);
     check(await page.textContent('#history-privacy') === "Gardé seulement sur cet appareil. Inclus dans l'export.", `${tag} : phrase de confidentialité`);
@@ -5226,7 +5237,7 @@ async function reportsCheck(browser, base) {
     await stopGuidance(page);
     // Hors guidage : Réglages › Mes signalements, à l'arrêt seulement.
     for (let i = 0; i < 2; i += 1) { await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 }); await page.waitForTimeout(500); }
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForTimeout(6000);
     const n = await page.locator('#reports-list .reports-card-btn').count();
     check(n === 4 && await page.isEnabled('#reports-list .reports-card-btn >> nth=0'), `${tag} : Réglages › Mes signalements, 2 lignes, actives à l'arrêt`, String(n));
@@ -5249,7 +5260,7 @@ async function savedPlacesCheck(browser, base) {
     const tag = `${width}×${height} ${theme}`;
     const { page, ctx, errors, stats } = await open(browser, base, { width, height, theme, overpass: () => ({ elements: [] }), directions: () => nav });
     await computeRoute(page);
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForSelector('#places-card');
     check(/Données personnelles/.test(await page.textContent('#places-privacy')), `${tag} : phrase « données personnelles »`);
     await page.selectOption('#place-kind', 'depot');
@@ -5309,7 +5320,7 @@ async function reportsShareCheck(browser, base) {
     await page.reload();
     await page.waitForTimeout(800);
     await page.evaluate(() => { navigator.share = undefined; }); // téléchargement (comme un navigateur sans partage de fichier)
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForSelector('#reports-card');
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#btn-reports-share')]);
     let text = '';
@@ -5641,7 +5652,7 @@ async function lyonAutoCheck(browser, base) {
     check(via.length === 0, 'réglage désactivé : aucune requête automatique', String(via.length));
     check(await page.locator('.route-card.banned').count() === 0, 'réglage désactivé : rien en rouge');
     check(await page.locator('.btn-bypass').count() === 1, 'réglage désactivé : bouton v76 présent');
-    await page.click('#btn-settings');
+    await openSettings(page);
     await page.waitForTimeout(300);
     check(await page.locator('#auto-bypass').isChecked() === false, 'réglage désactivé : case décochée dans Réglages');
     check(errors.length === 0, 'réglage désactivé : aucune erreur JavaScript', errors.join(' | '));
@@ -5897,6 +5908,78 @@ async function heightsCheck(browser, base) {
   await ok.ctx.close();
 }
 
+/** v84 : Réglages — sections repliables (toutes repliées, une puis plusieurs ouvertes, clavier, rechargement). */
+async function settingsSectionsCheck(browser, base) {
+  for (const [width, height, theme] of [[412, 900, 'day'], [412, 900, 'night'], [900, 412, 'day'], [900, 412, 'night']]) {
+    const tag = `réglages ${width}×${height} ${theme}`;
+    const { page, ctx, errors } = await open(browser, base, { width, height, theme });
+    await page.click('#btn-settings');
+    await page.waitForSelector('#dlg-settings[open]');
+    const state = () => page.evaluate(() => [...document.querySelectorAll('#dlg-settings section[data-section]')].map((sec) => {
+      const b = sec.querySelector('.section-toggle');
+      const body = document.getElementById(b.getAttribute('aria-controls'));
+      const sub = sec.querySelector('.section-sub');
+      const r = b.getBoundingClientRect();
+      const lh = sub ? parseFloat(getComputedStyle(sub).lineHeight) || 20 : 0;
+      return {
+        key: sec.dataset.section, open: b.getAttribute('aria-expanded'), hidden: body.hidden, h: r.height,
+        title: sec.querySelector('.section-title')?.textContent ?? b.textContent,
+        sub: sub && !sub.hidden ? sub.textContent : '',
+        subOk: !sub || sub.hidden || (sub.scrollWidth <= sub.clientWidth + 1 && sub.getBoundingClientRect().height <= lh * 1.5
+          && sub.getBoundingClientRect().right <= b.getBoundingClientRect().right + 1),
+        focusable: [...body.querySelectorAll('button, input, select, a, label[for]')].filter((n) => n.getClientRects().length).length,
+      };
+    }));
+    const s0 = await state();
+    check(s0.length === 18 && s0.every((x) => x.open === 'false' && x.hidden), `${tag} : 18 sections, toutes repliées au premier affichage`,
+      s0.filter((x) => x.open !== 'false').map((x) => x.key).join(', '));
+    check(s0.every((x) => x.focusable === 0), `${tag} : contenu replié caché et non focusable`);
+    check(s0.every((x) => x.h >= 48), `${tag} : titres ≥ 48 px`, s0.filter((x) => x.h < 48).map((x) => `${x.key} ${x.h}`).join(', '));
+    check(s0.every((x) => x.subOk), `${tag} : valeurs sur une ligne, jamais coupées`, s0.filter((x) => !x.subOk).map((x) => x.sub).join(' | '));
+    const sub = Object.fromEntries(s0.map((x) => [x.key, x.sub]));
+    check(sub.display === `Mode nuit : ${theme === 'night' ? 'Nuit' : 'Jour'}` && sub.bans === 'Contournement automatique : oui'
+      && sub.key === 'Clé : enregistrée' && sub.test === 'Vitesse : 50 km/h', `${tag} : valeurs courantes sous les titres`, JSON.stringify(sub));
+    await page.locator('#app-version').scrollIntoViewIfNeeded();
+    check(await page.isVisible('#app-version'), `${tag} : « Gabarit vNN » visible hors des sections`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-reglages-replie.png`) });
+    // Une section ouverte au toucher, puis deux au clavier (Entrée, Espace).
+    await page.click('#btn-sec-voice');
+    check(await page.isVisible('#voice-enabled'), `${tag} : « Guidage vocal » ouverte d'un toucher`);
+    await page.focus('#btn-sec-adr');
+    await page.keyboard.press('Enter');
+    await page.focus('#btn-sec-bans');
+    await page.keyboard.press(' ');
+    const s1 = await state();
+    const opened = s1.filter((x) => x.open === 'true').map((x) => x.key);
+    check(opened.join() === 'voice,adr,bans' && s1.filter((x) => x.open === 'true').every((x) => !x.hidden),
+      `${tag} : plusieurs sections ouvertes (toucher, Entrée, Espace)`, opened.join());
+    await page.locator('#btn-sec-voice').scrollIntoViewIfNeeded();
+    await noHorizontalScroll(page, tag);
+    const overlap = await page.evaluate(() => {
+      const r = [...document.querySelectorAll('#dlg-settings section[data-section]')].map((n) => n.getBoundingClientRect());
+      return r.some((a, i) => i && a.top < r[i - 1].bottom - 0.5);
+    });
+    check(!overlap, `${tag} : sections sans chevauchement`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-reglages-ouvertes.png`) });
+    // Rechargement : état gardé par section.
+    await page.reload();
+    await page.click('#btn-settings');
+    await page.waitForSelector('#dlg-settings[open]');
+    const s2 = await state();
+    check(s2.filter((x) => x.open === 'true').map((x) => x.key).join() === 'voice,adr,bans', `${tag} : état gardé après rechargement`);
+    await page.click('#btn-sec-adr');
+    check(!(await page.isVisible('#adr-enabled')), `${tag} : section refermée d'un toucher`);
+    // Clé vide : « Clé : manquante » dans le titre.
+    await page.evaluate(() => localStorage.removeItem('gabarit.orsKey'));
+    await page.reload();
+    await page.click('#btn-settings');
+    const title = await page.textContent('#sec-key-title');
+    check(title.includes('Clé : manquante'), `${tag} : clé vide → « Clé : manquante » dans le titre`, title);
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5908,7 +5991,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck, reglages: settingsSectionsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

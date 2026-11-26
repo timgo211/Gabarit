@@ -106,6 +106,7 @@ const APP_FILES = [
   './src/lib/route-samples.js',
   './src/lib/share.js',
   './src/lib/store.js',
+  './src/lib/settings-sections.js',
   './src/lib/sw-routing.js',
   './src/lib/theme.js',
   './src/lib/tunnels-convert.js',

@@ -135,13 +135,17 @@ test('ancien export sans recentPlaces : import sans erreur, liste vide', () => {
   assert.deepEqual(readExport(JSON.stringify({ ...JSON.parse(old), recentPlaces: 'abîmé' })).recentPlaces, []);
 });
 
-test('« Sources et licences » : repliée par défaut, état gardé et exporté', () => {
-  assert.equal(emptyData().settings.creditsOpen, false);
-  assert.equal(sanitizeData({ vehicles: [], settings: {} }).settings.creditsOpen, false);
+test('« Sources et licences » : repliée par défaut, état gardé et exporté (v84 : settings.sectionsOpen.credits)', () => {
+  assert.equal(emptyData().settings.sectionsOpen.credits, undefined);
+  assert.equal(sanitizeData({ vehicles: [], settings: {} }).settings.sectionsOpen.credits, undefined);
   const d = emptyData();
-  d.settings.creditsOpen = true;
-  assert.equal(readExport(exportData(d)).data.settings.creditsOpen, true);
-  assert.equal(sanitizeData({ vehicles: [], settings: { creditsOpen: 'oui' } }).settings.creditsOpen, false);
+  d.settings.sectionsOpen = { credits: true };
+  assert.equal(readExport(exportData(d)).data.settings.sectionsOpen.credits, true);
+  assert.equal(sanitizeData({ vehicles: [], settings: { sectionsOpen: { credits: 'oui' } } }).settings.sectionsOpen.credits, undefined);
+  // Ancienne sauvegarde v64 : creditsOpen repris, jamais réécrit (une seule source d'état).
+  const old = sanitizeData({ vehicles: [], settings: { creditsOpen: true } }).settings;
+  assert.equal(old.sectionsOpen.credits, true);
+  assert.equal('creditsOpen' in old, false);
 });
 
 test('✕ et « Effacer » : en guidage, à l\'arrêt seulement (R412-6-2, vitesse inconnue = en mouvement)', () => {

@@ -53,6 +53,7 @@ import {
 } from './lib/adr.js';
 import { ZFE, parseZfeData, avoidPolygonsFor, avoidForReroute } from './lib/zfe.js';
 import { routeRules, rulesSourceText, confirmedTunnelBans } from './lib/route-rules.js';
+import { toggleSection } from './lib/settings-sections.js';
 import { COUNTRY_RULES, countryDataPath, parseCountryData } from './lib/country-rules.js';
 import { createVoice } from './ui/voice.js';
 import { createWakeLock } from './ui/wake-lock.js';
@@ -1403,7 +1404,7 @@ const settings = createSettings({
   // Matières dangereuses (phase 5b) : réglage global, lu au prochain calcul (activeVehicle → withAdr).
   onAdrChange: (adr) => setSetting({ adr }),
   onDrivingReset: () => { saveDriving(storage, emptyDriving()); renderChoice(); },
-  onCreditsToggle: (open) => setSetting({ creditsOpen: open }), // v64
+  onSectionToggle: (key, open) => setSetting({ sectionsOpen: toggleSection(data.settings.sectionsOpen, key, open) }), // v84
   recent: recentPlaces, // v64 : effacer, exporter, importer
   recentEditAllowed: () => recentAllowed(), // v64 : en guidage, à l'arrêt seulement
 });
