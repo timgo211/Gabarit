@@ -5,7 +5,7 @@
 import { $, el } from './dom.js';
 import { pickShareMethod, shareResultText } from '../lib/share.js';
 import {
-  SHARE, buildShareFile, shareFileName, parseShareFile, previewImport, previewText, canImportShare, confirmImport,
+  SHARE, shareFileSpec, parseShareFile, previewImport, previewText, canImportShare, confirmImport,
 } from '../lib/reports-share.js';
 import {
   REPORT, canEditReports, updateReport, removeReport, reportLabel, reportStatus, MOVING_TEXT,
@@ -130,25 +130,24 @@ export function createReports(ctx) {
   $('#btn-report-close').addEventListener('click', close);
 
   // Phase 3c : fichier pour un ami (partage Android si le navigateur accepte le fichier, sinon téléchargement).
+  // v87 : .txt en text/plain (Chromium refuse application/json au partage), même contenu JSON.
   const shareStatus = $('#reports-share-status');
   $('#btn-reports-share').addEventListener('click', async () => {
-    let content;
+    let spec;
     try {
-      content = buildShareFile(ctx.getList(), { withNotes: $('#reports-share-notes').checked });
+      spec = shareFileSpec(ctx.getList(), { withNotes: $('#reports-share-notes').checked, now: new Date() });
     } catch (err) {
       shareStatus.textContent = err.message;
       return;
     }
-    const name = shareFileName(new Date());
     let file = null;
-    try { file = new File([content], name, { type: SHARE.MIME }); } catch { file = null; }
-    const method = pickShareMethod({
-      kind: 'file', hasShare: typeof navigator.share === 'function',
-      canShareFiles: !!file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }),
-    });
+    try { file = new File([spec.content], spec.name, { type: spec.type }); } catch { file = null; }
+    let canShareFiles = false;
+    try { canShareFiles = !!file && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] }); } catch { canShareFiles = false; }
+    const method = pickShareMethod({ kind: 'file', hasShare: typeof navigator.share === 'function', canShareFiles });
     if (method === 'share') {
       try {
-        await navigator.share({ files: [file], title: 'Signalements Gabarit' });
+        await navigator.share({ files: [file], title: spec.title });
         shareStatus.textContent = '';
         return;
       } catch (err) {
@@ -156,13 +155,13 @@ export function createReports(ctx) {
       }
     }
     try {
-      const href = URL.createObjectURL(new Blob([content], { type: SHARE.MIME }));
-      const a = Object.assign(document.createElement('a'), { href, download: name });
+      const href = URL.createObjectURL(new Blob([spec.content], { type: spec.type }));
+      const a = Object.assign(document.createElement('a'), { href, download: spec.name });
       document.body.append(a);
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(href), 10000);
-      shareStatus.textContent = shareResultText('download');
+      shareStatus.textContent = SHARE.DOWNLOAD_TEXT;
     } catch {
       shareStatus.textContent = shareResultText('download', { failed: true });
     }
@@ -176,6 +175,7 @@ export function createReports(ctx) {
   const previewNode = $('#reports-import-text');
   let pending = null; // { reports, dropped, summary } en attente de « Importer »
   const importAllowed = () => canImportShare({ parked: ctx.getParked() === true });
+  importInput.accept = SHARE.ACCEPT; // v87 : .txt et anciens .json ; seul le contenu est vérifié (parseShareFile)
 
   function renderImport() {
     const ok = importAllowed();

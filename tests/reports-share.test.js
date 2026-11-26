@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SHARE, buildShareFile, parseShareFile, previewImport, previewText, mergeImported, shareFileName,
+  SHARE, buildShareFile, parseShareFile, previewImport, previewText, mergeImported, shareFileName, shareFileSpec,
 } from '../src/lib/reports-share.js';
 import { cleanReport, isSpeakable, placeReports, guidanceReport, REPORT } from '../src/lib/reports.js';
 import { emptyData } from '../src/lib/store.js';
@@ -21,7 +21,7 @@ test('fichier : mes signalements confirmés seulement, jour seulement, sans note
   assert.deepEqual(f, { kind: SHARE.KIND, version: SHARE.VERSION, reports: [{ type: 'low-bridge', lat: 47.25, lon: 5.5, heading: 90, createdAt: '2026-11-20' }] });
   assert.equal(JSON.parse(buildShareFile(list, { withNotes: true })).reports[0].note, 'note privée');
   assert.throws(() => buildShareFile([mine({ confirmed: false })]), new RegExp(SHARE.NONE_TEXT));
-  assert.equal(shareFileName(new Date(2026, 10, 24)), 'gabarit-signalements-2026-11-24.json');
+  assert.equal(shareFileName(new Date(2026, 10, 24)), 'gabarit-signalements-2026-11-24.txt');
 });
 
 test('fichier : jamais mes lieux, ma clé ni mon profil (seul data.reports est lu)', () => {
@@ -147,4 +147,62 @@ test('import : vitesse inconnue ou GPS refusé = en mouvement', () => {
   assert.equal(canImportShare({ parked: 'true' }), false);
   assert.equal(confirmImport([], friend(), {}).ok, false);
   assert.equal(SHARE.PARKED_ONLY_TEXT, 'Disponible à l\'arrêt');
+});
+
+// v87 : fichier en .txt / text/plain (partage Android de Chromium), contenu JSON identique, import vérifié sur le contenu.
+test('v87 : nom .txt, type text/plain, titre, contenu identique à buildShareFile', () => {
+  const list = [mine(), mine({ id: 'm2', lon: 5.6 })];
+  const spec = shareFileSpec(list, { now: new Date(2026, 0, 5) });
+  assert.equal(spec.name, 'gabarit-signalements-2026-01-05.txt');
+  assert.equal(spec.type, 'text/plain');
+  assert.equal(SHARE.MIME, 'text/plain');
+  assert.equal(spec.title, 'Signalements Gabarit');
+  assert.equal(spec.content, buildShareFile(list));
+  assert.equal(shareFileSpec(list, { withNotes: true }).content, buildShareFile(list, { withNotes: true }));
+  const f = JSON.parse(spec.content);
+  assert.equal(f.kind, 'gabarit-reports');
+  assert.equal(f.version, 1);
+  assert.equal(spec.content.includes('note privée'), false);
+  assert.throws(() => shareFileSpec([mine({ confirmed: false })]), new RegExp(SHARE.NONE_TEXT));
+  assert.equal(SHARE.DOWNLOAD_TEXT, 'Fichier téléchargé : joins-le à ton message.');
+  for (const a of ['.txt', '.json', 'text/plain', 'application/json']) assert.ok(SHARE.ACCEPT.split(',').includes(a), a);
+});
+
+test('v87 : import d\'un .txt valide (même contenu), marqués importés, jamais confirmés', () => {
+  const txt = shareFileSpec([mine(), mine({ id: 'm2', lon: 5.6, type: 'control' })]).content;
+  const r = parseShareFile(txt, { makeId });
+  assert.equal(r.ok, true);
+  assert.equal(r.reports.length, 2);
+  assert.ok(r.reports.every((x) => x.origin === 'imported' && x.confirmed === false && isSpeakable(x) === false));
+  // Marque d'ordre des octets ajoutée par une messagerie : acceptée.
+  assert.equal(parseShareFile(`\uFEFF${txt}`, { makeId }).ok, true);
+});
+
+test('v87 : ancien fichier .json (v68) toujours accepté, résultat identique au .txt', () => {
+  const ancien = JSON.stringify({ kind: 'gabarit-reports', version: 1, reports: [{ type: 'danger', lat: 47.1, lon: 5.1, heading: 45, createdAt: '2026-11-01' }] }, null, 1);
+  const a = parseShareFile(ancien, { makeId: () => 'x' });
+  assert.equal(a.ok, true);
+  assert.equal(a.reports.length, 1);
+  assert.deepEqual(a, parseShareFile(ancien, { makeId: () => 'x' }));
+});
+
+test('v87 : .txt invalide → message clair, rien ajouté ; taille et doublons vérifiés', () => {
+  for (const bad of ['Bonjour, voici mes signalements', '', '<script>alert(1)</script>', '{"kind":"gabarit-reports"']) {
+    const r = parseShareFile(bad);
+    assert.equal(r.ok, false, bad);
+    assert.equal(r.reports, undefined);
+    assert.match(r.error, /signalements Gabarit|illisible/);
+  }
+  assert.match(parseShareFile('texte').error, /Rien n'a été ajouté/);
+  assert.match(parseShareFile(JSON.stringify({ kind: 'autre', version: 1, reports: [] })).error, /pas un fichier de signalements Gabarit/);
+  // 512 Ko au plus, mesurés en octets (accents compris).
+  assert.match(parseShareFile('é'.repeat(SHARE.MAX_BYTES / 2 + 1)).error, /trop gros/);
+  // Doublons : dans le fichier, puis contre mes signalements.
+  const one = { type: 'low-bridge', lat: 47.25, lon: 5.5, createdAt: '2026-11-01' };
+  const r = parseShareFile(JSON.stringify({ kind: SHARE.KIND, version: 1, reports: [one, { ...one, lon: 5.50001 }] }), { makeId });
+  assert.equal(r.reports.length, 1);
+  assert.equal(r.dropped, 1);
+  const p = previewImport([mine()], r.reports);
+  assert.deepEqual(p, { add: 0, duplicates: 1, overflow: 0 });
+  assert.equal(mergeImported([mine()], r.reports).length, 1);
 });

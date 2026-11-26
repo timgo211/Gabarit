@@ -479,11 +479,12 @@
         <ul id="reports-list" class="restr-list" aria-label="Mes signalements"></ul>
         <h4 class="field-label">Avec un ami (fichier, sans serveur)</h4>
         <p class="hint">Le fichier contient seulement tes signalements confirmés (type, position, jour) : jamais tes lieux, ta clé ni ton profil. Un fichier reçu est vérifié ; ses signalements restent « importés, à vérifier » et ne sont jamais dits à voix haute.</p>
+        <p class="hint">Ton ami l'ouvre avec Importer le fichier d'un ami… dans Réglages de Gabarit.</p>
         <label class="toggle"><input type="checkbox" id="reports-share-notes"> Inclure mes notes</label>
         <div class="row">
-          <button type="button" id="btn-reports-share" class="btn">Partager mes signalements (fichier)</button>
+          <button type="button" id="btn-reports-share" class="btn">Partager mes signalements</button>
           <label class="btn reports-card-btn" id="btn-reports-import" for="reports-import-file">Importer le fichier d'un ami…</label>
-          <input id="reports-import-file" type="file" accept="application/json,.json" hidden>
+          <input id="reports-import-file" type="file" accept=".txt,.json,text/plain,application/json" hidden>
         </div>
         <p id="reports-import-hint" class="hint" hidden>Disponible à l'arrêt</p>
         <div id="reports-import-preview" hidden>

@@ -100,6 +100,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Signalements pour un ami (3c, v68, `reports-share.js`) : fichier = mes confirmés seulement, jour seulement, sans
   lieux ni notes par défaut ; import vérifié (512 Ko, schéma, types), aperçu + confirmation, marqués importés, jamais dits.
   v69 : import à l'arrêt seulement (`canImportShare`, règle 3a), redit à « Importer » (`confirmImport`) : sinon rien fusionné.
+  v87 : fichier `.txt` en `text/plain` (Chromium refuse `application/json` au partage), même JSON ; import `.txt`/`.json` jugé sur le contenu.
 - Repliables (v84, composant commun `src/ui/collapsible.js`) : Réglages = 18 sections repliées par défaut, état
   `settings.sectionsOpen` (seule source, `creditsOpen` v64 relu), valeur sous le titre (`settings-sections.js`).
   Fiche : un seul menu « Informations du trajet » (`route-info.js`), replié à chaque calcul (`calcId`, compteur), jamais
