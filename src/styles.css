@@ -347,6 +347,9 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card.banned, .route-card.banned[aria-checked="true"] { border-color: var(--danger); border-left-color: var(--danger); }
 .route-card-banned { color: var(--danger); font-weight: 800; overflow-wrap: anywhere; }
 /* v81 : raison d'un contournement en échec, autre fiche qui évite l'interdiction (texte normal, lisible). */
+.route-card.not-offered { border-color: var(--danger); border-left-color: var(--danger); cursor: default; }
+.route-card.not-offered:active { transform: none; }
+.route-card-not-offered-name { color: var(--muted); overflow-wrap: anywhere; }
 .route-card-banned-why { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
 /* v77 : confirmation avant le départ sur un itinéraire interdit sans alternative (deux gros boutons). */
 .start-confirm {

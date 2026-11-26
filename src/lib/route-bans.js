@@ -22,7 +22,7 @@
 // (« nord → sud », « sud → nord ») est retenue seulement si l'itinéraire y roule dans ce sens (latitude 1 km avant et
 // 1 km après le point) ; sens illisible → retenue (prudence).
 
-import { SENSITIVE, sensitivePointsAlongRoute } from './sensitive-points.js';
+import { SENSITIVE, sensitivePointsAlongRoute, concernsVehicle } from './sensitive-points.js';
 import { LYON_BYPASS } from './lyon-bypass.js';
 import { formatDurationDelta, formatDistanceDelta } from './format.js';
 
@@ -41,6 +41,18 @@ export const BANS = Object.freeze({
    * les voies étiquetées se suivent avec des trous de 3 à 5 km (rapprochement à 80 % de la longueur).
    */
   ABSORB_GAP_M: 5000,
+  /**
+   * v83 (test tablette Nancy → Colmar 44 t du 26/11/2026, fiche « Sans péage » par la N59 sans aucune ligne ⛔) : section
+   * traversée lue par la géométrie seule, sans le veto du nom d'étape ORS (une étape garde le nom de son premier
+   * tronçon : « A 46 » sur 84 km d'A7, v81). Retenue si au moins GEO_MIN_POINTS points de la copie sont sur le tracé
+   * (15 m, cap ≤ 30° modulo 180°) et s'étalent sur GEO_MIN_M le long du tracé : un pont ou un croisement n'en touche
+   * qu'un ou deux, jamais au même cap sur 1 km.
+   */
+  GEO_MIN_POINTS: 3,
+  GEO_MIN_M: 1000,
+  /** v83 : profil jusqu'à 3,5 t : jamais de fiche « non proposée » (interdictions PL au-delà de 3,5 t). */
+  LIGHT_MAX_T: 3.5,
+  NOT_OFFERED_TEXT: 'trajet non proposé',
 });
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
@@ -192,7 +204,9 @@ export function routeBans(route, items, sections, { vehicle = null, copy = null,
   const out = [];
   const seen = new Set();
   const h = isNum(vehicle?.height) ? vehicle.height : null;
-  for (const it of items ?? []) {
+  const known = new Set((items ?? []).filter((it) => it?.type <= SENSITIVE.TYPES.BAN_BF).map((it) => it.section));
+  const all = [...(items ?? []), ...geoSectionItems(route, copy, vehicle, known)].sort((a, b) => a.along - b.along);
+  for (const it of all) {
     if (!(it?.type <= SENSITIVE.TYPES.BAN_BF)) continue;
     const s = sections?.[it.section];
     if (!s?.id || BANS.EXCLUDED.includes(s.id) || seen.has(s.id)) continue;
@@ -218,6 +232,36 @@ export function routeBans(route, items, sections, { vehicle = null, copy = null,
       short: `${title} : ${rule} · ${rangeText(range).replace(' à ', '–')}`,
       source: `${src}.`,
     });
+  }
+  return out;
+}
+
+/**
+ * v83 : sections d'interdiction traversées d'après la géométrie seule (sans veto du nom d'étape), absentes de `known`
+ * (indices de section déjà trouvés par sensitiveRules). Un élément par section, au premier point rencontré.
+ * @returns {{ type:number, section:number, ref:string, point:number[], along:number, geoOnly:true }[]}
+ */
+export function geoSectionItems(route, copy, vehicle = null, known = new Set()) {
+  const sections = copy?.meta?.sections ?? [];
+  const pts = (copy?.data?.points ?? []).filter((p) => p?.type <= SENSITIVE.TYPES.BAN_BF && p.section >= 0 && !known.has(p.section)
+    && !BANS.EXCLUDED.includes(sections[p.section]?.id) && Array.isArray(p.point) && isNum(p.point[0]) && isNum(p.point[1]));
+  if (!pts.length) return [];
+  // Chaque point compté à part (way = indice : le regroupement par voie n'en garderait qu'un).
+  const one = pts.map((p, k) => ({ ...p, type: SENSITIVE.TYPES.TUNNEL, section: -1, way: k, sec: p.section, ptype: p.type }));
+  const hits = sensitivePointsAlongRoute(route, { points: one }, { veto: false });
+  const bySec = new Map();
+  for (const hh of hits) {
+    const g = bySec.get(hh.sec) ?? [];
+    g.push(hh);
+    bySec.set(hh.sec, g);
+  }
+  const out = [];
+  for (const [si, g] of bySec) {
+    if (g.length < BANS.GEO_MIN_POINTS || g[g.length - 1].along - g[0].along < BANS.GEO_MIN_M) continue;
+    const first = g[0];
+    const it = { type: first.ptype, ref: first.ref ?? '', point: first.point, along: first.along, section: si, geoOnly: true };
+    if (!concernsVehicle(it, sections[si], vehicle)) continue;
+    out.push(it);
   }
   return out;
 }
@@ -293,4 +337,37 @@ export function rangeCoords(coords, from, to) {
   }
   out.push(pointAt(coords, to));
   return out.filter(Boolean);
+}
+
+/** v83 : nom d'une fiche « non proposée » : « N59 / N159 (Lunéville – Sélestat) interdite : trajet non proposé ». */
+export function notOfferedText(names) {
+  const list = [...new Set((names ?? []).filter(Boolean))];
+  if (!list.length) return `${BANS.SHORT_TEXT} : ${BANS.NOT_OFFERED_TEXT}`;
+  return `${list.join(' ; ')} interdite${list.length > 1 ? 's' : ''} : ${BANS.NOT_OFFERED_TEXT}`;
+}
+
+/**
+ * v83 (règle du propriétaire du 26/11/2026, non négociable : un trajet qui traverse une interdiction connue n'est pas
+ * proposé) : fiche qui traverse une interdiction connue active (desserte « Oui » déjà retirée) remplacée par une ligne
+ * non sélectionnable, sans « Démarrer », dès qu'au moins une autre fiche n'en traverse aucune — même mécanisme que les
+ * fiches par Lyon retirées après la rocade (v77). Toutes interdites (aucune alternative) → rien ici : fiche rouge et
+ * confirmation (v77 / v78). Pas pendant un contournement en cours (« Démarrer » déjà grisé), ni pour un profil
+ * ≤ 3,5 t. L'autre fiche (« Plus court » par des routes secondaires) n'est ni promue ni renommée.
+ * @param {{ blocked:boolean, names:string[] }[]} cards
+ * @param {{ pending?:boolean, vehicle?:object|null }} [opts]
+ * @returns {string[]} texte de la ligne par fiche, '' si proposée
+ */
+export function notOfferedCards(cards, { pending = false, vehicle = null } = {}) {
+  const list = cards ?? [];
+  const none = list.map(() => '');
+  const w = isNum(vehicle?.weight) ? vehicle.weight : null;
+  if (pending || (w !== null && w <= BANS.LIGHT_MAX_T)) return none;
+  if (!list.some((c) => c && !c.blocked)) return none;
+  return list.map((c) => (c?.blocked ? notOfferedText(c.names) : ''));
+}
+
+/** v83 : première fiche proposée (la fiche choisie si elle l'est), -1 si aucune. */
+export function firstOffered(notOffered, selected = 0) {
+  if (!notOffered?.[selected]) return selected;
+  return notOffered.findIndex((t) => !t);
 }
