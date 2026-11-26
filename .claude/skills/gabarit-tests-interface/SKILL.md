@@ -32,7 +32,8 @@ un appui long, aires (liste, repères, fiche, avis, copie `data/aires-osm/` sans
 « Gabarit v37 », Réglages ADR repris d'un ancien profil, profil sans champs ADR), temps de conduite et vent (`drive` : 4 h 25 déjà comptées, Open-Meteo simulé, bouton « travail » à l'arrêt,
 bandeau jamais sous la barre du bas, 360 / 412 px, tablette, paysage ; Réglages, copie, échec), tracés (`draw` :
 tuiles lentes comme le vrai fond, source `route` et couche `route-line` après calcul, autre fiche, Plan / Satellite,
-rechargement), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
+rechargement : itinéraire repris par la mémoire v53 (données et couche ; pixels non comptés, voir plus bas), puis
+mémoire `gabarit-route` effacée, rechargement sans tracé et nouveau calcul compté en pixels ambre), frontières (`border` : fiches Suisse / Italie un mercredi 21 h 50, nuit suisse en vigueur, sources,
 « à vérifier », 360 / 412 / 800 / 1280 px, guidage avec le GPS émulé : bandeau et une annonce vers 3 km captée,
 countryinfo absent, fichier pays absent), accès (`access` : desserte traversée vers km 16, desserte près du départ et
 de l'arrivée acceptée, voie interdite / autorisée selon l'heure un mercredi 8 h, condition non lue sur une ligne,
@@ -194,3 +195,12 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   ≥ 48 px, récap = niveaux `li[data-sev]`, pire niveau symbole + mot, contraste ≥ 4,5:1, ni coupé ni « … » ; cartes,
   question et boutons hors du menu ; ouvert : ordre interdit → info, fiches pays dedans ; autre fiche gardée ouverte,
   nouveau calcul replié, Entrée ouvre. Autres scénarios : `openTripInfo(page)` avant de vérifier une ligne à l'écran.
+- `sensibles` (PR 3b ; règle v81) : copie `data/points-sensibles/` de test : 2 lignes « Point sensible » (hauteur basse km 3,
+  tunnel sans hauteur km 4 : « à vérifier », « La signalisation fait foi. », source OSM) ; le point « interdiction » km 1
+  de la section est remplacé par 1 ligne d'interdiction (« · km 1 · », arrêté cité, « À vérifier. », niveau `ban` v84) ;
+  résumé « 3 points sensibles à vérifier » et 3 repères « ! » (la carte et le résumé comptent toujours les 3 points),
+  diagnostic, fiche rouge v78, guidage sans repère ni voix, fourgon 3,5 t, copie absente.
+- Défaut connu, révélé par `draw` (non corrigé, prompt séparé) : itinéraire repris (v53) avant la création de la carte
+  (style chargé en asynchrone, `loadStyle` → `build` de `map.js`) → `showRoutes` sort sur `if (!map) return;` : tracé
+  ajouté plus tard sur `style.load`, mais vue France par défaut (zoom 5), sans cadrage ni repères départ / arrivée.
+  Intermittent (environ 1 rechargement sur 8 ici) ; le détail de la vérification affiche centre et zoom.

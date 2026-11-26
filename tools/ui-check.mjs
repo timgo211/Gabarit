@@ -3906,7 +3906,12 @@ async function drawnRoutes(page) {
     const layer = map.getLayer('route-line');
     const visible = !!layer && map.getLayoutProperty('route-line', 'visibility') !== 'none';
     const order = (map.getStyle()?.layers ?? []).map((l) => l.id);
-    return { maps: window.__maps.length, features, layer: !!layer, visible, top: order.at(-1), loaded: map.isStyleLoaded() };
+    const c = map.getCenter();
+    const b = map.getBounds();
+    const pts = src?._data?.features?.flatMap((f) => f.geometry?.coordinates ?? []) ?? [];
+    const inView = pts.filter((p) => b.contains(p)).length;
+    return { maps: window.__maps.length, features, layer: !!layer, visible, top: order.at(-1), loaded: map.isStyleLoaded(),
+      view: `centre ${c.lng.toFixed(3)},${c.lat.toFixed(3)} zoom ${map.getZoom().toFixed(2)}, ${inView}/${pts.length} points dans la vue` };
   });
 }
 
@@ -3938,7 +3943,7 @@ async function drawCheck(browser, base) {
     const d = await drawnRoutes(page);
     const blue = (await bluePixels(page)) - baseline;
     check(d.features === n && d.layer && d.visible && blue > 2000, `${label} : tracés dessinés`,
-      `source ${d.features}/${n}, couche ${d.layer ? (d.visible ? 'visible' : 'masquée') : 'absente'}, +${blue} px ambre, tuiles chargées : ${d.loaded}`);
+      `source ${d.features}/${n}, couche ${d.layer ? (d.visible ? 'visible' : 'masquée') : 'absente'}, +${blue} px ambre, tuiles chargées : ${d.loaded}, ${d.view}`);
   };
   // Fond qui bouge encore (tuiles lentes en cours) au moment du calcul, comme sur la tablette.
   await page.evaluate(() => window.__maps.at(-1).panBy([200, 120], { duration: 0 }));
@@ -3954,9 +3959,25 @@ async function drawCheck(browser, base) {
   await expect('satellite', cards);
   await page.click('[data-layer="plan"]');
   await expect('retour au plan', cards);
+  // v53 : l'itinéraire en préparation est gardé (IndexedDB gabarit-route) et repris au rechargement : déjà dessiné.
+  await page.reload();
+  await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+  await page.waitForSelector('.route-card', { timeout: 10000 });
+  // Tracé repris : données et couche seulement. Les pixels ne sont pas comptés ici : si la reprise finit avant la
+  // création de la carte (style chargé en asynchrone), showRoutes de map.js sort sur `if (!map) return;` et la carte
+  // garde la vue France (zoom 5) : tracé dessiné mais minuscule, sans cadrage ni repères (défaut connu, signalé à part).
+  await page.waitForTimeout(1500);
+  const resumed = await drawnRoutes(page);
+  const nCards = await page.locator('.route-card').count();
+  check(resumed.features === nCards && resumed.layer && resumed.visible, 'page rechargée : itinéraire repris (v53), tracés dans la carte',
+    `source ${resumed.features}/${nCards}, couche ${resumed.layer ? (resumed.visible ? 'visible' : 'masquée') : 'absente'}, ${resumed.view}`);
+  // Régression v17 : rechargement sans itinéraire gardé, puis nouveau calcul (mémoire effacée avant, sinon la
+  // référence contient déjà le tracé repris).
+  await page.evaluate(() => new Promise((r) => { const q = indexedDB.deleteDatabase('gabarit-route'); q.onsuccess = q.onerror = q.onblocked = () => r(); }));
   await page.reload();
   await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
   await page.waitForTimeout(800);
+  check(await page.locator('.route-card').count() === 0, 'page rechargée sans mémoire : aucun tracé avant le calcul');
   baseline = await bluePixels(page);
   await page.evaluate(() => window.__maps.at(-1).panBy([-200, 80], { duration: 0 }));
   await computeRoute(page);
@@ -5431,12 +5452,21 @@ async function sensitiveCheck(browser, base) {
     });
     await computeRoute(page);
     await page.waitForFunction(() => /Point sensible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 10000 }).catch(() => {});
-    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
-    const sens = notes.filter((t) => t.startsWith('Point sensible'));
-    check(sens.length === 3, `${tag} : 3 points sensibles dans la fiche`, notes.join(' | '));
+    const notes = await page.$$eval('#route-notes .trip-info .rules-notes > li', (n) => n.map((li) => ({ text: li.textContent, sev: li.dataset.sev })));
+    const texts = notes.map((n) => n.text);
+    // v81 : le point « interdiction » (km 1) de la section est remplacé par la ligne de l'interdiction (route-bans.js) :
+    // restent 2 lignes « Point sensible » (hauteur basse km 3, tunnel sans hauteur km 4) et 1 ligne d'interdiction.
+    const sens = texts.filter((t) => t.startsWith('Point sensible'));
+    check(sens.length === 2 && sens.some((t) => /^Point sensible \(km 3\) : hauteur limitée/.test(t)) && sens.some((t) => /^Point sensible \(km 4\) : tunnel sans hauteur/.test(t)),
+      `${tag} : 2 points sensibles dans la fiche (hauteur, tunnel)`, texts.join(' | '));
+    check(!texts.some((t) => /^Point sensible \(km 1\)/.test(t)), `${tag} : point « interdiction » remplacé par la ligne d'interdiction (v81)`);
     check(sens.every((t) => /à vérifier/.test(t) && /La signalisation fait foi\./.test(t) && /OpenStreetMap way\/\d+, audit Gabarit du 24\/11\/2026/.test(t)),
       `${tag} : « à vérifier », « La signalisation fait foi. », source`);
-    check(sens.some((t) => /Source : arrêté de test du 01\/01\/2026/.test(t)), `${tag} : arrêté cité`);
+    const ban = notes.filter((n) => /^Route de test : interdite aux transports de marchandises de plus de 7,5 t/.test(n.text));
+    check(ban.length === 1 && /· km 1 ·/.test(ban[0].text) && /À vérifier\./.test(ban[0].text) && /La signalisation fait foi\./.test(ban[0].text),
+      `${tag} : une ligne d'interdiction (section, km 1), « À vérifier », « La signalisation fait foi. »`, ban.map((n) => n.text).join(' | '));
+    check(ban.length === 1 && /Source : arrêté de test du 01\/01\/2026/.test(ban[0].text), `${tag} : arrêté cité`);
+    check(ban.length === 1 && ban[0].sev === 'ban', `${tag} : ligne d'interdiction au niveau « interdit » (v84)`, ban[0]?.sev);
     check(/3 points sensibles à vérifier/.test(await page.textContent('.route-card[aria-checked="true"]')), `${tag} : résumé sur la fiche`);
     check(await page.locator('.sensitive-marker').count() === 3, `${tag} : 3 repères « ! » à l'arrêt`, String(await page.locator('.sensitive-marker').count()));
     check((stats.sensitive ?? []).includes('index.json'), `${tag} : copie data/points-sensibles/ lue`);
