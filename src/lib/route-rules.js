@@ -146,7 +146,7 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
  */
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
-  access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
+  access = null, winter = null, tolls = null, bridges = null, bridgeZones = null, bridgeWarnings = true, weightLimits = null,
   weightWarnings = true, speeds = null, axes = null, sensitive = null, dialog = null, dialogWarnings = true,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
@@ -193,7 +193,7 @@ export function routeRules(route, {
   lines.push(...acc.lines.filter((l) => l.level === 'warn'));
   short.push(...acc.short);
   // Ponts sans hauteur connue (phase 12a) : « à vérifier », fiche et carte à l'arrêt seulement, jamais dit.
-  const brg = bridgeRules(route, { vehicle, bridges, enabled: bridgeWarnings });
+  const brg = bridgeRules(route, { vehicle, bridges, zones: bridgeZones, enabled: bridgeWarnings }); // v91 : zones des agglomérations
   lines.push(...brg.lines.filter((l) => l.level === 'warn'));
   short.push(...brg.short);
   // Limites de poids d'OSM (phase 12a bis) : « à vérifier », fiche et carte à l'arrêt seulement, jamais dit.

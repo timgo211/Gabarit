@@ -11,8 +11,13 @@
 // plus ancien que l'étiquette). Classe de la route dessous (road-class.js, phase 2g) : autre = priorité haute,
 // nationale = moyenne, autoroute = jamais signalée (comptée dans la ligne technique). Pont portant lui-même une hauteur
 // lisible inférieure ou égale à celle du véhicule : signalé en priorité haute (ORS ne la lit pas sur la route dessous).
+// v91 (règle du propriétaire, sans source officielle) : pont sans hauteur au-dessus d'une autoroute signalé en priorité
+// moyenne si le point du croisement est dans une zone de grande agglomération (agglo-zones.js), compté à part
+// (counts.motorwayZone) ; hors zone, ou zones non lues : jamais signalé, comme avant. Zones en échec : une seule ligne
+// « à vérifier », jamais une ligne par pont.
 
 import { segmentClasses, ROAD_CLASS } from './road-class.js';
+import { aggloZoneAt, AGGLO_ZONES } from './agglo-zones.js';
 
 export const BRIDGE = Object.freeze({
   MIN_ANGLE_DEG: 20,
@@ -167,15 +172,15 @@ function pointAround(coords, i, t, d) {
  * Ponts sans hauteur connue au-dessus d'un itinéraire.
  * @param {{ coordinates:number[][], steps?:object[], roadExtras?:object|null }} route
  * @param {{ bridges:object[], clearances:object[] }} data mergeBridgeTiles
- * @param {{ vehicleHeight?:number|null }} opts
+ * @param {{ vehicleHeight?:number|null, zones?:object|null }} opts zones : parseAggloZones (null : autoroutes ignorées)
  * @returns {{ items:{ id:number, kind:string, name:string, level:'high'|'medium', roadClass:string|null,
  *   point:number[], along:number, index:number, text:string }[], counts:{ high:number, medium:number, motorway:number,
- *   knownBelow:number, knownOk:number } }}
+ *   knownBelow:number, knownOk:number, motorwayZone:number } }} zone : clé de la zone (autoroute en zone seulement)
  *   point : croisement exact tracé × pont [lon, lat] (repère, « Éviter ce passage » de la phase 12b) ; along : m depuis
  *   le départ ; items triés haute puis moyenne, puis dans l'ordre du trajet
  */
-export function bridgesAlongRoute(route, data, { vehicleHeight = null } = {}) {
-  const counts = { high: 0, medium: 0, motorway: 0, knownBelow: 0, knownOk: 0 };
+export function bridgesAlongRoute(route, data, { vehicleHeight = null, zones = null } = {}) {
+  const counts = { high: 0, medium: 0, motorway: 0, knownBelow: 0, knownOk: 0, motorwayZone: 0 };
   const coords = route?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2 || !data?.bridges?.length) return { items: [], counts };
   const bridgeGrid = buildIndex(data.bridges);
@@ -219,12 +224,18 @@ export function bridgesAlongRoute(route, data, { vehicleHeight = null } = {}) {
         }
         const roadClass = seg ? seg.classes[i] : null;
         let level;
+        let zone = null;
         if (own !== null) level = 'high'; // hauteur du pont lisible, au plus celle du véhicule (ou véhicule sans hauteur)
-        else if (roadClass === ROAD_CLASS.MOTORWAY) { counts.motorway += 1; continue; }
-        else level = roadClass === ROAD_CLASS.NATIONAL ? 'medium' : 'high';
-        counts[level] += 1;
+        else if (roadClass === ROAD_CLASS.MOTORWAY) {
+          // v91 : autoroute = ignoré, sauf croisement dans une zone de grande agglomération (priorité moyenne).
+          zone = zones ? aggloZoneAt(p, zones) : null;
+          if (!zone) { counts.motorway += 1; continue; }
+          level = 'medium';
+          counts.motorwayZone += 1;
+        } else level = roadClass === ROAD_CLASS.NATIONAL ? 'medium' : 'high';
+        if (!zone) counts[level] += 1;
         items.push({
-          id: br.id, kind: br.kind, name: br.name, level, roadClass,
+          id: br.id, kind: br.kind, name: br.name, level, roadClass, ...(zone ? { zone } : {}),
           point: [Math.round(p[0] * 1e6) / 1e6, Math.round(p[1] * 1e6) / 1e6], along: at, index: i,
           text: own !== null ? lowBridgeText(own) : BRIDGE.TEXT,
         });
@@ -249,9 +260,11 @@ export function bridgeLines(items) {
 }
 
 /** Ligne technique du diagnostic du trajet. */
-export function bridgeTechText(res) {
+export function bridgeTechText(res, { zonesFailed = false } = {}) {
   const c = res?.counts ?? { high: 0, medium: 0, motorway: 0 };
-  return `Ponts sans hauteur : ${c.high + c.medium} (haute ${c.high}, moyenne ${c.medium}, autoroutes ignorées ${c.motorway})`;
+  const z = c.motorwayZone ?? 0;
+  return `Ponts sans hauteur : ${c.high + c.medium + z} (haute ${c.high}, moyenne ${c.medium}, autoroutes en zone ${z}, `
+    + `autoroutes ignorées ${c.motorway})${zonesFailed ? ' ; zones des agglomérations indisponibles' : ''}`;
 }
 
 export const BRIDGE_UNAVAILABLE_TEXT = 'Ponts sans hauteur : données non chargées (copie OpenStreetMap absente ou illisible). La signalisation fait foi.';
@@ -260,10 +273,12 @@ export const BRIDGE_UNCOVERED_TEXT = 'Ponts sans hauteur : une partie du trajet 
 /**
  * Réglementation de la fiche (phase 12a) : lignes « à vérifier », résumé, ligne technique et repères de la carte.
  * @param {object} route
- * @param {{ vehicle?:object, bridges?:{ status:string, data:object, uncovered?:boolean }|null, enabled?:boolean }} ctx
+ * @param {{ vehicle?:object, bridges?:{ status:string, data:object, uncovered?:boolean }|null, enabled?:boolean,
+ *   zones?:{ status:string, data:object|null }|null }} ctx zones (v91) : 'ok' → ponts d'autoroute en zone signalés ;
+ *   'failed' → une ligne « à vérifier » ; absent, 'idle', 'loading' → comme avant, sans ligne
  * @returns {{ lines:object[], short:string[], items:object[], counts:object|null, tech:string }}
  */
-export function bridgeRules(route, { vehicle = null, bridges = null, enabled = true } = {}) {
+export function bridgeRules(route, { vehicle = null, bridges = null, enabled = true, zones = null } = {}) {
   const out = { lines: [], short: [], items: [], counts: null, tech: '' };
   if (!enabled) { out.tech = 'Ponts sans hauteur : signalement désactivé dans Réglages'; return out; }
   if (!bridges || bridges.status === 'idle' || bridges.status === 'loading') { out.tech = 'Ponts sans hauteur : copie en cours de lecture'; return out; }
@@ -272,11 +287,16 @@ export function bridgeRules(route, { vehicle = null, bridges = null, enabled = t
     out.tech = 'Ponts sans hauteur : données non chargées';
     return out;
   }
-  const res = bridgesAlongRoute(route, bridges.data, { vehicleHeight: vehicle?.height ?? null });
+  const zonesFailed = zones?.status === 'failed';
+  const res = bridgesAlongRoute(route, bridges.data, {
+    vehicleHeight: vehicle?.height ?? null, zones: zones?.status === 'ok' ? zones.data : null,
+  });
   out.items = res.items;
   out.counts = res.counts;
-  out.tech = bridgeTechText(res);
+  out.tech = bridgeTechText(res, { zonesFailed });
   out.lines.push(...bridgeLines(res.items));
+  // v91 : donnée de sécurité manquante = « à vérifier », une seule ligne (jamais une par pont).
+  if (zonesFailed) out.lines.push({ level: 'info', sev: 'check', text: AGGLO_ZONES.UNAVAILABLE_TEXT });
   if (bridges.uncovered) out.lines.push({ level: 'info', sev: 'check', text: BRIDGE_UNCOVERED_TEXT });
   if (res.items.length) out.short.push(`${res.items.length} pont${res.items.length > 1 ? 's' : ''} à vérifier`);
   return out;

@@ -7,6 +7,14 @@ import {
   bridgeCards, bridgeCrossings, bridgeNearAxis, buildAxisIndex, locateSection, normName, placeFromFeature, placeIndex,
   restrictionCards, restrictionPresent, restrictionProposal, segmentCrossing, sortCards, splitCards,
 } from '../src/lib/osm-audit.js';
+import { parseAggloZones } from '../src/lib/agglo-zones.js';
+
+// v91 : zones des grandes agglomérations SYNTHÉTIQUES couvrant toute la fixture (fiches inchangées par rapport à avant).
+const sq = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
+const FAR = sq(0.1, 40.1, 0.2, 40.2);
+const ALL_ZONES = parseAggloZones(
+  { ileDeFrance: sq(-10, 35, 20, 60), metropoleGrandParis: FAR, aixMarseille: FAR, lille: FAR, bordeaux: FAR, toulouse: FAR, nantes: FAR },
+  { metropoleLyon: FAR, eurometropole: FAR });
 
 const FEATURES = readFileSync(new URL('./fixtures/osm-audit-axes.geojsonseq', import.meta.url), 'utf8')
   .split('\n').map(parseGeojsonLine).filter(Boolean);
@@ -35,7 +43,7 @@ function run(levels = [1, 2]) {
     bridges.push(b);
     if (!bridgeNearAxis(b, index)) continue;
     near += 1;
-    cards.push(...bridgeCards(b, bridgeCrossings(b, axes, index), axes));
+    cards.push(...bridgeCards(b, bridgeCrossings(b, axes, index), axes, { zones: ALL_ZONES }));
   }
   cards.push(...axisCards(axes));
   const r = restrictionCards(RULES, axes, placeIndex(places));

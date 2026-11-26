@@ -15,10 +15,14 @@
 // Constats, par priorité : 1 interdiction PL connue (tools/audit-osm-interdictions.json, tableau 4 de l'étude) sans
 // l'étiquette correspondante ; 2 hauteur basse connue (< LOW_HEIGHT_M, seuil de tri et non une règle : valeur et sens à
 // vérifier) ; 3 hauteur inconnue (pont au-dessus d'un axe ou tunnel d'un axe sans maxheight sur la voie de l'axe).
+// v91 (règle du propriétaire, sans source officielle) : niveau 1, fiche « pont sans hauteur » gardée seulement si le
+// point du croisement est dans une zone de grande agglomération (agglo-zones.js, même code que l'appli) ; zones
+// absentes ou illisibles : l'audit s'arrête sans rien écrire (auditZones), jamais de fiche retirée en silence.
 
 import { bridgeLayer, heightTag } from './bridges-convert.js';
 import { parseHeight } from './bridge-check.js';
 import { normalizeRefs } from './hgv-tolls-geo.js';
+import { aggloZoneAt, parseAggloZones } from './agglo-zones.js';
 
 export const AUDIT = Object.freeze({
   DIR: './data/audit-osm/',
@@ -273,8 +277,15 @@ export function axisCards(axes) {
   return cards.filter(keepCard);
 }
 
-/** Fiches d'un pont au-dessus d'axes (croisements de bridgeCrossings). */
-export function bridgeCards(bridge, crossings, axes) {
+/** Fiche niveau 1 « pont sans hauteur » : gardée seulement en zone de grande agglomération (v91). */
+const motorwayBridge = (c) => c.niveau === 1 && c.type === 'pont sans hauteur';
+
+/**
+ * Fiches d'un pont au-dessus d'axes (croisements de bridgeCrossings). v91 : `zones` (parseAggloZones) obligatoire dès
+ * qu'une fiche niveau 1 « pont sans hauteur » est en jeu (sinon erreur : jamais retirée en silence) ; `stats`
+ * (facultatif) compte les fiches gardées (`motorwayIn`) et retirées (`motorwayOut`).
+ */
+export function bridgeCards(bridge, crossings, axes, { zones = null, stats = null } = {}) {
   const cards = [];
   for (const { axis, point } of crossings) {
     const ax = axes[axis];
@@ -296,7 +307,29 @@ export function bridgeCards(bridge, crossings, axes) {
       }));
     }
   }
-  return cards.filter(keepCard);
+  return cards.filter((c) => {
+    if (!motorwayBridge(c)) return true;
+    if (!zones) throw new Error('Audit OSM : zones des grandes agglomérations non lues (fiche « pont sans hauteur » de niveau 1).');
+    const keep = aggloZoneAt(c.point, zones) !== null;
+    if (stats) stats[keep ? 'motorwayIn' : 'motorwayOut'] = (stats[keep ? 'motorwayIn' : 'motorwayOut'] ?? 0) + 1;
+    return keep;
+  }).filter(keepCard);
+}
+
+/**
+ * Zones de l'audit (v91) : read(chemin relatif) → texte (exception si absent). → { zones } ou { problem } (fichier
+ * absent, JSON illisible, zone manquante ou sans anneau).
+ */
+export function auditZones(read) {
+  const files = ['data/zones-agglo.json', 'data/contours-ign.json'];
+  const json = [];
+  for (const f of files) {
+    let text;
+    try { text = read(f); } catch { return { problem: `${f} absent` }; }
+    try { json.push(JSON.parse(text)); } catch { return { problem: `${f} illisible` }; }
+  }
+  const zones = parseAggloZones(json[0], json[1]);
+  return zones ? { zones } : { problem: `${files.join(' ou ')} : zone manquante ou sans contour` };
 }
 
 // ───────── Interdictions connues (tableau 4 de l'étude) ─────────
@@ -520,6 +553,9 @@ export function auditReport(index, cards, { located = [], unlocated = [], axesLo
     '- **la signalisation fait foi** ; seul l\'arrêté fait foi pour la règle ; « en vigueur : à vérifier » ;',
     '- une correction faite dans OSM met 2 à 3 semaines à atteindre l\'API publique d\'ORS (étude, section 1) ;',
     '- données © contributeurs OpenStreetMap, licence ODbL ; fiches complètes dans `data/audit-osm/`.');
+  L.push('- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est en Île-de-France ou dans '
+    + 'une grande agglomération (Métropoles du Grand Paris, d\'Aix-Marseille-Provence, de Lille, Bordeaux, Toulouse, '
+    + 'Nantes, Lyon, Strasbourg ; règle du propriétaire, sans source officielle) ;');
   if (index.levels.includes(3)) {
     L.push('- niveau 3 (grandes départementales : primary ou secondary à référence D…) : fiches de priorité 1 et 2 '
       + 'seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur ».');

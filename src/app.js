@@ -32,6 +32,7 @@ import { avoidLocalFor } from './lib/access-local.js';
 import { plageShort } from './lib/access-conditional.js';
 import { createAccess } from './ui/access.js';
 import { createBridges, createTileCopy } from './ui/bridges.js';
+import { AGGLO_ZONES, parseAggloZones } from './lib/agglo-zones.js';
 import { AXES } from './lib/axes-convert.js';
 import { parseAxesTile, mergeAxesTiles } from './lib/axis-match.js';
 import { SENSITIVE, parseSensitiveTile, mergeSensitiveTiles, parseSensitiveSections } from './lib/sensitive-points.js';
@@ -454,6 +455,8 @@ for (const code of COUNTRY_RULES.FILES) {
 let tolls = { status: 'loading', data: null, network: null };
 // v76 : contour de la Métropole de Lyon (« Contourner par la rocade Est », loadMetro) et plans déjà calculés.
 let metro = { status: 'idle', rings: null };
+// v91 : zones des grandes agglomérations (loadAgglo).
+let agglo = { status: 'idle', data: null };
 const bypassCache = new WeakMap();
 const readJson = (path, parse) => fetch(path, { cache: 'no-cache' })
   .then((r) => (r.ok ? r.json() : null))
@@ -489,6 +492,7 @@ function rulesOf(route, vehicle, departure) {
   const win = winter.state;
   const tol = tolls;
   const brg = bridges.state;
+  const agz = agglo;
   const bw = data.settings.bridgeWarnings !== false;
   const wl = weightLimits.state;
   const ww = data.settings.weightWarnings !== false;
@@ -497,15 +501,15 @@ function rulesOf(route, vehicle, departure) {
   const spd = speedLimits.state;
   const ax = axes.state;
   const sn = sensitive.state;
-  if (hit && hit.dlc === dlc && hit.dw === dw && hit.ax === ax && hit.sn === sn && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  if (hit && hit.dlc === dlc && hit.dw === dw && hit.ax === ax && hit.sn === sn && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.agz === agz && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
-    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax, sensitive: sn, dialog: dlc, dialogWarnings: dw,
+    bridges: brg, bridgeZones: agz, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax, sensitive: sn, dialog: dlc, dialogWarnings: dw,
   });
-  rulesCache.set(route, { dlc, dw, ax, sn, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
+  rulesCache.set(route, { dlc, dw, ax, sn, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, agz, bw, wl, ww, rules });
   return rules;
 }
 
@@ -785,6 +789,18 @@ function loadMetro() {
   readJson(LYON_BYPASS.CONTOUR_PATH, (j) => (Array.isArray(j?.metropoleLyon) && j.metropoleLyon.length ? j.metropoleLyon : null))
     .then((rings) => {
       metro = rings ? { status: 'ok', rings } : { status: 'failed', rings: null };
+      renderChoice();
+    });
+}
+// v91 : zones des grandes agglomérations (agglo-zones.js) : data/zones-agglo.json + data/contours-ign.json, jamais
+// précachés (le service worker sert la copie déjà lue). Lues au calcul ; échec retenté au calcul suivant.
+function loadAgglo() {
+  if (agglo.status === 'ok' || agglo.status === 'loading') return;
+  agglo = { status: 'loading', data: null };
+  Promise.all([readJson(AGGLO_ZONES.ZONES_PATH, (j) => j), readJson(AGGLO_ZONES.CONTOURS_PATH, (j) => j)])
+    .then(([z, c]) => {
+      const d = parseAggloZones(z, c);
+      agglo = d ? { status: 'ok', data: d } : { status: 'failed', data: null };
       renderChoice();
     });
 }
@@ -1607,6 +1623,7 @@ function showChoice(selected) {
   weather.load(options.map((o) => o.route)); // une requête Open-Meteo, sans bloquer non plus
   access.load(options.map((o) => o.route)); // phase 5d : cases de data/acces-osm/ du trajet, sans requête d'API
   bridges.load(options.map((o) => o.route)); // phase 12a : cases de data/ponts-osm/ du trajet, sans requête d'API
+  loadAgglo(); // v91 : zones des grandes agglomérations (ponts au-dessus des autoroutes)
   axes.load(options.map((o) => o.route)); // PR 3a : cases de data/axes-osm/ (repli par la géométrie)
   sensitive.load(options.map((o) => o.route)); // PR 3b : cases de data/points-sensibles/
   weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/

@@ -61,6 +61,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   accord hors d'une vraie sortie de route en roulant.
 - Ponts sans hauteur connue (12a, `bridge-check.js`, copie `data/ponts-osm/` de l'Action « Données OSM », jamais
   précachée) : fiche et carte à l'arrêt seulement, jamais dits à voix haute ni dans le guidage ; « à vérifier ».
+  v91 (règle de Timothée, `agglo-zones.js`) : au-dessus d'une autoroute, signalé (moyenne) seulement en zone
+  (IdF + 8 agglomérations, `data/zones-agglo.json` + `data/contours-ign.json`) ; zones illisibles = 1 ligne « à vérifier » ;
+  audit niveau 1 idem (zones illisibles = arrêt sans écriture).
 - Mes restrictions (12b, `restrictions.js`, champ `restrictions` de `gabarit.data`, exporté) : polygone de
   `RESTR_RADIUS_M` = 30 m par restriction applicable proche du trajet, avec les ZFE dans `avoid_polygons` ; limite ORS
   « 150 km à vol d'oiseau avec zones évitées » → au-delà, rien n'est envoyé et la fiche dit « non évitées… À vérifier ».
