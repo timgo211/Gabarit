@@ -137,6 +137,9 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   section), puis 1 trajet complet avec les points de passage `via` du détour, sans zone ajoutée ; section encore là,
   demi-tour ou boucle à un point → échec (rouge v78 + raison). « Oui » à la desserte → direct remis sans requête.
   `choice.banAuto` (mémoire v53). Jamais dit, rien dans le guidage. Détail : skill zfe.
+- Hauteurs (v80, PR D) : sections Mont-Blanc (4,70 m) et Fréjus (4,30 m) traitées comme v78 / v79 seulement si la
+  hauteur du profil est connue et > valeur de l'arrêté (égale ou inconnue : ligne « point sensible » seule). Hauteurs
+  basses ponctuelles OSM (type 2) : jamais de contournement (ORS les applique ; faux positif A86 Duplex / N 12).
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

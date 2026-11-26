@@ -4,8 +4,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import {
-  sensitiveRules, parseSensitiveTile, mergeSensitiveTiles, parseSensitiveSections,
+  sensitiveRules, parseSensitiveTile, mergeSensitiveTiles, parseSensitiveSections, SENSITIVE,
 } from '../src/lib/sensitive-points.js';
+
+const SENSITIVE_LOW = SENSITIVE.TYPES.LOW;
 import {
   BANS, routeBans, activeBans, localQuestions, declaredText, confirmText, sanitizeAnswers, oneWayOf, travelAt, zoneLabel,
   localPossible, pointAt,
@@ -28,7 +30,7 @@ function through(id, dir = 'south') {
   const pts = COPY.data.points.filter((p) => p.section === si).map((p) => p.point).sort((a, b) => b[1] - a[1]);
   return { coordinates: dir === 'south' ? pts : pts.reverse(), steps: [] };
 }
-const bansOf = (route, vehicle = SEMI) => routeBans(route, sensitiveRules(route, { vehicle, copy: COPY }).items, SECTIONS);
+const bansOf = (route, vehicle = SEMI) => routeBans(route, sensitiveRules(route, { vehicle, copy: COPY }).items, SECTIONS, { vehicle });
 
 test('sens de la source et sens de marche', () => {
   assert.equal(oneWayOf('nord → sud'), 'south');
@@ -62,10 +64,23 @@ test('transit (N59, N66, Le Puy) et desserte autorisée (RN524) : question « de
   assert.deepEqual(bansOf(through('le-puy'), { weight: 7.5, height: 3 }), []);
 });
 
-test('Lyon (rocade, v77) et hauteurs (PR D) exclues', () => {
+test('Lyon (rocade, v77) exclue', () => {
   assert.ok(BANS.EXCLUDED.includes('lyon-a6') && BANS.EXCLUDED.includes('lyon-a7'));
   assert.deepEqual(bansOf(through('lyon-a7')).map((b) => b.id), []);
-  assert.deepEqual(bansOf(through('mont-blanc'), { weight: 44, height: 4.8 }).map((b) => b.id), []);
+});
+
+test('v80 : hauteurs des tunnels (arrêtés) seulement au-dessus de la valeur, hauteur connue ; hauteurs basses OSM jamais', () => {
+  const mb = bansOf(through('mont-blanc'), { weight: 44, height: 4.8 });
+  assert.deepEqual(mb.map((b) => [b.id, b.local]), [['mont-blanc', false]]);
+  assert.match(mb[0].text, /hauteur maximale 4,70 m.*Source : arrêté DDT-2020-0825/);
+  assert.deepEqual(bansOf(through('mont-blanc'), { weight: 44, height: 4.7 }).map((b) => b.id), [], '4,70 m passe');
+  assert.deepEqual(bansOf(through('mont-blanc'), { weight: 44, height: null }).map((b) => b.id), [], 'hauteur inconnue');
+  assert.deepEqual(bansOf(through('frejus'), { weight: 44, height: 4.5 }).map((b) => b.id), ['frejus']);
+  assert.deepEqual(bansOf(through('frejus'), { weight: 44, height: 4 }).map((b) => b.id), []);
+  const route = through('mont-blanc');
+  assert.deepEqual(routeBans(route, sensitiveRules(route, { vehicle: { height: 4.8 }, copy: COPY }).items, SECTIONS).map((b) => b.id), [], 'sans profil : rien');
+  const low = { type: SENSITIVE_LOW, section: -1, along: 100, value: 2, ref: 'A86' };
+  assert.deepEqual(routeBans({ coordinates: [[2, 48], [2, 49]] }, [low], SECTIONS, { vehicle: SEMI }), [], 'hauteur basse ponctuelle : jamais');
 });
 
 test('réponses : Non par défaut ; Oui retire l\'interdiction (ligne « desserte déclarée ») ; confirmation', () => {
