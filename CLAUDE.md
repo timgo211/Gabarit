@@ -132,6 +132,11 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   par le profil, hors lyon-a6/a7 et hauteurs ; sens « nord → sud » lu par le tracé ; fiche rouge + confirmation ;
   transit / desserte → question « Desserte locale dans la zone … ? » (Non par défaut, à l'arrêt, `choice.localAnswers`,
   trajet seulement). Jamais dit, rien dans le guidage. Détail : skill zfe.
+- Contournement par tronçons (v79, `ban-detour.js`, même réglage) : Recommandé par une interdiction v78 active → par
+  interdiction 1 tronçon A → B (15 km avant / après sur le tracé, ≤ 150 km à vol d'oiseau, carré 80 m par point de la
+  section), puis 1 trajet complet avec les points de passage `via` du détour, sans zone ajoutée ; section encore là,
+  demi-tour ou boucle à un point → échec (rouge v78 + raison). « Oui » à la desserte → direct remis sans requête.
+  `choice.banAuto` (mémoire v53). Jamais dit, rien dans le guidage. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »
