@@ -319,10 +319,11 @@ function refsBySegment(route, geo, geoAll = null) {
  * Points sensibles le long d'un itinéraire, regroupés : une section d'interdiction = une entrée ; une voie = une entrée.
  * @param {object} route itinéraire (parseDirections)
  * @param {{ points:object[] }} data copie lue (mergeSensitiveTiles)
- * @param {{ geo?:object|null }} opts geo : repli par la géométrie (axis-match.js) pour le veto de référence
+ * @param {{ geo?:object|null, veto?:boolean }} opts geo : repli par la géométrie (axis-match.js) pour le veto de référence ;
+ *   veto false : nom d'étape ORS ignoré (v83, sections d'interdiction traversées, route-bans.js)
  * @returns {{ type:number, ref:string, value:number|null, section:number, way:number, point:number[], along:number }[]}
  */
-export function sensitivePointsAlongRoute(route, data, { geo = null, geoAll = null } = {}) {
+export function sensitivePointsAlongRoute(route, data, { geo = null, geoAll = null, veto = true } = {}) {
   const coords = route?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2 || !data?.points?.length) return [];
   const line = [{ coords }];
@@ -340,7 +341,7 @@ export function sensitivePointsAlongRoute(route, data, { geo = null, geoAll = nu
       const r = toSegment(pt.point, seg.a, seg.b);
       if (r.dist > SENSITIVE.TOLERANCE_M || axisDiff(r.heading, pt.cap) > SENSITIVE.MAX_HEADING_DEG) continue;
       const rr = refs[seg.i];
-      if (pt.ref && rr.length && !rr.includes(pt.ref)) continue;
+      if (veto && pt.ref && rr.length && !rr.includes(pt.ref)) continue; // veto = false : géométrie seule (route-bans.js)
       const along = cum[seg.i] + r.t * (cum[seg.i + 1] - cum[seg.i]);
       if (!best || along < best.along) best = { along };
     }

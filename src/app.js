@@ -22,6 +22,7 @@ import {
 } from './lib/lyon-bypass.js';
 import {
   BANS, routeBans, activeBans, localQuestions, declaredText, confirmText, avoidingBansText, rangeCoords, pointAt as pointAlong,
+  notOfferedCards, firstOffered,
 } from './lib/route-bans.js';
 import {
   DETOUR, planDetour, detourNote, detourCost, detourFailText, detourOption, applyDetour, allDeclared, legAvoid,
@@ -538,6 +539,22 @@ function choiceRules(c = choice) {
       : confirmText([...(r.lyonBanned ? [{ label: 'Lyon, A6 et A7' }] : []), ...active]);
     return r;
   });
+  // v83 : fiche qui traverse une interdiction connue → « … interdite : trajet non proposé » (non sélectionnable) dès
+  // qu'une autre fiche n'en traverse aucune ; toutes interdites → fiche rouge et confirmation (inchangé).
+  // « Autres itinéraires » (banAuto 'off', panneau #nav-alts) : inchangé (rouge + 2e appui), le choix y est déjà fait.
+  const offered = c.banAuto === 'off' ? list.map(() => '') : notOfferedCards(list.map((r) => ({
+    blocked: !!r.blocked, names: [...(r.lyonBanned ? ['Lyon, A6 et A7'] : []), ...(r.bans ?? []).map((b) => b.title ?? b.label)],
+  })), { pending: c.lyonAuto === 'pending' || c.banAuto === 'pending', vehicle: c.vehicle });
+  list.forEach((r, i) => { r.notOffered = offered[i]; });
+  // Question « Desserte locale » d'une fiche non proposée : posée sur les fiches proposées (« Oui » la repropose).
+  const hidden = list.filter((r) => r.notOffered).flatMap((r) => r.localQuestions ?? []);
+  if (hidden.length) {
+    list.forEach((r) => {
+      if (r.notOffered) return;
+      const have = new Set((r.localQuestions ?? []).map((q) => q.id));
+      r.localQuestions = [...(r.localQuestions ?? []), ...hidden.filter((q) => !have.has(q.id) && have.add(q.id))];
+    });
+  }
   // v81 : fiche rouge : autre fiche calculée sans interdiction ni autre rouge indiquée (jamais promue).
   const cards = c.options.map((o, i) => ({
     label: o.label, blocked: !!list[i].blocked, bans: list[i].bans ?? [], duration: o.route?.duration, distance: o.route?.distance,
@@ -1000,6 +1017,13 @@ function renderChoice() {
   const rules = choiceRules();
   if (maybeAutoBypass(rules)) return; // v77 : état décidé, fiche déjà redessinée avec lui
   if (maybeBanDetour(rules)) return; // v79 : idem pour les autres interdictions connues
+  // v83 : fiche choisie non proposée → première fiche proposée (jamais renommée ni promue).
+  const offeredAt = firstOffered(rules?.map((r) => r?.notOffered ?? ''), choice.selected);
+  if (offeredAt >= 0 && offeredAt !== choice.selected) {
+    choice = { ...choice, selected: offeredAt };
+    map.selectRoute(offeredAt);
+    areas.select(choice.options[offeredAt].route);
+  }
   const pending = choice.lyonAuto === 'pending' || choice.banAuto === 'pending';
   if (pending || !rules?.[choice.selected]?.blocked) hideStartConfirm();
   // v77 : « Démarrer » grisé pendant le calcul du contournement (le trajet direct n'est pas proposé au départ).
@@ -1059,6 +1083,7 @@ function showBridgesOnMap(r, route = null) {
 /** Choix d'un itinéraire (fiche ou tracé touché), à l'arrêt seulement : l'écran de guidage masque tout ça. */
 function selectRoute(index) {
   if (!choice || navigation.active || index === choice.selected || !choice.options[index]) return;
+  if (choiceRules()?.[index]?.notOffered) return; // v83 : trajet non proposé (interdiction connue), non sélectionnable
   choice = { ...choice, selected: index, touched: true }; // v77 : choix du chauffeur (gardé par le contournement)
   routeSaveOn = true;
   saveRoute({ force: true });
@@ -1072,6 +1097,7 @@ map.onRoutePick(selectRoute);
 function startGuidance(simulate = null, resume = null, carry = null) {
   if (!choice) return 'Calcule d\'abord un itinéraire (bouton « Calculer l\'itinéraire »).';
   const option = choice.options[choice.selected];
+  if (!resume && choiceRules()?.[choice.selected]?.notOffered) return 'Trajet non proposé : il traverse une interdiction connue.'; // v83
   showMessage(messageNode, '');
   restrictionsUi.closeBridge(); // phase 12b : aucune saisie pendant le guidage
   planPark.watch(false); // v48 : plus de relevés hors guidage

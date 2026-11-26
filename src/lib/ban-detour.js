@@ -296,7 +296,7 @@ export async function planDetour({ route, bans, copy, vehicle, stops = [], geo =
   try { requests += 1; final = await fetchFinal(list); } catch (error) { trace.final = { error: true }; return fail('request', { error }); }
   trace.final = { length: Array.isArray(final?.coordinates) && final.coordinates.length > 1 ? lengthOf(final.coordinates) : 0 };
   const ids = new Set(bans.map((b) => b.id));
-  const again = routeBans(final, sensitiveRules(final, { vehicle, copy }).items, copy?.meta?.sections ?? [], { vehicle });
+  const again = routeBans(final, sensitiveRules(final, { vehicle, copy }).items, copy?.meta?.sections ?? [], { vehicle, copy }); // v83 : géométrie seule aussi
   if (again.some((b) => ids.has(b.id))) { trace.final.still = 'points'; return fail('still'); }
   // v81 : plages « Accès PL limité » de la section (zone élargie) : le trajet final ne doit plus les suivre.
   for (const leg of plan.legs) {

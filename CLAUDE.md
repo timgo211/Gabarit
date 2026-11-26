@@ -145,6 +145,10 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   rouge fin sur la carte, ponts regroupés à zoom < 11 ; fiche rouge : raison de l'échec et « X évite … » (jamais promue) ;
   veto du nom d'étape levé par la géométrie seulement (`geoRoadsAll`). Jamais dit. Détail : skill zfe.
   v82 : copie des points = section entière (voies déjà étiquetées gardées, marquées, jamais des fiches d'audit).
+- Fiches non proposées (v83, `notOfferedCards`) : fiche qui traverse une interdiction connue active (géométrie seule
+  aussi, sans veto du nom d'étape : 3 points sur 1 km) → ligne « [section] interdite : trajet non proposé », non
+  sélectionnable, dès qu'une autre fiche l'évite ; toutes → rouge + confirmation ; exceptions desserte « Oui », réglage
+  non, ≤ 3,5 t ; « Autres itinéraires » inchangé. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

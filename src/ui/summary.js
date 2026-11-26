@@ -67,6 +67,13 @@ function restrictionsText(v) {
 }
 
 function card(d, { checked, onSelect, rules, pending = '' }) {
+  // v83 : trajet qui traverse une interdiction connue alors qu'une autre fiche l'évite : ligne non sélectionnable.
+  if (rules?.notOffered) {
+    return el('div', { class: 'route-card not-offered', 'aria-disabled': 'true' }, [
+      el('span', { class: 'route-card-banned', text: `⛔ ${rules.notOffered}` }),
+      el('span', { class: 'route-card-not-offered-name', text: [d.name, d.distance].filter(Boolean).join(' · ') }),
+    ]);
+  }
   const facts = [d.distance, d.arrival, d.toll, d.fuel].filter(Boolean);
   const banned = rules?.blocked === true; // v77 / v78 : interdit, aucune alternative trouvée
   return el('button', {

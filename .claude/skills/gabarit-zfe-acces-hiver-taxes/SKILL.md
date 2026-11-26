@@ -272,3 +272,18 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   dit au journal) → points de la section, 9e champ = 1 (`tagged: true` à la lecture, source « voie déjà étiquetée dans
   OSM ») ; journal : points par section (sans étiquette / déjà étiquetées), `index.taggedCount`. Une section reste une
   entrée (regroupement par section) : aucune alerte en double.
+- Fiches non proposées (v83, test tablette Nancy → Colmar 44 t du 26/11/2026 : « Sans péage » par la N59 sans ligne
+  ⛔ après un contournement réussi). Cause : seul veto possible des points de la copie (15 m / 30° passés, plages
+  « Accès PL limité » km 39–93 trouvées, elles sans veto) = nom d'étape ORS d'une autre route (étape qui garde le nom de
+  son premier tronçon). `geoSectionItems` (route-bans.js, appelé par `routeBans` quand `copy` est passé, aussi par le
+  contrôle final de ban-detour.js) : sections lues par la géométrie seule (`sensitivePointsAlongRoute(…, { veto: false })`),
+  retenues si ≥ `GEO_MIN_POINTS` (3) points sur ≥ `GEO_MIN_M` (1 km) du tracé, Lyon exclu, `concernsVehicle`, sens
+  comme avant. Règle du propriétaire (non négociable) : `notOfferedCards` → `r.notOffered` « {titres} interdite(s) :
+  trajet non proposé » pour toute fiche `blocked` (interdiction active ou `lyonBanned`) dès qu'une autre fiche ne l'est
+  pas ; carte `.route-card.not-offered` (div, aria-disabled, sans « Démarrer ») ; `selectRoute` et `startGuidance`
+  refusent ; fiche choisie non proposée → `firstOffered` (jamais renommée ni promue : « Plus court » reste « Plus
+  court »). Rien pendant `lyonAuto` / `banAuto` 'pending', ni ≤ 3,5 t (`BANS.LIGHT_MAX_T`), ni réglage non (bans vides),
+  ni « Autres itinéraires » (`banAuto` 'off' : rouge + 2e appui). Question « desserte locale » d'une fiche non proposée
+  posée sur les fiches proposées (« Oui » la repropose). Toutes bloquées → v77 / v78 (rouge + confirmation).
+  Tests : `tests/route-bans-not-offered.test.js` (N59 avec étape « N 4 », Lyon, vraies réponses Mâcon → Valence et
+  contournement Nancy → Colmar).
