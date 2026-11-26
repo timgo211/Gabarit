@@ -286,6 +286,9 @@ input, select, textarea { min-width: 0; }
 }
 .section-toggle[aria-expanded="true"]::after { transform: rotate(-135deg); }
 .card > h3:has(> .section-toggle) { margin: 0; }
+/* v84 : composant commun (src/ui/collapsible.js) : titre puis sous-ligne courte (valeur, récap), jamais « … ». */
+.section-toggle-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; padding: 6px 0; }
+.section-sub { font-size: .85rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
 
 /* v55 : étapes entre le départ et l'arrivée (↑ ↓ ✕ : 48 px). */
 .stops-box { display: grid; gap: 8px; }

@@ -3,6 +3,7 @@
 // prix du gazole, export/import des données, simulation de trajet (rubrique Test).
 
 import { $, wireDialog } from './dom.js';
+import { collapsible } from './collapsible.js';
 import { satelliteCredits } from '../lib/map-layers.js';
 import { requestVersionLabel, versionLabel } from '../lib/app-version.js';
 import { testKey } from './api.js';
@@ -125,17 +126,9 @@ export function createSettings(ctx) {
   }
 
   // v64 : « Sources et licences » repliable, repliée par défaut (settings.creditsOpen) ; contenu inchangé.
-  const creditsBtn = $('#btn-credits');
-  const creditsBody = $('#credits-body');
-  function applyCredits(open) {
-    creditsBtn.setAttribute('aria-expanded', String(open));
-    creditsBody.hidden = !open;
-  }
-  creditsBtn.addEventListener('click', () => {
-    const open = creditsBtn.getAttribute('aria-expanded') !== 'true';
-    applyCredits(open);
-    ctx.onCreditsToggle?.(open);
-  });
+  // v84 : composant commun (src/ui/collapsible.js).
+  const credits = collapsible({ button: $('#btn-credits'), body: $('#credits-body'), onToggle: (o) => ctx.onCreditsToggle?.(o) });
+  const applyCredits = credits.set;
 
   // v64 : recherches récentes (src/lib/recent-places.js), effacées après confirmation.
   const recentStatus = $('#recent-status');

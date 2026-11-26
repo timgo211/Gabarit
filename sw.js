@@ -152,6 +152,7 @@ const APP_FILES = [
   './src/ui/settings.js',
   './src/ui/share.js',
   './src/ui/summary.js',
+  './src/ui/collapsible.js',
   './src/ui/theme.js',
   './src/ui/vehicles.js',
   './src/ui/voice.js',
