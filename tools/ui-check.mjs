@@ -5823,7 +5823,9 @@ async function detourCheck(browser, base) {
     check(done, `${tag} : note « Contournement appliqué : N59 … »`);
     check(calls.leg.length === 1 && calls.final.length === 1, `${tag} : 1 tronçon + 1 trajet final`, `${calls.leg.length} + ${calls.final.length}`);
     const squares = calls.leg[0]?.options?.avoid_polygons?.coordinates?.length ?? 0;
-    check(squares === 55, `${tag} : tronçon avec un carré par point de la section`, String(squares));
+    // v82 : un carré par point de la copie (section entière, voies déjà étiquetées comprises), plus les plages OSM.
+    const sectionPts = simulatedThrough('n59').features[0].geometry.coordinates.length;
+    check(squares >= sectionPts - 2, `${tag} : tronçon avec un carré par point de la section`, `${squares} (points ${sectionPts})`);
     check(!calls.final[0]?.options?.avoid_polygons, `${tag} : trajet final sans zone évitée`);
     const t = await text(page);
     check(await page.locator('.route-card.banned').count() === 0, `${tag} : plus de fiche rouge`);

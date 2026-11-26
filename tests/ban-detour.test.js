@@ -155,7 +155,7 @@ test('v80 : Mont-Blanc pour 4,80 m : tronçon avec un carré par voie du tunnel'
   assert.deepEqual(bans.map((b) => b.id), ['mont-blanc']);
   const plan = detourLegs(route, bans, COPY);
   assert.equal(plan.ok, true);
-  assert.equal(plan.legs[0].avoid.coordinates.length, 9);
+  assert.equal(plan.legs[0].avoid.coordinates.length, sectionPoints(COPY, 'mont-blanc').length); // un carré par voie du tunnel
 });
 
 // ───────── v81 : zone élargie (points de la copie ∪ plages « Accès PL limité » OSM), cas Nancy → Colmar ─────────
@@ -181,7 +181,21 @@ const NC_PLAGES = [{ enter: LUNEVILLE, exit: RAON - 1000, state: 'local' }];
 const ncBans = (plages) => routeBans(NC_ROUTE, sensitiveRules(NC_ROUTE, { vehicle: SEMI, copy: COPY }).items, COPY.meta.sections,
   { vehicle: SEMI, copy: COPY, plages });
 
+// Copie v81 : voies sans l'étiquette attendue seulement (avant v82, rien de Lunéville à Raon-l'Étape).
+const N59_INDEX = COPY.meta.sections.findIndex((s) => s.id === 'n59');
+const OLD_COPY = { ...COPY, data: { points: COPY.data.points.filter((p) => !(p.section === N59_INDEX && p.tagged)) } };
+
+test('v82 : copie des points = section N59 entière (voies déjà étiquetées gardées et marquées)', () => {
+  const all = sectionPoints(COPY, 'n59');
+  assert.ok(all.filter((p) => p.tagged).length >= 200, 'voies déjà étiquetées (hgv:conditional) de Lunéville à Raon');
+  assert.ok(Math.max(...all.map((p) => p.point[1])) > 48.55, 'points jusqu\'à Lunéville');
+  assert.ok(Math.max(...sectionPoints(OLD_COPY, 'n59').map((p) => p.point[1])) < 48.40, 'avant : à partir de Raon seulement');
+});
+
 test('v81 Nancy → Colmar : zone = copie ∪ plages OSM, A avant Lunéville, carrés sur toute la zone', () => {
+  const ncBans = (plages) => routeBans(NC_ROUTE, sensitiveRules(NC_ROUTE, { vehicle: SEMI, copy: OLD_COPY }).items, OLD_COPY.meta.sections,
+    { vehicle: SEMI, copy: OLD_COPY, plages });
+  const COPY = OLD_COPY; // eslint-disable-line no-shadow -- copie v81 dans ce test
   const [plain] = ncBans([]);
   assert.ok(plain.span.from > RAON - 2000, 'copie seule : section localisée à partir de Raon seulement');
   const [b] = ncBans(NC_PLAGES);
