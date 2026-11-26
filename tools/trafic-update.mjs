@@ -82,7 +82,7 @@ export function convertText(text, { now, lastModified = null, bytesRead = null, 
   }
   const result = convertTraffic(c.records, { now, stats: c.stats, lastModified });
   const ids = new Set(c.records.flatMap((r) => [r.tree.id, r.situation?.id]));
-  const lst = typeof listing === 'function' ? listing(ids) : listing;
+  const lst = typeof listing === 'function' ? listing(ids, now) : listing;
   const log = trafficLog(c.stats, result, { bytesRead, lastModified, listing: lst });
   if (result.problem) return { ok: false, stats: c.stats, result, log: `${log}\nCopie refusée : ${result.problem}. L'ancien JSON reste (branche trafic-data inchangée).` };
   if (!c.stats.records) return { ok: false, stats: c.stats, result, log: `${log}\nFlux sans aucun enregistrement : l'ancien JSON reste (branche trafic-data inchangée).` };
@@ -104,7 +104,7 @@ async function readListing() {
     const { buf, type } = await fetchCapped(FEED_DIR, { max: MAX_LISTING_BYTES, accept: 'text/html,*/*;q=0.5' });
     const html = decodeBody(buf, MAX_LISTING_BYTES).text;
     if (!/<a\s/i.test(html)) return { error: `pas de liste de fichiers (${type || 'type inconnu'})` };
-    return (ids) => listingStats(html, ids);
+    return (ids, now) => listingStats(html, ids, now);
   } catch (err) {
     return { error: String(err?.message || err).slice(0, 120) };
   }

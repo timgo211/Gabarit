@@ -215,9 +215,10 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   (DIR, DATEX II v2 en enveloppe SOAP ; https, domaine `tipi.bison-fute.gouv.fr` seulement, 20 Mo au plus, gzip et
   UTF-8 strict), compte la liste du dossier (complétude ; fichiers par événement jamais lus), convertit par
   `tools/trafic-convert.mjs` (`collectXml` avec `createXmlReader` de `dialog-etude.mjs`, `convertTraffic`,
-  `trafficLog`, `listingStats`) et publie `trafic.json` (format `gabarit-trafic` v1 : `publication`, `lastModified`,
+  `trafficLog`, `listingStats` avec l'âge des fichiers d'après la liste ; fermeture = `roadClosed`,
+  `carriagewayClosures`, `closedPermanentlyForTheWinter` ; contrôle « la droite départ → arrivée suit le sens cardinal ») et publie `trafic.json` (format `gabarit-trafic` v1 : `publication`, `lastModified`,
   `copied`, `counts`, `events` [`id`, `k` fermeture / accident / obstacle / bouchon / chantier, `st` sous-type DATEX,
-  `p` [lon, lat] 1e-4, `l` droite départ → arrivée seulement, `s`, `e`, `d` both / one / null, `r` route, `c`
+  `p` [lon, lat] 1e-4, `l` droite départ → arrivée seulement, `s`, `e`, `d` both / one / null, `dv` valeur brute du sens (`northBound`…), `r` route, `c`
   commentaire ≤ 200, `v`] ; ≤ 3 000, ≤ 1 Mo) sur la branche orpheline `trafic-data` réécrite à chaque lancement (push
   `--force`, jamais sur main), puis mesure les en-têtes CORS de raw.githubusercontent.com. Flux illisible →
   avertissement, sortie 0, ancien JSON gardé. Journal (aussi dans le résumé du run) sans coordonnée. Tests
