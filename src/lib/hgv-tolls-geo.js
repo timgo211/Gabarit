@@ -181,7 +181,7 @@ export function nearestSegment(net, point, heading) {
  * @param {object} tax taxe (parseTollData) : roads, bbox
  * @returns {{ enter:number, exit:number, roads:string[] }[]} distances depuis le départ (m)
  */
-export function matchTollNetwork(route, net, tax) {
+export function matchTollNetwork(route, net, tax, { geoAll = null } = {}) {
   const coords = Array.isArray(route?.coordinates) ? route.coordinates : [];
   if (coords.length < 2 || !net?.cells) return [];
   const line = prepareLine(coords);
@@ -206,8 +206,11 @@ export function matchTollNetwork(route, net, tax) {
     if (p[0] >= w - margin && p[0] <= e + margin && p[1] >= s - margin && p[1] <= n + margin) {
       const seg = nearestSegment(net, p, segmentBearing(line, at.segIndex ?? 0));
       const named = stepRefs[si] ?? [];
-      // Veto : l'étape ORS nomme une autre route (aucune référence commune avec la voie OSM).
-      if (seg && (!named.length || named.some((r) => seg.refs.includes(r)))) hit = seg;
+      // Veto : l'étape ORS nomme une autre route (aucune référence commune avec la voie OSM). v81 : levé si la
+      // géométrie (geoRoadsAll, axis-match.js) donne la référence de la voie à cet endroit (nom ORS = début d'étape).
+      const g = geoAll?.ref?.[at.segIndex];
+      const geoRefs = typeof g === 'string' && g ? g.split(';') : [];
+      if (seg && (!named.length || named.some((r) => seg.refs.includes(r)) || geoRefs.some((r) => seg.refs.includes(r)))) hit = seg;
     }
     if (!hit) { close(); continue; }
     const roads = hit.refs.filter((r) => tax.roads.includes(r));

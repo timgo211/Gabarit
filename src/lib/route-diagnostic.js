@@ -13,6 +13,7 @@ import { prepareLine, pointAt } from './nav-geo.js';
 import { roadRefs } from './route-samples.js';
 import { roadStatsText } from './road-class.js';
 import { geoStepLabel } from './axis-match.js';
+import { detourTraceText } from './ban-detour.js';
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
 const km = (m) => (m / 1000).toFixed(1).replace('.', ',');
@@ -53,7 +54,14 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
     const refs = roadRefs(s?.name);
     // PR 3b : étape sans nom → route retrouvée par la géométrie (repli 3a), « ambigu » ou « inconnue ».
     const unnamed = (name === '(sans nom)' || name.trim() === '-') && !refs.length;
-    const geo = unnamed && wp && rules ? ` | géométrie : ${geoStepLabel(rules.axes?.geo ?? null, wp[0], wp[1])}` : '';
+    let geo = unnamed && wp && rules ? ` | géométrie : ${geoStepLabel(rules.axes?.geo ?? null, wp[0], wp[1])}` : '';
+    // v81 : étape nommée de plus de 5 km dont la géométrie donne une autre route (ORS garde le nom du premier tronçon
+    // de l'étape jusqu'à la consigne suivante : « A 46 » sur l'A7 après Ternay, Mâcon → Valence).
+    if (!unnamed && wp && rules?.axes?.geoAll && a !== null && b !== null && b - a > UNNAMED_MIN_M) {
+      const g = geoStepLabel(rules.axes.geoAll, wp[0], wp[1]);
+      const other = roadRefs(g).filter((r) => !refs.includes(r));
+      if (other.length) geo = ` | géométrie : ${g} (nom ORS = début de l'étape)`;
+    }
     lines.push(`  ${a === null ? '?' : km(a)}–${b === null ? '?' : km(b)} | ${name} | ${refs.length ? refs.join(', ') : '—'} | ${wp ? pt(coords[wp[0]]) : '?'}${geo}`);
     // Étape sans nom (ORS renvoie « - » ou rien) de plus de 5 km : un point tous les 10 km.
     if (a !== null && b !== null && (name === '(sans nom)' || name.trim() === '-') && b - a > UNNAMED_MIN_M) {
@@ -68,6 +76,18 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   if (rules?.weightLimits?.tech) lines.push(rules.weightLimits.tech); // phase 12a bis : « Limites de poids : N »
   if (rules?.speedLimits?.tech) lines.push(rules.speedLimits.tech); // phase 11a : couverture et sources des limites
   if (rules?.sensitive?.tech) lines.push(rules.sensitive.tech); // PR 3b : points sensibles de l'audit OSM
+  // v81 : interdictions connues (plage de la section, points de la copie, plages OSM absorbées) et contournement.
+  if (Array.isArray(rules?.bans) && rules.bans.length) {
+    lines.push(`Interdictions connues (${rules.bans.length}) :`);
+    for (const b of rules.bans) {
+      const own = b.span ? `points de la copie km ${km(b.span.from)}–${km(b.span.to)}` : 'points de la copie : aucun sur le tracé';
+      lines.push(`  ${b.id} : zone km ${km(b.range.from)}–${km(b.range.to)} (${own} ; plages « Accès PL limité » réunies : ${b.plages?.length ?? 0})`);
+      if (b.span && (b.range.from < b.span.from - 1000 || b.range.to > b.span.to + 1000)) {
+        lines.push(`    section localisée en partie par la copie (km ${km(b.span.from)}–${km(b.span.to)} seulement), plage OSM km ${km(b.range.from)}–${km(b.range.to)}`);
+      }
+    }
+  }
+  if (rules?.detourDiag) lines.push(...detourTraceText(rules.detourDiag));
   if (rules) {
     const zfe = rules.passages ?? [];
     lines.push(`ZFE (${zfe.length}) :${zfe.length ? '' : ' aucune'}`);

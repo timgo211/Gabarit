@@ -72,7 +72,11 @@ function card(d, { checked, onSelect, rules, pending = '' }) {
   return el('button', {
     type: 'button', class: banned ? 'route-card banned' : 'route-card', role: 'radio', 'aria-checked': String(checked), onclick: onSelect,
   }, [
-    banned ? el('span', { class: 'route-card-banned', text: `⛔ ${rules.bannedShort ?? LYON_AUTO.BANNED_SHORT}` }) : null,
+    // v81 : une ligne par section interdite, puis la raison d'un contournement en échec et l'autre fiche qui l'évite.
+    ...(banned ? (rules.bannedLines?.length ? rules.bannedLines : [rules.bannedShort ?? LYON_AUTO.BANNED_SHORT])
+      .map((t) => el('span', { class: 'route-card-banned', text: `⛔ ${t}` })) : []),
+    banned && rules.banFail ? el('span', { class: 'route-card-banned-why', text: rules.banFail }) : null,
+    banned && rules.banAvoid ? el('span', { class: 'route-card-banned-why', text: rules.banAvoid }) : null,
     pending ? el('span', { class: 'route-card-pending hint', text: pending }) : null,
     el('span', { class: 'route-card-head' }, [
       el('span', { class: 'route-card-title' }, [

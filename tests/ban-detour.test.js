@@ -157,3 +157,69 @@ test('v80 : Mont-Blanc pour 4,80 m : tronçon avec un carré par voie du tunnel'
   assert.equal(plan.ok, true);
   assert.equal(plan.legs[0].avoid.coordinates.length, 9);
 });
+
+// ───────── v81 : zone élargie (points de la copie ∪ plages « Accès PL limité » OSM), cas Nancy → Colmar ─────────
+// Tracé de synthèse d'après le diagnostic du test tablette du 26/11/2026 (points du diagnostic, arrondis) : Nancy,
+// A33 / N4 jusqu'à Lunéville (km ~39), N59 jusqu'à Raon-l'Étape (aucun point dans la copie), puis les points de la
+// copie (Raon → tunnel Maurice-Lemaire → N159), D1059, A35, Colmar. Plage OSM simulée : de Lunéville au tunnel.
+const { prepareLine, locateOnLine } = await import('../src/lib/nav-geo.js');
+const N59_PTS = sectionPoints(COPY, 'n59').map((p) => p.point).sort((a, b) => a[0] - b[0])
+  .filter((p, i, all) => i === 0 || Math.hypot((p[0] - all[i - 1][0]) * 74000, (p[1] - all[i - 1][1]) * 111000) > 300);
+const NC_ROUTE = {
+  coordinates: [[6.20, 48.70], [6.18, 48.63], [6.305, 48.618], [6.419, 48.591], [6.53, 48.57], [6.642, 48.522],
+    [6.743, 48.464], [6.80, 48.42], ...N59_PTS, [7.29, 48.27], [7.38, 48.28], [7.384, 48.18], [7.36, 48.07]],
+  steps: [], distance: 152500, duration: 8520,
+};
+const NC_LINE = prepareLine(NC_ROUTE.coordinates);
+const alongOf = (p) => locateOnLine(NC_LINE, p).along;
+const LUNEVILLE = alongOf([6.53, 48.57]);
+const RAON = alongOf(N59_PTS[0]);
+// Voies étiquetées hgv:conditional de Lunéville jusqu'à 1 km avant le premier point de la copie (Raon-l'Étape).
+const NC_PLAGES = [{ enter: LUNEVILLE, exit: RAON - 1000, state: 'local' }];
+const ncBans = (plages) => routeBans(NC_ROUTE, sensitiveRules(NC_ROUTE, { vehicle: SEMI, copy: COPY }).items, COPY.meta.sections,
+  { vehicle: SEMI, copy: COPY, plages });
+
+test('v81 Nancy → Colmar : zone = copie ∪ plages OSM, A avant Lunéville, carrés sur toute la zone', () => {
+  const [plain] = ncBans([]);
+  assert.ok(plain.span.from > RAON - 2000, 'copie seule : section localisée à partir de Raon seulement');
+  const [b] = ncBans(NC_PLAGES);
+  assert.equal(b.id, 'n59');
+  assert.ok(Math.abs(b.range.from - LUNEVILLE) < 1, 'zone élargie dès Lunéville');
+  const plan = detourLegs(NC_ROUTE, [b], COPY);
+  assert.equal(plan.ok, true);
+  const leg = plan.legs[0];
+  assert.ok(alongOf(leg.a) < LUNEVILLE - 14000, 'A 15 km avant le début de la zone élargie');
+  assert.ok(leg.points.filter((p) => p.plage).length >= Math.floor((NC_PLAGES[0].exit - LUNEVILLE) / DETOUR.PLAGE_STEP_M));
+  assert.equal(leg.avoid.coordinates.length, leg.points.length);
+  // Sans plage : comportement v79 (A après Lunéville, dans la zone interdite).
+  const old = detourLegs(NC_ROUTE, [plain], COPY).legs[0];
+  assert.ok(alongOf(old.a) > LUNEVILLE);
+});
+
+test('v81 Nancy → Colmar : point de passage à moins de 2 km de la N59 Lunéville – Raon écarté ; repasse sur la plage → still', async () => {
+  const [b] = ncBans(NC_PLAGES);
+  // Tronçon simulé : longe la N59 à 1 km au nord entre Lunéville et Raon (routes parallèles), rien d'autre.
+  const near = async (a, z) => ({ coordinates: [a, [6.60, 48.555], [6.70, 48.50], [6.78, 48.445], z], steps: [] });
+  let out = await planDetour({ route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI, fetchLeg: near, fetchFinal: async () => NC_ROUTE });
+  assert.equal(out.reason, 'nodetour');
+  assert.ok(out.trace.legs[0].viasDropped >= 1, 'trace : points écartés comptés');
+  // Tronçon loin au sud (col), mais trajet final par la N59 de Lunéville à km ~50 puis le détour : still (plages).
+  const far = async (a, z) => ({ coordinates: [a, [6.45, 48.40], [6.60, 48.20], [7.00, 48.10], [7.30, 48.15], z], steps: [] });
+  const viaN59 = async (stops) => ({
+    coordinates: [...NC_ROUTE.coordinates.slice(0, 6), ...stops.map((s) => [s.lon, s.lat]), [7.36, 48.07]], steps: [], distance: 1, duration: 1,
+  });
+  out = await planDetour({ route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI, fetchLeg: far, fetchFinal: viaN59 });
+  assert.equal(out.reason, 'still');
+  assert.equal(out.trace.final.still, 'plages');
+  // Trajet final loin de toute la zone : réussi.
+  const away = async (stops) => ({
+    coordinates: [[6.20, 48.70], [6.30, 48.45], ...stops.map((s) => [s.lon, s.lat]), [7.36, 48.07]], steps: [], distance: 190000, duration: 11000,
+  });
+  out = await planDetour({ route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI, fetchLeg: far, fetchFinal: away });
+  assert.equal(out.ok, true, out.reason);
+  const { detourTraceText } = await import('../src/lib/ban-detour.js');
+  const txt = detourTraceText({ state: 'appliqué', trace: out.trace }).join('\n');
+  assert.match(txt, /^Contournement automatique : appliqué\n  n59 : zone km \d+,\d–\d+,\d ; A km \d+,\d ; B km \d+,\d ; vol d'oiseau \d+,\d km ; \d+ carrés \(dont \d+ sur les plages OSM\) ; tronçon ORS \d+,\d km ; points de passage \d \(écartés à moins de 2 km de la zone : \d\)\n  trajet final \d+,\d km$/);
+  assert.match(detourTraceText({ state: 'échec', reason: 'nodetour' })[0], /^Contournement automatique : échec \(aucun détour trouvé autour de la section\)$/);
+  assert.deepEqual(detourTraceText({}), []);
+});

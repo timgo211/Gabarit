@@ -27,7 +27,7 @@
 
 import { sensitivePointsAlongRoute, sensitiveRules, SENSITIVE } from './sensitive-points.js';
 import { squareAround } from './adr.js';
-import { pointAt, routeBans } from './route-bans.js';
+import { pointAt, routeBans, sectionPoints, sectionSpan } from './route-bans.js';
 import { STOPS } from './stops.js';
 import { crowPath } from './stops.js';
 import { prepareLine, locateOnLine } from './nav-geo.js';
@@ -46,6 +46,8 @@ export const DETOUR = Object.freeze({
   LOOP_GAP_M: 2000,
   LOOP_STEP_M: 50,
   MAX_CROW_M: 150000,
+  /** v81 : un point de zone évitée tous les 500 m sur les plages « Accès PL limité » de la section. */
+  PLAGE_STEP_M: 500,
   VIA_LABEL: 'Contournement (point de passage)',
   OPTION_KEY: 'detour',
   PENDING_TEXT: 'Calcul du contournement de l\'interdiction…',
@@ -67,20 +69,35 @@ const KY = 110540;
 const kxAt = (lat) => Math.cos(lat * RAD) * 111320;
 const dist = (a, b) => Math.hypot((b[0] - a[0]) * kxAt((a[1] + b[1]) / 2), (b[1] - a[1]) * KY);
 
-/** Points de la copie d'une section (par son identifiant). */
-export function sectionPoints(copy, id) {
-  const si = (copy?.meta?.sections ?? []).findIndex((s) => s?.id === id);
-  if (si < 0) return [];
-  return (copy?.data?.points ?? []).filter((p) => p.section === si && isPt(p.point));
+// v81 : sectionPoints / sectionSpan déplacés dans route-bans.js (même plage pour l'affichage et le contournement).
+export { sectionPoints, sectionSpan };
+
+/** Cap (degrés, 0 = nord) du tracé à `along`, lu sur ±20 m. */
+function headingAt(coords, along) {
+  const a = pointAt(coords, Math.max(0, along - 20));
+  const b = pointAt(coords, along + 20);
+  if (!isPt(a) || !isPt(b)) return 0;
+  const h = Math.atan2((b[0] - a[0]) * kxAt(a[1]), (b[1] - a[1]) * KY) / RAD;
+  return (h + 360) % 360;
 }
 
-/** Entrée et sortie (m depuis le départ) de la section sur le tracé, ou null. */
-export function sectionSpan(route, points, { geo = null } = {}) {
-  // Chaque point compté à part (le regroupement par section n'en garderait qu'un).
-  const one = points.map((p) => ({ ...p, type: SENSITIVE.TYPES.TUNNEL, section: -1 }));
-  const hits = sensitivePointsAlongRoute(route, { points: one }, { geo });
-  if (!hits.length) return null;
-  return { from: hits[0].along, to: hits[hits.length - 1].along };
+/**
+ * Points de la zone évitée (v81) : points de la copie + un point tous les 500 m sur les plages « Accès PL limité »
+ * absorbées par la section (ban.plages, route-bans.js widenRange), pris sur le tracé initial avec son cap. Sans plage :
+ * les points de la copie seuls (comportement v79).
+ */
+export function zonePoints(route, ban, copy) {
+  const pts = sectionPoints(copy, ban?.id);
+  const c = route?.coordinates;
+  if (!Array.isArray(c) || c.length < 2) return pts;
+  const extra = [];
+  for (const p of ban?.plages ?? []) {
+    for (let at = p.enter; at <= p.exit + 1; at += DETOUR.PLAGE_STEP_M) {
+      const q = pointAt(c, Math.min(at, p.exit));
+      if (isPt(q)) extra.push({ type: SENSITIVE.TYPES.TUNNEL, point: q, cap: headingAt(c, at), ref: '', value: null, section: -1, way: 0, plage: true });
+    }
+  }
+  return [...pts, ...extra];
 }
 
 /** Longueur du tracé (m). */
@@ -196,16 +213,22 @@ export function withDetourStops(stops, vias, alongOf) {
 export function detourLegs(route, bans, copy, { geo = null } = {}) {
   const legs = [];
   for (const b of bans ?? []) {
-    const points = sectionPoints(copy, b.id);
-    const span = points.length ? sectionSpan(route, points, { geo }) : null;
+    const own = sectionPoints(copy, b.id);
+    const pspan = own.length ? sectionSpan(route, own, { geo }) : null;
+    // v81 : plage élargie de la section (points de la copie ∪ plages « Accès PL limité »), comme sur la fiche.
+    const span = b.range && pspan ? { from: Math.min(b.range.from, pspan.from), to: Math.max(b.range.to, pspan.to) } : pspan;
     if (!span) return { ok: false, id: b.id, reason: 'span' };
     const cut = cutPoints(route, span);
     if (!cut) return { ok: false, id: b.id, reason: 'span' };
-    if (cut.crow > DETOUR.MAX_CROW_M) return { ok: false, id: b.id, reason: 'far' };
-    legs.push({ id: b.id, a: cut.a, b: cut.b, avoid: sectionSquares(points), points });
+    if (cut.crow > DETOUR.MAX_CROW_M) return { ok: false, id: b.id, reason: 'far', span, cut };
+    const points = zonePoints(route, b, copy);
+    legs.push({ id: b.id, a: cut.a, b: cut.b, avoid: sectionSquares(points), points, span, cut });
   }
   return { ok: true, legs };
 }
+
+/** Distance (m) d'un point au départ, le long du tracé initial (trace du diagnostic). */
+const alongIn = (line, p) => { try { return line ? locateOnLine(line, p).along : null; } catch { return null; } };
 
 /** Écart avec le trajet direct (toujours affiché, sans seuil). */
 export function detourCost(orig, alt) {
@@ -239,28 +262,70 @@ export function detourFailText(reason) {
  */
 export async function planDetour({ route, bans, copy, vehicle, stops = [], geo = null, fetchLeg, fetchFinal }) {
   let requests = 0;
-  const plan = detourLegs(route, bans, copy, { geo });
-  if (!plan.ok) return { ok: false, reason: plan.reason, requests };
-  const vias = [];
-  for (const leg of plan.legs) {
-    let legRoute;
-    try { requests += 1; legRoute = await fetchLeg(leg.a, leg.b, leg.avoid); } catch (error) { return { ok: false, reason: 'request', requests, error }; }
-    const found = detourVias(route, legRoute, leg.points);
-    if (!found.length) return { ok: false, reason: 'nodetour', requests };
-    vias.push(...found);
-  }
+  // v81 : trace pour le diagnostic du trajet (cause exacte d'un échec, lue au test sur tablette).
+  const trace = { legs: [], final: null };
   let line = null;
   try { line = prepareLine(route.coordinates); } catch { line = null; }
+  const fail = (reason, extra = {}) => ({ ok: false, reason, requests, trace, ...extra });
+  const plan = detourLegs(route, bans, copy, { geo });
+  if (!plan.ok) {
+    trace.legs.push({ id: plan.id, span: plan.span ?? null, a: plan.cut ? alongIn(line, plan.cut.a) : null, b: plan.cut ? alongIn(line, plan.cut.b) : null, crow: plan.cut?.crow ?? null });
+    return fail(plan.reason);
+  }
+  const vias = [];
+  for (const leg of plan.legs) {
+    const t = {
+      id: leg.id, span: leg.span, a: alongIn(line, leg.a), b: alongIn(line, leg.b), crow: leg.cut.crow,
+      squares: leg.avoid.coordinates.length, plagePoints: leg.points.filter((p) => p.plage).length,
+    };
+    trace.legs.push(t);
+    let legRoute;
+    try { requests += 1; legRoute = await fetchLeg(leg.a, leg.b, leg.avoid); } catch (error) { t.error = true; return fail('request', { error }); }
+    t.legLength = Array.isArray(legRoute?.coordinates) && legRoute.coordinates.length > 1 ? lengthOf(legRoute.coordinates) : 0;
+    const all = detourVias(route, legRoute, []);
+    const found = detourVias(route, legRoute, leg.points);
+    t.vias = found.length;
+    t.viasDropped = all.length - found.length;
+    if (!found.length) return fail('nodetour');
+    vias.push(...found);
+  }
   const alongOf = (p) => (line ? locateOnLine(line, p).along : 0);
   const list = withDetourStops(stops, vias, alongOf);
-  if (list.length > STOPS.MAX) return { ok: false, reason: 'full', requests };
+  if (list.length > STOPS.MAX) return fail('full');
   let final;
-  try { requests += 1; final = await fetchFinal(list); } catch (error) { return { ok: false, reason: 'request', requests, error }; }
+  try { requests += 1; final = await fetchFinal(list); } catch (error) { trace.final = { error: true }; return fail('request', { error }); }
+  trace.final = { length: Array.isArray(final?.coordinates) && final.coordinates.length > 1 ? lengthOf(final.coordinates) : 0 };
   const ids = new Set(bans.map((b) => b.id));
   const again = routeBans(final, sensitiveRules(final, { vehicle, copy }).items, copy?.meta?.sections ?? [], { vehicle });
-  if (again.some((b) => ids.has(b.id))) return { ok: false, reason: 'still', requests };
-  if (uturnNear(final, list.filter((s) => s.via === true && s.label === DETOUR.VIA_LABEL))) return { ok: false, reason: 'uturn', requests };
-  return { ok: true, route: final, stops: list, requests };
+  if (again.some((b) => ids.has(b.id))) { trace.final.still = 'points'; return fail('still'); }
+  // v81 : plages « Accès PL limité » de la section (zone élargie) : le trajet final ne doit plus les suivre.
+  for (const leg of plan.legs) {
+    const pz = leg.points.filter((p) => p.plage);
+    if (pz.length && sensitivePointsAlongRoute(final, { points: pz }).length) { trace.final.still = 'plages'; return fail('still'); }
+  }
+  if (uturnNear(final, list.filter((s) => s.via === true && s.label === DETOUR.VIA_LABEL))) { trace.final.uturn = true; return fail('uturn'); }
+  return { ok: true, route: final, stops: list, requests, trace };
+}
+
+/** v81 : bloc « Contournement automatique » du diagnostic du trajet (état, raison, plages, tronçon, contrôle final). */
+export function detourTraceText({ state = null, reason = null, trace = null } = {}) {
+  if (!state) return [];
+  const k = (m) => (isNum(m) ? (Math.round(m / 100) / 10).toFixed(1).replace('.', ',') : '?');
+  const lines = [`Contournement automatique : ${state}${reason ? ` (${DETOUR.FAIL_REASONS[reason] ?? reason})` : ''}`];
+  for (const t of trace?.legs ?? []) {
+    const parts = [`  ${t.id} : zone km ${k(t.span?.from)}–${k(t.span?.to)}`, `A km ${k(t.a)}`, `B km ${k(t.b)}`, `vol d'oiseau ${k(t.crow)} km`];
+    if (isNum(t.squares)) parts.push(`${t.squares} carrés (dont ${t.plagePoints} sur les plages OSM)`);
+    if (t.error) parts.push('tronçon : erreur ORS');
+    if (isNum(t.legLength)) parts.push(`tronçon ORS ${k(t.legLength)} km`);
+    if (isNum(t.vias)) parts.push(`points de passage ${t.vias} (écartés à moins de 2 km de la zone : ${t.viasDropped})`);
+    lines.push(parts.join(' ; '));
+  }
+  const f = trace?.final;
+  if (f) {
+    lines.push(f.error ? '  trajet final : erreur ORS'
+      : `  trajet final ${k(f.length)} km${f.still === 'points' ? ' ; repasse par des points de la section' : f.still === 'plages' ? ' ; repasse par les plages OSM de la section' : ''}${f.uturn ? ' ; demi-tour à un point de passage' : ''}`);
+  }
+  return lines;
 }
 
 /** États gardés par la mémoire v53 (`choice.banAuto`) ; 'pending' jamais gardé (refait à la reprise). */

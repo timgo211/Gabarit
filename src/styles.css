@@ -346,6 +346,8 @@ input[type="checkbox"], input[type="radio"] { width: 28px; height: 28px; accent-
 .route-card-rules { color: var(--danger); font-weight: 700; font-size: .9rem; overflow-wrap: anywhere; }
 .route-card.banned, .route-card.banned[aria-checked="true"] { border-color: var(--danger); border-left-color: var(--danger); }
 .route-card-banned { color: var(--danger); font-weight: 800; overflow-wrap: anywhere; }
+/* v81 : raison d'un contournement en échec, autre fiche qui évite l'interdiction (texte normal, lisible). */
+.route-card-banned-why { color: var(--text); font-weight: 600; overflow-wrap: anywhere; }
 /* v77 : confirmation avant le départ sur un itinéraire interdit sans alternative (deux gros boutons). */
 .start-confirm {
   display: grid; gap: 12px; padding: 14px; border-radius: 16px; margin: 8px 0;
@@ -851,7 +853,7 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 /* Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement. */
 .bridge-marker {
   width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; padding: 0; cursor: pointer;
-  font-size: 18px; line-height: 1; font-weight: 800; border: 3px solid var(--text); background: var(--bg); color: var(--danger);
+  font-size: 18px; line-height: 1; font-weight: 800; border: 2px solid var(--text); background: var(--bg); color: var(--danger);
 }
 .bridge-marker.medium { color: var(--warn); }
 /* v55 : étapes numérotées (couleurs d'accent, contraste vérifié par contrast.test.js). */

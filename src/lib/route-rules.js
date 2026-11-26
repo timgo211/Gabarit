@@ -17,13 +17,14 @@ import { euroRules } from './euro.js';
 import { winterRules } from './winter.js';
 import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
-import { geoRoadsFor, axisTechText } from './axis-match.js';
+import { geoRoadsFor, geoRoadsAll, axisTechText } from './axis-match.js';
 import { sensitiveRules } from './sensitive-points.js';
 import { weightRules as weightLimitRules } from './weight-check.js';
 import { speedRules } from './speed-limit.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
   ACCESS, POLICE_TEXT, conditionalAlongRoute, describeConditional, noConditionalText, unknownText, UNCOVERED_TEXT,
+  mergePassages, plageShort,
 } from './access-conditional.js';
 import { countriesAlongRoute } from './countries.js';
 
@@ -53,11 +54,13 @@ export function accessRules(route, { vehicle, access = null, departure = new Dat
   const ctry = countriesAlongRoute(route, { departure, elapsed });
   const countryAt = ctry.ok ? (al) => ctry.segments.find((s) => al >= s.enter && al <= s.exit)?.code ?? null : null;
   const cond = conditionalAlongRoute(route, { ways: access.ways, vehicle, departure, elapsed, countryAt });
-  out.conditional = cond.passages;
-  for (const p of cond.passages) {
+  // v81 : plages de voies contiguës (une ligne et une entrée courte par plage, plus une par voie OSM). La ligne garde
+  // sa plage (`plage`) : une plage qui recouvre une interdiction connue est absorbée par la ligne de la section.
+  out.conditional = mergePassages(cond.passages);
+  for (const p of out.conditional) {
     const active = p.state === 'no' || p.state === 'local';
-    out.lines.push({ level: active ? 'warn' : 'info', text: describeConditional(p) });
-    if (active) out.short.push(`Accès PL limité km ${Math.round(p.enter / 1000)}`);
+    out.lines.push({ level: active ? 'warn' : 'info', text: describeConditional(p), plage: p });
+    if (active) out.short.push(plageShort(p));
   }
   if (!cond.passages.length) out.lines.push({ level: 'info', text: noConditionalText(access.updated) });
   if (cond.unknown) out.lines.push({ level: 'info', text: unknownText(cond.unknown) });
@@ -152,6 +155,9 @@ export function routeRules(route, {
   // PR 3a : repli par la géométrie (data/axes-osm/) pour les étapes sans nom ni référence : règles fondées sur la
   // référence de la route seulement (week-end Île-de-France, réseau AURA) ; avertissements, jamais le calcul.
   const geo = axes?.status === 'ok' ? geoRoadsFor(route, axes.data, { copyTolerance: axes.meta?.tolerance ?? null }) : null;
+  // v81 : géométrie sur tous les tronçons, pour lever le veto du nom d'étape seulement (points sensibles, taxes PL).
+  const geoAllRaw = axes?.status === 'ok' ? geoRoadsAll(route, axes.data, { copyTolerance: axes.meta?.tolerance ?? null }) : null;
+  const geoAll = geoAllRaw?.status === 'ok' ? geoAllRaw : null;
   const bans = bansAlongRoute(route, { vehicle, departure, elapsed, geo: geo?.status === 'ok' ? geo : null });
   const lines = [];
   const short = [];
@@ -172,7 +178,7 @@ export function routeRules(route, {
   short.push(...win.short);
   short.push(...weight.short);
   // Taxes PL régionales (phase 5h) : R-Pass, écocontribution du Grand Est ; « à vérifier » = information seulement.
-  const toll = tollRules(route, { vehicle, tolls, departure, elapsed });
+  const toll = tollRules(route, { vehicle, tolls, departure, elapsed, geoAll });
   lines.push(...toll.lines.filter((l) => l.level === 'warn'));
   short.push(...toll.short);
   for (const p of passages) {
@@ -195,7 +201,7 @@ export function routeRules(route, {
   short.push(...wlim.short);
   // Points sensibles (PR 3b) : interdictions PL, hauteurs basses, tunnels sans hauteur de l'audit OSM ; « à vérifier »,
   // fiche et carte à l'arrêt seulement, jamais dit. Les ponts restent ceux de la phase 12a (pas de second compteur).
-  const sens = sensitiveRules(route, { vehicle, copy: sensitive, geo: geo?.status === 'ok' ? geo : null });
+  const sens = sensitiveRules(route, { vehicle, copy: sensitive, geo: geo?.status === 'ok' ? geo : null, geoAll });
   lines.push(...sens.lines);
   short.push(...sens.short);
   // Limitations de vitesse (phase 11a) : couverture sur la fiche, conditions « à vérifier », rien dit.
@@ -241,7 +247,7 @@ export function routeRules(route, {
     avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
     countries: ctry, weight, winter: win, euro, tolls: toll, foreignTolls: ftoll,
     localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
-    axes: { geo, tech: axes ? axisTechText(axes, geo) : null }, sensitive: sens,
+    axes: { geo, geoAll, tech: axes ? axisTechText(axes, geo) : null }, sensitive: sens,
   };
 }
 

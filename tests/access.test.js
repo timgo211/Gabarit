@@ -15,7 +15,7 @@ import {
 } from '../src/lib/access-local.js';
 import {
   ACCESS, parseConditional, parseCondition, evaluateWay, conditionalAlongRoute, parseAccessTile, describeConditional,
-  noConditionalText, unknownText, wayAlongRoute, holidayFor,
+  noConditionalText, unknownText, wayAlongRoute, holidayFor, mergePassages, plageShort, plageName, guidanceConditional, wayRestrictions,
 } from '../src/lib/access-conditional.js';
 import { accessElementFromFeature, convertAccess, osmiumAccessFilter, canRestrict } from '../src/lib/access-convert.js';
 import { parseGeojsonLine, parseIndex, buildCoverage, parsePoly } from '../src/lib/areas-osm-data.js';
@@ -226,7 +226,7 @@ test('messages : jamais « aucune restriction », copie absente, conditions non 
   assert.ok(!texts.some((t) => /Route des Crues/.test(t)), 'condition non lue : aucune ligne propre');
   assert.ok(ok.lines.filter((l) => l.level === 'warn').every((l) => /La signalisation fait foi\.$/.test(l.text)));
   assert.ok(!texts.some((t) => /aucune restriction/i.test(t) && !/signalée dans les données/.test(t)));
-  assert.deepEqual(ok.short, ['Desserte locale km 16', 'Accès PL limité km 8']);
+  assert.deepEqual(ok.short, ['Desserte locale km 16', 'Accès PL limité km 8 à 9']); // v81 : plage km de la voie
   const empty = accessRules(r, { vehicle: semi, access: { status: 'ok', ways: [], updated: '2026-12-01' } });
   assert.ok(empty.lines.some((l) => l.text === noConditionalText('2026-12-01')));
   const all = routeRules(r, { vehicle: semi, departure: D(2026, 11, 18, 8), access: { status: 'ok', ways, updated: '2026-12-01' } });
@@ -263,4 +263,36 @@ test('guidage : bandeau sous 10 km, une annonce vers 3 km seulement si interdite
   assert.equal(s1.local.length, 1);
   assert.equal(guidanceLocal(s1.local, 0).view, null, 'desserte à 15,6 km : pas encore de bandeau');
   assert.match(guidanceLocal(s1.local, 6000).view.text, /^Desserte locale dans 9,6 km/);
+});
+
+// v81 : N59 (test tablette Nancy → Colmar) : une voie OSM = une entrée « Accès PL limité » (plus de 60 sur la fiche).
+test('v81 : voies contiguës réunies en plages (2 km, même état, même restriction) ; une seule voix par plage', () => {
+  const tags = { 'hgv:conditional': 'no @ (weight>3.5)' };
+  const { restrictive } = wayRestrictions(tags, { vehicle: { weight: 44 } });
+  const dest = wayRestrictions({ 'hgv:conditional': 'destination @ (weight>3.5)' }, { vehicle: { weight: 44 } }).restrictive;
+  const way = (id, enter, exit, state = 'no', extra = {}) => ({
+    id, name: '', enter, exit, state, tags, restrictive, permissive: [], holiday: null, dir: null, at: new Date(2026, 10, 26, 6), ...extra,
+  });
+  const ways = [way('a', 39000, 40000), way('b', 40500, 47000), way('c', 52000, 53000), way('d', 53500, 54000, 'ok'),
+    way('e', 54100, 55000, 'local', { restrictive: dest })];
+  const pl = mergePassages(ways);
+  assert.deepEqual(pl.map((p) => [p.enter, p.exit, p.count]), [[39000, 47000, 2], [52000, 53000, 1], [53500, 54000, 1], [54100, 55000, 1]]);
+  assert.deepEqual(pl[0].ids, ['a', 'b']);
+  assert.equal(plageShort(pl[0]), 'Accès PL limité km 39 à 47');
+  assert.equal(plageShort(pl[1]), 'Accès PL limité km 52 à 53');
+  assert.equal(plageName(pl[0]), 'Voies sans nom (2 voies)');
+  assert.match(describeConditional(pl[0]), /^Voies sans nom \(2 voies\) interdite aux PL plus de 3,5 t : vous y seriez de km 39 à 47 \(entrée vers 6 h 00\), en vigueur à votre passage\. La signalisation fait foi\.$/);
+  assert.deepEqual(mergePassages([]), []);
+  // Guidage : 60 voies contiguës = une plage : une seule voix, le bandeau reste jusqu'à la fin de la plage.
+  const many = mergePassages(Array.from({ length: 60 }, (_, i) => way(`w${i}`, 39000 + i * 900, 39000 + i * 900 + 800)));
+  assert.equal(many.length, 1);
+  let announced = {};
+  let voices = 0;
+  for (let along = 30000; along < 95000; along += 250) {
+    const g = guidanceConditional(many, announced, { along, now: new Date(2026, 10, 26, 6).getTime(), timeTo: () => 0, vehicle: { weight: 44 } });
+    announced = g.announced;
+    if (g.speak) voices += 1;
+    if (along > 40000 && along < 92000) assert.ok(g.view, `bandeau à ${along}`);
+  }
+  assert.equal(voices, 1);
 });

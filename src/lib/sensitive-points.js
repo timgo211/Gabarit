@@ -276,8 +276,12 @@ export function mergeSensitiveTiles(tiles) {
 
 // ───────── Rapprochement d'un itinéraire ─────────
 
-/** Références de la route au tronçon i : étape ORS, sinon repli par la géométrie (3a) ; [] si inconnues. */
-function refsBySegment(route, geo) {
+/**
+ * Références de la route au tronçon i : étape ORS, sinon repli par la géométrie (3a) ; [] si inconnues. v81 : avec
+ * geoAll (geoRoadsAll, tous les tronçons), les références de la géométrie s'ajoutent à celles du nom d'étape : le veto
+ * ne s'applique que si NI le nom NI la géométrie ne donnent la référence du point.
+ */
+function refsBySegment(route, geo, geoAll = null) {
   const n = route.coordinates.length - 1;
   const out = new Array(n).fill(null);
   for (const s of route.steps ?? []) {
@@ -285,10 +289,13 @@ function refsBySegment(route, geo) {
     const refs = roadRefs(s.name);
     for (let i = Math.max(0, s.wayPoints[0]); i < s.wayPoints[1] && i < n; i += 1) out[i] = refs;
   }
+  const split = (g) => (typeof g === 'string' && g ? g.split(';') : []);
   for (let i = 0; i < n; i += 1) {
-    if (out[i]?.length) continue;
-    const g = geo?.ref?.[i];
-    out[i] = typeof g === 'string' && g ? g.split(';') : [];
+    if (!out[i]?.length) out[i] = split(geo?.ref?.[i]);
+    if (out[i].length && geoAll) {
+      const more = split(geoAll.ref?.[i]).filter((r) => !out[i].includes(r));
+      if (more.length) out[i] = [...out[i], ...more];
+    }
   }
   return out;
 }
@@ -300,7 +307,7 @@ function refsBySegment(route, geo) {
  * @param {{ geo?:object|null }} opts geo : repli par la géométrie (axis-match.js) pour le veto de référence
  * @returns {{ type:number, ref:string, value:number|null, section:number, way:number, point:number[], along:number }[]}
  */
-export function sensitivePointsAlongRoute(route, data, { geo = null } = {}) {
+export function sensitivePointsAlongRoute(route, data, { geo = null, geoAll = null } = {}) {
   const coords = route?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2 || !data?.points?.length) return [];
   const line = [{ coords }];
@@ -310,7 +317,7 @@ export function sensitivePointsAlongRoute(route, data, { geo = null } = {}) {
     const a = coords[i - 1]; const b = coords[i];
     cum.push(cum[i - 1] + Math.hypot((b[0] - a[0]) * kxAt(a[1]), (b[1] - a[1]) * KY));
   }
-  const refs = refsBySegment(route, geo);
+  const refs = refsBySegment(route, geo, geoAll);
   const hits = [];
   for (const pt of data.points) {
     let best = null;
@@ -380,7 +387,7 @@ export const SENSITIVE_UNAVAILABLE_TEXT = 'Points sensibles : données non charg
  * @param {{ vehicle?:object, copy?:{ status:string, data:object, updated?:string|null, meta?:{ sections:object[] } }|null,
  *   geo?:object|null }} ctx
  */
-export function sensitiveRules(route, { vehicle = null, copy = null, geo = null } = {}) {
+export function sensitiveRules(route, { vehicle = null, copy = null, geo = null, geoAll = null } = {}) {
   const out = { lines: [], short: [], items: [], tech: null };
   if (!copy) return out;
   if (copy.status === 'idle' || copy.status === 'loading') { out.tech = 'Points sensibles : copie en cours de lecture'; return out; }
@@ -390,7 +397,7 @@ export function sensitiveRules(route, { vehicle = null, copy = null, geo = null 
     return out;
   }
   const sections = copy.meta?.sections ?? [];
-  const found = sensitivePointsAlongRoute(route, copy.data, { geo });
+  const found = sensitivePointsAlongRoute(route, copy.data, { geo, geoAll });
   const counts = [0, 0, 0, 0];
   let ignored = 0;
   for (const it of found) {
@@ -399,7 +406,11 @@ export function sensitiveRules(route, { vehicle = null, copy = null, geo = null 
     counts[it.type] += 1;
     out.items.push({ ...it, text: sensitiveText(it, s, { updated: copy.updated }) });
   }
-  const shown = out.items.slice(0, SENSITIVE.MAX_SHOWN).map((it) => ({ level: 'warn', text: it.text }));
+  // v81 : la ligne garde sa section (`section`, indice dans meta.sections) : une interdiction connue active la remplace
+  // par sa ligne unique (route-bans.js).
+  const shown = out.items.slice(0, SENSITIVE.MAX_SHOWN).map((it) => ({
+    level: 'warn', text: it.text, ...(it.type <= SENSITIVE.TYPES.BAN_BF ? { section: it.section } : {}),
+  }));
   const more = out.items.length - shown.length;
   if (more > 0) shown.push({ level: 'warn', text: `+${more} point${more > 1 ? 's' : ''} sensible${more > 1 ? 's' : ''} à vérifier (voir la carte).` });
   out.lines = shown;

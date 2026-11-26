@@ -17,7 +17,7 @@
 //   mais illisibles → sauvegarde ignorée.
 
 import { sanitizeStops } from './stops.js';
-import { DETOUR_STATES } from './ban-detour.js';
+import { DETOUR_STATES, DETOUR } from './ban-detour.js';
 import { sanitizeAnswers } from './route-bans.js';
 
 /** v77 : états gardés du contournement automatique (« pending » non gardé : refait à la reprise). */
@@ -81,6 +81,8 @@ export function buildSave({
       // v77 : état du contournement automatique (Lyon) : jamais refait à la reprise s'il est fait ou en échec.
       ...(AUTO_STATES.includes(choice.lyonAuto) ? { lyonAuto: choice.lyonAuto } : {}),
       ...(DETOUR_STATES.includes(choice.banAuto) ? { banAuto: choice.banAuto } : {}), // v79
+      // v81 : raison courte d'un échec gardée (sinon « calcul impossible » à la reprise) ; clé connue seulement.
+      ...(choice.banAuto === 'failed' && Object.hasOwn(DETOUR.FAIL_REASONS, choice.banAutoReason ?? '') ? { banAutoReason: choice.banAutoReason } : {}),
       // v78 : réponses « Desserte locale dans la zone … ? » de ce trajet.
       localAnswers: sanitizeAnswers(choice.localAnswers),
     }),
@@ -157,11 +159,12 @@ export function restoredChoice(save, vehicles) {
   const vehicle = (vehicles ?? []).find((v) => v?.id === save.vehicleId);
   if (!vehicle) return null;
   const options = save.choice.options.map((o) => (o.stops === undefined ? o : { ...o, stops: sanitizeStops(o.stops) }));
-  const { lyonAuto, banAuto, ...rest } = save.choice;
+  const { lyonAuto, banAuto, banAutoReason, ...rest } = save.choice;
   return {
     ...rest, options, stops: sanitizeStops(save.choice.stops) ?? [], failures: [], vehicle,
     ...(AUTO_STATES.includes(lyonAuto) ? { lyonAuto } : {}), // v77
     ...(DETOUR_STATES.includes(banAuto) ? { banAuto } : {}), // v79
+    ...(banAuto === 'failed' && Object.hasOwn(DETOUR.FAIL_REASONS, banAutoReason ?? '') ? { banAutoReason } : {}), // v81
     localAnswers: sanitizeAnswers(save.choice.localAnswers), // v78
   };
 }

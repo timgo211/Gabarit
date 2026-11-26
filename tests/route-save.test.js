@@ -129,6 +129,16 @@ test('v79 : état du contournement par tronçons gardé (fait, échec, desserte 
   const bad = buildSave({ kind: 'plan', choice, vehicleId: 'v1', now: 1 });
   bad.choice.banAuto = 'x';
   assert.equal('banAuto' in restoredChoice(bad, vehicles), false);
+  // v81 : raison courte d'un échec gardée (clé connue seulement), sinon « calcul impossible » à la reprise.
+  const failed = buildSave({ kind: 'plan', choice: { ...choice, banAuto: 'failed', banAutoReason: 'nodetour', banTrace: { legs: [] } }, vehicleId: 'v1', now: 1 });
+  assert.equal(failed.choice.banAutoReason, 'nodetour');
+  assert.equal('banTrace' in failed.choice, false, 'trace jamais gardée');
+  assert.equal(restoredChoice(failed, vehicles).banAutoReason, 'nodetour');
+  assert.equal('banAutoReason' in buildSave({ kind: 'plan', choice: { ...choice, banAuto: 'failed', banAutoReason: 'x' }, vehicleId: 'v1', now: 1 }).choice, false);
+  assert.equal('banAutoReason' in buildSave({ kind: 'plan', choice: { ...choice, banAuto: 'done', banAutoReason: 'still' }, vehicleId: 'v1', now: 1 }).choice, false);
+  const forged = buildSave({ kind: 'plan', choice: { ...choice, banAuto: 'failed' }, vehicleId: 'v1', now: 1 });
+  forged.choice.banAutoReason = 'x';
+  assert.equal('banAutoReason' in restoredChoice(forged, vehicles), false);
 });
 
 test('v78 : réponses « desserte locale » du trajet gardées et nettoyées', () => {

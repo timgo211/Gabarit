@@ -21,13 +21,14 @@ import {
   LYON_AUTO, autoBypassStart, autoCost, autoNote, applyAutoBypass,
 } from './lib/lyon-bypass.js';
 import {
-  BANS, routeBans, activeBans, localQuestions, declaredText, confirmText,
+  BANS, routeBans, activeBans, localQuestions, declaredText, confirmText, avoidingBansText, rangeCoords, pointAt as pointAlong,
 } from './lib/route-bans.js';
 import {
   DETOUR, planDetour, detourNote, detourCost, detourFailText, detourOption, applyDetour, allDeclared, legAvoid,
 } from './lib/ban-detour.js';
 import { prepareLine, locateOnLine } from './lib/nav-geo.js';
 import { avoidLocalFor } from './lib/access-local.js';
+import { plageShort } from './lib/access-conditional.js';
 import { createAccess } from './ui/access.js';
 import { createBridges, createTileCopy } from './ui/bridges.js';
 import { AXES } from './lib/axes-convert.js';
@@ -503,21 +504,46 @@ function choiceRules(c = choice) {
       r.lines.unshift({ level: 'warn', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
     }
     // v78 : autres interdictions connues (route-bans.js) : fiche rouge, confirmation, question « desserte locale ».
-    const bans = autoBypassOn() ? routeBans(o.route, r.sensitive?.items ?? [], sensitive.state.meta?.sections ?? [], { vehicle: c.vehicle }) : [];
+    // v81 : plage km = points de la copie ∪ plages « Accès PL limité » qui touchent la section (même zone que le
+    // contournement) ; ces plages et la ligne « Point sensible » de la section ne sont plus répétées.
+    const bans = autoBypassOn() ? routeBans(o.route, r.sensitive?.items ?? [], sensitive.state.meta?.sections ?? [], {
+      vehicle: c.vehicle, copy: sensitive.state.status === 'ok' ? sensitive.state : null, plages: r.conditional ?? [],
+    }) : [];
     const active = activeBans(bans, c.localAnswers);
     r.bans = active;
     r.localQuestions = localQuestions(bans, c.localAnswers);
     // v79 : fiche du contournement : question « desserte locale » des zones contournées (« Oui » remet le direct).
     if (o.key === DETOUR.OPTION_KEY && Array.isArray(o.avoided)) r.localQuestions = [...r.localQuestions, ...localQuestions(o.avoided, c.localAnswers)];
-    if (active.length && c.banAuto === 'failed') r.lines.unshift({ level: 'warn', text: detourFailText(c.banAutoReason) });
+    const absorbed = new Set(active.flatMap((b) => b.plages ?? []));
+    const sectionsShown = new Set(bans.map((b) => b.section));
+    if (absorbed.size || sectionsShown.size) {
+      const drop = new Map();
+      for (const p of absorbed) { const t = plageShort(p); drop.set(t, (drop.get(t) ?? 0) + 1); }
+      r.short = r.short.filter((t) => { const n = drop.get(t) ?? 0; if (!n) return true; drop.set(t, n - 1); return false; });
+      r.lines = r.lines.filter((l) => !(l.plage && absorbed.has(l.plage)) && !(Number.isInteger(l.section) && sectionsShown.has(l.section)));
+    }
+    r.banFail = active.length && c.banAuto === 'failed' ? detourFailText(c.banAutoReason) : '';
+    if (r.banFail) r.lines.unshift({ level: 'warn', text: r.banFail });
     for (const b of bans) if (!active.includes(b)) r.lines.unshift({ level: 'info', text: declaredText(b) });
     for (const b of [...active].reverse()) r.lines.unshift({ level: 'warn', text: b.text });
     r.blocked = r.lyonBanned || active.length > 0; // (r.banned = passages ZFE interdits, ne pas confondre)
-    r.bannedShort = r.lyonBanned ? LYON_AUTO.BANNED_SHORT : `${BANS.SHORT_TEXT}, à vérifier`;
+    // v81 : une ligne courte par section sur la fiche (plus le texte générique), Lyon compris.
+    r.bannedLines = [...(r.lyonBanned ? [LYON_AUTO.BANNED_SHORT] : []), ...active.map((b) => b.short)];
+    r.bannedShort = r.bannedLines[0] ?? `${BANS.SHORT_TEXT}, à vérifier`;
+    // v81 : état du contournement automatique pour le diagnostic du trajet (cause exacte d'un échec).
+    r.detourDiag = c.banAuto || active.length
+      ? { state: DETOUR_STATE_TEXT[c.banAuto] ?? 'non lancé', reason: c.banAuto === 'failed' ? c.banAutoReason ?? null : null, trace: c.banTrace ?? null }
+      : null;
     r.confirmText = !active.length ? LYON_AUTO.CONFIRM_TEXT
       : confirmText([...(r.lyonBanned ? [{ label: 'Lyon, A6 et A7' }] : []), ...active]);
     return r;
   });
+  // v81 : fiche rouge : autre fiche calculée sans interdiction ni autre rouge indiquée (jamais promue).
+  const cards = c.options.map((o, i) => ({
+    label: o.label, blocked: !!list[i].blocked, bans: list[i].bans ?? [], duration: o.route?.duration, distance: o.route?.distance,
+    clean: !list[i].banned?.length && !list[i].forbiddenTunnels?.length && !list[i].lyonBanned,
+  }));
+  list.forEach((r, i) => { r.banAvoid = avoidingBansText(cards, i); });
   // Tunnel interdit : les autres itinéraires proposés qui l'évitent sont indiqués (choix à l'arrêt, d'un toucher).
   const counts = c.options.map((o, i) => ({ label: o.label, forbidden: list[i].forbiddenTunnels?.length ?? 0 }));
   list.forEach((r, i) => {
@@ -872,6 +898,11 @@ async function runAutoBypass(plan) {
 // trouvés (requêtes à part du budget de 3, sans diagnostic 2009). Une seule fois par calcul (choice.banAuto, mémoire
 // v53), après la décision de Lyon (v77). Réglage désactivé : rien. Jamais dit, rien dans le guidage.
 let banSeq = 0; // identifiant du calcul en cours : compteur, jamais l'horloge
+/** v81 : état du contournement (diagnostic du trajet). */
+const DETOUR_STATE_TEXT = Object.freeze({
+  pending: 'en cours', done: 'appliqué', failed: 'échec', declared: 'desserte déclarée, trajet direct remis',
+  off: 'non lancé (Autres itinéraires)',
+});
 /** @returns {boolean} vrai si l'état a changé (la fiche vient d'être redessinée). */
 function maybeBanDetour(rules) {
   if (!choice || navigation.active || !autoBypassOn() || choice.banAuto) return false;
@@ -905,7 +936,7 @@ async function runBanDetour(bans) {
   if (!choice || choice.banId !== id || navigation.active) return;
   if (!autoBypassOn()) { choice = { ...choice, banAuto: undefined }; renderChoice(); return; } // réglage coupé entre-temps
   if (!out.ok) {
-    choice = { ...choice, banAuto: 'failed', banAutoReason: out.reason };
+    choice = { ...choice, banAuto: 'failed', banAutoReason: out.reason, banTrace: out.trace ?? null };
     if (out.error) showMessage(messageNode, `Contournement de l'interdiction : ${errorText(out.error) || 'calcul impossible.'}`, 'info', serviceDetailText(out.error, store.getApiKey() ?? ''));
     renderChoice();
     saveRoute({ force: true });
@@ -921,7 +952,7 @@ async function runBanDetour(bans) {
   const crosses = choice.options.map((_, i) => (rules?.[i]?.bans ?? []).some((b) => ids.has(b.id)));
   const before = choice.options;
   const next = applyDetour({ options: before, crosses, detour: det, selected: choice.selected, manual: choice.touched === true });
-  choice = { ...choice, options: next.options, selected: next.selected, banAuto: 'done', banBefore: before };
+  choice = { ...choice, options: next.options, selected: next.selected, banAuto: 'done', banBefore: before, banTrace: out.trace ?? null };
   map.showRoutes(next.options.map((o) => o.route), next.selected); // une seule fois : pas de clignotement
   extendRoute(out.route);
   if (next.replaced) showMessage(messageNode, 'Itinéraire remplacé par le contournement d\'une interdiction connue (à vérifier).', 'info');
@@ -992,17 +1023,22 @@ function renderChoice() {
   fuelBtn.hidden = navigation.active;
   fuelBtn.setAttribute('aria-disabled', String(!planPark.parked));
   showZfeOnMap(rules);
-  showBridgesOnMap(rules?.[choice.selected]);
+  showBridgesOnMap(rules?.[choice.selected], choice.options[choice.selected]?.route);
 }
 
 /**
  * Repères des ponts (phase 12a) et des limites de poids (phase 12a bis) à vérifier de l'itinéraire choisi, à l'arrêt
  * seulement (retirés en guidage).
  */
-function showBridgesOnMap(r) {
+function showBridgesOnMap(r, route = null) {
   const items = r?.bridges?.items ?? [];
   const weights = r?.weightLimits?.items ?? [];
   const sens = r?.sensitive?.items ?? [];
+  // v81 : sections interdites actives : trait rouge fin sur le tracé, « ! » au début de la plage (un par section).
+  const coords = route?.coordinates ?? null;
+  const bans = coords ? (r?.bans ?? []) : [];
+  map.showBanSections(bans.map((b) => rangeCoords(coords, b.range?.from, b.range?.to)).filter((l) => l.length > 1));
+  const startOf = new Map(bans.map((b) => [b.section, pointAlong(coords, b.range?.from)]));
   map.showBridges([
     ...items.map((it) => ({
       key: bridgeKey(it), lonlat: it.point, level: it.level,
@@ -1014,7 +1050,7 @@ function showBridgesOnMap(r) {
     })),
     // PR 3b : points sensibles (interdictions, hauteurs basses, tunnels) ; texte au toucher, jamais dit.
     ...sens.map((it) => ({
-      key: sensitiveKey(it), lonlat: it.point, level: 'high', kind: 'sensitive', glyph: '!',
+      key: sensitiveKey(it), lonlat: (it.type <= 1 /* interdiction */ && startOf.get(it.section)) || it.point, level: 'high', kind: 'sensitive', glyph: '!',
       label: 'Point sensible à vérifier',
     })),
   ]);
@@ -1179,7 +1215,7 @@ async function openAlternatives(from, extraStop = null) {
       stops, touched: false, autoId: undefined,
       // v77 : rien d'automatique ici ; fiche par Lyon (A6 / A7) en rouge, confirmation avant de la guider.
       lyonAuto: 'none', lyonAutoReason: undefined,
-      banAuto: 'off', banAutoReason: undefined, banBefore: undefined, banId: undefined, // v79 : rien d'automatique ici non plus
+      banAuto: 'off', banAutoReason: undefined, banBefore: undefined, banId: undefined, banTrace: undefined, // v79 : rien d'automatique ici non plus
     };
     altConfirm = false;
     for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
@@ -1419,6 +1455,7 @@ const form = createRouteForm({
       places.clear();
       lanes.clear();
       map.showBridges([]);
+      map.showBanSections([]); // v81
       winter.clear();
       map.showZfe([]);
       map.showRoutes([]); // ancien tracé et repères de départ / d'arrivée effacés : rien ne laisse croire à un itinéraire

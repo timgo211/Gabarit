@@ -32,7 +32,7 @@ const EMPTY_FC = Object.freeze({ type: 'FeatureCollection', features: [] });
 
 const FRANCE_CENTER = [2.35, 46.6];
 const ROUTE_LAYERS = [
-  'route-hit', 'route-done-line', 'route-done-casing', 'route-turns', 'route-chevrons', 'route-line', 'route-casing',
+  'ban-sections-line', 'route-hit', 'route-done-line', 'route-done-casing', 'route-turns', 'route-chevrons', 'route-line', 'route-casing',
   'route-alt-line', 'route-alt-casing',
 ];
 /** Flèches sur le tracé en guidage (v53) : pastilles des manœuvres (source à part), chevrons sur le tracé choisi. */
@@ -40,6 +40,13 @@ const TURNS_SOURCE = 'route-turns';
 const ARROW_LAYERS = ['route-turns', 'route-chevrons'];
 /** Partie du tracé déjà parcourue (guidage, phase 2c) : source à part, grise, au-dessus du tracé. */
 const DONE_SOURCE = 'route-done';
+/**
+ * v81 : sections d'interdiction connues du tracé choisi (route-bans.js) : trait rouge fin (couleur réglementaire des ZFE
+ * interdites) sur le tracé, à l'arrêt seulement.
+ */
+const BAN_SOURCE = 'ban-sections';
+const BAN_COLOR = '#c62828';
+const BAN_WIDTH = 3;
 /** Changement de thème : voile posé avant setStyle, retiré au premier rendu complet (1,5 s au plus). */
 const VEIL_IN_MS = 150;
 const VEIL_MAX_MS = 1500;
@@ -160,6 +167,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   // Ponts sans hauteur connue (phase 12a) : repères à l'arrêt seulement, jamais en guidage.
   let bridgeItems = [];
   let bridgeMarkers = [];
+  let bridgeKey = ''; // v81 : repères des ponts dessinés (regroupés à zoom < 11)
+  /** v81 : morceaux du tracé choisi dans une section interdite : [[[lon, lat], …], …]. */
+  let banLines = [];
   /** v55 : étapes du trajet, repères numérotés (aussi en guidage) : [[lon, lat], …]. */
   let stopItems = [];
   let stopMarkers = [];
@@ -224,6 +234,14 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     };
   }
 
+  function banData() {
+    return {
+      type: 'FeatureCollection',
+      features: navigating ? [] : banLines.filter((l) => Array.isArray(l) && l.length > 1)
+        .map((coordinates) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates } })),
+    };
+  }
+
   function doneData() {
     return {
       type: 'FeatureCollection',
@@ -268,6 +286,9 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
       id: 'route-line', type: 'line', source: 'route', filter: isSelected, layout,
       paint: { 'line-color': c['route-line'], 'line-width': w['route-line'] },
     });
+    // v81 : trait rouge fin sur les sections interdites, au milieu du tracé choisi (vide en guidage).
+    map.addSource(BAN_SOURCE, { type: 'geojson', data: banData() });
+    map.addLayer({ id: 'ban-sections-line', type: 'line', source: BAN_SOURCE, layout, paint: { 'line-color': BAN_COLOR, 'line-width': BAN_WIDTH } });
     // v53 : chevrons blancs dans le sens de la marche (cachés de loin) et pastilles des manœuvres, sous la partie
     // parcourue (grise) ; seulement en guidage. Dessinés par MapLibre le long de la ligne : rien par position.
     putArrowImages();
@@ -316,6 +337,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (map.getSource('route')) map.removeSource('route');
     if (map.getSource(DONE_SOURCE)) map.removeSource(DONE_SOURCE);
     if (map.getSource(TURNS_SOURCE)) map.removeSource(TURNS_SOURCE);
+    if (map.getSource(BAN_SOURCE)) map.removeSource(BAN_SOURCE);
   }
 
   /** Images des flèches (v53), ajoutées une fois par style. */
@@ -542,6 +564,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     map.on('moveend', applyLayer);
     // v62 : P masqués / regroupés selon le zoom (area-cluster.js), recalculés à la fin d'un mouvement seulement.
     map.on('moveend', () => drawAreas());
+    map.on('moveend', () => drawBridges()); // v81 : ponts regroupés selon le zoom
     map.on('webglcontextlost', () => {
       lost = true;
       scheduleRestoreCheck(RESTORE_WAIT_LOST_MS);
@@ -560,7 +583,7 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     if (marks.pinTo) marker('pinTo', marks.pinTo, MARK_COLORS.pin);
     if (marks.pinFrom) marker('pinFrom', marks.pinFrom, MARK_COLORS.pin);
     drawAreas({ force: true });
-    drawBridges();
+    drawBridges({ force: true });
     drawStops();
     drawReports();
   }
@@ -619,11 +642,56 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     return node;
   }
 
-  function drawBridges() {
+  /** v81 : pastille « ⚠ 12 » d'un groupe de ponts / limites de poids (toucher = zoom + 2 sur le groupe). */
+  function bridgeGroupElement(mark) {
+    const node = document.createElement('button');
+    node.type = 'button';
+    node.className = 'bridge-marker weight-marker bridge-group';
+    node.textContent = `⚠ ${mark.items.length}`;
+    const aria = `${mark.items.length} ponts ou limites à vérifier : toucher pour zoomer`;
+    node.setAttribute('aria-label', aria);
+    node.title = aria;
+    for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());
+    node.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      if (!map) return;
+      if (anim) anim.follow = false;
+      map.easeTo({ center: mark.lonlat, zoom: map.getZoom() + AREA_CLUSTER.GROUP_ZOOM_STEP, duration: 500 });
+    });
+    return node;
+  }
+
+  /**
+   * Repères des ponts (12a), limites de poids (12a bis) et points sensibles (PR 3b), à l'arrêt seulement. v81 : à zoom
+   * < 11, ponts et limites regroupés par case de 64 px (même règle que les P, area-cluster.js ; jamais cachés, même
+   * sous le zoom 8) : 51 repères collés le long de la N59 formaient une masse noire sur le tracé (test tablette du
+   * 26/11/2026). Les points sensibles (« ! », un par section) ne sont jamais regroupés.
+   */
+  function drawBridges({ force = false } = {}) {
+    if (!map || navigating) {
+      for (const m of bridgeMarkers) m.remove();
+      bridgeMarkers = [];
+      bridgeKey = '';
+      return;
+    }
+    const zoom = map.getZoom();
+    const pool = bridgeItems.filter((i) => i.kind !== 'sensitive').map((i) => ({ ...i, id: i.key }));
+    const plan = clusterAreas(pool, {
+      zoom: zoom < AREA_CLUSTER.ALL_FROM ? Math.max(zoom, AREA_CLUSTER.HIDE_BELOW) : zoom,
+      project: (ll) => map.project(ll),
+    });
+    const sens = bridgeItems.filter((i) => i.kind === 'sensitive');
+    const key = `${plan.key}|${sens.map((i) => i.key).join(',')}`;
+    if (!force && key === bridgeKey) return;
+    bridgeKey = key;
     for (const m of bridgeMarkers) m.remove();
     bridgeMarkers = [];
-    if (!map || navigating) return;
-    for (const item of bridgeItems) {
+    for (const m of plan.marks) {
+      const node = m.kind === 'group' ? bridgeGroupElement(m) : bridgeElement(m.item);
+      bridgeMarkers.push(new lib.Marker({ element: node, anchor: 'center' }).setLngLat(m.kind === 'group' ? m.lonlat : m.item.lonlat).addTo(map));
+    }
+    for (const item of sens) {
       bridgeMarkers.push(new lib.Marker({ element: bridgeElement(item), anchor: 'center' }).setLngLat(item.lonlat).addTo(map));
     }
   }
@@ -993,7 +1061,12 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     },
     showBridges(items) {
       bridgeItems = Array.isArray(items) ? items.filter((i) => Array.isArray(i?.lonlat)) : [];
-      drawBridges();
+      drawBridges({ force: true });
+    },
+    /** v81 : sections interdites du tracé choisi (morceaux [[lon, lat], …]) ; liste vide = aucune. */
+    showBanSections(lines) {
+      banLines = Array.isArray(lines) ? lines : [];
+      map?.getSource(BAN_SOURCE)?.setData(banData());
     },
     /** Appelé avec la clé du repère de pont touché (à l'arrêt). */
     onBridgePick(cb) {
@@ -1064,7 +1137,8 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
     /** Entrée / sortie du mode guidage. En sortie : carte à plat, nord en haut, itinéraire entier. */
     setNavigating(on) {
       navigating = on;
-      drawBridges(); // phase 12a : aucun repère de pont pendant le guidage
+      drawBridges({ force: true }); // phase 12a : aucun repère de pont pendant le guidage
+      map?.getSource(BAN_SOURCE)?.setData(banData()); // v81 : aucune section rouge pendant le guidage
       applyLayer(); // boutons « Plan / Satellite » de l'arrêt masqués en guidage (le guidage a le sien)
       if (!map) return;
       map.resize();

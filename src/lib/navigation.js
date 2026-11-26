@@ -20,7 +20,7 @@ import { prepareGuidanceWind, guidanceWind, placeWind } from './wind.js';
 import { tunnelsAlongRoute, guidanceTunnel } from './adr.js';
 import { prepareGuidanceBorders, guidanceBorder } from './country-rules.js';
 import { localAlongRoute, guidanceLocal } from './access-local.js';
-import { conditionalAlongRoute, guidanceConditional } from './access-conditional.js';
+import { conditionalAlongRoute, guidanceConditional, mergePassages } from './access-conditional.js';
 import { countriesAlongRoute } from './countries.js';
 import { speedLimitsAlongRoute, limitAt } from './speed-limit.js';
 import { directionsForManeuvers, withDirections } from './directions.js';
@@ -246,14 +246,17 @@ function placeLocal(rules, route) {
   return localAlongRoute(route).passages.filter((p) => !p.accepted);
 }
 
-/** Voies à accès conditionnel suivies par l'itinéraire (phase 5d, copie data/acces-osm/ des cases du trajet). */
+/**
+ * Voies à accès conditionnel suivies par l'itinéraire (phase 5d, copie data/acces-osm/ des cases du trajet), réunies
+ * en plages (v81 : un bandeau et une seule voix par plage, pas une par voie OSM).
+ */
 function placeAccess(rules, route, now) {
   if (!rules?.vehicle || !rules.access?.length) return [];
   const ctry = countriesAlongRoute(route);
   const countryAt = ctry.ok ? (al) => ctry.segments.find((x) => al >= x.enter && al <= x.exit)?.code ?? null : null;
-  return conditionalAlongRoute(route, {
+  return mergePassages(conditionalAlongRoute(route, {
     ways: rules.access, vehicle: rules.vehicle, departure: new Date(now || Date.now()), countryAt,
-  }).passages;
+  }).passages);
 }
 
 /**

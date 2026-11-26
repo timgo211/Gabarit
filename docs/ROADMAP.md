@@ -651,6 +651,17 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     ORS réel : à vérifier sur la tablette (Nancy → Colmar 44 t : pas de N59, pas de demi-tour).
   - [x] **v80 — PR D** : hauteurs Mont-Blanc / Fréjus (profil > valeur de l'arrêté) par le chemin v78 / v79. Hauteurs
     basses ponctuelles : alerte seule (faux positif A86 Duplex constaté). Non vérifié sur ORS réel.
+  - [x] **v81 — interdictions lisibles** (test tablette Nancy → Colmar du 26/11/2026) : « Accès PL limité » en plages
+    (2 km, une voix par plage en guidage) ; une ligne par section (titre, règle, plage km, source) sur la fiche et dans
+    les notes, plages OSM qui la touchent (5 km) absorbées ; carte : trait rouge fin par section, un « ! », ponts
+    regroupés à zoom < 11 ; raison du contournement sur la fiche, bloc « Contournement automatique » au diagnostic,
+    raison gardée par la mémoire ; contournement sur la zone élargie (copie ∪ plages OSM, A avant la zone) ; fiche rouge
+    → « X évite … » (jamais promue, choix du 26/11/2026) ; veto du nom d'étape levé par la géométrie (tous les tronçons,
+    `geoRoadsAll` : « A 46 » sur l'A7 après Ternay). Non vérifié sur ORS réel.
+  - [ ] **Copie des points sensibles : sections entières** (PR à part) : l'audit (`restrictionCards`, `osm-audit.js`)
+    ne garde que les voies SANS l'étiquette attendue ; les voies déjà étiquetées `hgv:conditional` (N59 Lunéville →
+    Raon-l'Étape) n'ont donc aucun point. Garder aussi les voies étiquetées des sections (jamais une fiche à corriger) ;
+    ~30 lignes + tests, une exécution de l'Action « Audit OSM », quelques centaines de points, 0 requête ORS.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

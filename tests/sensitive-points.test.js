@@ -127,6 +127,22 @@ test('veto de référence : étape ORS ou repli 3a d\'une autre route → rien',
   assert.equal(sensitivePointsAlongRoute(r, copy.data, { geo }).length, 0);
 });
 
+// v81 : ORS garde le nom du premier tronçon d'une étape (« A 46 » sur l'A7 après Ternay, Mâcon → Valence).
+test('v81 : veto levé si la géométrie (tous les tronçons) donne la référence du point ; sinon inchangé', () => {
+  const copy = copyOf(built());
+  const named = route('A 46');
+  assert.equal(sensitivePointsAlongRoute(named, copy.data).length, 0, 'nom seul : veto comme avant');
+  const geoAll = { status: 'ok', ref: new Array(40).fill('A6') };
+  assert.ok(sensitivePointsAlongRoute(named, copy.data, { geoAll }).length > 0, 'géométrie A6 : point gardé');
+  const other = { status: 'ok', ref: new Array(40).fill('A7') };
+  assert.equal(sensitivePointsAlongRoute(named, copy.data, { geoAll: other }).length, 0, 'géométrie d\'une autre route : veto');
+  // Repli des étapes sans nom (geo) inchangé : geoAll ne remplace jamais une référence absente.
+  assert.equal(sensitivePointsAlongRoute(route('D 306'), copy.data, { geoAll: other }).length, 0);
+  // Fiche : la ligne d'une interdiction garde sa section (remplacée par la ligne unique de route-bans.js).
+  const lines = sensitiveRules(route('A 6'), { vehicle: SEMI, copy }).lines;
+  assert.ok(lines.some((l) => Number.isInteger(l.section)));
+});
+
 test('véhicule : hauteur ≤ véhicule + 0 m → signalée, plus haute → rien ; tonnage au-dessus du seuil seulement', () => {
   const low = { type: SENSITIVE.TYPES.LOW, value: 3.5 };
   const high = { type: SENSITIVE.TYPES.LOW, value: 4.5 };
