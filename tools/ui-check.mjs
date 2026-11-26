@@ -3938,6 +3938,7 @@ async function drawCheck(browser, base) {
   const { page, ctx, errors } = await open(browser, base, { width: 1280, height: 800, theme: 'day', layer: 'plan', slowTiles: true });
   // Pixels ambre déjà là sans tracé (titre, point GPS) : le tracé doit en ajouter nettement.
   let baseline = await bluePixels(page);
+  const empty = baseline;
   const expect = async (label, n) => {
     await page.waitForTimeout(1500);
     const d = await drawnRoutes(page);
@@ -3963,14 +3964,37 @@ async function drawCheck(browser, base) {
   await page.reload();
   await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
   await page.waitForSelector('.route-card', { timeout: 10000 });
-  // Tracé repris : données et couche seulement. Les pixels ne sont pas comptés ici : si la reprise finit avant la
-  // création de la carte (style chargé en asynchrone), showRoutes de map.js sort sur `if (!map) return;` et la carte
-  // garde la vue France (zoom 5) : tracé dessiné mais minuscule, sans cadrage ni repères (défaut connu, signalé à part).
-  await page.waitForTimeout(1500);
-  const resumed = await drawnRoutes(page);
-  const nCards = await page.locator('.route-card').count();
-  check(resumed.features === nCards && resumed.layer && resumed.visible, 'page rechargée : itinéraire repris (v53), tracés dans la carte',
-    `source ${resumed.features}/${nCards}, couche ${resumed.layer ? (resumed.visible ? 'visible' : 'masquée') : 'absente'}, ${resumed.view}`);
+  // v85 : itinéraire repris, même si la reprise finit avant la création de la carte (style en asynchrone) : dessiné,
+  // cadré (tous les points dans la vue, zoom de l'itinéraire, pas la vue France au zoom 5), repères départ / arrivée
+  // une seule fois. 10 rechargements, 0 échec attendu (avant v85 : vue France environ 1 fois sur 8).
+  baseline = empty;
+  let resumedOk = 0;
+  const RELOADS = 10;
+  for (let i = 1; i <= RELOADS; i += 1) {
+    if (i > 1) {
+      await page.reload();
+      await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
+      await page.waitForSelector('.route-card', { timeout: 10000 });
+    }
+    await page.waitForTimeout(1500);
+    const r = await drawnRoutes(page);
+    const nCards = await page.locator('.route-card').count();
+    const blue = (await bluePixels(page)) - baseline;
+    const framed = await page.evaluate(() => {
+      const m = window.__maps.at(-1);
+      const pts = m.getSource('route')?._data?.features?.flatMap((f) => f.geometry?.coordinates ?? []) ?? [];
+      const b = m.getBounds();
+      return { all: pts.length > 0 && pts.every((p) => b.contains(p)), zoom: m.getZoom(),
+        start: document.querySelectorAll('#map .maplibregl-marker').length };
+    });
+    const marks = await page.evaluate(() => [...document.querySelectorAll('#map .maplibregl-marker')]
+      .filter((n) => !n.matches('.me-marker, .area-marker, .bridge-marker, .sensitive-marker, .stop-marker, .report-marker, [class*="area"]')).length);
+    const ok = r.features === nCards && r.layer && r.visible && blue > 2000 && framed.all && framed.zoom > 8 && marks === 2;
+    if (ok) resumedOk += 1;
+    else check(false, `rechargement ${i} : itinéraire repris dessiné et cadré`,
+      `source ${r.features}/${nCards}, +${blue} px ambre, ${r.view}, repères départ / arrivée ${marks}`);
+  }
+  check(resumedOk === RELOADS, `page rechargée : itinéraire repris dessiné et cadré, ${RELOADS} rechargements`, `${resumedOk}/${RELOADS}`);
   // Régression v17 : rechargement sans itinéraire gardé, puis nouveau calcul (mémoire effacée avant, sinon la
   // référence contient déjà le tracé repris).
   await page.evaluate(() => new Promise((r) => { const q = indexedDB.deleteDatabase('gabarit-route'); q.onsuccess = q.onerror = q.onblocked = () => r(); }));
