@@ -903,6 +903,8 @@ input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--primary
 .area-marker.area-group { width: auto; min-width: 44px; height: 32px; padding: 0 8px; border-radius: 16px; font-size: 16px; white-space: nowrap; }
 /* Limites de poids d'OSM (phase 12a bis) : même repère, valeur écrite (« 3,5 t »), à l'arrêt seulement. */
 .bridge-marker.weight-marker { width: auto; min-width: 44px; height: 32px; border-radius: 16px; padding: 0 8px; font-size: 14px; white-space: nowrap; }
+/* Limites officielles DiaLog (phase 12c) : même repère, bord pointillé (« à vérifier »), à l'arrêt seulement. */
+.bridge-marker.dialog-marker { border-style: dashed; border-width: 3px; }
 .area-marker {
   width: 30px; height: 30px; padding: 0; border-radius: 8px; cursor: pointer;
   display: grid; place-items: center; font: 800 18px/1 system-ui, sans-serif;

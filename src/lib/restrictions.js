@@ -17,7 +17,7 @@ export const RESTR_RADIUS_M = 30;
 
 export const RESTR = Object.freeze({
   TYPES: Object.freeze(['height', 'weight', 'avoid']),
-  ORIGINS: Object.freeze(['manual', 'osm-bridge', 'osm-weight']),
+  ORIGINS: Object.freeze(['manual', 'osm-bridge', 'osm-weight', 'dialog']),
   HEIGHT: Object.freeze({ min: 1, max: 6 }),
   WEIGHT: Object.freeze({ min: 1, max: 60 }),
   /** Marge du profil sur la hauteur : la restriction s'applique si hauteur + 0,1 m ≥ valeur. */
@@ -264,6 +264,20 @@ export function fromWeight(item, { now = new Date() } = {}) {
     origin: 'osm-weight', osmId: item.id,
   };
 }
+
+/**
+ * Restriction proposée par « Éviter ce passage » depuis une limite DiaLog (phase 12c) : hauteur ou poids, valeur de la
+ * mesure (maximum autorisé), au milieu du passage sur le tracé (comme fromWeight).
+ */
+export function fromDialog(item, { now = new Date() } = {}) {
+  const title = typeof item.title === 'string' && item.title ? ` : ${item.title}` : '';
+  return {
+    lat: item.point[1], lon: item.point[0], type: item.k === 'h' ? 'height' : 'weight', value: item.value,
+    note: `Limite DiaLog${title}`, date: now.toISOString().slice(0, 10), origin: 'dialog',
+  };
+}
+
+export const DIALOG_AVOID_HELP = "« Éviter ce passage » enregistre une restriction (hauteur ou poids) au milieu du passage sur l'itinéraire ; elle est évitée quand le profil dépasse la limite. Seul l'arrêté fait foi.";
 
 export const WEIGHT_AVOID_HELP = "« Éviter ce passage » enregistre une restriction de poids au milieu du passage sur l'itinéraire ; elle est évitée quand le PTAC du profil dépasse la limite.";
 

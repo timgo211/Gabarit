@@ -562,7 +562,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   temps d'horloge → bornée en travail) ; ✘ « nav-toast » du scénario `guidage` à 412×900 dû à l'environnement
   (wake lock refusée par Chromium sans écran).
 
-- [ ] **Phase 12c — Limites officielles DiaLog (hauteur, poids)** (PR 1 : copie ; PR 2 : interface, v86)
+- [x] **Phase 12c — Limites officielles DiaLog (hauteur, poids)** (PR 1 : copie ; PR 2 : interface, v86)
   Action « DiaLog (copie) » (`.github/workflows/dialog.yml`, lundi + manuelle, `contents: write`, aucun secret) :
   XML DATEX II de la Base nationale de la réglementation de circulation (Licence Ouverte 2.0), lu en flux
   (`tools/dialog-update.mjs`, lecteur de `tools/dialog-etude.mjs`), mesures gardées par `tools/dialog-convert.mjs` :
@@ -570,8 +570,17 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   autorisé, opérateur ignoré (toujours lessThanOrEqualTo). Fin passée → ignorée ; période récurrente → « sur
   période » ; début futur → « à partir du ». Cases de 1° `data/dialog/` (5 Mo / 30 Mo, simplification 3 → 8 → 20 m),
   index avec date de publication, date de copie, nombre de mesures ; échec → anciens fichiers gardés. Jamais précachés.
-  PR 2 : fiche et repères à l'arrêt seulement (« à vérifier — seul l'arrêté fait foi — la signalisation fait foi »),
-  jamais dit ni dans le guidage.
+  Premier lancement (26/11/2026) : 2 840 mesures gardées (hauteur 247, poids 2 593), 60 cases, 1,1 Mo ; boîte Vosges :
+  Rosières-aux-Salines (54, 3,4 m, beffroi), Frizon (« PONT FRAGILE », 3,5 t), Eloyes (3,5 t, travaux, au 31/12/2026).
+  PR 2 (v86, `src/lib/dialog-limits.js`) : tronçon suivi (`followedRuns` de weight-check.js : 15 m, cap modulo 180°),
+  hauteur visée si hauteur + 0,1 m ≥ valeur, poids si PTAC > valeur, donnée du profil inconnue → montrée ; fiche à
+  l'arrêt seulement : « Hauteur limitée à X m (DiaLog) — « titre » — organisation — permanent | du … au … | à partir
+  du … [, sur période] [— dérogations possibles]. À vérifier — seul l'arrêté fait foi — la signalisation fait foi. »,
+  5 au plus + « +N » ; même passage déjà connu par OSM (poids de même valeur à 15 m) : une ligne « DiaLog et
+  OpenStreetMap ». Repères `.dialog-marker` au bord pointillé (« 3,4 m », « 3,5 t »), « Éviter ce passage » (origine
+  `dialog`). Réglage « Afficher les limites officielles (DiaLog) » (activé) ; ligne technique « Limites DiaLog : N
+  (hauteur x, poids y) ; copie du JJ/MM/AAAA » ; crédit dans Sources et licences avec la date. Copie absente, hors
+  France : rien, aucun message. Jamais dit ni dans le guidage.
 - [x] **v43 — Ne jamais recommander un itinéraire par un tunnel interdit**
   « Recommandé » (2g) écarte tout itinéraire calculé qui traverse un tunnel dont l'interdiction est confirmée pour le
   profil (classe Euro : texte officiel ou exploitant ; ADR quand le profil a des matières dangereuses), si une autre

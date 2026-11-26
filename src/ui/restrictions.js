@@ -5,8 +5,9 @@
 import { $, el } from './dom.js';
 import {
   addRestriction, updateRestriction, removeRestriction, restrictionLabel, canEditRestrictions, fromBridge,
-  fromWeight, HELP_TEXT, BRIDGE_AVOID_HELP, WEIGHT_AVOID_HELP, TYPE_LABELS,
+  fromWeight, fromDialog, HELP_TEXT, BRIDGE_AVOID_HELP, WEIGHT_AVOID_HELP, DIALOG_AVOID_HELP, TYPE_LABELS,
 } from '../lib/restrictions.js';
+import { dialogText, localDay } from '../lib/dialog-limits.js';
 
 /**
  * @param {{ getList:()=>object[], setList:(list:object[])=>void, getCenter:()=>number[]|null,
@@ -100,7 +101,8 @@ export function createRestrictions(ctx) {
   avoid.addEventListener('click', () => {
     if (!allowed() || !bridgeItem) return;
     try {
-      ctx.setList(addRestriction(ctx.getList(), bridgeKind === 'weight' ? fromWeight(bridgeItem) : fromBridge(bridgeItem)));
+      const raw = bridgeKind === 'weight' ? fromWeight(bridgeItem) : bridgeKind === 'dialog' ? fromDialog(bridgeItem) : fromBridge(bridgeItem);
+      ctx.setList(addRestriction(ctx.getList(), raw));
       say(panelStatus, 'Passage enregistré dans Mes restrictions : évité au prochain calcul (« Calculer l\'itinéraire »).');
     } catch (err) {
       say(panelStatus, err.message);
@@ -134,6 +136,19 @@ export function createRestrictions(ctx) {
       bridgeKind = 'weight';
       panelText.textContent = `${item.text} (km ${Math.round(item.along / 1000)})`;
       panelHelp.textContent = WEIGHT_AVOID_HELP;
+      say(panelStatus, '');
+      panel.hidden = false;
+      render();
+    },
+    /**
+     * Repère de limite officielle DiaLog touché (phase 12c, à l'arrêt) : texte de la mesure (titre de l'arrêté et
+     * organisation en textContent, jamais interprétés), aide et « Éviter ce passage ».
+     */
+    openDialog(item) {
+      bridgeItem = item;
+      bridgeKind = 'dialog';
+      panelText.textContent = `${dialogText(item, localDay())} (km ${Math.round(item.along / 1000)})`;
+      panelHelp.textContent = DIALOG_AVOID_HELP;
       say(panelStatus, '');
       panel.hidden = false;
       render();

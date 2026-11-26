@@ -136,6 +136,12 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
   vérifier », repères `.bridge-marker.weight-marker` (texte « 3,5 t », même calque que les ponts, retirés en guidage),
   repère touché → `#bridge-panel` (`restrictionsUi.openWeight`, aide `WEIGHT_AVOID_HELP`) ; Réglages › Limites de poids,
   case `#weight-warnings` (`settings.weightWarnings`, activée par défaut). Jamais de voix ni de bandeau.
+- Phase 12c (v86) : limites officielles DiaLog — copie `data/dialog/` (`src/ui/dialog-limits.js`, `createTileCopy`),
+  règles `dialogRules` (`src/lib/dialog-limits.js`) appelées par `routeRules` après les poids OSM (poids OSM de même
+  valeur à 15 m absorbé) ; lignes `warn` / `sev:'check'` (5 + « +N »), repères `.bridge-marker.weight-marker.dialog-marker`
+  (bord pointillé, texte « 3,4 m » / « 3,5 t »), toucher → `restrictionsUi.openDialog` (textContent, `DIALOG_AVOID_HELP`,
+  `fromDialog`) ; Réglages › Limites de poids, case `#dialog-warnings` (`settings.dialogWarnings`, oui par défaut) ;
+  crédit `#dialog-credit` + `#dialog-copy-date` (index.json lu à l'ouverture de Réglages). Copie absente : rien.
 - Phase 12b : Réglages › Mes restrictions (`#restrictions-card` : type, valeur, note, « Ajouter au centre de la carte »,
   liste Modifier / Supprimer) ; repère de pont touché → `#bridge-panel` (texte, aide `BRIDGE_AVOID_HELP`, « Éviter ce
   passage », fermé au démarrage du guidage). Boutons refusés si `canEditRestrictions` faux (en guidage hors

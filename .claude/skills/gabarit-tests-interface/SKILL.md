@@ -17,7 +17,7 @@ Interface dans Chromium (Playwright, hors CI, à relancer après toute modif d'i
 npm install --no-save --no-package-lock maplibre-gl@4.7.1   # une fois (node_modules/ ignoré par git)
 node tools/ui-check.mjs            # ou un scénario : layout | long | satellite | context | parked | comfort | destinations
                                    #   | overview | press | areas | foot | rules | drive | adr | draw | border | access | winter
-                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | recommande | autres | camion
+                                   #   | euro | tolls | failed | palette | guidage | bandeau | ponts | restrictions | poids | dialog | recommande | autres | camion
                                    #   | carburant | etapes | historique | limites | preparation | suggestions
                                    #   | signalements | lieux | ami
 ```
@@ -85,6 +85,12 @@ test `streets: true` porte une attribution) ; « Autres itinéraires » grisé o
   « Limites de poids : 3 », repère touché → panneau, « Éviter ce passage » → restriction poids `osm-weight` au point
   du tracé ; Réglages : case cochée ; guidage : aucun repère, rien à l'écran ni à voix haute ; réglage désactivé ;
   copie absente → « données non chargées ».
+- `dialog` (phase 12c) : même trajet, copies `data/poids-osm/` et `data/dialog/` simulées (`dialogCopy: 'fixture'`,
+  `dialogCopyFiles` passe par `tools/dialog-convert.mjs` ; par défaut 404, même si la vraie copie est dans le dépôt).
+  412×900 et 900×412, jour et nuit : 2 lignes DiaLog (poids 3,5 t fusionné avec la Rue du Viaduc OSM « DiaLog et
+  OpenStreetMap », hauteur 3,4 m au titre « <b>… » affiché en texte), mesure terminée et croisement ignorés, 2 repères
+  `.dialog-marker` pointillés, ligne technique, panneau et « Éviter ce passage » (origine `dialog`) ; Réglages : case
+  cochée, crédit avec la date ; guidage : aucun repère, rien à l'écran ni à voix haute ; réglage non ; copie absente = rien.
 - Environnement (constaté le 23/11/2026) : Chromium sans écran refuse la wake lock → « Écran non maintenu allumé »
   dans le panneau du bas, plus haut que sur la tablette ; à 412×900 (`guidage`) le message bref passe alors sur les
   alertes (✘ « nav-toast », vert avec une wake lock simulée). 760×360 à l'arrêt (alerte de conduite avec « Pas une

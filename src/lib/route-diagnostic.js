@@ -74,6 +74,7 @@ export function routeDiagnosticText(route, { version = '', rules = null, label =
   if (!steps.length) lines.push('  (aucune étape)');
   if (rules?.bridges?.tech) lines.push(rules.bridges.tech); // phase 12a : mesure du bruit sur de vrais trajets
   if (rules?.weightLimits?.tech) lines.push(rules.weightLimits.tech); // phase 12a bis : « Limites de poids : N »
+  if (rules?.dialogLimits?.tech) lines.push(rules.dialogLimits.tech); // phase 12c : « Limites DiaLog : N (…) »
   if (rules?.speedLimits?.tech) lines.push(rules.speedLimits.tech); // phase 11a : couverture et sources des limites
   if (rules?.sensitive?.tech) lines.push(rules.sensitive.tech); // PR 3b : points sensibles de l'audit OSM
   // v81 : interdictions connues (plage de la section, points de la copie, plages OSM absorbées) et contournement.

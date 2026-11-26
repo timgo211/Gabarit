@@ -72,6 +72,7 @@ export function createSettings(ctx) {
   const bridgeWarnings = $('#bridge-warnings');
   const autoBypass = $('#auto-bypass'); // v77
   const weightWarnings = $('#weight-warnings');
+  const dialogWarnings = $('#dialog-warnings');
   const windVoice = $('#wind-voice');
   const speedVoice = $('#speed-voice');
   const reportVoice = $('#report-voice'); // phase 3a
@@ -190,6 +191,7 @@ export function createSettings(ctx) {
     bridgeWarnings.checked = settings.bridgeWarnings !== false;
     autoBypass.checked = settings.autoBypass !== false;
     weightWarnings.checked = settings.weightWarnings !== false;
+    dialogWarnings.checked = settings.dialogWarnings !== false;
     windVoice.checked = settings.windVoice;
     speedVoice.checked = settings.speedVoice === true;
     reportVoice.checked = settings.reportVoice === true;
@@ -314,6 +316,7 @@ export function createSettings(ctx) {
   bridgeWarnings.addEventListener('change', () => ctx.onBridgeWarningsChange?.(bridgeWarnings.checked));
   autoBypass.addEventListener('change', () => ctx.onAutoBypassChange?.(autoBypass.checked));
   weightWarnings.addEventListener('change', () => ctx.onWeightWarningsChange?.(weightWarnings.checked));
+  dialogWarnings.addEventListener('change', () => ctx.onDialogWarningsChange?.(dialogWarnings.checked));
   windVoice.addEventListener('change', () => ctx.onWindVoiceChange?.(windVoice.checked));
   speedVoice.addEventListener('change', () => ctx.onSpeedVoiceChange?.(speedVoice.checked));
   reportVoice.addEventListener('change', () => ctx.onReportVoiceChange?.(reportVoice.checked));
