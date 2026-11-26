@@ -5878,7 +5878,7 @@ async function heightsCheck(browser, base) {
   await computeRoute(high.page);
   const red = await high.page.waitForFunction(() => /Contournement automatique impossible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 20000 }).then(() => true).catch(() => false);
   check(red && await high.page.locator('.route-card.banned').count() === 1, '4,80 m : fiche rouge, contournement impossible (tronçon simulé sans détour)');
-  check(/tunnel du Mont-Blanc : hauteur maximale 4,70 m.*Source : arrêté DDT-2020-0825/.test(await high.page.textContent('#route-notes')), '4,80 m : ligne de l\'arrêté');
+  check(/N205 \(tunnel du Mont-Blanc\) : hauteur maximale 4,70 m · km \d+.* · Source : arrêté DDT-2020-0825/.test(await high.page.textContent('#route-notes')), '4,80 m : ligne de l\'arrêté');
   await high.page.click('#btn-nav-start');
   check(await high.page.locator('#start-confirm:not([hidden])').count() === 1 && /Mont-Blanc/.test(await high.page.textContent('#start-confirm')), '4,80 m : confirmation avant le départ');
   await high.page.click('#btn-start-anyway');
