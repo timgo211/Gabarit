@@ -11,6 +11,14 @@ import {
   AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, auditSize, axisCards, axisLevel,
   bridgeCards, bridgeCrossings, buildAxisIndex, keepCard, placeFromFeature, placeIndex, restrictionCards, splitCards,
 } from '../src/lib/osm-audit.js';
+import { parseAggloZones } from '../src/lib/agglo-zones.js';
+
+// v91 : zones des grandes agglomérations SYNTHÉTIQUES couvrant toute la fixture (fiches inchangées par rapport à avant).
+const sq = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
+const FAR = sq(0.1, 40.1, 0.2, 40.2);
+const ALL_ZONES = parseAggloZones(
+  { ileDeFrance: sq(-10, 35, 20, 60), metropoleGrandParis: FAR, aixMarseille: FAR, lille: FAR, bordeaux: FAR, toulouse: FAR, nantes: FAR },
+  { metropoleLyon: FAR, eurometropole: FAR });
 import { SENSITIVE } from '../src/lib/sensitive-points.js';
 
 const way = (id, props, coords) => ({ type: 'Feature', id: `w${id}`, properties: props, geometry: { type: 'LineString', coordinates: coords } });
@@ -46,7 +54,7 @@ function run(features, levels, rules = RULES) {
   const cards = [];
   for (const f of features) {
     const b = auditBridgeFromFeature(f);
-    if (b) cards.push(...bridgeCards(b, bridgeCrossings(b, axes, index), axes));
+    if (b) cards.push(...bridgeCards(b, bridgeCrossings(b, axes, index), axes, { zones: ALL_ZONES }));
   }
   cards.push(...axisCards(axes));
   const r = restrictionCards(rules, axes, placeIndex(places));

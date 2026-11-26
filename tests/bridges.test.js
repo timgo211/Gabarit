@@ -94,7 +94,7 @@ test('hauteur connue dessous (tronçon maxheight à moins de 40 m) : ignoré ; a
   assert.equal(r.counts.knownBelow, 1);
   assert.ok(!r.items.some((it) => it.id === 1007));
   assert.equal(r.counts.motorway, 1);
-  assert.equal(bridgeTechText(r), `Ponts sans hauteur : ${r.counts.high + r.counts.medium} (haute ${r.counts.high}, moyenne ${r.counts.medium}, autoroutes ignorées 1)`);
+  assert.equal(bridgeTechText(r), `Ponts sans hauteur : ${r.counts.high + r.counts.medium} (haute ${r.counts.high}, moyenne ${r.counts.medium}, autoroutes en zone 0, autoroutes ignorées 1)`);
 });
 
 test('pont portant sa propre hauteur : signalé si elle ne dépasse pas celle du véhicule', () => {
@@ -140,7 +140,7 @@ test('fiche : réglage désactivé → rien ; copie absente → « données non 
   const on = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok });
   assert.ok(on.lines.some((l) => l.text.startsWith(BRIDGE.TEXT)));
   assert.match(on.short[0], /^\d+ ponts? à vérifier$/);
-  assert.match(on.tech, /^Ponts sans hauteur : \d+ \(haute \d+, moyenne \d+, autoroutes ignorées 1\)$/);
+  assert.match(on.tech, /^Ponts sans hauteur : \d+ \(haute \d+, moyenne \d+, autoroutes en zone 0, autoroutes ignorées 1\)$/);
   const off = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok, enabled: false });
   assert.deepEqual(off.lines, []);
   assert.deepEqual(off.items, []);
@@ -185,4 +185,85 @@ test('acceptation (données réelles) : sous le pont 243477938 → « haute » �
   const low = bridgesAlongRoute(under, real, { vehicleHeight: 3.5 });
   assert.ok(!low.items.some((x) => x.id === 243477938), 'véhicule de 3,5 m : hauteur connue dessous suffisante');
   assert.ok(low.counts.knownBelow >= 1);
+});
+
+// ───────── v91 : ponts au-dessus des autoroutes, zones des grandes agglomérations (agglo-zones.js) ─────────
+// Zones SYNTHÉTIQUES (2 décimales) : carré autour de l'autoroute du nord de underRoute() (47,668 à 47,672 N).
+const square = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
+function fakeZones(around) {
+  const far = square(0.1, 40.1, 0.2, 40.2);
+  const z = { ileDeFrance: far, metropoleGrandParis: far, aixMarseille: far, lille: far, bordeaux: far, toulouse: far, nantes: far };
+  const c = { metropoleLyon: far, eurometropole: far };
+  if (around) z.lille = square(6.20, 47.665, 6.22, 47.68);
+  return parseAggloZonesFn(z, c);
+}
+let parseAggloZonesFn;
+
+test('v91 : pont sans hauteur sur autoroute en zone → priorité moyenne, compté à part ; hors zone → ignoré', async () => {
+  ({ parseAggloZones: parseAggloZonesFn } = await import('../src/lib/agglo-zones.js'));
+  const inZ = bridgesAlongRoute(underRoute(), data, { vehicleHeight: 4, zones: fakeZones(true) });
+  const m = inZ.items.find((it) => it.id === 1007);
+  assert.equal(m.level, 'medium');
+  assert.equal(m.zone, 'lille');
+  assert.equal(m.text, BRIDGE.TEXT);
+  assert.equal(inZ.counts.motorwayZone, 1);
+  assert.equal(inZ.counts.motorway, 0);
+  assert.match(bridgeLines(inZ.items).find((l) => l.text.startsWith(BRIDGE.TEXT) && /moyenne/.test(l.text)).text, /priorité moyenne\)$/);
+  assert.equal(bridgeTechText(inZ), `Ponts sans hauteur : ${inZ.counts.high + inZ.counts.medium + 1} (haute ${inZ.counts.high}, moyenne ${inZ.counts.medium}, autoroutes en zone 1, autoroutes ignorées 0)`);
+  // Point du croisement dans la zone (2 décimales près) ; les autres ponts du trajet inchangés.
+  assert.ok(m.point[1] > 47.665 && m.point[1] < 47.68);
+  const out = bridgesAlongRoute(underRoute(), data, { vehicleHeight: 4, zones: fakeZones(false) });
+  assert.ok(!out.items.some((it) => it.id === 1007));
+  assert.equal(out.counts.motorway, 1);
+  assert.equal(out.counts.motorwayZone, 0);
+  const none = bridgesAlongRoute(underRoute(), data, { vehicleHeight: 4 });
+  assert.deepEqual(out.items, none.items);
+  assert.deepEqual(inZ.items.filter((it) => it.id !== 1007), none.items);
+});
+
+test('v91 : pont portant une hauteur ≤ véhicule au-dessus d\'une autoroute → priorité haute, en zone ou non', async () => {
+  ({ parseAggloZones: parseAggloZonesFn } = await import('../src/lib/agglo-zones.js'));
+  const r = underRoute();
+  // Tout le tracé en autoroute : le pont 1006 (3,5 m sur le pont) passe au-dessus d'une autoroute.
+  r.roadExtras = { waycategory: [[0, r.coordinates.length - 1, 1]], waytype: [[0, r.coordinates.length - 1, 1]] };
+  r.steps = [{ name: 'A 36', wayPoints: [0, r.coordinates.length - 1] }];
+  const zoneAll = parseAggloZonesFn(
+    { ileDeFrance: square(6.1, 47.6, 6.3, 47.7), metropoleGrandParis: square(0.1, 40.1, 0.2, 40.2), aixMarseille: square(0.1, 40.1, 0.2, 40.2),
+      lille: square(0.1, 40.1, 0.2, 40.2), bordeaux: square(0.1, 40.1, 0.2, 40.2), toulouse: square(0.1, 40.1, 0.2, 40.2), nantes: square(0.1, 40.1, 0.2, 40.2) },
+    { metropoleLyon: square(0.1, 40.1, 0.2, 40.2), eurometropole: square(0.1, 40.1, 0.2, 40.2) });
+  for (const zones of [zoneAll, fakeZones(false), null]) {
+    const res = bridgesAlongRoute(r, data, { vehicleHeight: 4, zones });
+    const low = res.items.find((it) => it.id === 1006);
+    assert.equal(low.level, 'high');
+    assert.equal(low.text, lowBridgeText(3.5));
+    assert.equal(low.zone, undefined);
+  }
+});
+
+test('v91 : zones indisponibles → une seule ligne « à vérifier », aucun pont d\'autoroute signalé ; chargement : comme avant', async () => {
+  const { bridgeRules } = await import('../src/lib/bridge-check.js');
+  const { AGGLO_ZONES } = await import('../src/lib/agglo-zones.js');
+  assert.equal(AGGLO_ZONES.UNAVAILABLE_TEXT, 'Zones des grandes agglomérations indisponibles : ponts sans hauteur au-dessus des autoroutes non examinés. La signalisation fait foi.');
+  const ok = { status: 'ok', data, uncovered: false };
+  const base = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok });
+  const failed = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok, zones: { status: 'failed', data: null } });
+  const zl = failed.lines.filter((l) => l.text === AGGLO_ZONES.UNAVAILABLE_TEXT);
+  assert.equal(zl.length, 1);
+  assert.equal(zl[0].sev, 'check');
+  assert.equal(zl[0].level, 'info');
+  assert.deepEqual(failed.items, base.items);
+  assert.ok(!failed.items.some((it) => it.id === 1007));
+  assert.equal(failed.lines.length, base.lines.length + 1);
+  assert.match(failed.tech, /autoroutes ignorées 1\) ; zones des agglomérations indisponibles$/);
+  for (const st of ['idle', 'loading']) {
+    const r = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok, zones: { status: st, data: null } });
+    assert.deepEqual(r.lines, base.lines);
+  }
+  // Copie des ponts absente ou réglage désactivé : pas de ligne des zones.
+  assert.ok(!bridgeRules(underRoute(), { bridges: { status: 'failed' }, zones: { status: 'failed' } }).lines.some((l) => l.text === AGGLO_ZONES.UNAVAILABLE_TEXT));
+  assert.deepEqual(bridgeRules(underRoute(), { bridges: ok, zones: { status: 'failed' }, enabled: false }).lines, []);
+  // Zones lues : pont 1007 en zone signalé.
+  ({ parseAggloZones: parseAggloZonesFn } = await import('../src/lib/agglo-zones.js'));
+  const zr = bridgeRules(underRoute(), { vehicle: { height: 4 }, bridges: ok, zones: { status: 'ok', data: fakeZones(true) } });
+  assert.ok(zr.items.some((it) => it.id === 1007 && it.level === 'medium'));
 });

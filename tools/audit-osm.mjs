@@ -13,6 +13,9 @@
 // data/axes-osm/ ne change pas avec les niveaux (axes-convert.js : motorway, trunk, primary seulement).
 // Plafond de data/audit-osm/ : 5 Mo par fichier, 30 Mo en tout ; dépassé → ⚠ au journal avec les chiffres, rien n'est
 // écrit (ni audit, ni axes, ni points sensibles, ni rapport : anciens fichiers gardés), code de sortie 1.
+// v91 : niveau 1, fiche « pont sans hauteur » gardée seulement en zone de grande agglomération (data/zones-agglo.json +
+// data/contours-ign.json, lus au tout début) ; fichier absent ou illisible → ⚠, arrêt avant tout téléchargement, rien
+// n'est écrit, code de sortie 1. Options --zones / --contours : autres chemins (tests seulement).
 //
 //   node tools/audit-osm.mjs [--levels 1,2,3]                 télécharge l'extrait et audite (niveaux 1-2 par défaut)
 //   node tools/audit-osm.mjs [--levels …] fichier.osm.pbf [france.poly]     extrait local (osmium nécessaire)
@@ -29,7 +32,7 @@ import { buildCoverage, parseGeojsonLine, parsePoly } from '../src/lib/areas-osm
 import { axisFromFeature, convertAxes } from '../src/lib/axes-convert.js';
 import { writeSensitivePoints } from './points-sensibles.mjs';
 import {
-  AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, auditSize, axisCards, bridgeCards, bridgeCrossings,
+  AUDIT, auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, auditSize, auditZones, axisCards, bridgeCards, bridgeCrossings,
   bridgeNearAxis, buildAxisIndex, placeFromFeature, placeIndex, restrictionCards, splitCards,
 } from '../src/lib/osm-audit.js';
 
@@ -117,7 +120,7 @@ function writeDir(dir, files) {
 }
 
 function parseArgs(argv) {
-  const out = { levels: AUDIT.LEVELS.slice(), pbf: null, seq: null, poly: null };
+  const out = { levels: AUDIT.LEVELS.slice(), pbf: null, seq: null, poly: null, zones: null, contours: null };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a === '--levels') {
@@ -127,6 +130,8 @@ function parseArgs(argv) {
       out.levels = range ? [1, 2, 3].filter((n) => n >= Number(range[1]) && n <= Number(range[2]))
         : v.split(',').map(Number).filter((n) => [1, 2, 3].includes(n));
     } else if (a === '--geojsonseq') out.seq = argv[i += 1];
+    else if (a === '--zones') out.zones = argv[i += 1];
+    else if (a === '--contours') out.contours = argv[i += 1];
     else if (a.endsWith('.poly')) out.poly = a;
     else out.pbf = a;
   }
@@ -136,6 +141,16 @@ function parseArgs(argv) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  // v91 : zones des grandes agglomérations, avant tout téléchargement ; absentes ou illisibles → rien n'est écrit.
+  const paths = { 'data/zones-agglo.json': args.zones, 'data/contours-ign.json': args.contours };
+  const zr = auditZones((f) => readFileSync(paths[f] ?? join(ROOT, f), 'utf8'));
+  if (zr.problem) {
+    say(`⚠ Audit OSM arrêté : ${zr.problem} (zones des grandes agglomérations, ponts au-dessus des autoroutes) — rien `
+      + 'n\'est enregistré (data/audit-osm/, data/axes-osm/, data/points-sensibles/ et docs/audit-osm-axes.md inchangés).');
+    process.exitCode = 1;
+    return;
+  }
+  const zones = zr.zones;
   const start = Date.now();
   const dir = mkdtempSync(join(tmpdir(), 'audit-osm-'));
   let updated = null;
@@ -195,6 +210,7 @@ async function main() {
     // Passe 2 : ponts, en flux.
     const cards = [];
     let nb = 0; let near = 0; let crossing = 0;
+    const zoneStats = { motorwayIn: 0, motorwayOut: 0 };
     const p2 = await readSeq(seq, (f) => {
       const b = auditBridgeFromFeature(f);
       if (!b) return;
@@ -204,10 +220,12 @@ async function main() {
       const x = bridgeCrossings(b, axes, index);
       if (!x.length) return;
       crossing += 1;
-      cards.push(...bridgeCards(b, x, axes));
+      cards.push(...bridgeCards(b, x, axes, { zones, stats: zoneStats }));
     });
     say(`Passe 2 (ponts) : ${nb} ponts lus, ${near} à moins de ${AUDIT.NEAR_M} m d'un axe examinés (garde-fou : les `
       + `autres écartés sans calcul), ${crossing} au-dessus d'un axe ; ${p2.seconds} s, mémoire max ${mo(p2.rss)}.`);
+    say(`Ponts sans hauteur au-dessus des autoroutes (niveau 1) : ${zoneStats.motorwayIn} gardés (zones des grandes `
+      + `agglomérations), ${zoneStats.motorwayOut} retirés (hors zone).`);
     if (existsSync(PONTS_INDEX)) {
       try {
         const pi = JSON.parse(readFileSync(PONTS_INDEX, 'utf8'));

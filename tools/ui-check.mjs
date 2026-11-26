@@ -2810,7 +2810,7 @@ async function bridgesCheck(browser, base) {
     await page.locator('.route-diag summary').click();
     await page.waitForFunction(() => /Ponts sans hauteur : /.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     const diag = await page.textContent('.route-diag-text');
-    check(/Ponts sans hauteur : 2 \(haute 2, moyenne 0, autoroutes ignorées 1\)/.test(diag), `${tag} : ligne technique des ponts`, (diag.match(/Ponts sans hauteur[^\n]*/) ?? [''])[0]);
+    check(/Ponts sans hauteur : 2 \(haute 2, moyenne 0, autoroutes en zone 0, autoroutes ignorées 1\)/.test(diag), `${tag} : ligne technique des ponts`, (diag.match(/Ponts sans hauteur[^\n]*/) ?? [''])[0]);
     // Repère touché : texte en message, jamais dit.
     await page.locator('.bridge-marker.high').first().click({ force: true });
     await page.waitForTimeout(300);

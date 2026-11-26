@@ -54,6 +54,11 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
     `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
     api.openstreetmap.org bloqué ; id 243477938 du constat)
+  - v91 : `agglo-zones.js` (pur, appli et audit : `parseAggloZones` des 9 zones de `data/zones-agglo.json` +
+    `data/contours-ign.json`, tout ou rien ; `aggloZoneAt`) ; pont sans hauteur au-dessus d'une autoroute signalé
+    (moyenne, `counts.motorwayZone`) seulement en zone, audit niveau 1 idem (`bridgeCards` `{ zones, stats }`,
+    `auditZones`, arrêt sans écriture si zones illisibles) ; app : `loadAgglo` (échec retenté au calcul suivant) ;
+    tests `tests/agglo-zones-ponts.test.js`
   - phase 11a : `speed-convert.js` (Action : voies motorway à tertiary et bretelles avec `maxspeed:hgv` / `maxspeed`
     en km/h, sens → la plus basse, drapeau conditions, voies mises bout à bout, `data/vitesses-osm/` mêmes cases que
     les ponts, 5 Mo / 40 Mo, 3 → 8 → 20 m, puis copie réduite, sinon rien), `speed-rules.js` (règles générales PL :
