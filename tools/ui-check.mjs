@@ -5478,6 +5478,9 @@ async function savedPlacesCheck(browser, base) {
  * aperçu + confirmation (refus → rien), puis accepté → « importé, à vérifier », note en texte brut, aucun élément créé.
  * v69 : import à l'arrêt seulement (relevés GPS hors guidage) : bouton grisé en roulant (« Disponible à l'arrêt »),
  * actif à l'arrêt ; le camion repart avant « Importer » → « Import annulé : camion en mouvement. », rien de fusionné.
+ * v87 : fichier .txt en text/plain ; partage simulé comme Chromium (canShare refuse application/json, accepte
+ * text/plain) → navigator.share reçoit le .txt et le titre « Signalements Gabarit » ; sans partage → téléchargement du
+ * même .txt + « Fichier téléchargé : joins-le à ton message. » ; import .txt, ancien .json, .txt invalide (rien ajouté).
  */
 async function reportsShareCheck(browser, base) {
   const reports = [
@@ -5491,22 +5494,40 @@ async function reportsShareCheck(browser, base) {
     await page.evaluate((pl) => { const d = JSON.parse(localStorage.getItem('gabarit.data')); d.places = pl; localStorage.setItem('gabarit.data', JSON.stringify(d)); }, places);
     await page.reload();
     await page.waitForTimeout(800);
-    await page.evaluate(() => { navigator.share = undefined; }); // téléchargement (comme un navigateur sans partage de fichier)
+    // v87 : partage simulé comme Chromium : application/json refusé, text/plain accepté.
+    await page.evaluate(() => {
+      window.__shared = null;
+      navigator.canShare = (d) => Array.isArray(d?.files) && d.files.every((x) => x.type === 'text/plain' && /\.txt$/.test(x.name));
+      navigator.share = async (d) => { const fl = d.files[0]; window.__shared = { name: fl.name, type: fl.type, title: d.title, text: await fl.text() }; };
+    });
     await openSettings(page);
     await page.waitForSelector('#reports-card');
+    check(await page.textContent('#btn-reports-share') === 'Partager mes signalements'
+      && (await page.textContent('#sec-reports-body')).includes('Ton ami l\'ouvre avec Importer le fichier d\'un ami… dans Réglages de Gabarit.')
+      && await page.getAttribute('#reports-import-file', 'accept') === '.txt,.json,text/plain,application/json',
+    `${tag} : bouton « Partager mes signalements », aide pour l'ami, import .txt et .json`);
+    const [noDl] = await Promise.all([page.waitForEvent('download', { timeout: 1500 }).catch(() => null), page.click('#btn-reports-share')]);
+    const shared = await page.evaluate(() => window.__shared);
+    check(!noDl && /^gabarit-signalements-\d{4}-\d\d-\d\d\.txt$/.test(shared?.name ?? '') && shared.type === 'text/plain'
+      && shared.title === 'Signalements Gabarit', `${tag} : feuille de partage avec le .txt text/plain, aucun téléchargement`, JSON.stringify(shared)?.slice(0, 200));
+    // Sans partage de fichier : téléchargement du même .txt.
+    await page.evaluate(() => { navigator.share = undefined; });
     const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#btn-reports-share')]);
     let text = '';
     if (dl) text = await (await import('node:fs/promises')).readFile(await dl.path(), 'utf8');
     const f = text ? JSON.parse(text) : null;
-    check(f?.kind === 'gabarit-reports' && f.reports.length === 1 && f.reports[0].createdAt === '2026-11-20'
+    check(f?.kind === 'gabarit-reports' && f.version === 1 && f.reports.length === 1 && f.reports[0].createdAt === '2026-11-20'
       && !/note privée|Maison|Exemple|orsKey|m1|08:15/.test(text), `${tag} : fichier = 1 signalement confirmé, jour seulement, sans note ni lieu`, text.slice(0, 200));
+    check(/\.txt$/.test(dl?.suggestedFilename() ?? '') && text === shared?.text
+      && await page.textContent('#reports-share-status') === 'Fichier téléchargé : joins-le à ton message.',
+    `${tag} : repli = même .txt téléchargé, « Fichier téléchargé : joins-le à ton message. »`, dl?.suggestedFilename());
     const piege = JSON.stringify({ kind: 'gabarit-reports', version: 1, reports: [
       { type: 'danger', lat: 47.1, lon: 5.1, createdAt: '2026-11-01', note: '<img src=x id=piege onerror="window.__pwn=1">', confirmed: true, origin: 'mine', extra: 1 },
       { type: 'control', lat: 47.2, lon: 5.2, createdAt: '2026-11-02' },
       { type: 'inconnu', lat: 47.3, lon: 5.3, createdAt: '2026-11-03' },
       { type: 'low-bridge', lat: 47.25, lon: 5.50001, createdAt: '2026-11-03' },
     ] });
-    const file = { name: 'ami.json', mimeType: 'application/json', buffer: Buffer.from(piege) };
+    const file = { name: 'ami.txt', mimeType: 'text/plain', buffer: Buffer.from(piege) };
     const count = () => page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).reports.length);
     const geo = async (speed, n) => { for (let i = 0; i < n; i += 1) { await setGeo(page, { lon: 5.4, lat: 47.2, accuracy: 5, speed }); await page.waitForTimeout(1000); } };
     // v69 : en roulant, bouton grisé.
@@ -5520,6 +5541,16 @@ async function reportsShareCheck(browser, base) {
     await geo(0, 6);
     check(await page.isEnabled('#reports-import-file') && await page.getAttribute('#btn-reports-import', 'aria-disabled') === 'false'
       && await page.isHidden('#reports-import-hint'), `${tag} : actif à l'arrêt`);
+    // v87 : .txt invalide → message clair, rien ajouté.
+    await page.setInputFiles('#reports-import-file', { name: 'mauvais.txt', mimeType: 'text/plain', buffer: Buffer.from('Salut, regarde ça') });
+    await page.waitForTimeout(300);
+    check(/pas un fichier de signalements Gabarit.*Rien n'a été ajouté/.test(await page.textContent('#reports-share-status'))
+      && await page.isHidden('#reports-import-preview') && await count() === 2, `${tag} : .txt invalide → message clair, rien ajouté`);
+    // Ancien .json (v68) : toujours lu (aperçu), puis annulé.
+    await page.setInputFiles('#reports-import-file', { name: 'ancien.json', mimeType: 'application/json', buffer: Buffer.from(piege) });
+    await page.waitForSelector('#reports-import-preview:not([hidden])', { timeout: 3000 }).catch(() => {});
+    check(/^2 signalements à importer/.test(await page.textContent('#reports-import-text')), `${tag} : ancien .json accepté`);
+    await page.click('#btn-reports-import-cancel');
     await page.setInputFiles('#reports-import-file', file);
     await page.waitForSelector('#reports-import-preview:not([hidden])', { timeout: 3000 }).catch(() => {});
     const asked = await page.textContent('#reports-import-text');

@@ -9,6 +9,11 @@
 // v69 : import à l'arrêt seulement, comme l'édition 3a (canEditReports : parkedState < 5 km/h pendant 3 s ; vitesse
 // inconnue ou GPS refusé = en mouvement, Code de la route art. R412-6-2) : bouton grisé, et contrôle redit au moment
 // de « Importer » (confirmImport) : camion reparti → rien n'est fusionné.
+// v87 : fichier en .txt / text/plain (même JSON, même format, même version). Chromium refuse application/json dans
+// navigator.share (canShare({ files }) → false ; liste des types de fichiers permis du partage Web dans le code de
+// Chromium, chrome/browser/webshare/share_service_impl.cc : .txt / text/plain permis, .json non) : l'appli
+// téléchargeait le fichier et Android proposait « Ouvrir avec » (vu sur la tablette, à recouper après v87). Import : vérifié sur le contenu, jamais sur l'extension ; anciens .json
+// toujours acceptés.
 
 import { REPORT, cleanReport, isDuplicate, sanitizeReports, canEditReports } from './reports.js';
 
@@ -17,7 +22,14 @@ export const SHARE = Object.freeze({
   VERSION: 1,
   /** 512 Ko au plus (500 signalements avec notes tiennent en moins de 200 Ko). */
   MAX_BYTES: 512 * 1024,
-  MIME: 'application/json',
+  /** v87 : text/plain (accepté par le partage Web de Chromium), contenu JSON inchangé. */
+  MIME: 'text/plain',
+  /** v87 : fichiers acceptés à l'import (anciens .json compris) ; seul le contenu est vérifié. */
+  ACCEPT: '.txt,.json,text/plain,application/json',
+  /** Titre de la feuille de partage Android. */
+  TITLE: 'Signalements Gabarit',
+  /** v87 : repli quand le partage du fichier est refusé. */
+  DOWNLOAD_TEXT: 'Fichier téléchargé : joins-le à ton message.',
   /** v69 : bouton d'import grisé hors de l'arrêt. */
   PARKED_ONLY_TEXT: 'Disponible à l\'arrêt',
   /** v69 : « Importer » touché alors que le camion roule (ou vitesse inconnue). */
@@ -25,10 +37,18 @@ export const SHARE = Object.freeze({
   NONE_TEXT: 'Aucun signalement confirmé à partager.',
 });
 
-/** Nom du fichier : « gabarit-signalements-2026-11-24.json ». */
+/** Nom du fichier : « gabarit-signalements-2026-11-24.txt » (v87, .json avant). */
 export function shareFileName(now = new Date()) {
   const p = (n) => String(n).padStart(2, '0');
-  return `gabarit-signalements-${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}.json`;
+  return `gabarit-signalements-${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}.txt`;
+}
+
+/**
+ * v87 : tout ce qu'il faut pour le partage (ou le téléchargement de repli) : nom, contenu, type, titre.
+ * Lève une Error si aucun signalement confirmé (comme buildShareFile).
+ */
+export function shareFileSpec(reports, { withNotes = false, now = new Date() } = {}) {
+  return { name: shareFileName(now), content: buildShareFile(reports, { withNotes }), type: SHARE.MIME, title: SHARE.TITLE };
 }
 
 /**
@@ -57,7 +77,8 @@ export function parseShareFile(text, { makeId } = {}) {
   if (typeof text !== 'string') return { ok: false, error: 'Fichier illisible.' };
   if (new TextEncoder().encode(text).length > SHARE.MAX_BYTES) return { ok: false, error: 'Fichier trop gros (512 Ko au plus).' };
   let raw;
-  try { raw = JSON.parse(text); } catch { return { ok: false, error: 'Fichier illisible (JSON attendu).' }; }
+  // v87 : un .txt passé par une messagerie peut gagner une marque d'ordre des octets (BOM) en tête : retirée.
+  try { raw = JSON.parse(text.replace(/^\uFEFF/, '')); } catch { return { ok: false, error: 'Fichier illisible : ce n\'est pas un fichier de signalements Gabarit (JSON attendu). Rien n\'a été ajouté.' }; }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.kind !== SHARE.KIND) {
     return { ok: false, error: 'Ce fichier n\'est pas un fichier de signalements Gabarit.' };
   }
