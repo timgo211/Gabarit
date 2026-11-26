@@ -503,7 +503,7 @@ function choiceRules(c = choice) {
       r.lines.unshift({ level: 'warn', text: why ? `${LYON_AUTO.BANNED_TEXT} (${why}.)` : LYON_AUTO.BANNED_TEXT });
     }
     // v78 : autres interdictions connues (route-bans.js) : fiche rouge, confirmation, question « desserte locale ».
-    const bans = autoBypassOn() ? routeBans(o.route, r.sensitive?.items ?? [], sensitive.state.meta?.sections ?? []) : [];
+    const bans = autoBypassOn() ? routeBans(o.route, r.sensitive?.items ?? [], sensitive.state.meta?.sections ?? [], { vehicle: c.vehicle }) : [];
     const active = activeBans(bans, c.localAnswers);
     r.bans = active;
     r.localQuestions = localQuestions(bans, c.localAnswers);

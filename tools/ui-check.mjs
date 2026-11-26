@@ -5859,6 +5859,39 @@ async function detourCheck(browser, base) {
   await bad.ctx.close();
 }
 
+/**
+ * v80 : tunnel du Mont-Blanc (hauteur maximale 4,70 m, arrêté) : profil 4,80 m → contournement tenté (tronçon simulé
+ * sans détour → échec), fiche rouge, raison, confirmation ; profil 4,70 m : rien de rouge ; rien dit.
+ */
+async function heightsCheck(browser, base) {
+  const json = simulatedThrough('mont-blanc');
+  json.features[0].geometry.coordinates.sort((p, q) => p[0] - q[0]); // tunnel est-ouest : points rangés par longitude
+  // Départ dans une case couverte par la copie (vers Sallanches) : les cases du tunnel sont hors de sa grille (`inside`),
+  // la case de 1° n'est lue que si le trajet touche une partie couverte (cas d'un vrai trajet venant de France).
+  json.features[0].geometry.coordinates.unshift([6.6, 45.9], [6.75, 45.9]);
+  const line = json.features[0].geometry.coordinates;
+  const truck = (height) => ({ id: 'v1', name: 'Porte-engins', height, width: 2.55, length: 16.5, weight: 44, axleload: 12, maxSpeed: 90 });
+  const high = await open(browser, base, { width: 412, height: 900, voice: true, start: line[0], directions: () => json, overpass: () => ({ elements: [] }), vehicle: truck(4.8) });
+  await computeRoute(high.page);
+  const red = await high.page.waitForFunction(() => /Contournement automatique impossible/.test(document.querySelector('#route-notes')?.textContent ?? ''), null, { timeout: 20000 }).then(() => true).catch(() => false);
+  check(red && await high.page.locator('.route-card.banned').count() === 1, '4,80 m : fiche rouge, contournement impossible (tronçon simulé sans détour)');
+  check(/tunnel du Mont-Blanc : hauteur maximale 4,70 m.*Source : arrêté DDT-2020-0825/.test(await high.page.textContent('#route-notes')), '4,80 m : ligne de l\'arrêté');
+  await high.page.click('#btn-nav-start');
+  check(await high.page.locator('#start-confirm:not([hidden])').count() === 1 && /Mont-Blanc/.test(await high.page.textContent('#start-confirm')), '4,80 m : confirmation avant le départ');
+  await high.page.click('#btn-start-anyway');
+  await high.page.waitForTimeout(1200);
+  const spoken = await high.page.evaluate(() => window.__spoken ?? []);
+  check(!spoken.some((t) => /Mont-Blanc|hauteur|interdi/i.test(t)), '4,80 m : rien dit', spoken.join(' | '));
+  check(high.errors.length === 0, '4,80 m : aucune erreur JavaScript', high.errors.join(' | '));
+  await high.ctx.close();
+  const ok = await open(browser, base, { width: 412, height: 900, start: line[0], directions: () => json, overpass: () => ({ elements: [] }), vehicle: truck(4.7) });
+  await computeRoute(ok.page);
+  await ok.page.waitForTimeout(2500);
+  check(await ok.page.locator('.route-card.banned').count() === 0, '4,70 m : rien de rouge (4,70 m passe)');
+  check(ok.errors.length === 0, '4,70 m : aucune erreur JavaScript', ok.errors.join(' | '));
+  await ok.ctx.close();
+}
+
 const only = process.argv[2];
 try {
   const all = { layout: layoutChecks, long: longTextCheck, satellite: async (b, u) => { await satelliteThemeCheck(b, u); await satelliteBuildingsCheck(b, u); await satelliteAbroadCheck(b, u); }, context: contextLossCheck,
@@ -5870,7 +5903,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

@@ -4,7 +4,13 @@
 // Sections d'interdiction de la copie des points sensibles (data/points-sensibles/, PR 3b : audit OpenStreetMap en
 // lecture seule, tools/audit-osm-interdictions.json, © contributeurs OSM, ODbL) rencontrées par un itinéraire et
 // concernées par le profil (concernsVehicle : poids, hauteur). Lyon (lyon-a6, lyon-a7) a sa règle propre
-// (lyon-bypass.js, contour de la Métropole) ; les hauteurs (Mont-Blanc, Fréjus) relèvent de la PR D : exclues ici.
+// (lyon-bypass.js, contour de la Métropole).
+// v80 (PR D) : sections de hauteur (Mont-Blanc 4,70 m, Fréjus 4,30 m, arrêtés lus : la plupart des voies du tunnel sont
+// sans étiquette maxheight dans OSM, ORS ne les connaît donc pas) retenues seulement si la hauteur du profil est connue
+// et STRICTEMENT supérieure à la valeur de l'arrêté (« hauteur maximale 4,70 m » : 4,70 m passe) ; hauteur égale ou
+// inconnue → ligne « point sensible » seule (v74). Hauteurs basses ponctuelles (type 2, étiquettes OSM qu'ORS applique
+// déjà) : jamais ici (faux positif constaté : A86 Duplex 2 m sous la N 12 à Vélizy, vraie réponse ORS
+// Joigny → Gonfreville) ; ligne « point sensible » seule.
 //
 // Règle d'affichage (choisie par le propriétaire, 25/11/2026) : interdiction sans alternative → itinéraire en rouge et
 // confirmation avant le départ ; source citée, « à vérifier », « la signalisation fait foi ». Interdiction « en transit
@@ -89,15 +95,18 @@ const km = (m) => `km ${Math.round(m / 1000)}`;
  * @param {object} route itinéraire (parseDirections)
  * @param {object[]} items points sensibles concernés par le profil (sensitiveRules(...).items)
  * @param {object[]} sections sections de la copie (meta.sections)
+ * @param {{ vehicle?:object }} [opts] profil (hauteur, v80) ; absent : sections de hauteur ignorées
  * @returns {{ id:string, label:string, along:number, local:boolean, ref:string, text:string, source:string }[]}
  */
-export function routeBans(route, items, sections) {
+export function routeBans(route, items, sections, { vehicle = null } = {}) {
   const out = [];
   const seen = new Set();
+  const h = isNum(vehicle?.height) ? vehicle.height : null;
   for (const it of items ?? []) {
     if (!(it?.type <= SENSITIVE.TYPES.BAN_BF)) continue;
     const s = sections?.[it.section];
-    if (!s?.id || BANS.EXCLUDED.includes(s.id) || s.nature === 'hauteur' || seen.has(s.id)) continue;
+    if (!s?.id || BANS.EXCLUDED.includes(s.id) || seen.has(s.id)) continue;
+    if (s.nature === 'hauteur' && !(h !== null && isNum(s.valeur) && h > s.valeur)) continue; // v80
     const want = oneWayOf(s.sens);
     if (want) {
       const dir = travelAt(route?.coordinates, it.along);

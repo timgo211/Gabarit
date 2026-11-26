@@ -257,7 +257,7 @@ export async function planDetour({ route, bans, copy, vehicle, stops = [], geo =
   let final;
   try { requests += 1; final = await fetchFinal(list); } catch (error) { return { ok: false, reason: 'request', requests, error }; }
   const ids = new Set(bans.map((b) => b.id));
-  const again = routeBans(final, sensitiveRules(final, { vehicle, copy }).items, copy?.meta?.sections ?? []);
+  const again = routeBans(final, sensitiveRules(final, { vehicle, copy }).items, copy?.meta?.sections ?? [], { vehicle });
   if (again.some((b) => ids.has(b.id))) return { ok: false, reason: 'still', requests };
   if (uturnNear(final, list.filter((s) => s.via === true && s.label === DETOUR.VIA_LABEL))) return { ok: false, reason: 'uturn', requests };
   return { ok: true, route: final, stops: list, requests };

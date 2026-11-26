@@ -228,3 +228,12 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   une reprise → message « refais le calcul ») ; « Non » ensuite → recalcul. Coût : 1 + 1 requête pour une
   interdiction (2n + 1 pour n), à part du budget de 3. Non vérifié sur ORS réel (réponses simulées : tests et
   `ui-check contournement`).
+- Hauteurs (v80, PR D, `routeBans(…, { vehicle })`) : sections de nature « hauteur » (mont-blanc 4,70 m, frejus 4,30 m,
+  arrêtés lus ; 9/11 et 8/9 voies sans maxheight dans OSM) retenues si `vehicle.height` connue et strictement > `valeur`
+  (« hauteur maximale 4,70 m » : 4,70 passe) ; égale ou inconnue → ligne v74 seule, sans rouge. Ensuite même chemin que
+  v78 / v79 (rouge, confirmation, contournement par tronçons ; pas de question desserte). Hauteurs basses ponctuelles
+  (type 2) jamais : ORS applique déjà maxheight ; faux positif mesuré sur la vraie réponse ORS Joigny → Gonfreville
+  (4 points A86 à 2 m, Duplex, au km 148, tracé sur la N 12 à Vélizy : routes superposées, 15 m / 30° ne les séparent
+  pas). Grille de la copie (`index.inside`) : cases du Mont-Blanc et du Fréjus hors grille ; la case de 1° n'est lue que
+  si le trajet touche une partie couverte (vrai trajet venant de France : oui ; trajet tout entier dans ces cases :
+  non lu). `ui-check hauteurs`.

@@ -28,7 +28,7 @@ const ROUTE = {
   coordinates: [[FIRST[0], FIRST[1] + 0.4], [FIRST[0], FIRST[1] + 0.2], ...PTS, [LAST[0], LAST[1] - 0.2], [LAST[0], LAST[1] - 0.4]],
   steps: [], distance: 140000, duration: 6000,
 };
-const BANS = routeBans(ROUTE, sensitiveRules(ROUTE, { vehicle: SEMI, copy: COPY }).items, COPY.meta.sections);
+const BANS = routeBans(ROUTE, sensitiveRules(ROUTE, { vehicle: SEMI, copy: COPY }).items, COPY.meta.sections, { vehicle: SEMI });
 const EAST = 0.15;
 /** Tronçon simulé : passe 0,15° à l'est de la section. */
 const legStub = async (a, b) => ({ coordinates: [a, [FIRST[0] + EAST, FIRST[1]], [(FIRST[0] + LAST[0]) / 2 + EAST, (FIRST[1] + LAST[1]) / 2], [LAST[0] + EAST, LAST[1]], b], steps: [] });
@@ -145,4 +145,15 @@ test('fiche, remplacement (rocade retirée si elle passe par la section), zones,
   assert.equal(allDeclared([{ id: 'n7-vienne', local: false }], { 'n7-vienne': true }), false);
   assert.equal(allDeclared([], {}), false);
   assert.ok(!DETOUR_STATES.includes('pending'));
+});
+
+test('v80 : Mont-Blanc pour 4,80 m : tronçon avec un carré par voie du tunnel', () => {
+  const pts = sectionPoints(COPY, 'mont-blanc').map((p) => p.point).sort((a, b) => a[0] - b[0]);
+  const route = { coordinates: [[6.4, 45.9], [6.6, 45.9], ...pts, [7.1, 45.75], [7.3, 45.74]], steps: [] };
+  const vehicle = { weight: 44, height: 4.8 };
+  const bans = routeBans(route, sensitiveRules(route, { vehicle, copy: COPY }).items, COPY.meta.sections, { vehicle });
+  assert.deepEqual(bans.map((b) => b.id), ['mont-blanc']);
+  const plan = detourLegs(route, bans, COPY);
+  assert.equal(plan.ok, true);
+  assert.equal(plan.legs[0].avoid.coordinates.length, 9);
 });

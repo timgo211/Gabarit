@@ -649,7 +649,8 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
   - [x] **v79 — PR C** : contournement par tronçons des nationales (n7-vienne, n59, n66, rn524, le-puy) :
     `ban-detour.js` (tronçon A → B avec carrés de 80 m, puis trajet complet avec points de passage). Non vérifié sur
     ORS réel : à vérifier sur la tablette (Nancy → Colmar 44 t : pas de N59, pas de demi-tour).
-  - [ ] **PR D** : hauteurs (Mont-Blanc, Fréjus, hauteurs basses ≤ véhicule).
+  - [x] **v80 — PR D** : hauteurs Mont-Blanc / Fréjus (profil > valeur de l'arrêté) par le chemin v78 / v79. Hauteurs
+    basses ponctuelles : alerte seule (faux positif A86 Duplex constaté). Non vérifié sur ORS réel.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
