@@ -22,8 +22,9 @@
 // (« nord → sud », « sud → nord ») est retenue seulement si l'itinéraire y roule dans ce sens (latitude 1 km avant et
 // 1 km après le point) ; sens illisible → retenue (prudence).
 
-import { SENSITIVE } from './sensitive-points.js';
+import { SENSITIVE, sensitivePointsAlongRoute } from './sensitive-points.js';
 import { LYON_BYPASS } from './lyon-bypass.js';
+import { formatDurationDelta, formatDistanceDelta } from './format.js';
 
 export const BANS = Object.freeze({
   /** Sections traitées ailleurs : Lyon (rocade Est, v76 / v77). */
@@ -33,6 +34,13 @@ export const BANS = Object.freeze({
   MAX_ANSWERS: 30,
   SHORT_TEXT: 'Interdiction connue sur le trajet',
   CONFIRM_PREFIX: 'Itinéraire par une interdiction connue',
+  /**
+   * v81 : plages « Accès PL limité » (voies OSM à accès conditionnel, access-conditional.js) réunies à la section si
+   * elles la touchent à 5 km près, de proche en proche : sur la N59 (test tablette Nancy → Colmar du 26/11/2026), la
+   * copie des points n'avait que Raon-l'Étape → tunnel (voies déjà étiquetées hgv:conditional exclues de l'audit) et
+   * les voies étiquetées se suivent avec des trous de 3 à 5 km (rapprochement à 80 % de la longueur).
+   */
+  ABSORB_GAP_M: 5000,
 });
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
@@ -89,16 +97,98 @@ export function localPossible(section) {
 }
 
 const km = (m) => `km ${Math.round(m / 1000)}`;
+const num = (x) => String(x).replace('.', ',');
+
+/** Points de la copie d'une section (par son identifiant). */
+export function sectionPoints(copy, id) {
+  const si = (copy?.meta?.sections ?? []).findIndex((s) => s?.id === id);
+  if (si < 0) return [];
+  return (copy?.data?.points ?? []).filter((p) => p.section === si && Array.isArray(p.point) && isNum(p.point[0]) && isNum(p.point[1]));
+}
+
+/** Entrée et sortie (m depuis le départ) des points de la section sur le tracé, ou null. */
+export function sectionSpan(route, points, { geo = null } = {}) {
+  // Chaque point compté à part (le regroupement par section n'en garderait qu'un).
+  const one = (points ?? []).map((p) => ({ ...p, type: SENSITIVE.TYPES.TUNNEL, section: -1 }));
+  const hits = sensitivePointsAlongRoute(route, { points: one }, { geo });
+  if (!hits.length) return null;
+  return { from: hits[0].along, to: hits[hits.length - 1].along };
+}
+
+/** Plage « Accès PL limité » en vigueur à l'heure de passage (voie interdite ou réservée à la desserte). */
+export const activePlage = (p) => p?.state === 'no' || p?.state === 'local';
+
+/**
+ * Plage de la section sur le tracé (v81) : points de la copie, réunis de proche en proche (5 km) avec les plages
+ * « Accès PL limité » actives qui la touchent. Même zone pour l'affichage et pour le contournement (ban-detour.js).
+ * @param {{ from:number, to:number }} base plage des points (ou du premier point rencontré)
+ * @param {object[]} plages mergePassages() de access-conditional.js
+ * @returns {{ from:number, to:number, plages:object[] }}
+ */
+export function widenRange(base, plages, { gap = BANS.ABSORB_GAP_M } = {}) {
+  let { from, to } = base;
+  const taken = [];
+  const rest = (plages ?? []).filter(activePlage);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let i = rest.length - 1; i >= 0; i -= 1) {
+      const p = rest[i];
+      if (p.enter > to + gap || p.exit < from - gap) continue;
+      from = Math.min(from, p.enter);
+      to = Math.max(to, p.exit);
+      taken.push(p);
+      rest.splice(i, 1);
+      changed = true;
+    }
+  }
+  taken.sort((a, b) => a.enter - b.enter);
+  return { from, to, plages: taken };
+}
+
+/** « N59 / N159 (Lunéville – Sélestat) » : routes puis lieux de la source, sans parenthèse. */
+export function sectionTitle(section) {
+  const head = zoneLabel(section);
+  const i = head.indexOf(', ');
+  const roads = i > 0 ? head.slice(0, i) : head;
+  const where = i > 0 ? head.slice(i + 2).replace(/\s*\([^)]*\)/g, '').replace(/\s*→\s*/g, ' – ').trim() : '';
+  return where ? `${roads} (${where})` : roads;
+}
+
+/** « interdite aux plus de 3,5 t en transit » d'après la nature et la valeur de la source ; sinon son texte. */
+export function sectionRule(section) {
+  const t = String(section?.texte ?? '');
+  const tail = t.includes(' : ') ? t.slice(t.indexOf(' : ') + 3).trim() : t.trim();
+  const m = /(\d+(?:[.,]\d+)?)\s*t\b/.exec(tail);
+  const v = isNum(section?.valeur) ? section.valeur : m ? Number(m[1].replace(',', '.')) : null;
+  const local = section?.nature !== 'transit' && /desserte/i.test(tail) ? ', sauf desserte locale' : '';
+  const sens = oneWayOf(section?.sens) ? ` (sens ${section.sens})` : '';
+  let rule = null;
+  if (section?.nature === 'hauteur' && v !== null) rule = `hauteur maximale ${num(isNum(section.valeur) ? section.valeur.toFixed(2) : v)} m`;
+  else if (section?.nature === 'transit' && v !== null) rule = `interdite aux plus de ${num(v)} t en transit`;
+  else if ((section?.nature === 'poids' || section?.nature === 'interdit') && v !== null) {
+    rule = /marchandises/i.test(tail) ? `interdite aux transports de marchandises de plus de ${num(v)} t` : `interdite aux plus de ${num(v)} t`;
+  }
+  return rule ? `${rule}${local}${sens}` : `${tail}${sens}`;
+}
+
+/** « km 39 à 110 » (ou « km 39 »). */
+export function rangeText({ from, to }) {
+  const a = Math.round(from / 1000); const b = Math.round(to / 1000);
+  return b > a ? `km ${a} à ${b}` : `km ${a}`;
+}
 
 /**
  * Interdictions d'un itinéraire.
  * @param {object} route itinéraire (parseDirections)
  * @param {object[]} items points sensibles concernés par le profil (sensitiveRules(...).items)
  * @param {object[]} sections sections de la copie (meta.sections)
- * @param {{ vehicle?:object }} [opts] profil (hauteur, v80) ; absent : sections de hauteur ignorées
- * @returns {{ id:string, label:string, along:number, local:boolean, ref:string, text:string, source:string }[]}
+ * @param {{ vehicle?:object, copy?:object|null, plages?:object[] }} [opts] profil (hauteur, v80) ; absent : sections de
+ *   hauteur ignorées. v81 : copy (points de la section) et plages « Accès PL limité » (mergePassages) pour la plage km.
+ * @returns {{ id:string, label:string, title:string, rule:string, along:number, range:{ from:number, to:number },
+ *   span:{ from:number, to:number }|null, plages:object[], local:boolean, ref:string, text:string, short:string,
+ *   source:string }[]}
  */
-export function routeBans(route, items, sections, { vehicle = null } = {}) {
+export function routeBans(route, items, sections, { vehicle = null, copy = null, plages = [] } = {}) {
   const out = [];
   const seen = new Set();
   const h = isNum(vehicle?.height) ? vehicle.height : null;
@@ -113,11 +203,20 @@ export function routeBans(route, items, sections, { vehicle = null } = {}) {
       if (dir && dir !== want) continue; // autre sens : non concerné
     }
     seen.add(s.id);
-    const source = it.type === SENSITIVE.TYPES.BAN ? `Source : ${s.arrete ?? 'arrêté'}.` : 'Source : Bison Futé, arrêté non lu.';
+    const src = it.type === SENSITIVE.TYPES.BAN ? `Source : ${s.arrete ?? 'arrêté'}` : 'Source : Bison Futé, arrêté non lu';
+    const pts = copy ? sectionPoints(copy, s.id) : [];
+    const span = pts.length ? sectionSpan(route, pts) : null;
+    const wide = widenRange(span ?? { from: it.along, to: it.along }, plages);
+    const range = { from: wide.from, to: wide.to };
+    const title = sectionTitle(s);
+    const rule = sectionRule(s);
     out.push({
-      id: s.id, label: zoneLabel(s), along: it.along, local: localPossible(s), ref: it.ref ?? '',
-      text: `Interdiction connue sur le trajet (${km(it.along)}) : ${s.texte}. En vigueur : à vérifier. La signalisation fait foi. ${source}`,
-      source,
+      id: s.id, label: zoneLabel(s), title, rule, along: it.along, range, span, plages: wide.plages,
+      local: localPossible(s), ref: it.ref ?? '', section: it.section,
+      // v81 : une seule ligne par section (titre, règle, plage km, source), sur la fiche et dans les notes.
+      text: `${title} : ${rule} · ${rangeText(range)} · ${src} · À vérifier. La signalisation fait foi.`,
+      short: `${title} : ${rule} · ${rangeText(range).replace(' à ', '–')}`,
+      source: `${src}.`,
     });
   }
   return out;
@@ -158,4 +257,40 @@ export function sanitizeAnswers(a) {
     if (/^[a-z0-9-]{1,40}$/.test(k) && typeof v === 'boolean') out[k] = v;
   }
   return out;
+}
+
+/**
+ * v81 (choix du propriétaire du 26/11/2026 : indiquer sans promouvoir) : sur une fiche rouge, l'autre fiche calculée qui
+ * n'a ni interdiction connue ni autre rouge (la plus rapide). L'ordre, le « Recommandé » et la confirmation ne changent
+ * pas : arrêtés Bison Futé non lus, l'autre fiche peut passer par des routes secondaires.
+ * @param {{ label:string, blocked:boolean, bans:object[], clean:boolean, duration:number, distance:number }[]} cards
+ * @param {number} i fiche rouge
+ * @returns {string} ligne, ou '' si aucune autre fiche ne convient
+ */
+export function avoidingBansText(cards, i) {
+  const me = cards?.[i];
+  if (!me?.blocked || !me.bans?.length) return '';
+  const ok = cards.map((c, j) => ({ c, j })).filter(({ c, j }) => j !== i && c && !c.blocked && !c.bans?.length && c.clean
+    && isNum(c.duration) && isNum(c.distance));
+  if (!ok.length) return '';
+  const { c } = ok.sort((a, b) => a.c.duration - b.c.duration)[0];
+  const names = [...new Set(me.bans.map((b) => b.title ?? b.label))].join(' ; ');
+  const delta = isNum(me.duration) && isNum(me.distance)
+    ? ` : ${formatDurationDelta(c.duration - me.duration)}, ${formatDistanceDelta(c.distance - me.distance)}` : '';
+  return `${c.label} évite ${names}${delta}. Touche la fiche pour la choisir. À vérifier, la signalisation fait foi.`;
+}
+
+/** v81 : morceau du tracé entre `from` et `to` (m depuis le départ), pour le trait rouge de la carte ; [] si vide. */
+export function rangeCoords(coords, from, to) {
+  if (!Array.isArray(coords) || coords.length < 2 || !isNum(from) || !isNum(to) || to <= from) return [];
+  const out = [pointAt(coords, from)];
+  let cum = 0;
+  for (let i = 1; i < coords.length; i += 1) {
+    const a = coords[i - 1]; const b = coords[i];
+    cum += Math.hypot((b[0] - a[0]) * kxAt(a[1]), (b[1] - a[1]) * KY);
+    if (cum > from && cum < to) out.push(b);
+    if (cum >= to) break;
+  }
+  out.push(pointAt(coords, to));
+  return out.filter(Boolean);
 }

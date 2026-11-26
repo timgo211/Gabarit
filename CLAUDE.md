@@ -140,6 +140,10 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Hauteurs (v80, PR D) : sections Mont-Blanc (4,70 m) et Fréjus (4,30 m) traitées comme v78 / v79 seulement si la
   hauteur du profil est connue et > valeur de l'arrêté (égale ou inconnue : ligne « point sensible » seule). Hauteurs
   basses ponctuelles OSM (type 2) : jamais de contournement (ORS les applique ; faux positif A86 Duplex / N 12).
+- Interdictions lisibles (v81) : « Accès PL limité » en plages (2 km, une voix par plage) ; une ligne par section
+  (titre · règle · plage km · source), plages OSM à ≤ 5 km absorbées, même zone pour le contournement (A avant) ; trait
+  rouge fin sur la carte, ponts regroupés à zoom < 11 ; fiche rouge : raison de l'échec et « X évite … » (jamais promue) ;
+  veto du nom d'étape levé par la géométrie seulement (`geoRoadsAll`). Jamais dit. Détail : skill zfe.
 - DiaLog (réglementation de circulation, DATEX II) : Action manuelle « Étude DiaLog » (`tools/dialog-etude.mjs`, journal
   seulement, rien gardé) ; `comparisonOperator` toujours `lessThanOrEqualTo` (écrit en dur) = valeur maximum autorisée,
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »

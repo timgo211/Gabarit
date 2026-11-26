@@ -237,3 +237,30 @@ description: Règles réglementaires France : ZFE et interdictions PL (phase 5),
   pas). Grille de la copie (`index.inside`) : cases du Mont-Blanc et du Fréjus hors grille ; la case de 1° n'est lue que
   si le trajet touche une partie couverte (vrai trajet venant de France : oui ; trajet tout entier dans ces cases :
   non lu). `ui-check hauteurs`.
+- Interdictions lisibles (v81, test tablette Nancy → Colmar 44 t du 26/11/2026) :
+  « Accès PL limité » (accès conditionnels 5d) : voies OSM contiguës réunies en plages (`mergePassages` :
+  écart ≤ 2 km le long du tracé, même état, même `restrictionText`) pour la fiche (« Accès PL limité km 39 à 47 »), les
+  notes (`plageName` : « Voies sans nom (54 voies) ») et le guidage (`placeAccess` de navigation.js : un bandeau et une
+  seule voix par plage). La N59 porte `hgv:conditional=no @ (weight>3.5)` sur chaque voie (plus de 60 entrées avant).
+  Sections d'interdiction (`route-bans.js`) : `sectionTitle` (« N59 / N159 (Lunéville – Sélestat) »), `sectionRule`
+  (nature / valeur, sinon texte de la source), plage = points de la copie (`sectionSpan`, déplacé ici) ∪ plages « Accès
+  PL limité » actives qui la touchent à 5 km, de proche en proche (`widenRange`, `BANS.ABSORB_GAP_M`) ; ligne unique
+  « titre : règle · km X à Y · Source : … · À vérifier. La signalisation fait foi. » (notes) et `short` (fiche, une par
+  section, `r.bannedLines`) ; plages absorbées et ligne « Point sensible » de la section retirées (`l.plage`,
+  `l.section`). Lyon : `LYON_AUTO.BANNED_SHORT` au même format. Carte : couche `ban-sections-line` (#c62828, 3 px, vide
+  en guidage, `rangeCoords`), « ! » au début de la plage ; ponts / limites regroupés à zoom < 11 (`clusterAreas`, jamais
+  cachés), « ! » jamais regroupé. Contournement (`ban-detour.js`) : même zone (`b.range`), A 15 km avant ; zone évitée =
+  carrés sur les points de la copie + un point tous les 500 m des plages (`zonePoints`, `PLAGE_STEP_M`) ; points de
+  passage à ≥ 2 km de tous ces points ; contrôle final aussi sur les plages (`trace.final.still` 'plages'). `trace`
+  (zone, A, B, vol d'oiseau, carrés, tronçon, points écartés, final) → `choice.banTrace` (jamais gardé) → bloc
+  « Contournement automatique » du diagnostic (`detourTraceText`), avec « Interdictions connues » (zone, points de la
+  copie, plages réunies, « section localisée en partie »). Raison sur la fiche (`r.banFail`) et gardée par la mémoire
+  (`banAutoReason`, clé connue seulement). Fiche rouge : `avoidingBansText` = autre fiche sans interdiction ni autre
+  rouge (la plus rapide) « X évite … : +1 h 01, −19 km. Touche la fiche pour la choisir. » — jamais promue (choix du
+  propriétaire du 26/11/2026 : arrêtés Bison Futé non lus, routes secondaires possibles). Veto du nom d'étape : ORS
+  (GraphHopper) ne crée pas de consigne à une jonction sans autre choix, l'étape garde le nom de son premier tronçon
+  (« A 46 » sur 84 km d'A7 après Ternay, Mâcon → Valence) ; `geoRoadsAll` (axis-match.js, tous les tronçons) ajoute
+  ses références à celles du nom pour le veto des points sensibles et des taxes PL seulement (nom affiché, part A/N,
+  « Recommandé » inchangés) ; diagnostic « géométrie : A 46, A 7 (nom ORS = début de l'étape) » (étape nommée > 5 km).
+  Copie des points : l'audit ne garde que les voies sans l'étiquette attendue → aucun point N59 Lunéville → Raon
+  (voies déjà en `hgv:conditional`) ; correctif de données à part (ROADMAP).

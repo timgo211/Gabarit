@@ -197,7 +197,7 @@ const keyOf = (r) => (r === null ? null : r === 'ambiguous' ? 'ambiguous' : `${r
  *   ambigu (voies de classes ou de références incompatibles) ; distances en m ;
  *   null si le tracé est absent.
  */
-export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COPY_TOLERANCE_M } = {}) {
+export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COPY_TOLERANCE_M, all = false } = {}) {
   const coords = route?.coordinates;
   if (!Array.isArray(coords) || coords.length < 2) return null;
   const n = coords.length - 1;
@@ -206,7 +206,9 @@ export function matchRouteAxes(route, data, { copyTolerance = AXIS_MATCH.MAX_COP
   const amb = new Array(n).fill(false);
   const stats = { samples: 0, segmentsTested: 0, segmentsIndexed: 0 };
   const line = prepareLine(coords);
-  const unnamed = unnamedSegments(route);
+  // v81 : all = tous les tronçons (étapes nommées comprises), pour lever un veto de nom seulement (jamais pour le nom
+  // affiché, la part A/N ni le « Recommandé »).
+  const unnamed = all ? new Array(n).fill(true) : unnamedSegments(route);
   let unnamedM = 0;
   for (let i = 0; i < n; i += 1) if (unnamed[i]) unnamedM += line.cum[i + 1] - line.cum[i];
   const km = { matched: 0, ambiguous: 0, unnamed: unnamedM };
@@ -280,6 +282,23 @@ export function geoRoadsFor(route, data, opts = {}) {
   if (hit && hit.data === data && hit.tol === opts.copyTolerance) return hit.res;
   const res = matchRouteAxes(route, data, opts);
   memo.set(route, { data, tol: opts.copyTolerance, res });
+  return res;
+}
+
+const memoAll = new WeakMap();
+/**
+ * v81 : références retrouvées par la géométrie sur TOUS les tronçons (étapes nommées comprises). ORS garde le nom du
+ * premier tronçon d'une étape jusqu'à la consigne suivante (GraphHopper : pas de consigne à une jonction sans autre
+ * choix) : l'étape « A 46 » de Mâcon → Valence couvre 84 km d'A7 après Ternay. Sert seulement à lever le veto du nom
+ * d'étape (points sensibles, taxes PL) : un point « A7 » sous l'étape « A 46 » est gardé si la géométrie dit A7.
+ * Le nom affiché, la part A/N et le « Recommandé » restent ceux des étapes (étape nommée jamais réécrite).
+ */
+export function geoRoadsAll(route, data, opts = {}) {
+  if (!route || typeof route !== 'object') return null;
+  const hit = memoAll.get(route);
+  if (hit && hit.data === data && hit.tol === opts.copyTolerance) return hit.res;
+  const res = matchRouteAxes(route, data, { ...opts, all: true });
+  memoAll.set(route, { data, tol: opts.copyTolerance, res });
   return res;
 }
 

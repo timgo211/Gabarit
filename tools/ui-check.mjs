@@ -5610,7 +5610,7 @@ async function lyonAutoCheck(browser, base) {
     const red = await page.waitForSelector('.route-card.banned', { timeout: 15000 }).then(() => true).catch(() => false);
     check(red, 'échec : fiche en rouge');
     const cards = await page.$$eval('.route-card', (n) => n.map((c) => c.textContent));
-    check(cards.length === 1 && /Interdit aux plus de 7,5 t en transit, aucune alternative trouvée/.test(cards[0]), 'échec : direct une seule fois, texte rouge', cards.join(' | '));
+    check(cards.length === 1 && /interdites aux plus de 7,5 t en transit, sauf desserte locale, aucune alternative trouvée/.test(cards[0]), 'échec : direct une seule fois, texte rouge', cards.join(' | '));
     check(/aucune alternative trouvée\. À vérifier\. La signalisation fait foi\./i.test(await page.textContent('#route-notes')), 'échec : ligne de la règle, « à vérifier »');
     check(await page.locator('.btn-bypass').count() === 1, 'échec : bouton « Contourner par la rocade Est » gardé');
     await page.click('#btn-nav-start');
@@ -5703,9 +5703,12 @@ async function bansCheck(browser, base) {
     await computeRoute(page);
     const red = await page.waitForSelector('.route-card.banned', { timeout: 15000 }).then(() => true).catch(() => false);
     check(red, `${tag} : fiche en rouge`);
-    check(/Interdiction connue sur le trajet, à vérifier/.test(await page.textContent('.route-card')), `${tag} : texte rouge de la fiche`);
+    // v81 : une ligne courte par section sur la fiche, une ligne complète dans les notes (une seule fois).
+    check(/⛔ N59 \/ N159 \(Lunéville – Sélestat\) : interdite aux plus de 3,5 t en transit · km \d+/.test(await page.textContent('.route-card')), `${tag} : texte rouge de la fiche`);
+    check(await page.locator('.route-card.banned .route-card-banned').count() === 1, `${tag} : une seule ligne rouge par section`);
     const notes = await page.textContent('#route-notes');
-    check(/Interdiction connue sur le trajet \(km \d+\) : N59 \/ N159.*En vigueur : à vérifier\. La signalisation fait foi\. Source : Bison Futé, arrêté non lu\./.test(notes), `${tag} : ligne de l'interdiction, source`);
+    check(/N59 \/ N159 \(Lunéville – Sélestat\) : interdite aux plus de 3,5 t en transit · km \d+.* · Source : Bison Futé, arrêté non lu · À vérifier\. La signalisation fait foi\./.test(notes), `${tag} : ligne de l'interdiction, source`);
+    check((notes.match(/Lunéville – Sélestat\) : interdite/g) ?? []).length === 1 && !/Point sensible \([^)]*\) : N59/.test(notes), `${tag} : ligne de section une seule fois`);
     check(/Desserte locale dans la zone N59/.test(notes), `${tag} : question « Desserte locale »`);
     await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 15 });
     await page.waitForTimeout(800);

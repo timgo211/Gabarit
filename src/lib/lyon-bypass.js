@@ -295,7 +295,7 @@ export const LYON_AUTO = Object.freeze({
   APPLIED_TEXT: 'Contournement de Lyon appliqué : A6 et A7 (Limonest – Ternay) interdites aux plus de 7,5 t en transit, '
     + `sauf desserte locale. À vérifier. La signalisation fait foi. ${SOURCES_TEXT}`,
   REPLACED_TEXT: 'Itinéraire remplacé par le contournement de Lyon (A6 et A7 interdites aux plus de 7,5 t en transit). À vérifier. La signalisation fait foi.',
-  BANNED_SHORT: 'Interdit aux plus de 7,5 t en transit, aucune alternative trouvée',
+  BANNED_SHORT: 'A6 et A7 (Limonest – Ternay) : interdites aux plus de 7,5 t en transit, sauf desserte locale, aucune alternative trouvée',
   BANNED_TEXT: 'Lyon, A6 et A7 (Limonest – Ternay) : interdit aux plus de 7,5 t en transit, sauf desserte locale. Aucune '
     + `alternative trouvée. À vérifier. La signalisation fait foi. ${SOURCES_TEXT}`,
   CONFIRM_TEXT: 'Itinéraire interdit aux plus de 7,5 t en transit (Lyon, A6 et A7). Aucune alternative trouvée. Démarrer quand même ?',

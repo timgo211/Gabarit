@@ -187,7 +187,7 @@ export function inTaxArea(point, tax) {
  * @returns {{ tax:object, enter:number, exit:number, enterTime:Date, roads:string[], countryKnown:boolean,
  *   method:'osm'|'names', networkDate:string|null }[]}
  */
-export function tollsAlongRoute(route, { data, network = null, departure = new Date(), elapsed = (t) => t } = {}) {
+export function tollsAlongRoute(route, { data, network = null, departure = new Date(), elapsed = (t) => t, geoAll = null } = {}) {
   if (!data?.taxes?.length) return [];
   const samples = sampleRoute(route, TOLLS.STEP_M);
   if (!samples.length) return [];
@@ -204,7 +204,7 @@ export function tollsAlongRoute(route, { data, network = null, departure = new D
     if (net) {
       // Géométrie : séries réunies à moins de 2 km, seulement en France (la copie est déjà découpée au périmètre).
       let cur = null;
-      for (const run of matchTollNetwork(route, net, tax)) {
+      for (const run of matchTollNetwork(route, net, tax, { geoAll })) { // v81 : veto du nom levé par la géométrie
         if (!inFrance(run.enter) && !inFrance(run.exit)) continue;
         if (cur && run.enter - cur.exit <= TOLLS.GAP_M) {
           cur.exit = run.exit;
@@ -288,7 +288,7 @@ export function describeToll(p) {
  * @param {{ status:'loading'|'ok'|'failed', data:object|null, network?:object|null }|null} tolls network : parseTollNetwork
  * @returns {{ passages:object[], lines:{ level:'warn'|'info', text:string, url?:string|null }[], short:string[] }}
  */
-export function tollRules(route, { vehicle, tolls = null, departure = new Date(), elapsed = (t) => t } = {}) {
+export function tollRules(route, { vehicle, tolls = null, departure = new Date(), elapsed = (t) => t, geoAll = null } = {}) {
   const out = { passages: [], lines: [], short: [], method: null };
   const ptac = isNum(vehicle?.weight) ? vehicle.weight : null;
   if (ptac !== null && ptac <= TOLLS.MIN_WEIGHT_T) return out;
@@ -304,7 +304,7 @@ export function tollRules(route, { vehicle, tolls = null, departure = new Date()
   out.method = data.taxes.map((t) => ({
     id: t.id, short: t.short, method: network?.taxes?.[t.id] ? 'osm' : 'names', networkDate: network?.updated ?? null,
   }));
-  out.passages = tollsAlongRoute(route, { data, network, departure, elapsed });
+  out.passages = tollsAlongRoute(route, { data, network, departure, elapsed, geoAll });
   for (const p of out.passages) {
     const d = describeToll({ ...p, vehicle });
     const alert = p.tax.status === 'confirmed' && d.inForce;

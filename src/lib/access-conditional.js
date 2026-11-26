@@ -37,6 +37,8 @@ export const ACCESS = Object.freeze({
   BANNER_M: 10000,
   ANNOUNCE_M: 3000,
   ANNOUNCE_MIN_M: 1000,
+  /** v81 : voies contiguës (écart ≤ 2 km le long du tracé, même état, même restriction) réunies en une plage. */
+  MERGE_GAP_M: 2000,
   SIGNAGE: 'la signalisation fait foi',
   UNAVAILABLE_TEXT: 'Restrictions horaires indisponibles (données non chargées).',
   LOADING_TEXT: 'Restrictions horaires : chargement des données…',
@@ -371,6 +373,31 @@ export function conditionalAlongRoute(route, { ways = [], vehicle = null, depart
   return out;
 }
 
+/**
+ * v81 : plages de voies contiguës. Une route découpée en dizaines de voies OSM portant la même étiquette (N59 :
+ * hgv:conditional sur chaque voie, test tablette Nancy → Colmar du 26/11/2026) donnait une ligne et une voix par voie.
+ * Voies réunies si l'écart le long du tracé est ≤ MERGE_GAP_M, même état à l'heure de passage et même restriction
+ * (restrictionText) ; la plage garde l'étiquette de sa première voie (évaluation en guidage), `ids` et `count`.
+ * @param {object[]} passages conditionalAlongRoute().passages (triés)
+ * @returns {object[]} plages triées : { ...première voie, enter, exit, ids, count, names }
+ */
+export function mergePassages(passages, { gapM = ACCESS.MERGE_GAP_M } = {}) {
+  const out = [];
+  for (const p of [...(passages ?? [])].sort((a, b) => a.enter - b.enter)) {
+    const text = restrictionText(p);
+    const last = out[out.length - 1];
+    if (last && last.state === p.state && last.text === text && p.enter - last.exit <= gapM) {
+      last.exit = Math.max(last.exit, p.exit);
+      last.ids.push(p.id);
+      last.count += 1;
+      if (p.name && !last.names.includes(p.name)) last.names.push(p.name);
+      continue;
+    }
+    out.push({ ...p, text, ids: [p.id], count: 1, names: p.name ? [p.name] : [] });
+  }
+  return out.map(({ text, ...r }) => r);
+}
+
 // ───────── Textes ─────────
 
 const km = (m) => `km ${Math.round(m / 1000)}`;
@@ -408,11 +435,26 @@ export function restrictionText(p) {
   return ok.length ? `${r} (PL autorisés ${ok.join(', ')})` : r;
 }
 
-/** Fiche : voie suivie par l'itinéraire, restriction en vigueur ou non à l'heure de passage. */
+/** Fiche : voie (ou plage de voies, v81) suivie par l'itinéraire, restriction en vigueur ou non à l'heure de passage. */
 export function describeConditional(p) {
-  const when = `vous y seriez vers ${km(p.enter)} (vers ${hhmm(p.at)})`;
+  const many = (p.count ?? 1) > 1;
+  const when = many && Math.round(p.exit / 1000) > Math.round(p.enter / 1000)
+    ? `vous y seriez de ${km(p.enter)} à ${Math.round(p.exit / 1000)} (entrée vers ${hhmm(p.at)})`
+    : `vous y seriez vers ${km(p.enter)} (vers ${hhmm(p.at)})`;
   const state = p.state === 'ok' ? 'pas en vigueur à votre passage' : 'en vigueur à votre passage';
-  return `${wayName(p)} ${restrictionText(p)} : ${when}, ${state}. ${capital(ACCESS.SIGNAGE)}.`;
+  return `${many ? plageName(p) : wayName(p)} ${restrictionText(p)} : ${when}, ${state}. ${capital(ACCESS.SIGNAGE)}.`;
+}
+
+/** Nom d'une plage : noms OSM (2 au plus), sinon « Voies sans nom », avec le nombre de voies. */
+export function plageName(p) {
+  const names = (p.names ?? []).slice(0, 2);
+  return `${names.length ? names.join(', ') : 'Voies sans nom'} (${p.count} voies)`;
+}
+
+/** Résumé court de la fiche : « Accès PL limité km 39 à 93 » (une plage = une entrée). */
+export function plageShort(p) {
+  const a = Math.round(p.enter / 1000); const b = Math.round(p.exit / 1000);
+  return b > a ? `Accès PL limité km ${a} à ${b}` : `Accès PL limité km ${a}`;
 }
 
 /** Aucune voie signalée : jamais « aucune restriction ». */
@@ -449,7 +491,7 @@ export function guidanceConditional(passages, announced = {}, { along, now, time
   let speak = null;
   for (const p of ahead) {
     const d = p.enter - along;
-    const key = `${p.id}:${Math.round(p.enter)}`;
+    const key = `${p.id}:${Math.round(p.enter)}`; // v81 : plage = id de sa première voie, une seule voix
     if (out[key] || d > ACCESS.ANNOUNCE_M || d < ACCESS.ANNOUNCE_MIN_M) continue;
     const ev = evalAt(p);
     if (!isForbidden(ev)) continue;
