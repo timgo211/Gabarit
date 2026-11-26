@@ -58,7 +58,7 @@ test('constantes : 15 m, 30° modulo 180°, cap à 5 m, marge de hauteur 0 m, li
   assert.equal(SENSITIVE.CAP_NEAR_M, 5);
   assert.equal(SENSITIVE.HEIGHT_MARGIN_M, 0);
   assert.equal(SENSITIVE.MAX_FILE_BYTES, 1024 * 1024);
-  assert.equal(SENSITIVE.MAX_TOTAL_BYTES, 5 * 1024 * 1024);
+  assert.equal(SENSITIVE.MAX_TOTAL_BYTES, 300 * 1024);
 });
 
 test('types gardés : arrêté, Bison Futé marqué, hauteur basse, tunnel ; jamais un pont ni une section non localisable', () => {

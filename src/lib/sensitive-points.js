@@ -52,7 +52,8 @@ export const SENSITIVE = Object.freeze({
   HEIGHT_MARGIN_M: 0,
   MAX_SHOWN: 5,
   MAX_FILE_BYTES: 1024 * 1024,
-  MAX_TOTAL_BYTES: 5 * 1024 * 1024,
+  /** v90 : 300 Ko en tout (avant : 5 Mo) ; copie du 24/11/2026 : 93 Ko. */
+  MAX_TOTAL_BYTES: 300 * 1024,
 });
 
 const isNum = (x) => typeof x === 'number' && Number.isFinite(x);
@@ -243,7 +244,7 @@ export function buildSensitivePoints(cards, sections, axes, { pontsIds = null, u
   log.push(`Taille : ${out.size} cases, ${mo(total)} Ko en tout (plus grosse ${biggest[0]} : ${mo(biggest[1])} Ko).`);
   let problem = null;
   if (biggest[1] > SENSITIVE.MAX_FILE_BYTES) problem = `case ${biggest[0]} de plus de 1 Mo`;
-  else if (total > SENSITIVE.MAX_TOTAL_BYTES) problem = 'plus de 5 Mo en tout';
+  else if (total > SENSITIVE.MAX_TOTAL_BYTES) problem = `${mo(total)} Ko en tout (plafond ${mo(SENSITIVE.MAX_TOTAL_BYTES)} Ko)`;
   if (problem) {
     log.push(`⚠ data/points-sensibles/ non modifié : ${problem} (ancienne copie gardée).`);
     return { index: null, tiles: null, log, problem };

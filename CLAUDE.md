@@ -120,6 +120,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   (`computeAvoidRoute`), carré 80 m, 150 km à vol d'oiseau ; jamais dit, rien dans le guidage.
 - Audit OSM (v71, Action manuelle « Audit OSM », `osm-audit.js`, `axes-convert.js`) : lecture seule, jamais d'écriture
   dans OSM ; extrait Geofabrik, secours download.openstreetmap.fr (v72) ; fiches « à vérifier sur place » ; copie `data/axes-osm/` (≤ 5 Mo / 30 Mo, jamais précachée). Détail : skill `gabarit-structure`.
+  v90 : niveau 3 (primary / secondary à réf. D…) = priorités 1 et 2 seulement (`keepCard`) ; `data/audit-osm/` ≤ 5 Mo /
+  30 Mo (`auditSize`, dépassé = rien écrit) ; `data/axes-osm/` jamais élargie aux départementales ; points sensibles ≤ 300 Ko.
 - Repli par la géométrie (PR 3a, v73, `axis-match.js`, copie `data/axes-osm/`) : ref des étapes ORS sans nom seulement
   (étape nommée jamais réécrite), 15 m, cap ≤ 30° modulo 180°, séries ≥ 300 m, ambigu = inconnu, copie simplifiée > 3 m
   = désactivé ; règles fondées sur la ref (week-end IdF, AURA), ligne A/N de la fiche et diagnostic, jamais le « Recommandé » ni le
