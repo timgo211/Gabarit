@@ -206,10 +206,10 @@ export function weightsAlongRoute(route, data, { ptac = null } = {}) {
 /** Lignes de la fiche : 5 au plus, puis « +N limites de poids à vérifier ». */
 export function weightLines(items) {
   const shown = (items ?? []).slice(0, WEIGHT.MAX_SHOWN).map((it) => ({
-    level: 'warn', text: `${it.text} (km ${Math.round(it.along / 1000)})`,
+    level: 'warn', sev: 'check', text: `${it.text} (km ${Math.round(it.along / 1000)})`,
   }));
   const more = (items?.length ?? 0) - shown.length;
-  if (more > 0) shown.push({ level: 'warn', text: `+${more} limite${more > 1 ? 's' : ''} de poids à vérifier (voir la carte).` });
+  if (more > 0) shown.push({ level: 'warn', sev: 'check', text: `+${more} limite${more > 1 ? 's' : ''} de poids à vérifier (voir la carte).` });
   return shown;
 }
 
@@ -227,7 +227,7 @@ export function weightRules(route, { vehicle = null, weights = null, enabled = t
   if (!enabled) { out.tech = 'Limites de poids : signalement désactivé dans Réglages'; return out; }
   if (!weights || weights.status === 'idle' || weights.status === 'loading') { out.tech = 'Limites de poids : copie en cours de lecture'; return out; }
   if (weights.status !== 'ok') {
-    out.lines.push({ level: 'info', text: WEIGHT_UNAVAILABLE_TEXT });
+    out.lines.push({ level: 'info', sev: 'check', text: WEIGHT_UNAVAILABLE_TEXT }); // v84 : donnée manquante = à vérifier
     out.tech = 'Limites de poids : données non chargées';
     return out;
   }
@@ -236,7 +236,7 @@ export function weightRules(route, { vehicle = null, weights = null, enabled = t
   out.counts = res.counts;
   out.tech = `Limites de poids : ${res.items.length}`;
   out.lines.push(...weightLines(res.items));
-  if (weights.uncovered) out.lines.push({ level: 'info', text: WEIGHT_UNCOVERED_TEXT });
+  if (weights.uncovered) out.lines.push({ level: 'info', sev: 'check', text: WEIGHT_UNCOVERED_TEXT });
   if (res.items.length) out.short.push(`${res.items.length} limite${res.items.length > 1 ? 's' : ''} de poids à vérifier`);
   return out;
 }

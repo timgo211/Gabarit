@@ -1827,6 +1827,7 @@ async function rulesCheck(browser, base) {
       `${width} px : source et date des données ZFE`);
     check(await page.isVisible('.btn-avoid-zfe'), `${width} px : bouton « Éviter la ZFE » à l'arrêt`);
     await noHorizontalScroll(page, `${width} px fiches et réglementation`);
+    await openTripInfo(page);
     await page.locator('#route-notes').scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-reglementation.png`) });
 
@@ -1908,6 +1909,7 @@ async function adrCheck(browser, base) {
     await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
     await page.waitForSelector('.btn-avoid-tunnel:not([disabled])', { timeout: 20000 });
     await noHorizontalScroll(page, `${width} px fiches ADR`);
+    await openTripInfo(page);
     await page.locator('#route-notes').scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-adr.png`) });
 
@@ -2027,7 +2029,7 @@ async function borderCheck(browser, base) {
       width, height, now, voice: true, directions: () => frChIt, overpass: () => ({ elements: [] }),
     });
     await computeRoute(page);
-    await page.waitForSelector('.country-card', { timeout: 10000 });
+    await page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
     const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
     check(notes.some((n) => /^Pays traversés : France → Suisse \(km 4, vers mercredi 21 h 5\d\) → Italie \(km 152, vers (mercredi|jeudi) \d+ h \d\d\)\./.test(n.text)),
       `${width} px : pays traversés, km et heure de chaque frontière`, notes.map((n) => n.text).slice(0, 3).join(' | '));
@@ -2070,7 +2072,7 @@ async function borderCheck(browser, base) {
       check(/transport combiné/.test(await page.textContent('#vehicles-body .vehicle-card.active .dims')), '360 px : profil « transport combiné »');
       await page.keyboard.press('Escape');
       await computeRoute(page);
-      await page.waitForSelector('.country-card', { timeout: 10000 });
+      await page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
       const n2 = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
       check(n2.some((n) => n.cls !== 'warn' && /transport combiné : en international, 44 t seulement avec un tracteur à 3 essieux/.test(n.text))
         && !n2.some((n) => /limité à 40 t sauf transport combiné/.test(n.text)), '360 px : transport combiné → information, plus d\'alerte 40 t',
@@ -2081,9 +2083,10 @@ async function borderCheck(browser, base) {
       await page.click('#vehicles-body button[type="submit"]');
       await page.keyboard.press('Escape');
       await computeRoute(page);
-      await page.waitForSelector('.country-card', { timeout: 10000 });
+      await page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
     }
     await noHorizontalScroll(page, `${width} px fiches des pays`);
+    await openTripInfo(page);
     await page.locator('.country-card').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-pays.png`) });
 
@@ -2115,19 +2118,19 @@ async function borderCheck(browser, base) {
   // countryinfo absent (réponse sans l'extra) : message, jamais un silence. Fichier suisse absent : « à vérifier ».
   const noInfo = await open(browser, base, { width: 412, height: 900, now, overpass: () => ({ elements: [] }) });
   await computeRoute(noInfo.page);
-  await noInfo.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await noInfo.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   check(/Pays traversés indisponibles/.test(await noInfo.page.textContent('#route-notes')), 'countryinfo absent → « Pays traversés indisponibles »');
   await noInfo.ctx.close();
   const noFile = await open(browser, base, { width: 412, height: 900, now, directions: () => frChIt, countryFiles: { CH: null }, overpass: () => ({ elements: [] }) });
   await computeRoute(noFile.page);
-  await noFile.page.waitForSelector('.country-card', { timeout: 10000 });
+  await noFile.page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
   check(/Règles PL en Suisse non chargées : à vérifier\./.test(await noFile.page.textContent('.country-card')), 'fichier data/pays/CH.json absent → « à vérifier »');
   check(noFile.errors.length === 0, 'fichier absent : aucune erreur JavaScript', noFile.errors.join(' | '));
   await noFile.ctx.close();
   // Phase 5h : München → Innsbruck (Allemagne puis Autriche), fiche Autriche « à vérifier ».
   const mi = await open(browser, base, { width: 412, height: 900, now, directions: () => fixture('ors-directions-muenchen-innsbruck.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(mi.page);
-  await mi.page.waitForSelector('.country-card', { timeout: 10000 });
+  await mi.page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
   const cards = await mi.page.$$eval('.country-card', (d) => d.map((x) => { x.open = true; return x.textContent; }));
   const at = cards.find((t) => /Autriche/.test(t));
   check(cards.some((t) => /Allemagne/.test(t)) && at && /à vérifier/.test(at), 'München → Innsbruck : fiches Allemagne et Autriche, Autriche « à vérifier »', cards.map((t) => t.slice(0, 120)).join(' | '));
@@ -2149,7 +2152,7 @@ async function borderCheck(browser, base) {
   check(/5 essieux et plus/.test(await mi.page.textContent('#vehicles-body .vehicle-card.active .dims')), 'profil « 5 essieux et plus » enregistré');
   await mi.page.keyboard.press('Escape');
   await computeRoute(mi.page);
-  await mi.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await mi.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   check(/4 essieux et plus/.test(await mi.page.textContent('#route-notes')), 'GO-Maut : catégorie 4+ pour 5 essieux');
   check(mi.errors.length === 0, 'München → Innsbruck : aucune erreur JavaScript', mi.errors.join(' | '));
   await mi.ctx.close();
@@ -2170,7 +2173,7 @@ async function winterCheck(browser, base) {
       width, height, now, voice: true, directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: 'fixture',
     });
     await computeRoute(page);
-    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
     await page.waitForTimeout(500);
     const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
     const w = notes.filter((n) => /^Équipements d'hiver exigés du 1er novembre au 31 mars/.test(n.text));
@@ -2184,6 +2187,7 @@ async function winterCheck(browser, base) {
     check((stats.winter ?? []).includes('index.json') && (stats.winter ?? []).includes('4_45.json') && !(stats.winter ?? []).includes('6_45.json'),
       `${width} px : copie data/hiver/ lue (index + case du trajet seulement)`, (stats.winter ?? []).join(','));
     await noHorizontalScroll(page, `${width} px notes équipements d'hiver`);
+    await openTripInfo(page);
     await page.locator('.rules-notes').scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-hiver.png`) });
     if (width === 360) {
@@ -2200,7 +2204,7 @@ async function winterCheck(browser, base) {
       await page.reload();
       await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
       await computeRoute(page);
-      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
       await page.waitForTimeout(500);
       const t = await page.textContent('#route-notes');
       check(/PL avec remorque ou semi-remorque : chaînes à neige pour au moins deux roues motrices à bord, même avec des pneus hiver\./.test(t) && !/sans remorque : chaînes/.test(t),
@@ -2231,13 +2235,13 @@ async function winterCheck(browser, base) {
   // Juillet : rien.
   const july = await open(browser, base, { width: 412, height: 900, now: new Date('2026-07-08T08:00:00+02:00').getTime(), directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: 'fixture' });
   await computeRoute(july.page);
-  await july.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await july.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   check(!/Équipements d'hiver|Panneau B26/.test(await july.page.textContent('#route-notes')), 'juillet : aucune ligne d\'hiver');
   await july.ctx.close();
   // Copie absente en novembre : « indisponibles », jamais un silence.
   const none = await open(browser, base, { width: 412, height: 900, now, directions: () => nav, overpass: () => ({ elements: [] }), winterCopy: null });
   await computeRoute(none.page);
-  await none.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await none.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   await none.page.waitForTimeout(500);
   check(/Équipements d'hiver indisponibles \(données non chargées\)/.test(await none.page.textContent('#route-notes')), 'copie absente → « Équipements d\'hiver indisponibles »');
   check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
@@ -2245,7 +2249,7 @@ async function winterCheck(browser, base) {
   // Fiche Suisse en juillet : rubrique « Équipements d'hiver » affichée toute l'année.
   const ch = await open(browser, base, { width: 412, height: 900, now: new Date('2026-07-08T08:00:00+02:00').getTime(), directions: () => fixture('ors-directions-fr-ch-it.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(ch.page);
-  await ch.page.waitForSelector('.country-card', { timeout: 10000 });
+  await ch.page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
   const cards = await ch.page.$$eval('.country-card', (n) => n.map((c) => ({ sections: [...c.querySelectorAll('h4')].map((h) => h.textContent), text: c.textContent })));
   check(cards[0].sections.includes("Équipements d'hiver") && /Chaînes à neige obligatoires.*Selon la météo \/ les panneaux, pas de période légale\./.test(cards[0].text),
     'fiche Suisse : « Équipements d\'hiver » en juillet, sans période légale');
@@ -2273,12 +2277,13 @@ async function euroCheck(browser, base) {
       directions: (body) => { if (body.options?.avoid_polygons) avoid.push(body.options.avoid_polygons); return mb; },
     });
     await computeRoute(page);
-    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
     const notes = await notesOf(page);
     check(notes.some((n) => n.cls === 'warn' && /^Tunnel du Mont-Blanc interdit à votre véhicule \(Euro 3\), vers km 13 : PL de marchandises de plus de 3,5 t Euro 0 à 4 interdits depuis le 1er juillet 2020 \(arrêté préfectoral n° 2020-0825 du 18 juin 2020\).*lu le 21\/11\/2026\. La signalisation fait foi\.Texte$/.test(n.text)),
       `${width} px : alerte Mont-Blanc Euro 3, source et date, lien`, notes.map((n) => n.text).join(' | '));
     check(/Mont-Blanc interdit \(Euro 3\)/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : fiche d'itinéraire « Mont-Blanc interdit (Euro 3) »`);
     await noHorizontalScroll(page, `${width} px notes Euro`);
+    await openTripInfo(page);
     await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-euro.png`) });
     // v48 : « Éviter le tunnel » (classe Euro interdite) : à l'arrêt seulement (grisé en roulant ou vitesse inconnue),
@@ -2311,7 +2316,7 @@ async function euroCheck(browser, base) {
       await page.reload();
       await page.waitForSelector('.maplibregl-canvas', { timeout: 15000 });
       await computeRoute(page);
-      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
       const n6 = await notesOf(page);
       check(n6.some((n) => n.cls !== 'warn' && /^Tunnel du Mont-Blanc, vers km 13 : votre classe \(Euro 6\) est admise/.test(n.text)) && !n6.some((n) => /interdit à votre véhicule/.test(n.text)),
         '360 px : après rechargement, Euro 6 admis', n6.map((n) => n.text).join(' | '));
@@ -2322,7 +2327,7 @@ async function euroCheck(browser, base) {
       await page.click('#vehicles-body button[type="submit"]');
       await page.keyboard.press('Escape');
       await computeRoute(page);
-      await page.waitForSelector('.rules-notes', { timeout: 10000 });
+      await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
       const n0 = await notesOf(page);
       check(n0.some((n) => n.cls === 'warn' && /Classe Euro non précisée dans le profil : vérifiez-la\./.test(n.text))
         && n0.some((n) => /^Tunnel du Mont-Blanc : Euro 5, EEV et Euro 6 admis/.test(n.text)), '360 px : non précisé, les deux cas affichés', n0.map((n) => n.text).join(' | '));
@@ -2350,7 +2355,7 @@ async function euroCheck(browser, base) {
   // Fréjus, Euro 4 : confirmé par l'exploitant (nom, date), sur la fiche d'itinéraire.
   const fr = await open(browser, base, { width: 412, height: 900, now, vehicle: veh('4'), directions: () => fixture('ors-directions-frejus.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(fr.page);
-  await fr.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await fr.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   const fn = await notesOf(fr.page);
   check(fn.some((n) => n.cls === 'warn' && /^Tunnel du Fréjus interdit à votre véhicule \(Euro 4\).*Confirmé par l'exploitant : SFTRF .*lu le 21\/11\/2026 ; arrêté préfectoral non retrouvé\. La signalisation fait foi\./.test(n.text)),
     'Fréjus Euro 4 : confirmé par l\'exploitant, arrêté non retrouvé', fn.map((n) => n.text).join(' | '));
@@ -2369,7 +2374,7 @@ async function euroCheck(browser, base) {
     for (const [width, height] of [[360, 760], [1280, 800]]) {
       const c = await open(browser, base, { width, height, now, vehicle: veh('3'), directions: () => json, overpass: () => ({ elements: [] }) });
       await computeRoute(c.page);
-      await c.page.waitForSelector('.country-card', { timeout: 10000 });
+      await c.page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
       const text = await c.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
       const sections = await c.page.$$eval('.country-card:first-child h4', (h) => h.map((x) => x.textContent));
       check(sections.includes('Normes Euro') && re.test(text), `${width} px : fiche ${label}, rubrique « Normes Euro »`, text.slice(0, 300));
@@ -2402,13 +2407,14 @@ async function tollsCheck(browser, base) {
       width, height, now: nov, voice: true, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }),
     });
     await computeRoute(page);
-    await page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
     const notes = await notesOf(page);
     const r = rpass(notes);
     check(r && r.cls !== 'warn' && /^R-Pass \(taxe PL de la Collectivité européenne d'Alsace\) prévue à partir du 1er janvier 2027, au moins de km 0 à km 9\d \(A36, A35 ; repérage par les noms d'étape, carte OpenStreetMap du réseau non chargée\)\..*Recours en cours devant le tribunal administratif de Strasbourg \(effet suspensif non établi\)\. Tarif annoncé, poids du profil 44 t, Euro VI \(classe D \(PTRA de plus de 32 t\)\) : 14,6 centimes par km .*Aucun total calculé pour le trajet\..*lue le 21\/11\/2026\. La signalisation fait foi\.Site officiel$/.test(r.text) && !/€/.test(r.text),
       `${width} px : R-Pass « prévue à partir du 1er janvier 2027 », information, taux de la classe, lien`, notes.map((n) => n.text).join(' | '));
     check(!/R-Pass|Taxe|taxe/.test(await page.textContent('.route-card[aria-checked="true"]')), `${width} px : rien sur la fiche d'itinéraire`);
     await noHorizontalScroll(page, `${width} px notes taxes PL`);
+    await openTripInfo(page);
     await page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}-tolls.png`) });
     if (width === 360 || width === 1280) {
@@ -2433,7 +2439,7 @@ async function tollsCheck(browser, base) {
   ]) {
     const c = await open(browser, base, { width: 412, height: 900, now, vehicle: veh(euro), directions: () => als, overpass: () => ({ elements: [] }) });
     await computeRoute(c.page);
-    await c.page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await c.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
     const r = rpass(await notesOf(c.page));
     check(r && r.cls !== 'warn' && re.test(r.text), `${label} : R-Pass en information`, r?.text);
     check(!/R-Pass/.test(await c.page.textContent('.route-card[aria-checked="true"]')), `${label} : rien sur la fiche d'itinéraire`);
@@ -2444,8 +2450,9 @@ async function tollsCheck(browser, base) {
   for (const [width, height] of [[360, 760], [1280, 800]]) {
     const dg = await open(browser, base, { width, height, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }) });
     await computeRoute(dg.page);
-    await dg.page.waitForSelector('.route-diag', { timeout: 10000 });
+    await dg.page.waitForSelector('.route-diag', { state: 'attached', timeout: 10000 });
     check(!(await dg.page.$eval('.route-diag', (d) => d.open)), `${width} px : diagnostic replié par défaut`);
+    await openTripInfo(dg.page);
     await dg.page.click('.route-diag summary');
     await dg.page.click('.btn-diag-copy');
     await dg.page.waitForTimeout(300);
@@ -2464,7 +2471,8 @@ async function tollsCheck(browser, base) {
     const swVersion = readFileSync(join(ROOT, 'sw.js'), 'utf8').match(/const VERSION = '([^']+)';/)[1];
     const sv = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), sw: true });
     await computeRoute(sv.page);
-    await sv.page.waitForSelector('.route-diag', { timeout: 10000 });
+    await sv.page.waitForSelector('.route-diag', { state: 'attached', timeout: 10000 });
+    await openTripInfo(sv.page);
     await sv.page.click('.route-diag summary');
     await sv.page.click('.btn-diag-copy');
     await sv.page.waitForTimeout(500);
@@ -2497,10 +2505,11 @@ async function tollsCheck(browser, base) {
   for (const [width, height] of [[360, 760], [1280, 800]]) {
     const g = await open(browser, base, { width, height, now: nov, vehicle: veh('6'), directions: () => blind, overpass: () => ({ elements: [] }), tollsNetwork: 'fixture' });
     await computeRoute(g.page);
-    await g.page.waitForSelector('.rules-notes', { timeout: 10000 });
+    await g.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
     const r = rpass(await notesOf(g.page));
     check(r && r.cls !== 'warn' && /prévue à partir du 1er janvier 2027, de km 0 à km [89]\d \(A3[56], A3[56] ; repérage sur la carte OpenStreetMap du 01\/12\/2026 \(ODbL\) et les contours IGN Admin Express \(Licence Ouverte\), limites exactes à vérifier\)\..*La signalisation fait foi\./.test(r.text) && !/au moins/.test(r.text),
       `${width} px : étapes sans nom, R-Pass repéré par la géométrie (information)`, r?.text);
+    await openTripInfo(g.page);
     await g.page.click('.route-diag summary');
     await g.page.click('.btn-diag-copy');
     await g.page.waitForTimeout(300);
@@ -2509,7 +2518,8 @@ async function tollsCheck(browser, base) {
       `${width} px : diagnostic, méthode et points tous les 10 km`, JSON.stringify(txt.slice(0, 1500)));
     await noHorizontalScroll(g.page, `${width} px R-Pass par la géométrie`);
     if (width === 360) {
-      await g.page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
+      await openTripInfo(g.page);
+    await g.page.locator('.rules-notes').first().scrollIntoViewIfNeeded();
       await g.page.screenshot({ path: join(SHOTS, `${width}-tolls-geo.png`) });
     }
     check(g.errors.length === 0, `${width} px géométrie : aucune erreur JavaScript`, g.errors.join(' | '));
@@ -2518,21 +2528,21 @@ async function tollsCheck(browser, base) {
   // A36 et D 83 de Belfort (Besançon → Belfort, faux positif v28) : hors du réseau R-Pass, aucune ligne.
   const bb = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-besancon-belfort.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(bb.page);
-  await bb.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await bb.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   const bn = await notesOf(bb.page);
   check(!rpass(bn) && !bn.some((n) => /Taxe possible|Écocontribution/.test(n.text)), 'Besançon → Belfort (A36, puis D 83 dans Belfort) : aucune ligne R-Pass', bn.map((n) => n.text).join(' | '));
   await bb.ctx.close();
   // Grand Est : A31, 2 avril 2027, réseau officiel, aucun montant ; fichier absent.
   const ge = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => fixture('ors-directions-metz-nancy.json'), overpass: () => ({ elements: [] }) });
   await computeRoute(ge.page);
-  await ge.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await ge.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   const gn = await notesOf(ge.page);
   check(gn.some((n) => n.cls !== 'warn' && /^Écocontribution poids lourds \(ECPL\) de la Région Grand Est prévue à partir du 2 avril 2027, au moins de km 0 à km \d+ \(A31 ; repérage par les noms d'étape, carte OpenStreetMap du réseau non chargée\)\..*Aucun montant calculé\./.test(n.text) && !/centimes|€/.test(n.text)) && !rpass(gn),
     'Grand Est : écocontribution sur l\'A31, réseau officiel, aucun montant, pas de R-Pass', gn.map((n) => n.text).join(' | '));
   await ge.ctx.close();
   const ab = await open(browser, base, { width: 412, height: 900, now: nov, vehicle: veh('6'), directions: () => als, overpass: () => ({ elements: [] }), tollsFile: null });
   await computeRoute(ab.page);
-  await ab.page.waitForSelector('.rules-notes', { timeout: 10000 });
+  await ab.page.waitForSelector('.rules-notes', { state: 'attached', timeout: 10000 });
   const an = await notesOf(ab.page);
   check(an.some((n) => /^Taxes PL régionales indisponibles \(données non chargées\)/.test(n.text)), 'fichier absent : « Taxes PL régionales indisponibles »', an.map((n) => n.text).join(' | '));
   check(ab.errors.length === 0, 'fichier absent : aucune erreur JavaScript', ab.errors.join(' | '));
@@ -2544,7 +2554,7 @@ async function tollsCheck(browser, base) {
   ci.summary = [{ value: 70, distance: 3803.5, amount: 2 }, { value: 17, distance: 165515.9, amount: 98 }];
   const bp = await open(browser, base, { width: 360, height: 760, now: nov, vehicle: veh('6'), directions: () => be, overpass: () => ({ elements: [] }) });
   await computeRoute(bp.page);
-  await bp.page.waitForSelector('.country-card', { timeout: 10000 });
+  await bp.page.waitForSelector('.country-card', { state: 'attached', timeout: 10000 });
   const bt = await bp.page.$eval('.country-card', (d) => { d.open = true; return d.textContent; });
   check(/Belgique/.test(bt) && /Changements au 1er janvier 2027 : nouveaux tarifs.*aucune route ajoutée.*Viapass, Prélèvement kilométrique : les modifications prévues à partir du 1er janvier 2027/.test(bt),
     '360 px : fiche Belgique, changements Viapass au 1er janvier 2027 avec la source', bt.slice(0, 400));
@@ -2674,6 +2684,7 @@ async function bridgesCheck(browser, base) {
     check(markers === 2, `${tag} : 2 repères de pont sur la carte à l'arrêt`, String(markers));
     check((stats.bridges ?? []).includes('index.json') && (stats.bridges ?? []).includes('6_47.json'), `${tag} : copie data/ponts-osm/ lue`, (stats.bridges ?? []).join(','));
     // Diagnostic du trajet : ligne technique.
+    await openTripInfo(page);
     await page.locator('.route-diag summary').click();
     await page.waitForFunction(() => /Ponts sans hauteur : /.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     const diag = await page.textContent('.route-diag-text');
@@ -2946,6 +2957,7 @@ async function weightsCheck(browser, base) {
     check(markers === 3, `${tag} : 3 repères de limite de poids à l'arrêt`, String(markers));
     check(/^3,5 t$/.test((await page.locator('.weight-marker').first().textContent()).trim()), `${tag} : repère « 3,5 t »`);
     check((stats.weights ?? []).includes('index.json') && (stats.weights ?? []).includes('6_47.json'), `${tag} : copie data/poids-osm/ lue`, (stats.weights ?? []).join(','));
+    await openTripInfo(page);
     await page.locator('.route-diag summary').click();
     await page.waitForFunction(() => /Limites de poids : /.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     check(/Limites de poids : 3/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique « Limites de poids : 3 »`);
@@ -3029,7 +3041,8 @@ async function speedsCheck(browser, base) {
       const cardText = (await page.textContent('.route-card[aria-checked="true"] .route-card-speed').catch(() => '')) ?? '';
       check(/^Limites de vitesse connues : \d+ % du trajet$/.test(cardText.trim()), `${tag} : ligne « Limites de vitesse connues » sur la fiche`, cardText);
       check((stats.speeds ?? []).includes('index.json') && (stats.speeds ?? []).includes('6_47.json'), `${tag} : copie data/vitesses-osm/ lue`, (stats.speeds ?? []).join(','));
-      await page.locator('.route-diag summary').click();
+      await openTripInfo(page);
+    await page.locator('.route-diag summary').click();
       await page.waitForFunction(() => /Limites de vitesse : \d+ %/.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
       check(/Limites de vitesse : \d+ % \(OSM \d+ %/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique des limites de vitesse`);
       await noHorizontalScroll(page, `${tag} limites de vitesse`);
@@ -3447,7 +3460,7 @@ async function driveWindCheck(browser, base) {
       width, height, wind: () => 95, driving: drivenFor(4 * 3600 + 25 * 60), overpass: () => fixture('overpass-aires.json'),
     });
     await computeRoute(page);
-    await page.waitForSelector('.wind-credit', { timeout: 10000 });
+    await page.waitForSelector('.wind-credit', { state: 'attached', timeout: 10000 });
     const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
     check(notes.some((t) => /^Vent fort : rafales jusqu'à 95 km\/h/.test(t)), `${label} : fiche, vent fort à l'heure de passage`, notes.join(' | '));
     check(notes.some((t) => /^Pause de 45 min conseillée après \d+ min de route/.test(t))
@@ -3463,6 +3476,7 @@ async function driveWindCheck(browser, base) {
     if (cards > 1) { await page.locator('.route-card').nth(1).click(); await page.waitForTimeout(400); }
     check(stats.wind === 1, `${label} : une seule requête Open-Meteo pour le calcul (choix d'itinéraire compris)`, `${stats.wind}`);
     await noHorizontalScroll(page, `${label} fiches, vent et conduite`);
+    await openTripInfo(page);
     await page.locator('#route-notes').scrollIntoViewIfNeeded();
     await page.screenshot({ path: join(SHOTS, `${width}x${height}-conduite-fiche.png`) });
 
@@ -3533,7 +3547,7 @@ async function driveWindCheck(browser, base) {
     const set = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).settings);
     check(set.windGust === 55 && set.windVoice === false && set.driveVoice === true, 'Réglages : seuil et voix gardés', JSON.stringify(set).slice(0, 60));
     await computeRoute(page);
-    await page.waitForSelector('.wind-credit', { timeout: 10000 });
+    await page.waitForSelector('.wind-credit', { state: 'attached', timeout: 10000 });
     check((await page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent))).some((t) => /rafales jusqu'à 60 km\/h/.test(t)),
       'seuil de Réglages appliqué (rafales de 60 km/h signalées)');
     await page.click('#btn-route');
@@ -5426,6 +5440,7 @@ async function sensitiveCheck(browser, base) {
     check(/3 points sensibles à vérifier/.test(await page.textContent('.route-card[aria-checked="true"]')), `${tag} : résumé sur la fiche`);
     check(await page.locator('.sensitive-marker').count() === 3, `${tag} : 3 repères « ! » à l'arrêt`, String(await page.locator('.sensitive-marker').count()));
     check((stats.sensitive ?? []).includes('index.json'), `${tag} : copie data/points-sensibles/ lue`);
+    await openTripInfo(page);
     await page.locator('.route-diag summary').click();
     await page.waitForTimeout(400);
     check(/Points sensibles : 3 \(interdictions 1/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique du diagnostic`);
@@ -5494,6 +5509,7 @@ async function axesFallbackCheck(browser, base) {
     await page.waitForFunction(() => /géométrie : à vérifier/.test(document.querySelector('.route-card[aria-checked="true"]')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     check(/Autoroute et nationale : \d+ % \(numéros retrouvés par la géométrie : à vérifier\)/.test(await page.textContent('.route-card[aria-checked="true"]')),
       `${tag} : ligne « Autoroute et nationale » mise à jour avec le repli`, await page.textContent('.route-card[aria-checked="true"]'));
+    await openTripInfo(page);
     await page.locator('.route-diag summary').click();
     await page.waitForFunction(() => /Repli par la géométrie/.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
     const diag = await page.textContent('.route-diag-text');
@@ -5529,7 +5545,8 @@ async function axesFallbackCheck(browser, base) {
   await none.page.waitForTimeout(1500);
   check(!/Île-de-France/.test(await none.page.textContent('#route-notes')), 'copie absente : aucune ligne Île-de-France devinée');
   check(/Autoroute et nationale : inconnue/.test(await none.page.textContent('.route-card[aria-checked="true"]')), 'copie absente : part A/N inconnue, comme avant');
-  await none.page.locator('.route-diag summary').click();
+  await openTripInfo(none.page);
+    await none.page.locator('.route-diag summary').click();
   await none.page.waitForTimeout(500);
   check(/Repli par la géométrie \(axes OSM\) : données non chargées/.test(await none.page.textContent('.route-diag-text')), 'copie absente : « données non chargées »');
   check(none.errors.length === 0, 'copie absente : aucune erreur JavaScript', none.errors.join(' | '));
@@ -5908,6 +5925,119 @@ async function heightsCheck(browser, base) {
   await ok.ctx.close();
 }
 
+/** v84 : ouvre le menu « Informations du trajet » (replié à chaque calcul) avant de vérifier son contenu à l'écran. */
+async function openTripInfo(page, root = '#route-notes') {
+  const btn = `${root} .trip-info > .section-toggle`;
+  await page.waitForSelector(btn, { timeout: 10000 });
+  if (await page.getAttribute(btn, 'aria-expanded') !== 'true') await page.click(btn);
+}
+
+/** v84 : menu « Informations du trajet » : en-tête, niveau, récap, repli à chaque calcul. */
+async function tripInfoCheck(browser, base) {
+  const nav = fixture('ors-directions-nav.json');
+  const line = nav.features[0].geometry.coordinates;
+  const [cx, cy] = line[Math.floor(line.length / 2)];
+  const d = 0.006;
+  const zfe = {
+    updated: '2026-03-26',
+    zones: [{
+      id: 'TEST-ZFE-001', name: 'Testville', start: '2025-01-01', end: null,
+      pl: { critair: 'V3', hours: '24/7' }, vul: { critair: 'V3', hours: '24/7' },
+      url: 'https://example.org/arrete-zfe.pdf',
+      polygons: [[[[cx - d, cy - d], [cx + d, cy - d], [cx + d, cy + d], [cx - d, cy + d], [cx - d, cy - d]]]],
+    }],
+    voies: [],
+  };
+  const frChIt = fixture('ors-directions-fr-ch-it.json');
+  // Sans alerte : accès lus (aucune restriction), ponts et limites de poids non signalés (Réglages).
+  const calm = JSON.parse(JSON.stringify(nav));
+  calm.features[0].properties.extras.roadaccessrestrictions = { values: [[0, line.length - 1, 0]], summary: [] };
+  const cases = [
+    { name: 'sans alerte', opts: { directions: () => calm, overpass: () => ({ elements: [] }), settings: { bridgeWarnings: false, weightWarnings: false } }, recap: 'Aucune alerte' },
+    { name: 'défaut', opts: { directions: () => nav, overpass: () => ({ elements: [] }) } },
+    { name: 'interdit', opts: { zfe, directions: () => nav, overpass: () => ({ elements: [] }) }, want: 'ban' },
+    { name: 'plusieurs pays', opts: { directions: () => frChIt, overpass: () => ({ elements: [] }), now: new Date('2026-11-18T21:50:00+01:00').getTime() }, countries: 2 },
+  ];
+  const WORD = { ban: 'interdit', alert: 'alerte', check: 'à vérifier', info: 'info' };
+  for (const [width, height, theme] of [[412, 900, 'day'], [412, 900, 'night'], [900, 412, 'day'], [900, 412, 'night']]) {
+    for (const c of cases) {
+      const tag = `fiche-infos ${width}×${height} ${theme} ${c.name}`;
+      const { page, ctx, errors } = await open(browser, base, { width, height, theme, ...c.opts });
+      await computeRoute(page);
+      await page.waitForSelector('#route-notes .trip-info', { timeout: 10000 });
+      const h = () => page.evaluate(() => {
+        const box = document.querySelector('#route-notes .trip-info');
+        const btn = box.querySelector(':scope > .section-toggle');
+        const body = document.getElementById(btn.getAttribute('aria-controls'));
+        const sub = btn.querySelector('.section-sub');
+        const lvl = btn.querySelector('.trip-info-level');
+        const sevs = [...body.querySelectorAll(':scope > .rules-notes > li')].map((li) => li.dataset.sev);
+        const r = btn.getBoundingClientRect();
+        const lum = (rgb) => {
+          const [R, G, B] = rgb.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+          return 0.2126 * R + 0.7152 * G + 0.0722 * B;
+        };
+        const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+        const bg = getComputedStyle(box).backgroundColor;
+        return {
+          expanded: btn.getAttribute('aria-expanded'), hidden: body.hidden, h: r.height, w: r.width,
+          title: btn.querySelector('.section-title').textContent, sub: sub.textContent, level: lvl.textContent, cls: box.className,
+          sevs, cards: document.querySelectorAll('.route-card').length,
+          checkTexts: [...body.querySelectorAll(':scope > .rules-notes > li:not([data-sev="info"])')].map((li) => li.textContent.slice(0, 50)),
+          inside: !!body.querySelector('.route-card, .local-question, .btn-avoid-zfe, .btn-avoid-tunnel'),
+          countries: body.querySelectorAll('.country-card').length,
+          overflow: sub.scrollWidth > sub.clientWidth + 1 || r.right > window.innerWidth + 0.5,
+          ellipsis: /…$/.test(sub.textContent),
+          lvlRatio: ratio(getComputedStyle(lvl).color, bg), subRatio: ratio(getComputedStyle(sub).color, bg),
+          disclaimer: !!document.querySelector('.disclaimer')?.getClientRects().length,
+        };
+      });
+      const s0 = await h();
+      const n = { ban: 0, alert: 0, check: 0 };
+      for (const v of s0.sevs) if (v in n) n[v] += 1;
+      const plural = { ban: 'interdits', alert: 'alertes', check: 'à vérifier' };
+      const parts = ['ban', 'alert', 'check'].filter((k) => n[k]).map((k) => `${n[k]} ${n[k] > 1 ? plural[k] : WORD[k]}`);
+      const recap = parts.length ? parts.join(' · ') : 'Aucune alerte';
+      const worst = ['ban', 'alert', 'check'].find((k) => n[k]) ?? 'info';
+      check(s0.expanded === 'false' && s0.hidden, `${tag} : menu replié après le calcul`);
+      check(s0.title === 'Informations du trajet' && s0.h >= 48, `${tag} : en-tête ≥ 48 px`, `${Math.round(s0.h)} px`);
+      check(s0.sub === recap, `${tag} : récap « ${recap} »`, `${s0.sub} — ${s0.checkTexts.join(' | ')}`);
+      check(s0.cls.includes(`sev-${worst}`) && s0.level.includes(WORD[worst]), `${tag} : pire niveau lisible sans ouvrir (symbole + mot)`, s0.level);
+      if (c.want) check(worst === c.want, `${tag} : niveau ${WORD[c.want]}`, worst);
+      if (c.recap) check(s0.sub === c.recap, `${tag} : « ${c.recap} »`, s0.sub);
+      check(!s0.overflow && !s0.ellipsis, `${tag} : en-tête ni coupé ni « … »`);
+      check(s0.lvlRatio >= 4.5 && s0.subRatio >= 4.5, `${tag} : contraste ≥ 4,5:1`, `${s0.lvlRatio.toFixed(2)} / ${s0.subRatio.toFixed(2)}`);
+      check(s0.cards >= 1 && !s0.inside && s0.disclaimer, `${tag} : cartes, question et boutons hors du menu, pied de page visible`);
+      await noHorizontalScroll(page, tag);
+      await page.locator('#route-notes .trip-info').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-fiche-infos-${c.name.replace(/ /g, '-')}-replie.png`) });
+      await openTripInfo(page);
+      const s1 = await h();
+      check(s1.expanded === 'true' && !s1.hidden, `${tag} : ouvert d'un toucher`);
+      const order = s1.sevs.map((v) => ['ban', 'alert', 'check', 'info'].indexOf(v));
+      check(order.every((v, i) => !i || v >= order[i - 1]), `${tag} : ordre interdits, alertes, à vérifier, infos`, s1.sevs.join(','));
+      if (c.countries) check(s1.countries === c.countries, `${tag} : ${c.countries} fiches pays dans le menu`, String(s1.countries));
+      await page.locator('#route-notes .trip-info').scrollIntoViewIfNeeded();
+      await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-fiche-infos-${c.name.replace(/ /g, '-')}-ouvert.png`) });
+      // Autre fiche du même calcul : reste ouvert ; nouveau calcul : replié.
+      if (s1.cards > 1) {
+        await page.locator('.route-card[aria-checked="false"]').first().click();
+        await page.waitForTimeout(400);
+        check((await h()).expanded === 'true', `${tag} : autre fiche du même calcul, menu gardé ouvert`);
+      }
+      await page.click('#btn-route');
+      await page.waitForTimeout(1500);
+      check((await h()).expanded === 'false', `${tag} : nouveau calcul, menu replié`);
+      // Clavier : Entrée ouvre.
+      await page.focus('#route-notes .trip-info > .section-toggle');
+      await page.keyboard.press('Enter');
+      check((await h()).expanded === 'true', `${tag} : Entrée ouvre le menu`);
+      check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+      await ctx.close();
+    }
+  }
+}
+
 /** v84 : Réglages — sections repliables (toutes repliées, une puis plusieurs ouvertes, clavier, rechargement). */
 async function settingsSectionsCheck(browser, base) {
   for (const [width, height, theme] of [[412, 900, 'day'], [412, 900, 'night'], [900, 412, 'day'], [900, 412, 'night']]) {
@@ -5991,7 +6121,7 @@ try {
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,
-    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck, reglages: settingsSectionsCheck };
+    repli: axesFallbackCheck, sensibles: sensitiveCheck, lyon: lyonAutoCheck, interdictions: bansCheck, contournement: detourCheck, hauteurs: heightsCheck, reglages: settingsSectionsCheck, 'fiche-infos': tripInfoCheck };
   for (const [name, fn] of Object.entries(all)) {
     if (only && only !== name) continue;
     console.log(`\n— ${name}`);

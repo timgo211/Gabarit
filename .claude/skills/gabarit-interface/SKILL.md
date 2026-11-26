@@ -258,6 +258,19 @@ description: Règles de la carte, du guidage à l'écran, de la mise en page té
 - v64, « Sources et licences » : titre = `button#btn-credits.section-toggle` (≥ 48 px, chevron CSS selon
   `aria-expanded`), contenu `#credits-body` (hidden si replié) inchangé ; `settings.creditsOpen` (false par défaut,
   exporté). ui-check : `openCredits(page)` avant de lire un crédit.
+- v84, repliables (composant `src/ui/collapsible.js` : `collapsible({ button, body })` pour le HTML existant,
+  `makeCollapsible` pour un bloc créé en JS ; bouton natif, aria-expanded / aria-controls, corps `hidden`) :
+  - Réglages : chaque `section[data-section]` (clés `SECTION_KEYS` de `src/lib/settings-sections.js`, ordre de l'écran),
+    titre `#btn-sec-<clé>` + sous-ligne `#sec-<clé>-sub` (`sectionSummary`, réglages de conduite seulement), corps
+    `#sec-<clé>-body` ; « Sources et licences » garde `#btn-credits` / `#credits-body`. État `settings.sectionsOpen`
+    ({ clé: true }, exporté, seule source) ; ancienne sauvegarde avec `creditsOpen: true` → `credits` ouverte. Clé vide ou
+    refusée au test (`invalidKey` de `summarizeKeyTest`) → « Clé : manquante » dans le titre. `#app-version` hors sections.
+  - Fiche : `tripInfoMenu` de `summary.js` dans `#route-notes` (et `#nav-alts-notes`) : en-tête `.trip-info` (pire niveau
+    `.trip-info-level` symbole + mot, « Informations du trajet », récap `recapText`), corps = lignes `sortLines`
+    (`li[data-sev]`, classe `level` inchangée), fiches pays, notes véhicule, diagnostic, sources. Couleurs `--lvl-ban`,
+    `--lvl-alert`, `--lvl-check`, `--lvl-info` (AA testé). Replié à chaque `choice.calcId` (compteur `nextCalcId`).
+  - ui-check : `openSettings(page)` (déplie tout sauf « Sources et licences »), `openTripInfo(page, root)` ; scénarios
+    `reglages` et `fiche-infos`.
 - Phase 3a (v66), mes signalements (`src/lib/reports.js`, `src/ui/reports.js`) :
   - bouton rond `#btn-nav-report` (drapeau Material Symbols `flag`, à la place de `.nav-slot`) : un appui → `markReport`
     du moteur (dernière position reçue, cap du moment ; doublon < 20 m refusé ; jamais annoncé pendant ce guidage),

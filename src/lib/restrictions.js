@@ -217,14 +217,14 @@ export function restrictionLines(route, plan) {
   const lines = [];
   if (!plan?.applicable?.length) return lines;
   if (plan.avoided.length && !plan.tooFar) lines.push({ level: 'info', text: avoidedText(plan.avoided.length) });
-  if (plan.tooFar) lines.push({ level: 'warn', text: TOO_FAR_TEXT });
+  if (plan.tooFar) lines.push({ level: 'warn', sev: 'check', text: TOO_FAR_TEXT });
   for (const r of plan.atEnds) {
-    lines.push({ level: 'warn', text: `Restriction saisie par toi au départ ou à l'arrivée (${restrictionLabel(r)}) : non évitable, à vérifier. La signalisation fait foi.` });
+    lines.push({ level: 'warn', sev: 'check', text: `Restriction saisie par toi au départ ou à l'arrivée (${restrictionLabel(r)}) : non évitable, à vérifier. La signalisation fait foi.` });
   }
   const coords = route?.coordinates ?? [];
   for (const r of plan.tooFar ? plan.applicable : plan.avoided) {
     if (nearLine([r.lon, r.lat], coords, RESTR_RADIUS_M)) {
-      lines.push({ level: 'warn', text: `L'itinéraire passe près d'une restriction saisie par toi (${restrictionLabel(r)}${r.note ? `, ${r.note}` : ''}) : à vérifier. La signalisation fait foi.` });
+      lines.push({ level: 'warn', sev: 'check', text: `L'itinéraire passe près d'une restriction saisie par toi (${restrictionLabel(r)}${r.note ? `, ${r.note}` : ''}) : à vérifier. La signalisation fait foi.` });
     }
   }
   return lines;

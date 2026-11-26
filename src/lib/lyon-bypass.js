@@ -231,7 +231,8 @@ export function lyonBypassPlan(route, {
   else if (isPt(from) && isPt(to)) out.dir = from[1] > to[1] ? 'south' : 'north';
   const fail = (reason) => {
     out.reason = reason;
-    out.lines.push({ level: 'warn', text: `${LYON_RULE_TEXT} ${LYON_REASON_TEXTS[reason]}` });
+    // v84 : desserte locale possible = à vérifier ; sinon interdit (menu « Informations du trajet »).
+    out.lines.push({ level: 'warn', sev: reason === 'local' ? 'check' : 'ban', text: `${LYON_RULE_TEXT} ${LYON_REASON_TEXTS[reason]}` });
     return out;
   };
   if (applied) return fail('applied');
@@ -244,7 +245,7 @@ export function lyonBypassPlan(route, {
   if (!pts) return fail('points');
   out.ok = true;
   out.via = pts.map(viaStop);
-  out.lines.push({ level: 'warn', text: LYON_RULE_TEXT });
+  out.lines.push({ level: 'warn', sev: 'ban', text: LYON_RULE_TEXT });
   return out;
 }
 

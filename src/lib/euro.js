@@ -188,10 +188,10 @@ export function describeTunnel(p, vehicle, all = TUNNEL_RULES) {
     if (!concerned) continue;
     const date = r.dateRule ? ` ; ${r.dateRule}` : '';
     if (cls) {
-      lines.push({ level: 'warn', text: `${p.name} interdit à votre véhicule (${mine}), ${where} : ${head(r)}${date}. ${sourceText(r)} ${EURO.FOOTER}`, url: r.source.url, linkText: 'Texte' });
+      lines.push({ level: 'warn', sev: 'ban', text: `${p.name} interdit à votre véhicule (${mine}), ${where} : ${head(r)}${date}. ${sourceText(r)} ${EURO.FOOTER}`, url: r.source.url, linkText: 'Texte' });
       cards.push(`${short(p.name)} interdit (${mine}${r.status === 'operator' ? ', exploitant' : ''})`);
     } else {
-      lines.push({ level: 'warn', text: `${p.name}, ${where} : ${head(r)}${date}. Classe Euro non précisée dans le profil : vérifiez-la. ${sourceText(r)} ${EURO.FOOTER}`, url: r.source.url, linkText: 'Texte' });
+      lines.push({ level: 'warn', sev: 'check', text: `${p.name}, ${where} : ${head(r)}${date}. Classe Euro non précisée dans le profil : vérifiez-la. ${sourceText(r)} ${EURO.FOOTER}`, url: r.source.url, linkText: 'Texte' });
     }
   }
   const checkSet = new Set(rules.filter((r) => r.status === 'check').flatMap((r) => r.banned));

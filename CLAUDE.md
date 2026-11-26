@@ -99,6 +99,12 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Signalements pour un ami (3c, v68, `reports-share.js`) : fichier = mes confirmés seulement, jour seulement, sans
   lieux ni notes par défaut ; import vérifié (512 Ko, schéma, types), aperçu + confirmation, marqués importés, jamais dits.
   v69 : import à l'arrêt seulement (`canImportShare`, règle 3a), redit à « Importer » (`confirmImport`) : sinon rien fusionné.
+- Repliables (v84, composant commun `src/ui/collapsible.js`) : Réglages = 18 sections repliées par défaut, état
+  `settings.sectionsOpen` (seule source, `creditsOpen` v64 relu), valeur sous le titre (`settings-sections.js`).
+  Fiche : un seul menu « Informations du trajet » (`route-info.js`), replié à chaque calcul (`calcId`, compteur), jamais
+  ouvert tout seul, rien sauvegardé ; en-tête = pire niveau symbole + mot + récap ; lignes triées interdit / alerte /
+  à vérifier / info (champ `sev` des règles) ; donnée de sécurité manquante = « à vérifier ». Cartes, ⛔, fiche rouge,
+  question desserte et boutons d'action toujours hors du menu. Détail : skill `gabarit-interface`.
 - Pendant le guidage, aucune saisie à l'écran (Code de la route art. R412-6-2 : écran permis s'il aide à la navigation),
   sauf une étape ajoutée à l'arrêt seulement (v55 ci-dessous).
 - Étapes (v55, `stops.js`) : 10 au plus, un seul calcul ORS avec tous les points (budget 3, jamais

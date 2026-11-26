@@ -19,6 +19,11 @@
   --danger-fg: #FFFFFF;
   --ok: #276B3E;
   --warn: #7A4A12;
+  /* v84 : niveaux du menu « Informations du trajet » (toujours avec symbole + mot, jamais la couleur seule). */
+  --lvl-ban: #B04040;
+  --lvl-alert: #A84300;
+  --lvl-check: #7A5A00;
+  --lvl-info: #5C5F69;
   --error-bg: #F6E3DF;
   --error-fg: #7A1F1F;
   --route: #E8A93B;
@@ -51,6 +56,10 @@
   --danger-fg: #14161C;
   --ok: #8FD6A4;
   --warn: #F0B850;
+  --lvl-ban: #E08080;
+  --lvl-alert: #F59E5B;
+  --lvl-check: #F0C850;
+  --lvl-info: #A9A79E;
   --error-bg: #3A1A1A;
   --error-fg: #F5D6D6;
   --route: #E8A93B;
@@ -289,6 +298,22 @@ input, select, textarea { min-width: 0; }
 /* v84 : composant commun (src/ui/collapsible.js) : titre puis sous-ligne courte (valeur, récap), jamais « … ». */
 .section-toggle-text { flex: 1 1 auto; min-width: 0; display: grid; gap: 2px; padding: 6px 0; }
 .section-sub { font-size: .85rem; font-weight: 400; color: var(--muted); white-space: nowrap; }
+
+/* v84 : menu « Informations du trajet » (en-tête toujours visible : niveau symbole + mot, titre, récap, chevron). */
+.trip-info { margin: 12px 0 0; border: 1px solid var(--border); border-left: 6px solid var(--lvl-info); border-radius: 10px;
+  background: var(--card); padding: 0 0 0 10px; min-width: 0; }
+.trip-info.sev-ban { border-left-color: var(--lvl-ban); }
+.trip-info.sev-alert { border-left-color: var(--lvl-alert); }
+.trip-info.sev-check { border-left-color: var(--lvl-check); }
+.trip-info > .section-toggle { gap: 10px; }
+.trip-info-level { flex: 0 0 auto; display: grid; justify-items: center; min-width: 4.6em; font-size: .8rem; font-weight: 800; line-height: 1.1; }
+.trip-info-icon { font-size: 1.35rem; line-height: 1.2; }
+.trip-info-level.sev-ban { color: var(--lvl-ban); }
+.trip-info-level.sev-alert { color: var(--lvl-alert); }
+.trip-info-level.sev-check { color: var(--lvl-check); }
+.trip-info-level.sev-info { color: var(--lvl-info); }
+.trip-info .section-sub { color: var(--fg); font-weight: 600; white-space: normal; }
+.trip-info > .collapsible-body { padding: 0 10px 10px 0; }
 
 /* v55 : étapes entre le départ et l'arrivée (↑ ↓ ✕ : 48 px). */
 .stops-box { display: grid; gap: 8px; }

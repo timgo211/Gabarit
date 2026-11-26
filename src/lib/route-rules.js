@@ -38,17 +38,17 @@ export function accessRules(route, { vehicle, access = null, departure = new Dat
   const out = { lines: [], short: [], localTransit: [], local: [], conditional: [] };
   const loc = localAlongRoute(route, { departure, elapsed });
   out.local = loc.passages;
-  if (!loc.ok) out.lines.push({ level: 'info', text: LOCAL.UNAVAILABLE_TEXT });
+  if (!loc.ok) out.lines.push({ level: 'info', sev: 'check', text: LOCAL.UNAVAILABLE_TEXT }); // v84 : donnée manquante
   for (const p of loc.passages) {
     if (p.accepted) { out.lines.push({ level: 'info', text: describeLocalAccepted(p) }); continue; }
     out.localTransit.push(p);
-    out.lines.push({ level: 'warn', text: describeLocal(p) });
+    out.lines.push({ level: 'warn', sev: 'ban', text: describeLocal(p) });
     out.short.push(`Desserte locale km ${Math.round(p.enter / 1000)}`);
   }
   if (access?.status !== 'ok') {
     out.lines.push(access?.status === 'loading' || access?.status === 'idle'
       ? { level: 'info', text: ACCESS.LOADING_TEXT }
-      : { level: 'warn', text: ACCESS.UNAVAILABLE_TEXT });
+      : { level: 'warn', sev: 'check', text: ACCESS.UNAVAILABLE_TEXT });
     return out;
   }
   const ctry = countriesAlongRoute(route, { departure, elapsed });
@@ -59,7 +59,7 @@ export function accessRules(route, { vehicle, access = null, departure = new Dat
   out.conditional = mergePassages(cond.passages);
   for (const p of out.conditional) {
     const active = p.state === 'no' || p.state === 'local';
-    out.lines.push({ level: active ? 'warn' : 'info', text: describeConditional(p), plage: p });
+    out.lines.push({ level: active ? 'warn' : 'info', ...(active ? { sev: 'ban' } : {}), text: describeConditional(p), plage: p });
     if (active) out.short.push(plageShort(p));
   }
   if (!cond.passages.length) out.lines.push({ level: 'info', text: noConditionalText(access.updated) });
@@ -78,7 +78,7 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
   if (!vehicle?.hazmat) return out;
   const code = effectiveCode(vehicle);
   if (!code) {
-    out.lines.push({ level: 'info', text: ADR.NO_CODE_TEXT });
+    out.lines.push({ level: 'info', sev: 'check', text: ADR.NO_CODE_TEXT }); // v84 : contrôle des tunnels impossible
     return out;
   }
   const ok = tunnels?.status === 'ok' && tunnels.data?.ok;
@@ -87,11 +87,11 @@ export function tunnelRules(route, { vehicle, tunnels = null, departure = new Da
   if (!ok) {
     out.lines.push(tunnels?.status === 'loading'
       ? { level: 'info', text: ADR.LOADING_TEXT }
-      : { level: 'warn', text: ADR.UNAVAILABLE_TEXT });
+      : { level: 'warn', sev: 'check', text: ADR.UNAVAILABLE_TEXT });
   }
   for (const p of out.passages) {
     if (p.forbidden) {
-      out.lines.push({ level: 'warn', text: describeForbidden(p) });
+      out.lines.push({ level: 'warn', sev: 'ban', text: describeForbidden(p) });
       out.short.push(`${tunnelName(p)} interdit`);
     } else out.lines.push({ level: 'info', text: describeAllowed(p) });
   }
@@ -183,7 +183,7 @@ export function routeRules(route, {
   short.push(...toll.short);
   for (const p of passages) {
     if (p.banned) {
-      lines.push({ level: 'warn', text: describeZfePassage(p, vehicle), url: p.url });
+      lines.push({ level: 'warn', sev: 'ban', text: describeZfePassage(p, vehicle), url: p.url });
       short.push(`ZFE ${p.name} interdite`);
     } else lines.push({ level: 'info', text: describeZfeAllowed(p), url: p.url });
   }
@@ -208,10 +208,10 @@ export function routeRules(route, {
   const spd = speedRules(route, { vehicle, speeds, countries });
   lines.push(...spd.lines);
   for (const c of bans.conflicts) {
-    lines.push({ level: 'warn', text: describeBanConflict(c) });
+    lines.push({ level: 'warn', sev: 'ban', text: describeBanConflict(c) });
     short.push(banShortText(c, departure));
   }
-  if (bans.applies && !bans.calendarKnown) lines.push({ level: 'info', text: CALENDAR_UNKNOWN_TEXT });
+  if (bans.applies && !bans.calendarKnown) lines.push({ level: 'info', sev: 'check', text: CALENDAR_UNKNOWN_TEXT });
   let windZones = [];
   if (wind?.status === 'ok' && wind.forecast) {
     const threshold = wind.threshold ?? WIND.GUST.default;
