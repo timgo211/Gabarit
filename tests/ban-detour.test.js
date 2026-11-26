@@ -213,14 +213,22 @@ test('v81 Nancy → Colmar : point de passage à moins de 2 km de la N59 Lunévi
   out = await planDetour({ route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI, fetchLeg: far, fetchFinal: viaN59 });
   assert.equal(out.reason, 'still');
   assert.equal(out.trace.final.still, 'plages');
-  // Trajet final loin de toute la zone : réussi.
-  const away = async (stops) => ({
-    coordinates: [[6.20, 48.70], [6.30, 48.45], ...stops.map((s) => [s.lon, s.lat]), [7.36, 48.07]], steps: [], distance: 190000, duration: 11000,
+  // Vraie réponse ORS (26/11/2026, Nancy → Colmar par Saverne et Strasbourg, 2 points de passage, 226,6 km ; départ et
+  // arrivée arrondis à 0,01°) : le contrôle final l'accepte, aucun point de la zone sur le tracé.
+  const { parseDirections } = await import('../src/lib/ors-response.js');
+  const real = parseDirections(JSON.parse(readFileSync(new URL('./fixtures/ors-directions-nancy-colmar-contournement.json', import.meta.url), 'utf8')));
+  assert.equal(sensitiveRules(real, { vehicle: SEMI, copy: COPY }).items.filter((it) => it.type <= 1).length, 0, 'aucune interdiction sur le tracé');
+  const viaPts = [real.coordinates[849], real.coordinates[1392]]; // points de passage de la requête (way_points)
+  out = await planDetour({
+    route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI,
+    fetchLeg: async (a, z) => ({ coordinates: [a, ...viaPts, z], steps: [] }), fetchFinal: async () => real,
   });
-  out = await planDetour({ route: NC_ROUTE, bans: [b], copy: COPY, vehicle: SEMI, fetchLeg: far, fetchFinal: away });
   assert.equal(out.ok, true, out.reason);
+  assert.equal(out.route, real);
   const { detourTraceText } = await import('../src/lib/ban-detour.js');
   const txt = detourTraceText({ state: 'appliqué', trace: out.trace }).join('\n');
+  const { routeDiagnosticText } = await import('../src/lib/route-diagnostic.js');
+  assert.match(routeDiagnosticText(real, { rules: { detourDiag: { state: 'appliqué', trace: out.trace } } }), /^Contournement automatique : appliqué$/m);
   assert.match(txt, /^Contournement automatique : appliqué\n  n59 : zone km \d+,\d–\d+,\d ; A km \d+,\d ; B km \d+,\d ; vol d'oiseau \d+,\d km ; \d+ carrés \(dont \d+ sur les plages OSM\) ; tronçon ORS \d+,\d km ; points de passage \d \(écartés à moins de 2 km de la zone : \d\)\n  trajet final \d+,\d km$/);
   assert.match(detourTraceText({ state: 'échec', reason: 'nodetour' })[0], /^Contournement automatique : échec \(aucun détour trouvé autour de la section\)$/);
   assert.deepEqual(detourTraceText({}), []);
