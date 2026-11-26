@@ -630,10 +630,11 @@ export function createMap(container, fallbackNode, initialTheme, opts = {}) {
   function bridgeElement(item) {
     const node = document.createElement('button');
     node.type = 'button';
-    node.className = `bridge-marker ${item.level === 'high' ? 'high' : 'medium'}${item.kind === 'weight' ? ' weight-marker' : ''}${item.kind === 'sensitive' ? ' sensitive-marker' : ''}`;
+    node.className = `bridge-marker ${item.level === 'high' ? 'high' : 'medium'}${item.kind === 'weight' ? ' weight-marker' : ''}${item.kind === 'dialog' ? ' weight-marker dialog-marker' : ''}${item.kind === 'sensitive' ? ' sensitive-marker' : ''}`;
     node.dataset.key = item.key;
-    // Limite de poids (12a bis) : « 3,5 t » ; point sensible (PR 3b) : « ! ».
-    node.textContent = (item.kind === 'weight' || item.kind === 'sensitive') && item.glyph ? item.glyph : '⚠';
+    // Limite de poids (12a bis) : « 3,5 t » ; limite DiaLog (12c) : « 3,4 m » ou « 3,5 t », bord pointillé ;
+    // point sensible (PR 3b) : « ! ».
+    node.textContent = (item.kind === 'weight' || item.kind === 'dialog' || item.kind === 'sensitive') && item.glyph ? item.glyph : '⚠';
     node.setAttribute('aria-label', item.label);
     node.title = item.label;
     for (const ev of ['mousedown', 'touchstart', 'pointerdown', 'dblclick', 'contextmenu']) node.addEventListener(ev, (e) => e.stopPropagation());

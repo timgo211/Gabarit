@@ -73,6 +73,7 @@ export function emptyData() {
       bridgeWarnings: true,
       autoBypass: true,
       weightWarnings: true,
+      dialogWarnings: true,
       panelCollapsed: false,
       sectionsOpen: {},
       adr: emptyAdrSettings(),
@@ -138,6 +139,7 @@ export function sanitizeData(raw) {
       bridgeWarnings: s.bridgeWarnings !== false, // ponts sans hauteur connue (phase 12a), signalés par défaut
       autoBypass: s.autoBypass !== false, // v77 : contournement automatique des interdictions, activé par défaut
       weightWarnings: s.weightWarnings !== false, // limites de poids d'OSM (phase 12a bis), signalées par défaut
+      dialogWarnings: s.dialogWarnings !== false, // limites officielles DiaLog (phase 12c), affichées par défaut
       panelCollapsed: s.panelCollapsed === true, // v62 : panneau de préparation replié (carte seule), déplié par défaut
       // v84 : sections de Réglages ouvertes (seule source d'état, « Sources et licences » comprise), tout replié par
       // défaut ; ancienne sauvegarde v64 : creditsOpen repris pour « Sources et licences ».

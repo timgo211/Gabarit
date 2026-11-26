@@ -42,7 +42,8 @@ export function weightText(limit, local = false) {
   return `Limite de poids de ${fmtT(limit)} t d'après OpenStreetMap${local ? ' (desserte locale possible)' : ''}, que le calcul n'a peut-être pas prise en compte : à vérifier. La signalisation fait foi.`;
 }
 
-function decodeLine(arr, start) {
+/** Ligne en 1e-5° et écarts à partir de arr[start] ; aussi lue par dialog-limits.js (phase 12c). */
+export function decodeLine(arr, start) {
   const out = [];
   let x = 0; let y = 0;
   for (let i = start; i + 1 < arr.length; i += 2) {
@@ -136,24 +137,16 @@ function waysAt(cells, p, heading) {
 }
 
 /**
- * Tronçons à limite de poids inférieure au PTAC, suivis par l'itinéraire.
- * @param {{ coordinates:number[][] }} route
- * @param {{ ways:object[] }} data mergeWeightTiles
- * @param {{ ptac?:number|null }} opts PTAC du profil (t)
- * @returns {{ items:{ id:number, limit:number, local:boolean, point:number[], along:number, length:number,
- *   text:string }[], counts:{ shown:number, local:number, aboveOk:number } }}
- *   point : milieu du passage sur le tracé [lon, lat] (repère, « Éviter ce passage ») ; along : m depuis le départ ;
- *   items dans l'ordre du trajet ; aboveOk : tronçons proches dont la limite admet le PTAC
+ * Passages du tracé sur des tronçons suivis (point tous les 5 m à ≤ 15 m, cap compatible à 30° près modulo 180° :
+ * jamais un croisement ; trous de 15 m tolérés ; passage ≥ 25 m ou ≥ 60 % du tronçon). Partagé par les limites de
+ * poids OSM (12a bis) et les limites DiaLog (12c).
+ * @param {number[][]} coords tracé [lon, lat]
+ * @param {{ coords:number[][] }[]} ways
+ * @returns {{ line:object, runs:{ way:object, enter:number, exit:number }[] }}
  */
-export function weightsAlongRoute(route, data, { ptac = null } = {}) {
-  const counts = { shown: 0, local: 0, aboveOk: 0 };
-  const coords = route?.coordinates;
-  if (!Array.isArray(coords) || coords.length < 2 || !data?.ways?.length || !isNum(ptac) || ptac <= 0) return { items: [], counts };
-  const low = data.ways.filter((w) => w.limit < ptac);
-  counts.aboveOk = data.ways.length - low.length;
-  if (!low.length) return { items: [], counts };
-  const lengths = new Map(low.map((w) => [w, lineLength(w.coords)]));
-  const cells = indexSegments(low);
+export function followedRuns(coords, ways) {
+  const lengths = new Map(ways.map((w) => [w, lineLength(w.coords)]));
+  const cells = indexSegments(ways);
   const line = prepareLine(coords);
   const N = Math.max(1, Math.ceil(line.total / WEIGHT.SAMPLE_M));
   const open = new Map(); // tronçon → { enter, exit }
@@ -180,6 +173,27 @@ export function weightsAlongRoute(route, data, { ptac = null } = {}) {
     }
   }
   for (const [w, r] of open) close(w, r);
+  return { line, runs };
+}
+
+/**
+ * Tronçons à limite de poids inférieure au PTAC, suivis par l'itinéraire.
+ * @param {{ coordinates:number[][] }} route
+ * @param {{ ways:object[] }} data mergeWeightTiles
+ * @param {{ ptac?:number|null }} opts PTAC du profil (t)
+ * @returns {{ items:{ id:number, limit:number, local:boolean, point:number[], along:number, length:number,
+ *   text:string }[], counts:{ shown:number, local:number, aboveOk:number } }}
+ *   point : milieu du passage sur le tracé [lon, lat] (repère, « Éviter ce passage ») ; along : m depuis le départ ;
+ *   items dans l'ordre du trajet ; aboveOk : tronçons proches dont la limite admet le PTAC
+ */
+export function weightsAlongRoute(route, data, { ptac = null } = {}) {
+  const counts = { shown: 0, local: 0, aboveOk: 0 };
+  const coords = route?.coordinates;
+  if (!Array.isArray(coords) || coords.length < 2 || !data?.ways?.length || !isNum(ptac) || ptac <= 0) return { items: [], counts };
+  const low = data.ways.filter((w) => w.limit < ptac);
+  counts.aboveOk = data.ways.length - low.length;
+  if (!low.length) return { items: [], counts };
+  const { line, runs } = followedRuns(coords, low);
   // Tronçons voisins de même limite mis bout à bout (rue découpée en plusieurs chemins OSM) : un seul passage.
   runs.sort((x, y) => x.enter - y.enter);
   const merged = [];

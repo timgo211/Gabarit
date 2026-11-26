@@ -83,7 +83,8 @@ test('valeur courante sous le titre : réglages de conduite seulement, courte', 
   assert.equal(sectionSummary('bans', s), 'Contournement automatique : oui');
   assert.equal(sectionSummary('bans', { ...s, autoBypass: false }), 'Contournement automatique : non');
   assert.equal(sectionSummary('bridges', s), 'Signaler : oui');
-  assert.equal(sectionSummary('weights', { ...s, weightWarnings: false }), 'Signaler : non');
+  assert.equal(sectionSummary('weights', { ...s, weightWarnings: false }), 'Signaler : non · DiaLog : oui');
+  assert.equal(sectionSummary('weights', { ...s, dialogWarnings: false }), 'Signaler : oui · DiaLog : non'); // phase 12c
   assert.equal(sectionSummary('diesel', s), 'Prix : non renseigné');
   assert.equal(sectionSummary('diesel', { ...s, dieselPrice: 1.85 }), 'Prix : 1,85 €/L');
   assert.equal(sectionSummary('test', s), 'Vitesse : 50 km/h');

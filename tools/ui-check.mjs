@@ -28,6 +28,7 @@ import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/
 import { BRIDGE } from '../src/lib/bridge-check.js';
 import { buildSensitivePoints } from '../src/lib/sensitive-points.js';
 import { weightFromFeature, convertWeights } from '../src/lib/weight-convert.js';
+import { convertDialog } from './dialog-convert.mjs';
 import { speedFromFeature, convertSpeeds } from '../src/lib/speed-convert.js';
 import { directionFromFeature, convertDirections } from '../src/lib/directions-convert.js';
 import { placeFromFeature, convertPlaces } from '../src/lib/places-convert.js';
@@ -167,7 +168,7 @@ async function open(browser, base, {
   zfe = { zones: [], voies: [] }, now = null, wind = null, driving = null, vehicle = null, tunnels = undefined,
   slowTiles = false, osmCopy = 'fixture', voice = false, countryFiles = null, accessCopy = 'fixture', winterCopy = null,
   tollsFile = undefined, tollsNetwork = null, sw = false, streets = false, nightLevel = undefined, buildings = false,
-  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
+  bridgesCopy = null, settings = null, restrictions = null, weightsCopy = null, dialogCopy = null, speedsCopy = null, directionsCopy = null, placesCopy = null, lanesCopy = null,
   start = START, fuel = null, pelias = null, reports = null, axesCopy = 'repo', sensitiveCopy = 'repo',
 } = {}) {
   const ctx = await browser.newContext({
@@ -361,6 +362,15 @@ async function open(browser, base, {
     const json = weightFiles?.get(name);
     return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
   });
+  // Phase 12c : copie data/dialog/ (null, par défaut : absente, 404, même quand l'Action a écrit la vraie copie dans le
+  // dépôt ; 'fixture' : mesures synthétiques le long du trajet de Colombier passées par les fonctions de l'Action).
+  const dialogFiles = dialogCopyFiles(dialogCopy);
+  await ctx.route(/\/data\/dialog\/[^/]+\.json(\?.*)?$/, (route) => {
+    const name = new URL(route.request().url()).pathname.split('/').pop();
+    stats.dialog = [...(stats.dialog ?? []), name];
+    const json = dialogFiles?.get(name);
+    return json ? route.fulfill({ json }) : route.fulfill({ status: 404, body: '' });
+  });
   // Phase 11a : copie data/vitesses-osm/ (null, par défaut : absente, 404 ; 'fixture' : voies de
   // tests/fixtures/osm-vitesses-colombier.geojsonseq passées par les fonctions de l'Action).
   const speedFiles = speedsCopyFiles(speedsCopy);
@@ -475,6 +485,109 @@ function weightsCopyFiles(kind) {
   const { index, tiles } = convertWeights(feats.map(weightFromFeature).filter(Boolean),
     { updated: '2026-12-01', grid: buildCoverage([poly]), countries: ['france'] });
   return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * Fichiers de la copie DiaLog simulée (phase 12c, nom → JSON), d'après les fonctions de l'Action : sur le trajet de
+ * Colombier (plein nord, lon 6,2105), poids 3,5 t sur la Rue du Viaduc (même passage que la limite OSM → une ligne),
+ * hauteur 3,4 m (titre avec « <b> », jamais interprété), mesure terminée et route qui croise (jamais montrées).
+ */
+function dialogCopyFiles(kind) {
+  if (!kind) return null;
+  const poly = parsePoly('zone\n1\n   -5 42\n   8.3 42\n   8.3 51.2\n   -5 51.2\nEND\nEND\n');
+  const m = (o) => ({ rec: false, negate: false, start: '2024-02-02', end: null, ...o });
+  const { index, tiles } = convertDialog([
+    m({ k: 'w', value: 3.5, title: 'PONT FRAGILE (essai)', org: 'Commune D', lines: [[[6.2105, 47.658], [6.2105, 47.66], [6.2105, 47.662]]] }),
+    m({ k: 'h', value: 3.4, title: '<b>Passage sous le beffroi</b> (essai)', org: 'Commune C', lines: [[[6.2105, 47.665], [6.2105, 47.668]]] }),
+    m({ k: 'w', value: 7.5, title: 'Travaux terminés (essai)', org: 'Commune F', start: '2025-03-01', end: '2026-01-01', lines: [[[6.2105, 47.651], [6.2105, 47.654]]] }),
+    m({ k: 'h', value: 3, title: 'Route qui croise (essai)', org: 'Commune G', lines: [[[6.205, 47.67], [6.216, 47.67]]] }),
+  ], { publication: '2026-11-26T13:14:00+00:00', updated: '2026-11-26', grid: buildCoverage([poly]) });
+  return new Map([['index.json', index], ...[...tiles].map(([k, t]) => [`${k}.json`, t])]);
+}
+
+/**
+ * Phase 12c : limites officielles DiaLog. Fiche à l'arrêt : 2 lignes (poids 3,5 t fusionné avec la limite OSM de la
+ * Rue du Viaduc, hauteur 3,4 m au titre affiché tel quel), repères au bord pointillé, ligne technique, panneau et
+ * « Éviter ce passage » ; mesure terminée et croisement ignorés ; guidage : aucun repère, rien à l'écran ni à voix
+ * haute ; réglage désactivé ; copie absente = rien, aucun message. Portrait et paysage, jour et nuit.
+ */
+async function dialogCheck(browser, base) {
+  const col = fixture('ors-directions-colombier.json');
+  const line = col.features[0].geometry.coordinates;
+  for (const [width, height, theme] of [[412, 900, 'day'], [900, 412, 'night'], [412, 900, 'night'], [900, 412, 'day']]) {
+    const tag = `${width}×${height} ${theme}`;
+    const { page, ctx, errors, stats } = await open(browser, base, {
+      width, height, theme, voice: true, directions: () => col, overpass: () => ({ elements: [] }), weightsCopy: 'fixture', dialogCopy: 'fixture',
+    });
+    await computeRoute(page);
+    await page.waitForFunction(() => (document.querySelector('#route-notes')?.textContent ?? '').includes('(DiaLog'), null, { timeout: 10000 }).catch(() => {});
+    const notes = await page.$$eval('.rules-notes li', (n) => n.map((li) => ({ cls: li.className, text: li.textContent })));
+    const dl = notes.filter((n) => /\(DiaLog/.test(n.text));
+    check(dl.length === 2 && dl.every((l) => l.cls === 'warn'), `${tag} : 2 limites officielles sur la fiche`, dl.map((l) => l.text).join(' | '));
+    check(/^Poids limité à 3,5 t \(DiaLog et OpenStreetMap\) — « PONT FRAGILE \(essai\) » — Commune D — permanent\. À vérifier — seul l'arrêté fait foi — la signalisation fait foi\. \(km 1\)$/.test(dl[0]?.text ?? ''),
+      `${tag} : poids 3,5 t, une ligne avec les deux sources`, dl[0]?.text);
+    check(!notes.some((n) => n.text.startsWith('Limite de poids de 3,5 t')), `${tag} : ligne OSM de la Rue du Viaduc absorbée`);
+    check(notes.some((n) => /12 t d'après OpenStreetMap/.test(n.text)), `${tag} : autre limite OSM gardée`);
+    check(dl[1]?.text.includes('« <b>Passage sous le beffroi</b> (essai) »') && await page.locator('#route-notes b').count() === 0,
+      `${tag} : titre affiché en texte, jamais interprété`, dl[1]?.text);
+    check(!notes.some((n) => /Travaux terminés|Route qui croise/.test(n.text)), `${tag} : mesure terminée et croisement ignorés`);
+    const marks = page.locator('.bridge-marker.dialog-marker');
+    check(await marks.count() === 2, `${tag} : 2 repères DiaLog à l'arrêt`, String(await marks.count()));
+    const glyphs = (await marks.allTextContents()).map((t) => t.trim()).sort();
+    check(glyphs.join(',') === '3,4 m,3,5 t', `${tag} : repères « 3,4 m » et « 3,5 t »`, glyphs.join(','));
+    check(await marks.first().evaluate((n) => getComputedStyle(n).borderTopStyle) === 'dashed', `${tag} : bord pointillé`);
+    check((stats.dialog ?? []).includes('index.json') && (stats.dialog ?? []).includes('6_47.json'), `${tag} : copie data/dialog/ lue`, (stats.dialog ?? []).join(','));
+    await openTripInfo(page);
+    await page.locator('.route-diag summary').click();
+    await page.waitForFunction(() => /Limites DiaLog : /.test(document.querySelector('.route-diag-text')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+    check(/Limites DiaLog : 2 \(hauteur 1, poids 1\) ; copie du 26\/11\/2026/.test(await page.textContent('.route-diag-text')), `${tag} : ligne technique DiaLog`);
+    const weightMark = marks.filter({ hasText: '3,5 t' });
+    await weightMark.click({ force: true });
+    await page.waitForSelector('#bridge-panel:not([hidden])', { timeout: 5000 }).catch(() => {});
+    check(/^Poids limité à 3,5 t \(DiaLog et OpenStreetMap\) — « PONT FRAGILE \(essai\) » .* \(km 1\)$/.test(await page.textContent('#bridge-panel-text')), `${tag} : repère touché → texte de la mesure`);
+    check(/Seul l'arrêté fait foi/.test(await page.textContent('#bridge-panel-help')), `${tag} : aide « Éviter ce passage » (DiaLog)`);
+    await page.click('#btn-bridge-avoid');
+    await page.waitForTimeout(200);
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('gabarit.data')).restrictions);
+    check(stored.length === 1 && stored[0].type === 'weight' && stored[0].value === 3.5 && stored[0].origin === 'dialog'
+      && Math.abs(stored[0].lon - line[0][0]) < 1e-6, `${tag} : restriction de poids enregistrée au point du tracé`, JSON.stringify(stored));
+    await noHorizontalScroll(page, `${tag} limites DiaLog`);
+    await page.screenshot({ path: join(SHOTS, `${width}x${height}-${theme}-dialog.png`) });
+    await page.click('#btn-bridge-close');
+    if (width === 412 && theme === 'day') {
+      await openSettings(page);
+      await page.waitForSelector('#dialog-warnings');
+      check(await page.isChecked('#dialog-warnings'), `${tag} : case « Afficher les limites officielles (DiaLog) » cochée par défaut`);
+      await page.waitForFunction(() => /Copie du 26\/11\/2026/.test(document.querySelector('#dialog-credit')?.textContent ?? ''), null, { timeout: 5000 }).catch(() => {});
+      check(/Base nationale de la réglementation de circulation \(DiaLog\),\s+Licence Ouverte 2\.0\.\s*Copie du 26\/11\/2026\./.test(await page.textContent('#dialog-credit')),
+        `${tag} : crédit DiaLog avec la date de la copie`, await page.textContent('#dialog-credit'));
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(300);
+      await setGeo(page, { lon: line[0][0], lat: line[0][1], accuracy: 5, speed: 0 });
+      await page.click('#btn-nav-start');
+      await page.waitForSelector('#nav:not([hidden])');
+      await page.waitForTimeout(1200);
+      check(await page.locator('.dialog-marker').count() === 0, `${tag} : aucun repère DiaLog pendant le guidage`);
+      check(!/DiaLog|3,4 m|arrêté/i.test(await page.textContent('#nav')), `${tag} : rien de DiaLog dans l'écran de guidage`);
+      await drive(ctx, page, line, 50, 85);
+      check(await page.locator('.dialog-marker').count() === 0, `${tag} : toujours aucun repère en roulant`);
+      const spoken = await page.evaluate(() => window.__spoken ?? []);
+      check(!spoken.some((t) => /DiaLog|hauteur limitée|poids limité|arrêté/i.test(t)), `${tag} : rien dit à voix haute`, spoken.join(' | '));
+    }
+    check(errors.length === 0, `${tag} : aucune erreur JavaScript`, errors.join(' | '));
+    await ctx.close();
+  }
+  const off = await open(browser, base, { width: 412, height: 900, directions: () => col, overpass: () => ({ elements: [] }), dialogCopy: 'fixture', settings: { dialogWarnings: false } });
+  await computeRoute(off.page);
+  await off.page.waitForTimeout(800);
+  const offNotes = await off.page.$$eval('.rules-notes li', (n) => n.map((li) => li.textContent));
+  check(!offNotes.some((t) => /DiaLog|officielle/.test(t)) && await off.page.locator('.dialog-marker').count() === 0, 'réglage désactivé : aucune limite DiaLog', offNotes.join(' | '));
+  await off.ctx.close();
+  const none = await open(browser, base, { width: 412, height: 900, directions: () => col, overpass: () => ({ elements: [] }) });
+  await computeRoute(none.page);
+  await none.page.waitForTimeout(800);
+  check(!/DiaLog|officielle/.test(await none.page.textContent('#route-notes')) && await none.page.locator('.dialog-marker').count() === 0, 'copie absente : rien, aucun message');
+  await none.ctx.close();
 }
 
 /** Fichiers de la copie des communes soumises aux équipements d'hiver simulée (nom → JSON). */
@@ -6171,7 +6284,7 @@ try {
     overview: overviewGpsCheck, press: pressThenTypeCheck, areas: areasCheck, foot: footCheck, rules: rulesCheck,
     drive: driveWindCheck, adr: adrCheck, draw: drawCheck, border: borderCheck, access: accessCheck, winter: winterCheck, euro: euroCheck,
     tolls: tollsCheck, failed: failedCheck, palette: paletteCheck, guidage: guidanceCheck, bandeau: bannerCheck,
-    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
+    ponts: bridgesCheck, restrictions: restrictionsCheck, poids: weightsCheck, dialog: dialogCheck, vitesse: speedsCheck, directions: directionsCheck, voies: lanesCheck,
     recommande: recommendedTunnelCheck, autres: otherRoutesCheck, reprise: repriseCheck, camion: truckIconCheck,
     carburant: fuelCheck, etapes: stopsCheck, 'ligne-etape': stopLineCheck, historique: historyCheck, limites: ruleLimitsCheck,
     preparation: preparationCheck, suggestions: suggestionsCheck, signalements: reportsCheck, lieux: savedPlacesCheck, ami: reportsShareCheck,

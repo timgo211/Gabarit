@@ -59,7 +59,7 @@ export function sectionSummary(key, settings = {}, { hasKey = false, keyInvalid 
     case 'driving': return `Alerte vent : ${s.windGust ?? 70} km/h`;
     case 'bans': return `Contournement automatique : ${yesNo(s.autoBypass !== false)}`;
     case 'bridges': return `Signaler : ${yesNo(s.bridgeWarnings !== false)}`;
-    case 'weights': return `Signaler : ${yesNo(s.weightWarnings !== false)}`;
+    case 'weights': return `Signaler : ${yesNo(s.weightWarnings !== false)} · DiaLog : ${yesNo(s.dialogWarnings !== false)}`;
     case 'diesel': {
       const p = formatPricePerLiter(s.dieselPrice);
       return p ? `Prix : ${p} €/L` : 'Prix : non renseigné';

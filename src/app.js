@@ -36,6 +36,8 @@ import { AXES } from './lib/axes-convert.js';
 import { parseAxesTile, mergeAxesTiles } from './lib/axis-match.js';
 import { SENSITIVE, parseSensitiveTile, mergeSensitiveTiles, parseSensitiveSections } from './lib/sensitive-points.js';
 import { createWeightLimits } from './ui/weight-limits.js';
+import { createDialogLimits } from './ui/dialog-limits.js';
+import { DIALOG_LIMITS, frDate } from './lib/dialog-limits.js';
 import { createSpeedLimits } from './ui/speed-limits.js';
 import { createDirections } from './ui/directions.js';
 import { createPlaces } from './ui/places.js';
@@ -200,7 +202,7 @@ navigation = createNavigation({
     bridges.extend(route); // phase 12a : cases de data/ponts-osm/ manquantes
     axes.extend(route); // PR 3a : cases de data/axes-osm/ manquantes
     sensitive.extend(route); // PR 3b : cases de data/points-sensibles/ manquantes
-    weightLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
+    weightLimits.extend(route); dialogLimits.extend(route); // phase 12a bis : cases de data/poids-osm/ manquantes
     speedLimits.extend(route); // phase 11a : cases de data/vitesses-osm/ manquantes
     directions.extend(route); // phase 11b : cases de data/directions-osm/ manquantes
     places.extend(route); // phase 11c : cases de data/lieux-osm/ manquantes
@@ -334,6 +336,21 @@ const sensitive = createTileCopy({
 });
 // Limites de poids d'OSM (phase 12a bis) : data/poids-osm/, mêmes cases que les ponts.
 const weightLimits = createWeightLimits({ onChange: () => renderChoice() });
+// Limites officielles DiaLog (phase 12c) : data/dialog/, mêmes cases ; fiche et repères à l'arrêt, jamais dites.
+const dialogLimits = createDialogLimits({ onChange: () => renderChoice() });
+// Crédit « Sources et licences » : date de la copie DiaLog lue dans data/dialog/index.json (une fois, à l'ouverture
+// de Réglages ; copie absente : pas de date, aucun message).
+let dialogCreditRead = null;
+function showDialogCredit() {
+  dialogCreditRead ??= fetch(DIALOG_LIMITS.INDEX_PATH, { cache: 'no-cache' })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((j) => {
+      const date = frDate(typeof j?.updated === 'string' ? j.updated : null);
+      const node = document.getElementById('dialog-copy-date');
+      if (node) node.textContent = date ? ` Copie du ${date}.` : '';
+    })
+    .catch(() => {});
+}
 // Limitations de vitesse (phase 11a) : fiche, puis guidage (cases arrivées après « Démarrer » ou au recalcul).
 const speedLimits = createSpeedLimits({
   onChange: (st) => {
@@ -361,6 +378,8 @@ map.onBridgePick((key) => {
   if (it) { restrictionsUi.openBridge(it); return; } // phase 12b : texte, aide et « Éviter ce passage »
   const w = (rules.weightLimits?.items ?? []).find((x) => weightKey(x) === key);
   if (w) { restrictionsUi.openWeight(w); return; } // phase 12a bis : restriction de poids au point du tracé
+  const dli = (rules.dialogLimits?.items ?? []).find((x) => dialogKey(x) === key);
+  if (dli) { restrictionsUi.openDialog(dli); return; } // phase 12c : texte de la mesure, « Éviter ce passage »
   const sp = (rules.sensitive?.items ?? []).find((x) => sensitiveKey(x) === key);
   if (sp) showMessage(messageNode, sp.text, 'info'); // PR 3b : texte du point sensible, jamais dit
 });
@@ -402,6 +421,7 @@ map.onReportPick((id) => {
 showReportMarkers();
 const bridgeKey = (it) => `${it.id}@${Math.round(it.along)}`;
 const weightKey = (it) => `w${it.id}@${Math.round(it.along)}`;
+const dialogKey = (it) => `d${it.k}${it.id}@${Math.round(it.along)}`; // phase 12c
 const sensitiveKey = (it) => `s${it.type}:${it.way}@${Math.round(it.along)}`; // PR 3b
 
 // ───────── Équipements d'hiver (phase 5f) : data/hiver/, cases traversées par les itinéraires proposés ─────────
@@ -467,18 +487,20 @@ function rulesOf(route, vehicle, departure) {
   const bw = data.settings.bridgeWarnings !== false;
   const wl = weightLimits.state;
   const ww = data.settings.weightWarnings !== false;
+  const dlc = dialogLimits.state;
+  const dw = data.settings.dialogWarnings !== false;
   const spd = speedLimits.state;
   const ax = axes.state;
   const sn = sensitive.state;
-  if (hit && hit.ax === ax && hit.sn === sn && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
+  if (hit && hit.dlc === dlc && hit.dw === dw && hit.ax === ax && hit.sn === sn && hit.spd === spd && hit.wl === wl && hit.ww === ww && hit.brg === brg && hit.bw === bw && hit.minute === minute && hit.zfe === zfeData && hit.vehicle === vehicle && hit.forecast === w.forecast
     && hit.sig === sig && hit.dsig === dsig && hit.pool === pool && hit.tun === tun && hit.ctry === ctry && hit.acc === acc && hit.win === win && hit.tol === tol) return hit.rules;
   // Aires du trajet (phase 9) : la pause conseillée est proposée sur une aire du bon sens.
   const placed = pool.length ? placeAlongRoute(pool, route) : [];
   const rules = routeRules(route, {
     vehicle, departure, zfe: zfeData, driving, wind: w, areas: placed, tunnels: tun, countries: ctry, access: acc, winter: win, tolls: tol,
-    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax, sensitive: sn,
+    bridges: brg, bridgeWarnings: bw, weightLimits: wl, weightWarnings: ww, speeds: spd, axes: ax, sensitive: sn, dialog: dlc, dialogWarnings: dw,
   });
-  rulesCache.set(route, { ax, sn, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
+  rulesCache.set(route, { dlc, dw, ax, sn, spd, minute, zfe: zfeData, vehicle, forecast: w.forecast, sig, dsig, pool, tun, ctry, acc, win, tol, brg, bw, wl, ww, rules });
   return rules;
 }
 
@@ -622,7 +644,7 @@ async function avoidZfe() {
     bridges.extend(route);
     axes.extend(route);
     sensitive.extend(route);
-    weightLimits.extend(route);
+    weightLimits.extend(route); dialogLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
@@ -686,7 +708,7 @@ async function avoidTunnel() {
     bridges.extend(route);
     axes.extend(route);
     sensitive.extend(route);
-    weightLimits.extend(route);
+    weightLimits.extend(route); dialogLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
@@ -733,7 +755,7 @@ async function avoidLocal() {
     bridges.extend(route);
     axes.extend(route);
     sensitive.extend(route);
-    weightLimits.extend(route);
+    weightLimits.extend(route); dialogLimits.extend(route);
     speedLimits.extend(route);
     directions.extend(route);
     places.extend(route);
@@ -817,7 +839,7 @@ function extendRoute(route) {
   bridges.extend(route);
   axes.extend(route);
   sensitive.extend(route);
-  weightLimits.extend(route);
+  weightLimits.extend(route); dialogLimits.extend(route);
   speedLimits.extend(route);
   directions.extend(route);
   places.extend(route);
@@ -1061,6 +1083,7 @@ function renderChoice() {
 function showBridgesOnMap(r, route = null) {
   const items = r?.bridges?.items ?? [];
   const weights = r?.weightLimits?.items ?? [];
+  const official = r?.dialogLimits?.items ?? [];
   const sens = r?.sensitive?.items ?? [];
   // v81 : sections interdites actives : trait rouge fin sur le tracé, « ! » au début de la plage (un par section).
   const coords = route?.coordinates ?? null;
@@ -1076,6 +1099,14 @@ function showBridgesOnMap(r, route = null) {
       key: weightKey(it), lonlat: it.point, level: 'high', kind: 'weight', glyph: `${String(it.limit).replace('.', ',')} t`,
       label: `Limite de poids à vérifier : ${String(it.limit).replace('.', ',')} t${it.local ? ', desserte locale possible' : ''}`,
     })),
+    // Phase 12c : limites officielles DiaLog, repère au bord pointillé (« à vérifier »), texte au toucher, jamais dit.
+    ...official.map((it) => {
+      const v = String(it.value).replace('.', ',');
+      return {
+        key: dialogKey(it), lonlat: it.point, level: 'high', kind: 'dialog', glyph: it.k === 'h' ? `${v} m` : `${v} t`,
+        label: `Limite officielle (DiaLog) à vérifier : ${it.k === 'h' ? `hauteur ${v} m` : `poids ${v} t`}`,
+      };
+    }),
     // PR 3b : points sensibles (interdictions, hauteurs basses, tunnels) ; texte au toucher, jamais dit.
     ...sens.map((it) => ({
       key: sensitiveKey(it), lonlat: (it.type <= 1 /* interdiction */ && startOf.get(it.section)) || it.point, level: 'high', kind: 'sensitive', glyph: '!',
@@ -1248,7 +1279,7 @@ async function openAlternatives(from, extraStop = null) {
       banAuto: 'off', banAutoReason: undefined, banBefore: undefined, banId: undefined, banTrace: undefined, // v79 : rien d'automatique ici non plus
     };
     altConfirm = false;
-    for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
+    for (const o of options) { access.extend(o.route); bridges.extend(o.route); axes.extend(o.route); sensitive.extend(o.route); weightLimits.extend(o.route); dialogLimits.extend(o.route); speedLimits.extend(o.route); directions.extend(o.route); places.extend(o.route); lanes.extend(o.route); winter.extend(o.route); }
     altUi.status.textContent = 'Choisis un itinéraire, puis « Guider par cet itinéraire ».';
     renderAlternatives();
   } catch (err) {
@@ -1399,8 +1430,9 @@ const settings = createSettings({
   onBridgeWarningsChange: (on) => { setSetting({ bridgeWarnings: on }); renderChoice(); },
   onAutoBypassChange: (on) => { setSetting({ autoBypass: on }); renderChoice(); }, // v77
   onWeightWarningsChange: (on) => { setSetting({ weightWarnings: on }); renderChoice(); },
+  onDialogWarningsChange: (on) => { setSetting({ dialogWarnings: on }); renderChoice(); },
   onClose: () => { settingsOpen = false; syncReportPark(); }, // phase 3a
-  onOpen: () => { placesUi?.render(); restrictionsUi.render(); historyPanel.refresh(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu
+  onOpen: () => { placesUi?.render(); restrictionsUi.render(); historyPanel.refresh(); showDialogCredit(); settingsOpen = true; syncReportPark(); reportsUi.render(); }, // v56 : historique relu
   getHistory: () => historyStore.list(),
   onHistoryImported: async (list) => { await historyStore.merge(list); await historyPanel.refresh(); },
   onWindGustChange: (g) => { setSetting({ windGust: g }); renderChoice(); },
@@ -1480,6 +1512,7 @@ const form = createRouteForm({
       axes.clear();
       sensitive.clear();
       weightLimits.clear();
+      dialogLimits.clear();
       speedLimits.clear();
       directions.clear();
       places.clear();
@@ -1524,6 +1557,7 @@ function showChoice(selected) {
   axes.load(options.map((o) => o.route)); // PR 3a : cases de data/axes-osm/ (repli par la géométrie)
   sensitive.load(options.map((o) => o.route)); // PR 3b : cases de data/points-sensibles/
   weightLimits.load(options.map((o) => o.route)); // phase 12a bis : cases de data/poids-osm/
+  dialogLimits.load(options.map((o) => o.route)); // phase 12c : cases de data/dialog/
   speedLimits.load(options.map((o) => o.route)); // phase 11a : cases de data/vitesses-osm/
   directions.load(options.map((o) => o.route)); // phase 11b : cases de data/directions-osm/
   places.load(options.map((o) => o.route)); // phase 11c : cases de data/lieux-osm/

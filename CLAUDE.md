@@ -161,6 +161,8 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   à ignorer. Rien dans l'appli (étude section 8). « Seul l'arrêté fait foi. »
 - Copie DiaLog (12c, Action « DiaLog (copie) », `tools/dialog-convert.mjs`, `data/dialog/` jamais précachée, 5 Mo / 30 Mo) :
   noEntry + hauteur ou poids hors negate, géométrie linéaire ; valeur = maximum ; fin passée ignorée. Détail : skill structure.
+  v86 (`dialog-limits.js`) : tronçon suivi 15 m, hauteur + 0,1 ≥ valeur, PTAC > valeur ; fiche et repères pointillés à
+  l'arrêt, jamais dits ; « à vérifier — seul l'arrêté fait foi » ; doublon OSM = une ligne ; copie absente = rien.
 - Textes officiels illisibles depuis le conteneur : Action « Textes officiels » (`tools/textes-officiels.json`, journal
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +

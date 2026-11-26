@@ -19,7 +19,8 @@ import { tollRules } from './hgv-tolls.js';
 import { bridgeRules } from './bridge-check.js';
 import { geoRoadsFor, geoRoadsAll, axisTechText } from './axis-match.js';
 import { sensitiveRules } from './sensitive-points.js';
-import { weightRules as weightLimitRules } from './weight-check.js';
+import { weightRules as weightLimitRules, weightLines } from './weight-check.js';
+import { dialogRules, localDay } from './dialog-limits.js';
 import { speedRules } from './speed-limit.js';
 import { localAlongRoute, describeLocal, describeLocalAccepted, LOCAL } from './access-local.js';
 import {
@@ -146,7 +147,7 @@ export function avoidableTunnels(adrForbidden = [], euroPassages = []) {
 export function routeRules(route, {
   vehicle, departure = new Date(), zfe = null, driving = null, wind = null, areas = [], tunnels = null, countries = null,
   access = null, winter = null, tolls = null, bridges = null, bridgeWarnings = true, weightLimits = null,
-  weightWarnings = true, speeds = null, axes = null, sensitive = null,
+  weightWarnings = true, speeds = null, axes = null, sensitive = null, dialog = null, dialogWarnings = true,
 } = {}) {
   const schedule = driving ? breakSchedule(driving, route, departure.getTime(), { areas }) : null;
   const elapsed = schedule?.elapsed ?? ((t) => t);
@@ -197,8 +198,18 @@ export function routeRules(route, {
   short.push(...brg.short);
   // Limites de poids d'OSM (phase 12a bis) : « à vérifier », fiche et carte à l'arrêt seulement, jamais dit.
   const wlim = weightLimitRules(route, { vehicle, weights: weightLimits, enabled: weightWarnings });
+  // Limites officielles DiaLog (phase 12c) : « à vérifier », fiche et carte à l'arrêt seulement, jamais dit. Même
+  // passage déjà connu par OSM (même valeur à 15 m sur le tracé) : une seule ligne, avec les deux sources.
+  const dl = dialogRules(route, { vehicle, copy: dialog, enabled: dialogWarnings, osmItems: wlim.items, today: localDay(departure) });
+  if (dl.absorbed.size) {
+    wlim.items = wlim.items.filter((it) => !dl.absorbed.has(it));
+    wlim.lines = [...weightLines(wlim.items), ...wlim.lines.filter((l) => l.level !== 'warn')];
+    wlim.short = wlim.items.length ? [`${wlim.items.length} limite${wlim.items.length > 1 ? 's' : ''} de poids à vérifier`] : [];
+  }
   lines.push(...wlim.lines.filter((l) => l.level === 'warn'));
   short.push(...wlim.short);
+  lines.push(...dl.lines);
+  short.push(...dl.short);
   // Points sensibles (PR 3b) : interdictions PL, hauteurs basses, tunnels sans hauteur de l'audit OSM ; « à vérifier »,
   // fiche et carte à l'arrêt seulement, jamais dit. Les ponts restent ceux de la phase 12a (pas de second compteur).
   const sens = sensitiveRules(route, { vehicle, copy: sensitive, geo: geo?.status === 'ok' ? geo : null, geoAll });
@@ -246,7 +257,7 @@ export function routeRules(route, {
     passages, banned, bans, lines, short, windZones, tunnels: tun.passages, forbiddenTunnels: tun.forbidden,
     avoidableTunnels: avoidableTunnels(tun.forbidden, euro.passages),
     countries: ctry, weight, winter: win, euro, tolls: toll, foreignTolls: ftoll,
-    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, speedLimits: spd,
+    localTransit: acc.localTransit, local: acc.local, conditional: acc.conditional, bridges: brg, weightLimits: wlim, dialogLimits: dl, speedLimits: spd,
     axes: { geo, geoAll, tech: axes ? axisTechText(axes, geo) : null }, sensitive: sens,
   };
 }
