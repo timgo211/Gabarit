@@ -203,6 +203,13 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   `contents: read`) : télécharge le XML DATEX II DiaLog (URL stable data.gouv.fr, domaines data.gouv.fr / DiaLog
   seulement, 3 essais), lu en flux (lecteur maison, DOCTYPE refusé), journal de statistiques seulement ; tests
   `dialog-etude.test.js` sur la fixture synthétique `dialog-datex.xml` ; fichier local en argument pour essayer.
+- `tools/dialog-update.mjs` + `.github/workflows/dialog.yml` (Action « DiaLog (copie) », lundi 4 h 53 UTC + manuelle,
+  `contents: write`) : même téléchargement (`openStream`, `feedXml` de `dialog-etude.mjs`), mesures gardées par
+  `tools/dialog-convert.mjs` (`createDialogCollector`, `convertDialog`, `dialogLog`), écrit `data/dialog/` (index.json
+  + cases `E_N.json` : `o` [titre, organisation, début, fin] et `m` [ligne, mesure, k 0 hauteur / 1 poids, valeur, iO,
+  drapeaux 1 période / 2 dérogation, coordonnées 1e-5° en écarts]) ; grille France reprise de `data/poids-osm/index.json`.
+  Dossier remplacé d'un coup, échec → ancien gardé. Tests `dialog-convert.test.js` (même fixture, complétée : cas du
+  type boîte Vosges, expirée, période, dérogation seule, MultiLineString). Hors des `paths` d'osm-data.yml.
 - `tools/audit-osm.mjs` + `.github/workflows/audit-osm.yml` (Action « Audit OSM », manuelle seulement, input
   `niveaux` 1-2 ou 1-3, lecture seule, aucun appel d'écriture OSM) : extrait France Geofabrik, en secours (v72)
   download.openstreetmap.fr après 5 échecs (`downloadWithFallback`, source au journal, au rapport et dans

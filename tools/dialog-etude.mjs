@@ -470,7 +470,8 @@ export function checkUrl(url) {
   return u;
 }
 
-async function openStream(url) {
+// Aussi utilisé par tools/dialog-update.mjs (Action « DiaLog (copie) »).
+export async function openStream(url) {
   let current = checkUrl(url).href;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const res = await fetch(current, { redirect: 'manual', headers: { Accept: 'application/xml,text/xml,*/*;q=0.5' },
@@ -490,8 +491,8 @@ async function openStream(url) {
   throw new Error('trop de redirections');
 }
 
-export async function readStream(chunks, opts) {
-  const { handler, stats } = createDialogStats(opts);
+// Lit un flux (morceaux d'octets) dans un handler du lecteur XML ; aussi utilisé par tools/dialog-update.mjs.
+export async function feedXml(chunks, handler) {
   const reader = createXmlReader(handler);
   const decoder = new TextDecoder('utf-8', { fatal: true });
   let bytes = 0;
@@ -503,6 +504,12 @@ export async function readStream(chunks, opts) {
   }
   reader.write(decoder.decode());
   reader.end();
+  return bytes;
+}
+
+export async function readStream(chunks, opts) {
+  const { handler, stats } = createDialogStats(opts);
+  const bytes = await feedXml(chunks, handler);
   return { stats, bytes };
 }
 
