@@ -1,0 +1,68 @@
+name: Trafic
+
+# Phase 10 A : copie des événements du réseau routier national non concédé (DIR, Bison Futé, flux « tipi » DATEX II
+# v2, Licence Ouverte Etalab 2.0 : citer la source et la date de mise à jour) en un petit JSON national
+# (tools/trafic-update.mjs et tools/trafic-convert.mjs : ≤ 1 Mo, ≤ 3 000 événements, aucune coordonnée dans le journal).
+# Publié sur la branche de données orpheline `trafic-data`, réécrite à chaque lancement, jamais sur main : GitHub Pages
+# et « Données OSM » ne sont pas relancés et l'historique de main ne grossit pas (un push fait avec le GITHUB_TOKEN ne
+# déclenche aucun autre workflow ni construction Pages : docs.github.com, « GITHUB_TOKEN », lu le 26/11/2026).
+# Lu par l'appli via raw.githubusercontent.com (CORS *).
+# Domaines : tipi.bison-fute.gouv.fr (lecture, contrôlé par le code), github.com (push), raw.githubusercontent.com
+# (mesure CORS, en-têtes seulement). Aucun secret : GITHUB_TOKEN de l'Action, jamais affiché.
+# Flux illisible : rien n'est publié, l'ancien JSON reste, le journal le dit (avertissement, pas d'échec).
+# Lancement à la main seulement pour l'instant : onglet Actions › Trafic › Run workflow (depuis main).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trafic
+  cancel-in-progress: false
+
+jobs:
+  copie:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Lire le flux et convertir
+        id: copy
+        run: node tools/trafic-update.mjs "$RUNNER_TEMP/trafic.json"
+      - name: Publier sur la branche trafic-data (réécrite)
+        if: steps.copy.outputs.ok == 'true'
+        env:
+          PUB: ${{ steps.copy.outputs.publication }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch --orphan trafic-data
+          cp "$RUNNER_TEMP/trafic.json" trafic.json
+          cat > README.md <<'EOF'
+          # Données trafic de Gabarit (branche de données)
+
+          Branche réécrite à chaque lancement de l'Action « Trafic » : ne pas modifier à la main.
+
+          `trafic.json` : événements du réseau routier national non concédé (fermetures, bouchons, accidents, chantiers,
+          obstacles) publiés par les DIR sur Bison Futé (https://www.bison-fute.gouv.fr/donnees-sur-le-rrn.html),
+          Licence Ouverte Etalab 2.0. Date de mise à jour : champ `publication` du fichier.
+          Les autoroutes à péage ne sont pas couvertes. À vérifier : la signalisation fait foi.
+          EOF
+          git add trafic.json README.md
+          git commit -q -m "Trafic : copie du ${PUB}"
+          git push --force origin HEAD:refs/heads/trafic-data
+          echo "Publié sur trafic-data : $(wc -c < trafic.json) octets."
+      - name: Mesure CORS (raw.githubusercontent.com, en-têtes seulement)
+        if: steps.copy.outputs.ok == 'true'
+        continue-on-error: true
+        run: |
+          sleep 5
+          url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/trafic-data/trafic.json"
+          curl -sS -o /dev/null -D "$RUNNER_TEMP/headers.txt" -H "Origin: https://timgo211.github.io" "$url"
+          echo "GET $url (Origin: https://timgo211.github.io)"
+          grep -i -E '^(HTTP/|access-control-allow-origin|content-type|cache-control|content-length):?' "$RUNNER_TEMP/headers.txt" | tr -d '\r'

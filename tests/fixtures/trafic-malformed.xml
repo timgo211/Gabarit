@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Fixture SYNTHÉTIQUE : flux coupé au milieu (balise jamais fermée). -->
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Body>
+    <d2LogicalModel xmlns="http://datex2.eu/schema/2/2_0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" modelBaseVersion="2">
+      <payloadPublication xsi:type="SituationPublication" lang="fr">
+        <publicationTime>2026-11-26T12:24:34+01:00</publicationTime>
+        <situation id="s1" version="1">
+          <situationRecord xsi:type="Accident" id="r1" version="1">
+            <groupOfLocations xsi:type="Point"><locationForDisplay><latitude>45.10</latitude><longitude>5.70</longitude></locationForDisplay></groupOfLocations>
+          </situationRecord>
+        </situation>
+      </payloadPublication>
+    </d2LogicalModel>
+  </soapenv:Body>

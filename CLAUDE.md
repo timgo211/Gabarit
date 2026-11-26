@@ -164,6 +164,10 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   noEntry + hauteur ou poids hors negate, géométrie linéaire ; valeur = maximum ; fin passée ignorée. Détail : skill structure.
   v86 (`dialog-limits.js`) : tronçon suivi 15 m, hauteur + 0,1 ≥ valeur, PTAC > valeur ; fiche et repères pointillés à
   l'arrêt, jamais dits ; « à vérifier — seul l'arrêté fait foi » ; doublon OSM = une ligne ; copie absente = rien.
+- Trafic (10 A, PR 1, Action « Trafic », `tools/trafic-update.mjs` / `trafic-convert.mjs`) : `content.xml` des DIR
+  (Bison Futé, Licence Ouverte Etalab 2.0) → `trafic.json` (≤ 1 Mo, ≤ 3 000) sur la branche orpheline `trafic-data`
+  réécrite à chaque lancement, jamais sur main ; ligne = droite départ → arrivée seulement ; flux illisible = ancien
+  gardé ; journal sans coordonnée. Détail : skill structure.
 - Textes officiels illisibles depuis le conteneur : Action « Textes officiels » (`tools/textes-officiels.json`, journal
   seulement, ne relance pas l'Action OSM) ; chiffre lu par OCR codé seulement s'il est recoupé.
 - Satellite hors de France (7d, `SATELLITE_SOURCES`) : source codée seulement si conditions lues ET tuile réelle 200 +
