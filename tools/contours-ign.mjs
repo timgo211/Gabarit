@@ -11,12 +11,17 @@
 // (pointInTax ne lit que des anneaux extérieurs). Écrit data/contours-ign.json ; le journal donne le millésime, le
 // nombre de points et la taille. Licence Ouverte (Etalab 2.0), © IGN.
 //
-// Usage : node tools/contours-ign.mjs [sortie]
+// Zones des grandes agglomérations (Île-de-France, métropoles) : data/zones-agglo.json, fichier à part (logique et
+// simplification dans tools/zones-agglo.mjs), jamais dans data/contours-ign.json, dont les clés ne changent pas.
+//
+// Usage : node tools/contours-ign.mjs [sortie] [sortie des zones]
 import { writeFile } from 'node:fs/promises';
+import { ZONES, buildZones, rings } from './zones-agglo.mjs';
 
 const WFS = 'https://data.geopf.fr/wfs/ows';
 const UA = 'Mozilla/5.0 (X11; Linux x86_64) Gabarit (contours IGN Admin Express)';
 const out = process.argv[2] ?? 'data/contours-ign.json';
+const outZones = process.argv[3] ?? 'data/zones-agglo.json';
 
 async function get(url, type = 'text') {
   for (let i = 1; i <= 4; i += 1) {
@@ -54,52 +59,6 @@ async function features(prefix, layer, filter) {
   const list = j?.features ?? [];
   console.log(`${layer} [${filter}] : ${list.length} objet(s) ; propriétés ${JSON.stringify(list[0]?.properties ?? {}).slice(0, 300)}`);
   return list;
-}
-
-const RAD = Math.PI / 180;
-/** Douglas-Peucker sur un anneau [lon, lat], tolérance en mètres. */
-function simplify(ring, tol) {
-  const lat0 = ring.reduce((s, p) => s + p[1], 0) / ring.length;
-  const kx = 111320 * Math.cos(lat0 * RAD); const ky = 110540;
-  const P = ring.map(([x, y]) => [x * kx, y * ky]);
-  const keep = new Uint8Array(P.length);
-  keep[0] = 1; keep[P.length - 1] = 1;
-  const stack = [[0, P.length - 1]];
-  while (stack.length) {
-    const [a, b] = stack.pop();
-    let max = 0; let idx = -1;
-    const [ax, ay] = P[a]; const [bx, by] = P[b];
-    const dx = bx - ax; const dy = by - ay; const L = Math.hypot(dx, dy);
-    for (let i = a + 1; i < b; i += 1) {
-      const d = L === 0 ? Math.hypot(P[i][0] - ax, P[i][1] - ay) : Math.abs(dy * P[i][0] - dx * P[i][1] + bx * ay - by * ax) / L;
-      if (d > max) { max = d; idx = i; }
-    }
-    if (max > tol && idx > 0) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
-  }
-  const r4 = (v) => Math.round(v * 1e4) / 1e4;
-  const outRing = [];
-  for (let i = 0; i < ring.length; i += 1) {
-    if (!keep[i]) continue;
-    const p = [r4(ring[i][0]), r4(ring[i][1])];
-    const last = outRing.at(-1);
-    if (!last || last[0] !== p[0] || last[1] !== p[1]) outRing.push(p);
-  }
-  if (outRing.length && (outRing[0][0] !== outRing.at(-1)[0] || outRing[0][1] !== outRing.at(-1)[1])) outRing.push(outRing[0]);
-  return outRing;
-}
-
-/** Anneaux extérieurs simplifiés d'une liste d'objets (Polygon / MultiPolygon). */
-function rings(list, tol) {
-  const res = [];
-  for (const f of list) {
-    const g = f.geometry;
-    const polys = g?.type === 'Polygon' ? [g.coordinates] : g?.type === 'MultiPolygon' ? g.coordinates : [];
-    for (const poly of polys) {
-      const r = simplify(poly[0], tol);
-      if (r.length >= 4) res.push(r);
-    }
-  }
-  return res;
 }
 
 const { prefix, year } = await pickLayerPrefix();
@@ -151,3 +110,21 @@ for (const k of ['alsace', 'grandEst', 'meurtheEtMoselle', 'eurometropole', 'met
 const text = `${JSON.stringify(result)}\n`;
 await writeFile(out, text);
 console.log(`${out} : ${text.length} octets`);
+
+// Zones des grandes agglomérations, cherchées par leur nom (filtre WFS sur un mot sans accent, ILIKE sans casse, LIKE
+// si ILIKE est refusé, puis nom exact comparé sans accents ni casse) ; requête refusée ou échouée : zone absente (⚠),
+// les autres restent.
+const found = {};
+for (const z of ZONES) {
+  for (const op of ['ILIKE', 'LIKE']) {
+    try {
+      const list = await features(prefix, z.layer, `nom_officiel ${op} '%${z.like}%'`);
+      for (const f of list) console.log(`  ${z.layer} : ${JSON.stringify(f.properties ?? {}).slice(0, 200)}`);
+      found[z.key] = list;
+      break;
+    } catch (err) { console.log(`⚠ ${z.layer} [${op} ${z.like}] : ${err.message}`); }
+  }
+}
+const zones = buildZones(found, { prefix, year, read: result.read });
+for (const line of zones.log) console.log(line);
+if (zones.text) await writeFile(outZones, zones.text);

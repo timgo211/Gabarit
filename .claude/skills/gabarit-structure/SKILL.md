@@ -255,6 +255,15 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   PR 3b : `geoStepLabel` (route retrouvée par étape sans nom, colonne « géométrie » du diagnostic).
 - Contournement de Lyon (v76) : `src/lib/lyon-bypass.js` (plan, points de passage, écart), tests
   `tests/lyon-bypass.test.js` ; contour `metropoleLyon` de `data/contours-ign.json` ; détail : skill zfe.
+- Zones des grandes agglomérations (PR 1 sur 3 des ponts au-dessus des autoroutes, contours seulement) :
+  `tools/zones-agglo.mjs` (logique pure : `ZONES`, `normName`, `pickByName`, `simplify`/`rings` partagés avec
+  `tools/contours-ign.mjs`, `buildZones`, plafond 500 000 octets) → `data/zones-agglo.json` (clés `ileDeFrance` couche
+  region 150 m ; `metropoleGrandParis`, `aixMarseille`, `lille`, `bordeaux`, `toulouse`, `nantes` couche epci 50 m ;
+  `names`, `props` = propriétés IGN lues, codes compris), écrit par l'Action « Contours IGN » à côté de
+  `data/contours-ign.json` (clés inchangées). Cherchées par nom (ILIKE sur un mot sans accent, LIKE en secours, puis
+  nom exact sans accents ni casse) ; absente / ambiguë → clé non écrite, ⚠ avec noms proches. Tests
+  `tests/zones-agglo.test.js`, fixture synthétique `zones-agglo-ign.geojson`. `tools/zones-agglo.mjs` n'est pas dans
+  les `paths` de l'Action : la relancer à la main après une modif de ce seul fichier.
 - Points sensibles (PR 3b, v74) : `src/lib/sensitive-points.js` (construction `buildSensitivePoints` : fiches d'audit +
   sections + copie des axes pour le cap + ids de `data/ponts-osm/` pour le recoupement des ponts ; lecture
   `parseSensitiveTile` / `mergeSensitiveTiles` / `parseSensitiveSections` ; `sensitivePointsAlongRoute`,
