@@ -565,6 +565,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     hors zone comme avant ; zones illisibles : une ligne « à vérifier », ponts comme avant ; pont portant une hauteur
     ≤ véhicule : haute partout. Audit : niveau 1, fiche « pont sans hauteur » gardée en zone seulement (fiches du
     run 4 : 2 335 en zone gardées, 9 734 hors zone retirées au prochain run) ; zones illisibles : arrêt sans écriture.
+    Appliquée au run 5 (ci-dessous) : 2 335 gardées, 9 734 retirées, toutes les gardées en zone (recompté).
 - [x] **Phase 12a bis — Limites de poids d'après OSM** (v42)
   L'Action « Données OSM » copie aussi, pour la France, les tronçons routiers portant maxweight ou maxweight:hgv en
   tonnes (valeurs illisibles ignorées ; drapeau « desserte possible » si hgv=destination|delivery ou
@@ -717,6 +718,13 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     415 → 989), 77 cases, 119 Ko ; 1 267 hauteurs basses écartées faute de cap (secondary hors copie des axes).
     Écarts des niveaux 1-2 (+430, +89 fiches) : autre extrait, pas le code. À revoir : 45 ponts de l'audit absents de
     `data/ponts-osm/`.
+  - [x] **Audit niveaux 1-3 avec la règle des zones (v91)** (run 5 du 26/11/2026, depuis `main` 9cb61bd, accord du
+    propriétaire, 1 lancement) : même source de secours et même extrait du 23/11/2026, 113 min (téléchargement
+    6 652 s contre 756 s au run 4 : miroir lent, pas le code), aucun ⚠. Ponts sans hauteur au-dessus des autoroutes
+    (niveau 1) : 2 335 gardés (zones des grandes agglomérations), 9 734 retirés (hors zone). 14 002 fiches : niveau 1
+    3 190, niveau 2 9 007, niveau 3 1 805 ; priorités 1 : 526, 2 : 2 270, 3 : 11 206. Autres types et niveaux 2-3
+    identiques au run 4 (même extrait). `data/audit-osm/` 7,38 Mo (3 fichiers + index, le plus gros
+    `niveau-2.json` 4,96 Mo) ; `data/axes-osm/` et `data/points-sensibles/` (2 653 points, 119 Ko) inchangés à l'octet.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
