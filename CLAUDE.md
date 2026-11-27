@@ -62,7 +62,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
 - Ponts sans hauteur connue (12a, `bridge-check.js`, copie `data/ponts-osm/` de l'Action « Données OSM », jamais
   précachée) : fiche et carte à l'arrêt seulement, jamais dits à voix haute ni dans le guidage ; « à vérifier ».
   v91 (règle de Timothée, `agglo-zones.js`) : au-dessus d'une autoroute, signalé (moyenne) seulement en zone
-  (IdF + 8 agglomérations, `data/zones-agglo.json` + `data/contours-ign.json`) ; zones illisibles = 1 ligne « à vérifier » ;
+  (v92 : 15 zones, IdF + 14 agglomérations, `data/zones-agglo.json` + `data/contours-ign.json`) ; zones illisibles = 1 ligne « à vérifier » ;
   audit niveau 1 idem (zones illisibles = arrêt sans écriture).
 - Mes restrictions (12b, `restrictions.js`, champ `restrictions` de `gabarit.data`, exporté) : polygone de
   `RESTR_RADIUS_M` = 30 m par restriction applicable proche du trajet, avec les ZFE dans `avoid_polygons` ; limite ORS
@@ -125,7 +125,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   dans OSM ; extrait Geofabrik, secours download.openstreetmap.fr (v72) ; fiches « à vérifier sur place » ; copie `data/axes-osm/` (≤ 5 Mo / 30 Mo, jamais précachée). Détail : skill `gabarit-structure`.
   v90 : niveau 3 (primary / secondary à réf. D…) = priorités 1 et 2 seulement (`keepCard`) ; `data/audit-osm/` ≤ 5 Mo /
   30 Mo (`auditSize`, dépassé = rien écrit) ; `data/axes-osm/` jamais élargie aux départementales ; points sensibles ≤ 300 Ko.
-  Run 5 (niveaux 1-3, règle v91) du 26/11/2026 : 14 002 fiches (niveau 1 : 3 190, dont 2 335 ponts en zone), 7,38 Mo ; points sensibles 2 653, 119 Ko.
+  Run 6 (niveaux 1-3, v92, 15 zones) du 27/11/2026 : 14 125 fiches (niveau 1 : 3 388, dont 2 606 ponts en zone), 7,46 Mo ; points sensibles 2 575, 116 Ko.
 - Repli par la géométrie (PR 3a, v73, `axis-match.js`, copie `data/axes-osm/`) : ref des étapes ORS sans nom seulement
   (étape nommée jamais réécrite), 15 m, cap ≤ 30° modulo 180°, séries ≥ 300 m, ambigu = inconnu, copie simplifiée > 3 m
   = désactivé ; règles fondées sur la ref (week-end IdF, AURA), ligne A/N de la fiche et diagnostic, jamais le « Recommandé » ni le
