@@ -35,18 +35,19 @@ export const ZONES = Object.freeze([
   { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50 },
   { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50 },
   { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50 },
-  // Facultatives (étape 1/5) : noms supposés, jamais un code ; mot du filtre sans accent (ILIKE ne confond pas é / e).
+  // Facultatives (étape 1/5) : jamais un code ; mot du filtre sans accent (ILIKE ne confond pas é / e). Étape 1 bis :
+  // Metz, Reims, Angers, Avignon = nom_officiel exact lu au journal du run n° 7 de l'Action « Contours IGN » (27/11/2026).
   { key: 'dijon', layer: 'epci', name: 'Dijon Métropole', like: 'Dijon', tol: 50, optional: true },
-  { key: 'metz', layer: 'epci', name: 'Metz Métropole', like: 'Metz', tol: 50, optional: true },
+  { key: 'metz', layer: 'epci', name: 'Euro-métropole de Metz', like: 'Metz', tol: 50, optional: true },
   { key: 'nancy', layer: 'epci', name: 'Métropole du Grand Nancy', like: 'Nancy', tol: 50, optional: true },
-  { key: 'reims', layer: 'epci', name: 'Reims Métropole', like: 'Reims', tol: 50, optional: true },
+  { key: 'reims', layer: 'epci', name: 'CU du Grand Reims', like: 'Reims', tol: 50, optional: true },
   { key: 'orleans', layer: 'epci', name: 'Orléans Métropole', like: 'Orl', tol: 50, optional: true },
   { key: 'tours', layer: 'epci', name: 'Tours Métropole Val de Loire', like: 'Tours', tol: 50, optional: true },
-  { key: 'angers', layer: 'epci', name: 'Angers Loire Métropole', like: 'Angers', tol: 50, optional: true },
+  { key: 'angers', layer: 'epci', name: 'CU Angers Loire Métropole', like: 'Angers', tol: 50, optional: true },
   { key: 'clermontFerrand', layer: 'epci', name: 'Clermont Auvergne Métropole', like: 'Clermont', tol: 50, optional: true },
   { key: 'saintEtienne', layer: 'epci', name: 'Saint-Étienne Métropole', like: 'tienne', tol: 50, optional: true },
   { key: 'leHavre', layer: 'epci', name: 'Le Havre Seine Métropole', like: 'Havre', tol: 50, optional: true },
-  { key: 'avignon', layer: 'epci', name: 'Grand Avignon', like: 'Avignon', tol: 50, optional: true },
+  { key: 'avignon', layer: 'epci', name: 'CA du Grand Avignon (COGA)', like: 'Avignon', tol: 50, optional: true },
   { key: 'brest', layer: 'epci', name: 'Brest Métropole', like: 'Brest', tol: 50, optional: true },
 ].map((z) => Object.freeze(z)));
 
