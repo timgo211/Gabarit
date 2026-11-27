@@ -54,8 +54,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
     dessous à 40 m, classe de la route dessous, textes, `bridgeRules`) ; UI `src/ui/bridges.js` (cases du trajet comme
     `access.js`) ; fixtures `osm-ponts-colombier.geojsonseq` et `ors-directions-colombier.json` (**synthétiques** :
     api.openstreetmap.org bloqué ; id 243477938 du constat)
-  - v91 : `agglo-zones.js` (pur, appli et audit : `parseAggloZones` des 9 zones de `data/zones-agglo.json` +
-    `data/contours-ign.json`, tout ou rien ; `aggloZoneAt`) ; pont sans hauteur au-dessus d'une autoroute signalé
+  - v91 : `agglo-zones.js` (pur, appli et audit : `parseAggloZones` des 27 zones en v93, 25 de `data/zones-agglo.json` +
+    2 de `data/contours-ign.json`, tout ou rien ; `aggloZoneAt`) ; pont sans hauteur au-dessus d'une autoroute signalé
     (moyenne, `counts.motorwayZone`) seulement en zone, audit niveau 1 idem (`bridgeCards` `{ zones, stats }`,
     `auditZones`, arrêt sans écriture si zones illisibles) ; app : `loadAgglo` (échec retenté au calcul suivant) ;
     tests `tests/agglo-zones-ponts.test.js`
@@ -263,7 +263,7 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
 - Zones des grandes agglomérations (PR 1 sur 3 des ponts au-dessus des autoroutes, contours seulement) :
   `tools/zones-agglo.mjs` (logique pure : `ZONES`, `normName`, `pickByName`, `simplify`/`rings` partagés avec
   `tools/contours-ign.mjs`, `buildZones`, plafond 500 000 octets) → `data/zones-agglo.json` (clés `ileDeFrance` couche
-  region 150 m ; `metropoleGrandParis`, `aixMarseille`, `lille`, `bordeaux`, `toulouse`, `nantes` couche epci 50 m ;
+  region 150 m ; les 24 autres clés de `ZONES` (v93) couche epci 50 m ;
   `names`, `props` = propriétés IGN lues, codes compris), écrit par l'Action « Contours IGN » à côté de
   `data/contours-ign.json` (clés inchangées). Cherchées par nom (ILIKE sur un mot sans accent, LIKE en secours, puis
   nom exact sans accents ni casse) ; absente / ambiguë → clé non écrite, ⚠ avec noms proches. Tests
