@@ -569,6 +569,12 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     v92 (PR #116 et #117) : + Métropoles Nice Côte d'Azur, Montpellier Méditerranée, Rennes, Grenoble-Alpes, Rouen
     Normandie et Toulon-Provence-Méditerranée → 15 zones. Appliquée au run 6 (ci-dessous) : 2 606 gardées, 9 107
     retirées, toutes les gardées en zone (recompté avec `aggloZoneAt`).
+    v93 (PR #119 à #121 ; noms lus par les runs 7 et 8 de l'Action « Contours IGN » du 27/11/2026) : + Dijon Métropole,
+    Euro-métropole de Metz, Métropole du Grand Nancy, CU du Grand Reims, Orléans Métropole, Tours Métropole Val de
+    Loire, CU Angers Loire Métropole, Clermont Auvergne Métropole, Saint-Etienne Métropole, Le Havre Seine Métropole,
+    CA du Grand Avignon (COGA), Brest Métropole → 27 zones (25 dans `data/zones-agglo.json`, Lyon et Strasbourg dans
+    `data/contours-ign.json`). Appliquée au run 7 (ci-dessous) : 3 424 gardées, 8 289 retirées, toutes les gardées
+    en zone (recompté avec `aggloZoneAt`).
 - [x] **Phase 12a bis — Limites de poids d'après OSM** (v42)
   L'Action « Données OSM » copie aussi, pour la France, les tronçons routiers portant maxweight ou maxweight:hgv en
   tonnes (valeurs illisibles ignorées ; drapeau « desserte possible » si hgv=destination|delivery ou
@@ -742,6 +748,22 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     `niveau-2.json` 4,92 Mo) ; `data/axes-osm/` 9,35 Mo, 90 cases (3 cases de bord retirées : -2_42, 7_45, 8_49 ;
     cause probable : contour france.poly de Geofabrik au lieu de la zone de `data/ponts-osm/`) ; points sensibles
     2 575, 77 cases, 116 Ko. Ponts de l'audit absents de `data/ponts-osm/` : 0 (45 au run 4).
+  - [x] **Audit niveaux 1-3 avec les 27 zones (v93)** (run 7 du 27/11/2026, depuis `main` 3bb3595, accord du
+    propriétaire, 1 lancement, commit de l'Action 911bfe7) : Geofabrik (pas de secours), extrait du 26/11/2026 (le
+    même qu'au run 6), 12 min (téléchargement 506 s), aucun ⚠. Ponts sans hauteur au-dessus des autoroutes
+    (niveau 1) : 3 424 gardés (zones des grandes agglomérations), 8 289 retirés (hors zone) ; même total qu'au run 6
+    (11 713). Par zone (`aggloZoneAt`, première zone qui contient le point) : les 15 zones du run 6 inchangées
+    (Île-de-France 1 355, Métropole du Grand Paris 0, Aix-Marseille-Provence 250, Lille 215, Lyon 179, Bordeaux 151,
+    Grenoble 132, Toulouse 77, Nantes 73, Toulon 65, Nice 46, Strasbourg 41, Rouen 11, Montpellier 10, Rennes 1) ;
+    + 818 dans les 12 nouvelles : Reims 226, Metz 118, Angers 114, Tours 92, Clermont-Ferrand 58, Le Havre 56,
+    Nancy 52, Saint-Étienne 48, Dijon 22, Orléans 21, Avignon 11, Brest 0 (aucune autoroute dans le contour d'après
+    `data/axes-osm/` : N12 et N165 en voie rapide). Fiches du run 6 toutes gardées (0 retirée, 818 ajoutées). 14 943 fiches :
+    niveau 1 4 206 (pont sans hauteur 3 424, autres types identiques au run 6), niveau 2 8 930 et niveau 3 1 807
+    (fichiers inchangés) ; priorités 1 : 526, 2 : 2 271, 3 : 12 146. `data/audit-osm/` 7,91 Mo (8 296 191 octets,
+    3 fichiers + index ; `niveau-1.json` 2 367 037, `niveau-2.json` 5 157 620 sous 5 242 880, `niveau-3.json`
+    770 862). `data/axes-osm/` (9 807 563 octets, 90 cases) et `data/points-sensibles/` (2 575 points, 77 cases,
+    118 383 octets) inchangés à l'octet : même extrait, et les zones ne jouent que sur les ponts du niveau 1.
+    Rapport : les 27 noms lus dans les fichiers. Tests sur `main` 911bfe7 : 950/950.
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·

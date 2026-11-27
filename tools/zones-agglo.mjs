@@ -6,7 +6,7 @@
 // Chaque zone est cherchée par son NOM dans la couche IGN Admin Express COG (comme la Métropole de Lyon en v76),
 // jamais par un code deviné ; le code lu (code_insee, code_siren…) est écrit dans props. Nom comparé sans accents,
 // sans casse, apostrophes ’ et ' confondues, espaces regroupés.
-// Les noms seront vérifiés par le run de l'Action (data.geopf.fr est bloqué depuis le conteneur de développement).
+// Noms lus par les runs n° 7 et 8 de l'Action (27/11/2026).
 // v93 : toutes les zones de ZONES sont obligatoires (25, toutes lues par l'appli et l'audit, AGGLO_ZONES.ZONES_KEYS de
 // src/lib/agglo-zones.js, même ordre, tout ou rien ; v92 : 13). Une zone absente, ambiguë (0 ou plusieurs objets au nom
 // exact), sans anneau lisible ou dont la requête a échoué : ⚠ au journal avec les 5 noms les plus proches trouvés
