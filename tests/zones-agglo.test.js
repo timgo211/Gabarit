@@ -1,7 +1,6 @@
 // Contours des grandes agglomérations (data/zones-agglo.json, PR 1 sur 3 : contours seulement) : zones cherchées par
-// leur nom dans les couches IGN Admin Express, simplification, plafond 500 Ko ; v92 : 13 zones obligatoires, une
-// manquante = rien écrit (exitCode 1) ; étape 1/5 : 12 zones facultatives (noms non prouvés), une manquante = ⚠ avec
-// les 5 noms proches, clé non écrite, le reste écrit (exitCode 0) ; data/contours-ign.json
+// leur nom dans les couches IGN Admin Express, simplification, plafond 500 Ko ; v93 : 25 zones obligatoires (13 de v92
+// + 12 de l'étape 1/5), une manquante = ⚠ avec les 5 noms proches, rien écrit (exitCode 1) ; data/contours-ign.json
 // inchangé (taxes PL, contournement de Lyon). Fixture SYNTHÉTIQUE zones-agglo-ign.geojson (2 décimales). Aucun réseau.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -19,7 +18,7 @@ const like = (z) => FX.filter((f) => f.properties.layer === z.layer
   && f.properties.nom_officiel.toLowerCase().includes(z.like.toLowerCase()));
 const foundAll = () => Object.fromEntries(ZONES.map((z) => [z.key, like(z)]));
 /**
- * Les 13 zones trouvées, une seule fois chacune : candidats de la fixture, doublons de Toulouse et de Grenoble
+ * 24 zones trouvées une seule fois (toutes sauf Reims) : candidats de la fixture, doublons de Toulouse et de Grenoble
  * écartés, Nantes et Rouen (absentes de la fixture) ajoutées en formes SYNTHÉTIQUES (2 décimales, codes fictifs).
  */
 function foundComplete() {
@@ -30,10 +29,10 @@ function foundComplete() {
   f.rouen = [...f.rouen, { properties: { nom_officiel: 'Métropole Rouen Normandie', code_siren: '900000011' }, geometry: { type: 'Polygon', coordinates: [[[0.95, 49.35], [1.25, 49.35], [1.25, 49.5], [0.95, 49.35]]] } }];
   return f;
 }
-const REQ = ZONES.filter((z) => !z.optional);
-const OPT = ZONES.filter((z) => z.optional);
-const OPT_KEYS = ['dijon', 'metz', 'nancy', 'reims', 'orleans', 'tours', 'angers', 'clermontFerrand', 'saintEtienne',
+/** Les 12 agglomérations de l'étape 1/5, obligatoires en v93. */
+const V93_KEYS = ['dijon', 'metz', 'nancy', 'reims', 'orleans', 'tours', 'angers', 'clermontFerrand', 'saintEtienne',
   'leHavre', 'avignon', 'brest'];
+const V93 = ZONES.filter((z) => V93_KEYS.includes(z.key));
 /**
  * Les 25 zones trouvées : foundComplete (Reims y est absente : « Communauté urbaine du Grand Reims » et 6 voisines
  * SYNTHÉTIQUES, aucune au nom exact) + « CU du Grand Reims » SYNTHÉTIQUE (2 décimales, code fictif).
@@ -46,40 +45,35 @@ function foundFull() {
 const OPTS = { prefix: 'ADMINEXPRESS-COG.2026', year: 2026, read: '2026-11-26' };
 
 test('zones : clés, couches, noms cherchés et tolérances', () => {
-  assert.deepEqual(REQ.map((z) => z.key),
+  assert.deepEqual(ZONES.slice(0, 13).map((z) => z.key),
     ['ileDeFrance', 'metropoleGrandParis', 'aixMarseille', 'lille', 'bordeaux', 'toulouse', 'nantes',
       'nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']);
-  assert.deepEqual(REQ.map((z) => z.name), ['Île-de-France', 'Métropole du Grand Paris',
+  assert.deepEqual(ZONES.slice(0, 13).map((z) => z.name), ['Île-de-France', 'Métropole du Grand Paris',
     "Métropole d'Aix-Marseille-Provence", 'Métropole Européenne de Lille', 'Bordeaux Métropole', 'Toulouse Métropole',
     'Nantes Métropole', "Métropole Nice Côte d'Azur", 'Montpellier Méditerranée Métropole', 'Rennes Métropole',
     'Grenoble-Alpes-Métropole', 'Métropole Rouen Normandie', 'Métropole Toulon-Provence-Méditerranée']);
-  assert.deepEqual(REQ.map((z) => z.layer), ['region', ...Array(12).fill('epci')]);
-  assert.deepEqual(REQ.map((z) => z.tol), [150, ...Array(12).fill(50)]);
-  // v92 : les zones obligatoires sont exactement celles lues par l'appli (ZONES_KEYS, même ordre), en tête.
-  assert.deepEqual(REQ.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
-  assert.deepEqual(ZONES.slice(0, 13), REQ);
-  for (const z of REQ) assert.deepEqual(Object.keys(z), ['key', 'layer', 'name', 'like', 'tol'], z.key);
-  // Étape 1/5 : 12 facultatives après, couche epci, 50 m, jamais dans ZONES_KEYS (pas encore lues par l'appli).
+  assert.deepEqual(ZONES.map((z) => z.layer), ['region', ...Array(ZONES.length - 1).fill('epci')]);
+  assert.deepEqual(ZONES.map((z) => z.tol), [150, ...Array(ZONES.length - 1).fill(50)]);
+  // v93 : toutes les zones de l'outil sont obligatoires et lues par l'appli (ZONES_KEYS, même ordre) ; aucun champ
+  // « optional ».
+  assert.deepEqual(ZONES.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
+  for (const z of ZONES) assert.deepEqual(Object.keys(z), ['key', 'layer', 'name', 'like', 'tol'], z.key);
+  // Les 12 de l'étape 1/5 après les 13 de v92, dans le même ordre.
   assert.equal(ZONES.length, 25);
-  assert.deepEqual(OPT.map((z) => z.key), OPT_KEYS);
-  assert.deepEqual(ZONES.slice(13).map((z) => z.key), OPT_KEYS);
-  assert.deepEqual(OPT.map((z) => z.name), ['Dijon Métropole', 'Euro-métropole de Metz', 'Métropole du Grand Nancy',
+  assert.deepEqual(ZONES.slice(13).map((z) => z.key), V93_KEYS);
+  assert.deepEqual(V93.map((z) => z.name), ['Dijon Métropole', 'Euro-métropole de Metz', 'Métropole du Grand Nancy',
     'CU du Grand Reims', 'Orléans Métropole', 'Tours Métropole Val de Loire', 'CU Angers Loire Métropole',
     'Clermont Auvergne Métropole', 'Saint-Étienne Métropole', 'Le Havre Seine Métropole', 'CA du Grand Avignon (COGA)',
     'Brest Métropole']);
   // Étape 1 bis : 4 noms copiés du journal du run n° 7 (nom_officiel exact, caractère par caractère).
-  const byKey = Object.fromEntries(OPT.map((z) => [z.key, z]));
+  const byKey = Object.fromEntries(V93.map((z) => [z.key, z]));
   assert.deepEqual([...byKey.metz.name].map((c) => c.codePointAt(0)), [...'Euro-m\u00e9tropole de Metz'].map((c) => c.codePointAt(0)));
   assert.equal(byKey.reims.name, 'CU du Grand Reims');
   assert.equal(byKey.angers.name, 'CU Angers Loire M\u00e9tropole');
   assert.equal(byKey.avignon.name, 'CA du Grand Avignon (COGA)');
   assert.deepEqual(['metz', 'reims', 'angers', 'avignon'].map((k) => byKey[k].like), ['Metz', 'Reims', 'Angers', 'Avignon']);
-  for (const z of OPT) {
-    assert.deepEqual(Object.keys(z), ['key', 'layer', 'name', 'like', 'tol', 'optional'], z.key);
-    assert.equal(z.layer, 'epci', z.key);
-    assert.equal(z.tol, 50, z.key);
-    assert.equal(z.optional, true, z.key);
-    assert.ok(!AGGLO_ZONES.ZONES_KEYS.includes(z.key), z.key);
+  for (const z of V93) {
+    assert.equal(z.optional, undefined, z.key);
     assert.ok(!AGGLO_ZONES.CONTOURS_KEYS.includes(z.key), z.key);
   }
   assert.equal(new Set(ZONES.map((z) => z.key)).size, 25);
@@ -190,12 +184,12 @@ test('fichier des zones : les 25 présentes → fichier écrit, codes lus dans p
   assert.doesNotMatch(log, /⚠/);
   assert.match(log, /ileDeFrance : « Île-de-France » \(region, code 11\), 2 anneau\(x\), 9 points \(150 m\)\./);
   assert.match(log, /rennes : « Rennes Métropole » \(epci, code 900000003\), 1 anneau\(x\), 4 points \(50 m\)\./);
-  assert.match(log, /dijon : « Dijon Métropole » \(epci, code 910000001\), 1 anneau\(x\), 4 points \(50 m\), facultative\./);
-  assert.doesNotMatch(log, /rennes : .*facultative/);
-  assert.match(z.log.at(-1), /^data\/zones-agglo\.json : 13\/13 zone\(s\) obligatoire\(s\), 12\/12 facultative\(s\), \d+ octets \(plafond 500000\)\.$/);
-  // L'appli v92 lit ce fichier (15 zones avec Lyon et Strasbourg) : les 12 clés en plus sont sans effet.
+  assert.match(log, /dijon : « Dijon Métropole » \(epci, code 910000001\), 1 anneau\(x\), 4 points \(50 m\)\./);
+  assert.doesNotMatch(log, /facultative/);
+  assert.match(z.log.at(-1), /^data\/zones-agglo\.json : 25\/25 zone\(s\) obligatoire\(s\), \d+ octets \(plafond 500000\)\.$/);
+  // L'appli v93 lit ce fichier : 27 zones avec Lyon et Strasbourg.
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
-  assert.equal(parseAggloZones(d, contours).zones.length, 15);
+  assert.equal(parseAggloZones(d, contours).zones.length, 27);
 });
 
 test('fichier des zones : zones obligatoires absente / ambiguë → ⚠ avec les noms proches, RIEN écrit, exitCode 1', () => {
@@ -207,17 +201,18 @@ test('fichier des zones : zones obligatoires absente / ambiguë → ⚠ avec les
   assert.match(log, /⚠ nantes \(« Nantes Métropole »\) : absent, zone manquante ; noms proches trouvés \(« Nantes », 5 au plus\) : « Communauté de communes d'Erdre et Gesvres \(près de Nantes\) »\./);
   assert.match(log, /⚠ grenoble \(« Grenoble-Alpes-Métropole »\) : ambigu \(2 objets\), zone manquante ; noms proches trouvés \(« Grenoble », 5 au plus\) : « Grenoble-Alpes-Métropole », « Grenoble Alpes Métropole »\./);
   assert.match(log, /⚠ rouen \(« Métropole Rouen Normandie »\) : absent, zone manquante ; noms proches trouvés \(« Rouen », 5 au plus\) : « Communauté d'agglomération Seine-Eure \(près de Rouen\) »\./);
+  assert.match(log, /⚠ reims \(« CU du Grand Reims »\) : absent, zone manquante ; noms proches trouvés \(« Reims », 5 au plus\) : /);
   // Les zones trouvées restent au journal, mais aucun fichier partiel.
   assert.match(log, /ileDeFrance : « Île-de-France » \(region, code 11\), 2 anneau\(x\), 9 points \(150 m\)\./);
-  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 4 zone(s) obligatoire(s) manquante(s) sur 13 (toulouse, nantes, grenoble, rouen) : rien écrit, l\'ancien fichier reste.');
+  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 5 zone(s) obligatoire(s) manquante(s) sur 25 (toulouse, nantes, grenoble, rouen, reims) : rien écrit, l\'ancien fichier reste.');
   assert.ok(!z.log.some((l) => /zone\(s\), \d+ octets/.test(l)));
 });
 
-test('fichier des zones : une seule zone manquante parmi les 13 (absente, ambiguë, illisible, requête échouée) → rien écrit, exitCode 1', () => {
+test('fichier des zones : une seule zone manquante parmi les 25 (absente, ambiguë, illisible, requête échouée) → rien écrit, exitCode 1', () => {
   const ok = buildZones(foundFull(), OPTS);
   assert.equal(ok.exitCode, 0);
   const bad = (x) => [{ properties: { nom_officiel: x.name, code_siren: '900000099' }, geometry: { type: 'Point', coordinates: [5, 45] } }];
-  for (const z of REQ) {
+  for (const z of ZONES) {
     const near = { properties: { nom_officiel: `${z.name} (voisin)`, code_siren: '900000098' }, geometry: null };
     const cases = {
       'requête échouée': (f) => { delete f[z.key]; },
@@ -231,8 +226,11 @@ test('fichier des zones : une seule zone manquante parmi les 13 (absente, ambigu
       const r = buildZones(found, OPTS);
       assert.equal(r.text, null, `${z.key} ${why}`);
       assert.equal(r.exitCode, 1, `${z.key} ${why}`);
-      assert.ok(r.log.some((l) => l.startsWith(`⚠ ${z.key} (« ${z.name} ») : ${why}`)), `${z.key} ${why}`);
-      assert.equal(r.log.at(-1), `⚠ data/zones-agglo.json : 1 zone(s) obligatoire(s) manquante(s) sur 13 (${z.key}) : rien écrit, l'ancien fichier reste.`);
+      assert.ok(r.log.some((l) => l.startsWith(`⚠ ${z.key} (« ${z.name} ») : ${why}, zone manquante`)), `${z.key} ${why}`);
+      // Absente : les noms proches trouvés restent au journal (5 au plus).
+      if (why === 'absent') assert.ok(r.log.some((l) => l.endsWith(`noms proches trouvés (« ${z.like} », 5 au plus) : « ${z.name} (voisin) ».`)), z.key);
+      assert.equal(r.log.at(-1), `⚠ data/zones-agglo.json : 1 zone(s) obligatoire(s) manquante(s) sur 25 (${z.key}) : rien écrit, l'ancien fichier reste.`);
+      assert.doesNotMatch(r.log.join('\n'), /facultative/);
     }
   }
   // Rien trouvé du tout, ou listes vides : rien écrit.
@@ -240,7 +238,7 @@ test('fichier des zones : une seule zone manquante parmi les 13 (absente, ambigu
     const r = buildZones(found, OPTS);
     assert.equal(r.text, null);
     assert.equal(r.exitCode, 1);
-    assert.match(r.log.at(-1), /^⚠ data\/zones-agglo\.json : 13 zone\(s\) obligatoire\(s\) manquante\(s\) sur 13 /);
+    assert.match(r.log.at(-1), /^⚠ data\/zones-agglo\.json : 25 zone\(s\) obligatoire\(s\) manquante\(s\) sur 25 /);
   }
   assert.match(buildZones(Object.fromEntries(ZONES.map((x) => [x.key, []])), OPTS).log[0], /absent, zone manquante ; noms proches trouvés \(« France », 5 au plus\) : aucun\./);
 });
@@ -254,23 +252,23 @@ test('ancien jeu de 7 zones seulement (6 ajoutées en échec) → rien écrit, e
   for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']) {
     assert.match(z.log.join('\n'), new RegExp(`⚠ ${k} \\(« .+ »\\) : requête échouée, zone manquante\\.`));
   }
-  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 6 zone(s) obligatoire(s) manquante(s) sur 13 (nice, montpellier, rennes, grenoble, rouen, toulon) : rien écrit, l\'ancien fichier reste.');
-  // Aucune des 13 obligatoires n'est dite facultative.
-  for (const x of REQ) assert.doesNotMatch(z.log.join('\n'), new RegExp(`${x.key} \\(.*facultative`), x.key);
+  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 6 zone(s) obligatoire(s) manquante(s) sur 25 (nice, montpellier, rennes, grenoble, rouen, toulon) : rien écrit, l\'ancien fichier reste.');
+  // Aucune zone n'est dite facultative.
+  assert.doesNotMatch(z.log.join('\n'), /facultative/);
 });
 
-test('appli (v92) : fichier du dépôt à 13 clés lu (15 zones) ; sans une clé ajoutée en v92 → refusé (tout ou rien)', () => {
-  const z13 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
+test('appli (v93) : fichier du dépôt à 25 clés lu (27 zones) ; sans une clé ajoutée en v92 ou v93 → refusé (tout ou rien)', () => {
+  const z25 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
-  assert.deepEqual(Object.keys(z13).filter((k) => AGGLO_ZONES.ZONES_KEYS.includes(k)), [...AGGLO_ZONES.ZONES_KEYS]);
-  const p13 = parseAggloZones(z13, contours);
-  assert.ok(p13);
-  assert.deepEqual(p13.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
-  for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']) {
-    assert.equal(parseAggloZones({ ...z13, [k]: undefined }, contours), null, k);
-    assert.equal(parseAggloZones({ ...z13, [k]: 'x' }, contours), null, k);
+  assert.deepEqual(Object.keys(z25).filter((k) => AGGLO_ZONES.ZONES_KEYS.includes(k)), [...AGGLO_ZONES.ZONES_KEYS]);
+  const p25 = parseAggloZones(z25, contours);
+  assert.ok(p25);
+  assert.deepEqual(p25.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
+  for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon', ...V93_KEYS]) {
+    assert.equal(parseAggloZones({ ...z25, [k]: undefined }, contours), null, k);
+    assert.equal(parseAggloZones({ ...z25, [k]: 'x' }, contours), null, k);
   }
-  assert.equal(aggloZoneAt([6.02, 47.24], p13), null); // Besançon : hors zone
+  assert.equal(aggloZoneAt([6.02, 47.24], p25), null); // Besançon : hors zone
 });
 
 test('plafond 500 Ko (inchangé) : au-delà, rien écrit (jamais partiel), ⚠ avec les chiffres, exitCode 1', () => {
@@ -278,7 +276,7 @@ test('plafond 500 Ko (inchangé) : au-delà, rien écrit (jamais partiel), ⚠ a
   const ring = [];
   for (let i = 0; i < 40000; i += 1) ring.push([Math.round((1 + i * 0.0005) * 1e4) / 1e4, i % 2 ? 43.01 : 43]);
   ring.push([21, 44], ring[0]);
-  const found = foundComplete();
+  const found = foundFull();
   found.nantes = [{ properties: { nom_officiel: 'Nantes Métropole', code_siren: '244400404' }, geometry: { type: 'Polygon', coordinates: [ring] } }];
   const z = buildZones(found, OPTS);
   assert.equal(z.text, null);
@@ -319,7 +317,7 @@ test('Action « Contours IGN » : data/zones-agglo.json ajouté au commit, aucun
   assert.match(yml, /run: node tools\/contours-ign\.mjs data\/contours-ign\.json\n/);
 });
 
-// ───────── Étape 1/5 : 12 zones facultatives (noms non prouvés, à confirmer par le run de l'Action) ─────────
+// ───────── v93 : les 12 zones de l'étape 1/5, obligatoires (noms lus par le run de l'Action du 27/11/2026) ─────────
 
 test('noms proches : 5 au plus, contenant le mot du filtre (sans accents ni casse), les plus proches d\'abord', () => {
   const names = FX.map((f) => f.properties.nom_officiel);
@@ -337,76 +335,32 @@ test('noms proches : 5 au plus, contenant le mot du filtre (sans accents ni cass
   assert.deepEqual(nearNames(undefined, 'Brest Métropole', 'Brest'), []);
 });
 
-test('facultative absente (Reims de la fixture) → ⚠ avec 5 noms proches, clé non écrite, 24 zones écrites, exitCode 0', () => {
+test('Reims absente (fixture) → ⚠ avec les 5 noms proches, RIEN écrit (l\'ancien fichier reste), exitCode 1', () => {
   const z = buildZones(foundComplete(), OPTS);
-  assert.ok(z.text);
-  assert.equal(z.exitCode, 0);
-  const d = JSON.parse(z.text);
-  assert.equal(d.reims, undefined);
-  assert.equal(d.names.reims, undefined);
-  assert.equal(d.props.reims, undefined);
-  for (const x of ZONES) if (x.key !== 'reims') assert.ok(Array.isArray(d[x.key]) && d[x.key].length, x.key);
+  assert.equal(z.text, null);
+  assert.equal(z.exitCode, 1);
   const log = z.log.join('\n');
-  assert.ok(z.log.includes('⚠ reims (« CU du Grand Reims ») : absent, zone facultative non écrite ; noms proches trouvés '
+  assert.ok(z.log.includes('⚠ reims (« CU du Grand Reims ») : absent, zone manquante ; noms proches trouvés '
     + '(« Reims », 5 au plus) : « Communauté urbaine du Grand Reims », « CA Reims Sud (synthétique) », « CC Reims Est (synthétique) », '
     + '« CC Reims Ouest (synthétique) », « CC Région de Reims Nord (synthétique) ».'), log);
   // Aucun des 6 faux noms ni « Communauté urbaine du Grand Reims » n'égale le nom cherché.
   assert.ok(!FX.some((f) => normName(f.properties.nom_officiel) === normName('CU du Grand Reims')));
-  assert.ok(z.log.includes('⚠ 1 zone(s) facultative(s) non écrite(s) sur 12 (reims).'));
-  assert.match(z.log.at(-1), /^data\/zones-agglo\.json : 13\/13 zone\(s\) obligatoire\(s\), 11\/12 facultative\(s\), \d+ octets \(plafond 500000\)\.$/);
+  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 1 zone(s) obligatoire(s) manquante(s) sur 25 (reims) : rien écrit, l\'ancien fichier reste.');
+  assert.doesNotMatch(log, /facultative/);
 });
 
-test('chaque facultative absente, ambiguë, illisible ou en échec → ignorée avec ⚠, le reste écrit, exitCode 0', () => {
-  const full = JSON.parse(buildZones(foundFull(), OPTS).text);
-  for (const z of OPT) {
-    const near = { properties: { nom_officiel: `${z.name} (voisin)`, code_siren: '910000098' }, geometry: null };
-    const cases = {
-      'requête échouée': (f) => { delete f[z.key]; },
-      absent: (f) => { f[z.key] = [near]; },
-      'ambigu (2 objets)': (f) => { f[z.key] = [...f[z.key], f[z.key].find((x) => normName(x.properties.nom_officiel) === normName(z.name))]; },
-      'aucun anneau lisible': (f) => { f[z.key] = [{ properties: { nom_officiel: z.name, code_siren: '910000097' }, geometry: { type: 'Point', coordinates: [5, 45] } }]; },
-    };
-    for (const [why, mutate] of Object.entries(cases)) {
-      const found = foundFull();
-      mutate(found);
-      const r = buildZones(found, OPTS);
-      assert.ok(r.text, `${z.key} ${why}`);
-      assert.equal(r.exitCode, 0, `${z.key} ${why}`);
-      const d = JSON.parse(r.text);
-      assert.equal(d[z.key], undefined);
-      assert.equal(d.names[z.key], undefined);
-      assert.equal(d.props[z.key], undefined);
-      // Les 24 autres zones écrites telles quelles.
-      for (const x of ZONES) if (x.key !== z.key) assert.deepEqual(d[x.key], full[x.key], `${z.key} ${why} → ${x.key}`);
-      assert.ok(r.log.some((l) => l.startsWith(`⚠ ${z.key} (« ${z.name} ») : ${why}, zone facultative non écrite`)), `${z.key} ${why}`);
-      if (why === 'absent') assert.ok(r.log.some((l) => l.endsWith(`noms proches trouvés (« ${z.like} », 5 au plus) : « ${z.name} (voisin) ».`)), z.key);
-      assert.ok(r.log.includes(`⚠ 1 zone(s) facultative(s) non écrite(s) sur 12 (${z.key}).`));
-      assert.match(r.log.at(-1), /13\/13 zone\(s\) obligatoire\(s\), 11\/12 facultative\(s\)/);
-    }
-  }
-});
-
-test('les 12 facultatives en échec → fichier des 13 obligatoires seulement (comme v92), exitCode 0', () => {
+test('les 12 zones de v93 en échec → rien écrit, exitCode 1 (plus jamais un fichier à 13 clés)', () => {
   const found = foundFull();
-  for (const k of OPT_KEYS) delete found[k];
-  const z = buildZones(found, OPTS);
-  assert.equal(z.exitCode, 0);
-  const d = JSON.parse(z.text);
-  assert.deepEqual(Object.keys(d), ['source', 'layer', 'year', 'read', 'tolerance', 'names', 'props', ...AGGLO_ZONES.ZONES_KEYS]);
-  assert.ok(z.log.includes(`⚠ 12 zone(s) facultative(s) non écrite(s) sur 12 (${OPT_KEYS.join(', ')}).`));
-  assert.match(z.log.at(-1), /13\/13 zone\(s\) obligatoire\(s\), 0\/12 facultative\(s\)/);
-});
-
-test('obligatoire absente, facultatives présentes → rien écrit, exitCode 1 (les facultatives ne sauvent jamais le fichier)', () => {
-  const found = foundFull();
-  delete found.toulon;
+  for (const k of V93_KEYS) delete found[k];
   const z = buildZones(found, OPTS);
   assert.equal(z.text, null);
   assert.equal(z.exitCode, 1);
-  assert.equal(z.log.at(-1), '⚠ data/zones-agglo.json : 1 zone(s) obligatoire(s) manquante(s) sur 13 (toulon) : rien écrit, l\'ancien fichier reste.');
+  for (const k of V93_KEYS) assert.match(z.log.join('\n'), new RegExp(`⚠ ${k} \\(« .+ »\\) : requête échouée, zone manquante\\.`), k);
+  assert.equal(z.log.at(-1), `⚠ data/zones-agglo.json : 12 zone(s) obligatoire(s) manquante(s) sur 25 (${V93_KEYS.join(', ')}) : `
+    + 'rien écrit, l\'ancien fichier reste.');
 });
 
-test('plafond 500 Ko dépassé par une facultative → rien écrit, ⚠ avec la taille, exitCode 1', () => {
+test('plafond 500 Ko dépassé par une zone de v93 (Dijon) → rien écrit, ⚠ avec la taille, exitCode 1', () => {
   const ring = [];
   for (let i = 0; i < 40000; i += 1) ring.push([Math.round((1 + i * 0.0005) * 1e4) / 1e4, i % 2 ? 47.01 : 47]);
   ring.push([21, 48], ring[0]);
@@ -420,55 +374,47 @@ test('plafond 500 Ko dépassé par une facultative → rien écrit, ⚠ avec la 
   assert.ok(Number(m[1]) > ZONES_MAX_BYTES);
 });
 
-test('appli v92 : fichier à 25 clés lu comme le fichier à 13 (clés en plus sans effet), appli et audit', () => {
+test('appli v93 : fichier à 25 clés lu (27 zones), fichier à 13 refusé ; Dijon synthétique en zone ; appli et audit', () => {
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
   const d25 = JSON.parse(buildZones(foundFull(), OPTS).text);
   const d13 = { ...d25 };
-  for (const k of OPT_KEYS) delete d13[k];
+  for (const k of V93_KEYS) delete d13[k];
   const p25 = parseAggloZones(d25, contours);
   assert.ok(p25);
-  assert.deepEqual(p25, parseAggloZones(d13, contours));
+  assert.equal(parseAggloZones(d13, contours), null); // ancienne copie à 13 clés : zones indisponibles
   assert.deepEqual(p25.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
-  // Un point dans la zone synthétique de Dijon n'est pas encore « en zone » (étape 1/5 : rien de lu par l'appli).
+  // Un point dans la zone synthétique de Dijon est « en zone » (v93 : lue par l'appli).
   assert.ok(d25.dijon[0].length >= 4);
-  assert.equal(aggloZoneAt([5.05, 47.27], p25), null);
-  // Fichier du dépôt + 12 clés en plus (formes synthétiques) : mêmes zones et mêmes noms pour l'audit.
+  assert.equal(aggloZoneAt([5.05, 47.27], p25), 'dijon');
+  // Fichier du dépôt sans les 12 clés de v93 : refusé par l'audit aussi (arrêt, jamais une fiche retirée en silence).
   const real = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
-  const more = { ...real, names: { ...real.names }, props: { ...real.props } };
-  for (const k of OPT_KEYS) { more[k] = d25[k]; more.names[k] = d25.names[k]; more.props[k] = d25.props[k]; }
+  const less = { ...real };
+  for (const k of V93_KEYS) delete less[k];
   const readWith = (z) => (f) => (f.includes('zones-agglo') ? JSON.stringify(z) : readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
-  assert.deepEqual(auditZones(readWith(more)), auditZones(readWith(real)));
-  assert.equal(auditZones(readWith(more)).zones.zones.length, 15);
+  assert.match(auditZones(readWith(less)).problem, /zone manquante/);
+  assert.equal(auditZones(readWith(real)).zones.zones.length, 27);
 });
 
-test('étape 1 bis : fichier réel du dépôt (25 clés ou moins) = fichier réduit aux 13 obligatoires, pour l\'appli et l\'audit', () => {
-  const realText = readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8');
-  const real = JSON.parse(realText);
+test('v93 : fichier réel du dépôt = exactement les 25 clés de ZONES_KEYS, 27 zones pour l\'appli et l\'audit', () => {
+  const real = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
   const META = ['source', 'layer', 'year', 'read', 'tolerance', 'names', 'props'];
   const zoneKeys = Object.keys(real).filter((k) => !META.includes(k));
-  assert.ok(zoneKeys.length <= 25 && zoneKeys.length >= 13, String(zoneKeys.length));
-  for (const k of zoneKeys) assert.ok(ZONES.some((x) => x.key === k), k);
-  for (const k of AGGLO_ZONES.ZONES_KEYS) assert.ok(zoneKeys.includes(k), k);
-  // Fichier réduit : 13 clés obligatoires, names et props réduits aussi.
-  const only = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => AGGLO_ZONES.ZONES_KEYS.includes(k)));
-  const reduced = { ...Object.fromEntries(META.map((k) => [k, real[k]])), names: only(real.names), props: only(real.props), ...only(real) };
-  assert.equal(Object.keys(reduced).length, META.length + 13);
+  assert.deepEqual(zoneKeys, [...AGGLO_ZONES.ZONES_KEYS]);
+  assert.deepEqual(Object.keys(real.names), [...AGGLO_ZONES.ZONES_KEYS]);
   // Appli.
   const pReal = parseAggloZones(real, contours);
   assert.ok(pReal);
-  assert.deepEqual(pReal, parseAggloZones(reduced, contours));
-  assert.equal(pReal.zones.length, 15);
-  // Audit.
+  assert.equal(pReal.zones.length, 27);
+  // Audit : mêmes zones, 27 noms lus dans les fichiers.
   const readWith = (z) => (f) => (f.includes('zones-agglo') ? JSON.stringify(z) : readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
   const aReal = auditZones(readWith(real));
-  assert.deepEqual(aReal, auditZones(readWith(reduced)));
-  assert.equal(aReal.zones.zones.length, 15);
-  assert.equal(aReal.names.length, 15);
-  // Le centre d'une zone facultative écrite n'est jamais rendu sous sa clé (zone pas encore lue par l'appli).
-  for (const k of zoneKeys.filter((x) => !AGGLO_ZONES.ZONES_KEYS.includes(x))) {
+  assert.deepEqual(aReal.zones, pReal);
+  assert.equal(aReal.names.length, 27);
+  // Le centre de la boîte du premier anneau de chaque zone ajoutée, s'il est dans la zone, est rendu sous sa clé.
+  for (const k of V93_KEYS) {
     const [w, s0, e, n] = real[k][0].reduce(([a, b, c, d], [x, y]) => [Math.min(a, x), Math.min(b, y), Math.max(c, x), Math.max(d, y)], [180, 90, -180, -90]);
     const hit = aggloZoneAt([(w + e) / 2, (s0 + n) / 2], pReal);
-    assert.notEqual(hit, k, k);
+    assert.ok(hit === k || hit === null, `${k} : ${hit}`);
   }
 });

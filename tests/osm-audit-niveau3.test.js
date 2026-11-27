@@ -17,7 +17,7 @@ import { AGGLO_ZONES, parseAggloZones } from '../src/lib/agglo-zones.js';
 const sq = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
 const FAR = sq(0.1, 40.1, 0.2, 40.2);
 const ALL_ZONES = parseAggloZones(
-  // Toutes les clés lues (v92 : 13) ; seule l'Île-de-France, élargie, couvre les points des tests.
+  // Toutes les clés lues (v93 : 25) ; seule l'Île-de-France, élargie, couvre les points des tests.
   { ...Object.fromEntries(AGGLO_ZONES.ZONES_KEYS.map((k) => [k, FAR])), ileDeFrance: sq(-10, 35, 20, 60) },
   { metropoleLyon: FAR, eurometropole: FAR });
 import { SENSITIVE } from '../src/lib/sensitive-points.js';

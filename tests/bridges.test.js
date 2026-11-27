@@ -193,7 +193,7 @@ test('acceptation (données réelles) : sous le pont 243477938 → « haute » �
 const square = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
 function fakeZones(around) {
   const far = square(0.1, 40.1, 0.2, 40.2);
-  // Toutes les clés lues par l'appli (v92 : 13 de data/zones-agglo.json), loin du tracé.
+  // Toutes les clés lues par l'appli (v93 : 25 de data/zones-agglo.json), loin du tracé.
   const z = Object.fromEntries(AGGLO_ZONES.ZONES_KEYS.map((k) => [k, far]));
   const c = Object.fromEntries(AGGLO_ZONES.CONTOURS_KEYS.map((k) => [k, far]));
   if (around) z.lille = square(6.20, 47.665, 6.22, 47.68);
