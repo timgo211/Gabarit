@@ -11,6 +11,10 @@
 // src/lib/agglo-zones.js, tout ou rien). Une zone absente, ambiguë (0 ou plusieurs objets au nom exact), sans anneau
 // lisible ou dont la requête a échoué : ⚠ au journal avec les noms proches trouvés, et RIEN n'est écrit (l'ancien
 // data/zones-agglo.json reste, jamais un fichier partiel) ; exitCode = 1 dans le résultat.
+// Étape 1/5 (12 agglomérations de plus) : 12 zones FACULTATIVES (optional: true), pas encore lues par l'appli ni par
+// l'audit (absentes de ZONES_KEYS : clés en trop sans effet, parseAggloZones ne lit que ZONES_KEYS). Noms NON
+// PROUVÉS, à confirmer par le run de l'Action : une facultative absente, ambiguë, illisible ou en échec = ⚠ au journal
+// avec les 5 noms les plus proches (contenant le mot du filtre), clé non écrite, les autres zones écrites, exitCode 0.
 //
 // Seuls les anneaux extérieurs ; Douglas-Peucker en mètres (projection locale) : 150 m (région), 50 m (métropoles) ;
 // coordonnées à 4 décimales. Plafond ZONES_MAX_BYTES (500 Ko) : au-delà, rien écrit (jamais un fichier partiel).
@@ -31,6 +35,19 @@ export const ZONES = Object.freeze([
   { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50 },
   { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50 },
   { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50 },
+  // Facultatives (étape 1/5) : noms supposés, jamais un code ; mot du filtre sans accent (ILIKE ne confond pas é / e).
+  { key: 'dijon', layer: 'epci', name: 'Dijon Métropole', like: 'Dijon', tol: 50, optional: true },
+  { key: 'metz', layer: 'epci', name: 'Metz Métropole', like: 'Metz', tol: 50, optional: true },
+  { key: 'nancy', layer: 'epci', name: 'Métropole du Grand Nancy', like: 'Nancy', tol: 50, optional: true },
+  { key: 'reims', layer: 'epci', name: 'Reims Métropole', like: 'Reims', tol: 50, optional: true },
+  { key: 'orleans', layer: 'epci', name: 'Orléans Métropole', like: 'Orl', tol: 50, optional: true },
+  { key: 'tours', layer: 'epci', name: 'Tours Métropole Val de Loire', like: 'Tours', tol: 50, optional: true },
+  { key: 'angers', layer: 'epci', name: 'Angers Loire Métropole', like: 'Angers', tol: 50, optional: true },
+  { key: 'clermontFerrand', layer: 'epci', name: 'Clermont Auvergne Métropole', like: 'Clermont', tol: 50, optional: true },
+  { key: 'saintEtienne', layer: 'epci', name: 'Saint-Étienne Métropole', like: 'tienne', tol: 50, optional: true },
+  { key: 'leHavre', layer: 'epci', name: 'Le Havre Seine Métropole', like: 'Havre', tol: 50, optional: true },
+  { key: 'avignon', layer: 'epci', name: 'Grand Avignon', like: 'Avignon', tol: 50, optional: true },
+  { key: 'brest', layer: 'epci', name: 'Brest Métropole', like: 'Brest', tol: 50, optional: true },
 ].map((z) => Object.freeze(z)));
 
 export const ZONES_MAX_BYTES = 500_000;
@@ -51,6 +68,31 @@ export function pickByName(list, name) {
   const exact = (list ?? []).filter((f) => normName(f?.properties?.nom_officiel) === want);
   if (exact.length === 1) return { status: 'ok', feature: exact[0], names };
   return { status: exact.length ? 'ambigu' : 'absent', count: exact.length, names };
+}
+
+export const NEAR_MAX = 5;
+
+/** Distance d'édition (Levenshtein) entre deux textes déjà normalisés. */
+function editDistance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i += 1) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j += 1) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+/**
+ * Les `max` noms trouvés les plus proches du nom cherché, parmi ceux qui contiennent le mot du filtre (`like`, comparé
+ * sans accents ni casse) : distance d'édition croissante, puis ordre alphabétique. Pour le journal seulement.
+ */
+export function nearNames(names, name, like, max = NEAR_MAX) {
+  const want = normName(name); const word = normName(like);
+  return [...new Set(names ?? [])].filter((n) => normName(n).includes(word))
+    .map((n) => ({ n, d: editDistance(normName(n), want) }))
+    .sort((a, b) => a.d - b.d || (a.n < b.n ? -1 : a.n > b.n ? 1 : 0))
+    .slice(0, max).map((x) => x.n);
 }
 
 const RAD = Math.PI / 180;
@@ -102,7 +144,8 @@ export function rings(list, tol) {
 /**
  * Fichier des zones. found : { clé: liste d'objets IGN candidats (filtre WFS sur le mot `like`) }, ou absent si la
  * requête a échoué. Renvoie { text, data, log, exitCode } : text = null et exitCode = 1 si rien n'est à écrire (une
- * des 13 zones manquante, ou plafond dépassé) ; sinon exitCode = 0. Jamais un fichier partiel.
+ * des 13 zones obligatoires manquante, ou plafond dépassé) ; sinon exitCode = 0. Zone facultative manquante : ⚠,
+ * clé non écrite, le reste écrit. Jamais un fichier partiel pour les obligatoires.
  */
 export function buildZones(found, { prefix = null, year = null, read = null, maxBytes = ZONES_MAX_BYTES } = {}) {
   const log = [];
@@ -116,35 +159,44 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     props: {},
   };
   const missing = [];
+  const missingOpt = [];
+  const req = ZONES.filter((z) => !z.optional).length;
+  const opt = ZONES.length - req;
   for (const z of ZONES) {
+    const lost = z.optional ? 'zone facultative non écrite' : 'zone manquante';
+    const miss = () => (z.optional ? missingOpt : missing).push(z.key);
     const list = found?.[z.key];
-    if (!Array.isArray(list)) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, zone manquante.`); continue; }
+    if (!Array.isArray(list)) { miss(); log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, ${lost}.`); continue; }
     const p = pickByName(list, z.name);
-    const near = p.names.length ? p.names.map((n) => `« ${n} »`).join(', ') : 'aucun';
     if (p.status !== 'ok') {
-      missing.push(z.key);
-      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, zone manquante ; noms proches trouvés : ${near}.`);
+      miss();
+      const near = nearNames(p.names, z.name, z.like);
+      const nearText = near.length ? near.map((n) => `« ${n} »`).join(', ') : 'aucun';
+      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, ${lost} ; `
+        + `noms proches trouvés (« ${z.like} », ${NEAR_MAX} au plus) : ${nearText}.`);
       continue;
     }
     const r = rings([p.feature], z.tol);
-    if (!r.length) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, zone manquante.`); continue; }
+    if (!r.length) { miss(); log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, ${lost}.`); continue; }
     data[z.key] = r;
     data.names[z.key] = String(p.feature.properties.nom_officiel).trim();
     data.props[z.key] = p.feature.properties;
     log.push(`${z.key} : « ${data.names[z.key]} » (${z.layer}, code ${p.feature.properties.code_insee ?? p.feature.properties.code_siren ?? 'non lu'}), `
-      + `${r.length} anneau(x), ${r.reduce((s, x) => s + x.length, 0)} points (${z.tol} m).`);
+      + `${r.length} anneau(x), ${r.reduce((s, x) => s + x.length, 0)} points (${z.tol} m)${z.optional ? ', facultative' : ''}.`);
   }
+  if (missingOpt.length) log.push(`⚠ ${missingOpt.length} zone(s) facultative(s) non écrite(s) sur ${opt} (${missingOpt.join(', ')}).`);
   if (missing.length) {
-    log.push(`⚠ data/zones-agglo.json : ${missing.length} zone(s) manquante(s) sur ${ZONES.length} (${missing.join(', ')}) : `
+    log.push(`⚠ data/zones-agglo.json : ${missing.length} zone(s) obligatoire(s) manquante(s) sur ${req} (${missing.join(', ')}) : `
       + 'rien écrit, l\'ancien fichier reste.');
     return { text: null, data, log, exitCode: 1 };
   }
   const text = `${JSON.stringify(data)}\n`;
   const bytes = Buffer.byteLength(text);
   if (bytes > maxBytes) {
-    log.push(`⚠ data/zones-agglo.json : ${bytes} octets > plafond ${maxBytes} octets : rien écrit.`);
+    log.push(`⚠ data/zones-agglo.json : ${bytes} octets > plafond ${maxBytes} octets : rien écrit, l'ancien fichier reste.`);
     return { text: null, data, log, exitCode: 1 };
   }
-  log.push(`data/zones-agglo.json : ${ZONES.length}/${ZONES.length} zone(s), ${bytes} octets (plafond ${maxBytes}).`);
+  log.push(`data/zones-agglo.json : ${req}/${req} zone(s) obligatoire(s), ${opt - missingOpt.length}/${opt} facultative(s), `
+    + `${bytes} octets (plafond ${maxBytes}).`);
   return { text, data, log, exitCode: 0 };
 }
