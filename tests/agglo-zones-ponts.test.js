@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { AGGLO_ZONES, parseAggloZones, aggloZoneAt } from '../src/lib/agglo-zones.js';
 import {
-  auditAxisFromFeature, auditBridgeFromFeature, auditZones, axisCards, bridgeCards, bridgeCrossings, buildAxisIndex,
+  auditAxisFromFeature, auditBridgeFromFeature, auditIndex, auditReport, auditZones, axisCards, bridgeCards, bridgeCrossings,
+  buildAxisIndex, splitCards,
 } from '../src/lib/osm-audit.js';
 import { bridgeFromFeature, clearanceFromFeature, convertBridges } from '../src/lib/bridges-convert.js';
 import { parseBridgeTile, mergeBridgeTiles, bridgeRules, lowBridgeText } from '../src/lib/bridge-check.js';
@@ -261,4 +262,37 @@ test('v92 (e) : pont portant une hauteur ≤ véhicule → priorité haute parto
       assert.equal(low.zone, undefined);
     }
   }
+});
+
+test('v92 : rapport d\'audit — les 15 zones citées, noms lus dans les fichiers de données (jamais écrits en dur)', () => {
+  const zr = auditZones(read);
+  const z = JSON.parse(read('data/zones-agglo.json'));
+  const c = JSON.parse(read('data/contours-ign.json'));
+  // Noms officiels IGN, dans l'ordre des zones : 13 de data/zones-agglo.json, puis Lyon et Strasbourg.
+  const expected = [...AGGLO_ZONES.ZONES_KEYS.map((k) => z.names[k]), c.props.metropoleLyon.nom_officiel, c.props.epci.nom_officiel];
+  assert.deepEqual(zr.names, expected);
+  assert.equal(zr.names.length, 15);
+  assert.ok(zr.names.every((n) => typeof n === 'string' && n.length > 3));
+  assert.equal(zr.names.at(-2), 'Métropole de Lyon');
+  assert.equal(zr.names.at(-1), 'Eurométropole de Strasbourg');
+  const { cards } = audit(ZONES);
+  const index = auditIndex(cards, splitCards(cards), { updated: '2026-11-26', levels: [1, 2, 3] });
+  const md = auditReport(index, cards, { zoneNames: zr.names });
+  const line = md.split('\n').find((l) => l.startsWith('- niveau 1 (autoroutes) : fiche « pont sans hauteur »'));
+  assert.equal(line, `- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est dans l'une des 15 zones `
+    + `suivantes : ${expected.join(', ')} (Île-de-France et grandes agglomérations ; règle du propriétaire, sans source officielle) ;`);
+  for (const n of expected) assert.ok(line.includes(n), n);
+  // Plus aucune liste de v91 écrite en dur.
+  assert.doesNotMatch(md, /Métropoles du Grand Paris, d'Aix-Marseille-Provence, de Lille/);
+  const src = read('src/lib/osm-audit.js');
+  for (const n of ['Rennes Métropole', 'Toulouse Métropole', 'Nantes', 'Montpellier']) assert.ok(!src.includes(n), n);
+  // Noms absents (fichier sans names) : renvoi aux fichiers, aucune liste inventée.
+  const noNames = auditZones((f) => (f.includes('zones-agglo') ? JSON.stringify({ ...z, names: {} }) : read(f)));
+  assert.ok(noNames.zones);
+  assert.equal(noNames.names, null);
+  const md0 = auditReport(index, cards, { zoneNames: noNames.names });
+  assert.ok(md0.includes('seulement si le croisement est dans une zone de data/zones-agglo.json ou de '
+    + 'data/contours-ign.json (Île-de-France et grandes agglomérations ; règle du propriétaire, sans source officielle) ;'));
+  // Le script d'audit passe les noms lus au rapport.
+  assert.match(read('tools/audit-osm.mjs'), /zoneNames: zr\.names/);
 });
