@@ -566,6 +566,9 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     ≤ véhicule : haute partout. Audit : niveau 1, fiche « pont sans hauteur » gardée en zone seulement (fiches du
     run 4 : 2 335 en zone gardées, 9 734 hors zone retirées au prochain run) ; zones illisibles : arrêt sans écriture.
     Appliquée au run 5 (ci-dessous) : 2 335 gardées, 9 734 retirées, toutes les gardées en zone (recompté).
+    v92 (PR #116 et #117) : + Métropoles Nice Côte d'Azur, Montpellier Méditerranée, Rennes, Grenoble-Alpes, Rouen
+    Normandie et Toulon-Provence-Méditerranée → 15 zones. Appliquée au run 6 (ci-dessous) : 2 606 gardées, 9 107
+    retirées, toutes les gardées en zone (recompté avec `aggloZoneAt`).
 - [x] **Phase 12a bis — Limites de poids d'après OSM** (v42)
   L'Action « Données OSM » copie aussi, pour la France, les tronçons routiers portant maxweight ou maxweight:hgv en
   tonnes (valeurs illisibles ignorées ; drapeau « desserte possible » si hgv=destination|delivery ou
@@ -725,6 +728,20 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     3 190, niveau 2 9 007, niveau 3 1 805 ; priorités 1 : 526, 2 : 2 270, 3 : 11 206. Autres types et niveaux 2-3
     identiques au run 4 (même extrait). `data/audit-osm/` 7,38 Mo (3 fichiers + index, le plus gros
     `niveau-2.json` 4,96 Mo) ; `data/axes-osm/` et `data/points-sensibles/` (2 653 points, 119 Ko) inchangés à l'octet.
+  - [x] **Audit niveaux 1-3 avec les 15 zones (v92)** (run 6 du 27/11/2026, depuis `main` 7dfa98b, accord du
+    propriétaire, 1 lancement, commit de l'Action 86011a1) : Geofabrik (pas de secours), extrait du 26/11/2026,
+    20 min (téléchargement 1 055 s), aucun ⚠. Ponts sans hauteur au-dessus des autoroutes (niveau 1) : 2 606 gardés
+    (zones des grandes agglomérations), 9 107 retirés (hors zone). Par zone (`aggloZoneAt`, première zone qui contient
+    le point) : Île-de-France 1 355, Métropole du Grand Paris 0 (incluse dans l'Île-de-France : 632 dans son contour),
+    Aix-Marseille-Provence 250, Lille 215, Bordeaux 151, Toulouse 77, Nantes 73, Nice 46, Montpellier 10, Rennes 1,
+    Grenoble 132, Rouen 11, Toulon 65, Lyon 179, Strasbourg 41. 14 125 fiches : niveau 1 3 388 (interdiction PL
+    absente 39, hauteur basse connue 200, pont sans hauteur 2 606, tunnel sans hauteur 529, hauteur sur le pont
+    seulement 14), niveau 2 8 930, niveau 3 1 807 ; priorités 1 : 526, 2 : 2 271, 3 : 11 328. Écarts hors des 6
+    nouvelles zones (tunnels 598 → 529, hauteurs basses 204 → 200, Aix-Marseille 244 → 250, ponts gardés + retirés
+    12 069 → 11 713) : autre extrait, pas le code. `data/audit-osm/` 7,46 Mo (3 fichiers + index, le plus gros
+    `niveau-2.json` 4,92 Mo) ; `data/axes-osm/` 9,35 Mo, 90 cases (3 cases de bord retirées : -2_42, 7_45, 8_49 ;
+    cause probable : contour france.poly de Geofabrik au lieu de la zone de `data/ponts-osm/`) ; points sensibles
+    2 575, 77 cases, 116 Ko. Ponts de l'audit absents de `data/ponts-osm/` : 0 (45 au run 4).
   - [ ] **`tools/osm-update.mjs` branché sur `tools/osm-download.mjs`** (PR à part : relance « Données OSM »).
 
 - [x] **Écran de navigation (v53)** : pastille de la rue sous le camion avec l'écusson du numéro ; ligne « Sortie 12 ·
