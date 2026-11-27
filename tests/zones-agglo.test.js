@@ -55,8 +55,8 @@ test('zones : clés, couches, noms cherchés et tolérances', () => {
     'Grenoble-Alpes-Métropole', 'Métropole Rouen Normandie', 'Métropole Toulon-Provence-Méditerranée']);
   assert.deepEqual(REQ.map((z) => z.layer), ['region', ...Array(12).fill('epci')]);
   assert.deepEqual(REQ.map((z) => z.tol), [150, ...Array(12).fill(50)]);
-  // v92 : les zones obligatoires sont exactement celles lues par l'appli (ZONES_KEYS, même ordre), en tête.
-  assert.deepEqual(REQ.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
+  // v93 : toutes les zones de l'outil sont lues par l'appli (ZONES_KEYS, même ordre).
+  assert.deepEqual(ZONES.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
   assert.deepEqual(ZONES.slice(0, 13), REQ);
   for (const z of REQ) assert.deepEqual(Object.keys(z), ['key', 'layer', 'name', 'like', 'tol'], z.key);
   // Étape 1/5 : 12 facultatives après, couche epci, 50 m, jamais dans ZONES_KEYS (pas encore lues par l'appli).
@@ -79,7 +79,7 @@ test('zones : clés, couches, noms cherchés et tolérances', () => {
     assert.equal(z.layer, 'epci', z.key);
     assert.equal(z.tol, 50, z.key);
     assert.equal(z.optional, true, z.key);
-    assert.ok(!AGGLO_ZONES.ZONES_KEYS.includes(z.key), z.key);
+    assert.ok(AGGLO_ZONES.ZONES_KEYS.includes(z.key), z.key); // v93 : lues par l'appli
     assert.ok(!AGGLO_ZONES.CONTOURS_KEYS.includes(z.key), z.key);
   }
   assert.equal(new Set(ZONES.map((z) => z.key)).size, 25);
@@ -193,9 +193,9 @@ test('fichier des zones : les 25 présentes → fichier écrit, codes lus dans p
   assert.match(log, /dijon : « Dijon Métropole » \(epci, code 910000001\), 1 anneau\(x\), 4 points \(50 m\), facultative\./);
   assert.doesNotMatch(log, /rennes : .*facultative/);
   assert.match(z.log.at(-1), /^data\/zones-agglo\.json : 13\/13 zone\(s\) obligatoire\(s\), 12\/12 facultative\(s\), \d+ octets \(plafond 500000\)\.$/);
-  // L'appli v92 lit ce fichier (15 zones avec Lyon et Strasbourg) : les 12 clés en plus sont sans effet.
+  // L'appli v93 lit ce fichier : 27 zones avec Lyon et Strasbourg.
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
-  assert.equal(parseAggloZones(d, contours).zones.length, 15);
+  assert.equal(parseAggloZones(d, contours).zones.length, 27);
 });
 
 test('fichier des zones : zones obligatoires absente / ambiguë → ⚠ avec les noms proches, RIEN écrit, exitCode 1', () => {
@@ -259,18 +259,18 @@ test('ancien jeu de 7 zones seulement (6 ajoutées en échec) → rien écrit, e
   for (const x of REQ) assert.doesNotMatch(z.log.join('\n'), new RegExp(`${x.key} \\(.*facultative`), x.key);
 });
 
-test('appli (v92) : fichier du dépôt à 13 clés lu (15 zones) ; sans une clé ajoutée en v92 → refusé (tout ou rien)', () => {
-  const z13 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
+test('appli (v93) : fichier du dépôt à 25 clés lu (27 zones) ; sans une clé ajoutée en v92 ou v93 → refusé (tout ou rien)', () => {
+  const z25 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
-  assert.deepEqual(Object.keys(z13).filter((k) => AGGLO_ZONES.ZONES_KEYS.includes(k)), [...AGGLO_ZONES.ZONES_KEYS]);
-  const p13 = parseAggloZones(z13, contours);
-  assert.ok(p13);
-  assert.deepEqual(p13.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
-  for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']) {
-    assert.equal(parseAggloZones({ ...z13, [k]: undefined }, contours), null, k);
-    assert.equal(parseAggloZones({ ...z13, [k]: 'x' }, contours), null, k);
+  assert.deepEqual(Object.keys(z25).filter((k) => AGGLO_ZONES.ZONES_KEYS.includes(k)), [...AGGLO_ZONES.ZONES_KEYS]);
+  const p25 = parseAggloZones(z25, contours);
+  assert.ok(p25);
+  assert.deepEqual(p25.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
+  for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon', ...OPT_KEYS]) {
+    assert.equal(parseAggloZones({ ...z25, [k]: undefined }, contours), null, k);
+    assert.equal(parseAggloZones({ ...z25, [k]: 'x' }, contours), null, k);
   }
-  assert.equal(aggloZoneAt([6.02, 47.24], p13), null); // Besançon : hors zone
+  assert.equal(aggloZoneAt([6.02, 47.24], p25), null); // Besançon : hors zone
 });
 
 test('plafond 500 Ko (inchangé) : au-delà, rien écrit (jamais partiel), ⚠ avec les chiffres, exitCode 1', () => {
@@ -392,7 +392,7 @@ test('les 12 facultatives en échec → fichier des 13 obligatoires seulement (c
   const z = buildZones(found, OPTS);
   assert.equal(z.exitCode, 0);
   const d = JSON.parse(z.text);
-  assert.deepEqual(Object.keys(d), ['source', 'layer', 'year', 'read', 'tolerance', 'names', 'props', ...AGGLO_ZONES.ZONES_KEYS]);
+  assert.deepEqual(Object.keys(d), ['source', 'layer', 'year', 'read', 'tolerance', 'names', 'props', ...REQ.map((x) => x.key)]);
   assert.ok(z.log.includes(`⚠ 12 zone(s) facultative(s) non écrite(s) sur 12 (${OPT_KEYS.join(', ')}).`));
   assert.match(z.log.at(-1), /13\/13 zone\(s\) obligatoire\(s\), 0\/12 facultative\(s\)/);
 });
@@ -420,55 +420,47 @@ test('plafond 500 Ko dépassé par une facultative → rien écrit, ⚠ avec la 
   assert.ok(Number(m[1]) > ZONES_MAX_BYTES);
 });
 
-test('appli v92 : fichier à 25 clés lu comme le fichier à 13 (clés en plus sans effet), appli et audit', () => {
+test('appli v93 : fichier à 25 clés lu (27 zones), fichier à 13 refusé ; Dijon synthétique en zone ; appli et audit', () => {
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
   const d25 = JSON.parse(buildZones(foundFull(), OPTS).text);
   const d13 = { ...d25 };
   for (const k of OPT_KEYS) delete d13[k];
   const p25 = parseAggloZones(d25, contours);
   assert.ok(p25);
-  assert.deepEqual(p25, parseAggloZones(d13, contours));
+  assert.equal(parseAggloZones(d13, contours), null); // ancienne copie à 13 clés : zones indisponibles
   assert.deepEqual(p25.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
-  // Un point dans la zone synthétique de Dijon n'est pas encore « en zone » (étape 1/5 : rien de lu par l'appli).
+  // Un point dans la zone synthétique de Dijon est « en zone » (v93 : lue par l'appli).
   assert.ok(d25.dijon[0].length >= 4);
-  assert.equal(aggloZoneAt([5.05, 47.27], p25), null);
-  // Fichier du dépôt + 12 clés en plus (formes synthétiques) : mêmes zones et mêmes noms pour l'audit.
+  assert.equal(aggloZoneAt([5.05, 47.27], p25), 'dijon');
+  // Fichier du dépôt sans les 12 clés de v93 : refusé par l'audit aussi (arrêt, jamais une fiche retirée en silence).
   const real = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
-  const more = { ...real, names: { ...real.names }, props: { ...real.props } };
-  for (const k of OPT_KEYS) { more[k] = d25[k]; more.names[k] = d25.names[k]; more.props[k] = d25.props[k]; }
+  const less = { ...real };
+  for (const k of OPT_KEYS) delete less[k];
   const readWith = (z) => (f) => (f.includes('zones-agglo') ? JSON.stringify(z) : readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
-  assert.deepEqual(auditZones(readWith(more)), auditZones(readWith(real)));
-  assert.equal(auditZones(readWith(more)).zones.zones.length, 15);
+  assert.match(auditZones(readWith(less)).problem, /zone manquante/);
+  assert.equal(auditZones(readWith(real)).zones.zones.length, 27);
 });
 
-test('étape 1 bis : fichier réel du dépôt (25 clés ou moins) = fichier réduit aux 13 obligatoires, pour l\'appli et l\'audit', () => {
-  const realText = readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8');
-  const real = JSON.parse(realText);
+test('v93 : fichier réel du dépôt = exactement les 25 clés de ZONES_KEYS, 27 zones pour l\'appli et l\'audit', () => {
+  const real = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
   const META = ['source', 'layer', 'year', 'read', 'tolerance', 'names', 'props'];
   const zoneKeys = Object.keys(real).filter((k) => !META.includes(k));
-  assert.ok(zoneKeys.length <= 25 && zoneKeys.length >= 13, String(zoneKeys.length));
-  for (const k of zoneKeys) assert.ok(ZONES.some((x) => x.key === k), k);
-  for (const k of AGGLO_ZONES.ZONES_KEYS) assert.ok(zoneKeys.includes(k), k);
-  // Fichier réduit : 13 clés obligatoires, names et props réduits aussi.
-  const only = (o) => Object.fromEntries(Object.entries(o).filter(([k]) => AGGLO_ZONES.ZONES_KEYS.includes(k)));
-  const reduced = { ...Object.fromEntries(META.map((k) => [k, real[k]])), names: only(real.names), props: only(real.props), ...only(real) };
-  assert.equal(Object.keys(reduced).length, META.length + 13);
+  assert.deepEqual(zoneKeys, [...AGGLO_ZONES.ZONES_KEYS]);
+  assert.deepEqual(Object.keys(real.names), [...AGGLO_ZONES.ZONES_KEYS]);
   // Appli.
   const pReal = parseAggloZones(real, contours);
   assert.ok(pReal);
-  assert.deepEqual(pReal, parseAggloZones(reduced, contours));
-  assert.equal(pReal.zones.length, 15);
-  // Audit.
+  assert.equal(pReal.zones.length, 27);
+  // Audit : mêmes zones, 27 noms lus dans les fichiers.
   const readWith = (z) => (f) => (f.includes('zones-agglo') ? JSON.stringify(z) : readFileSync(new URL(`../${f}`, import.meta.url), 'utf8'));
   const aReal = auditZones(readWith(real));
-  assert.deepEqual(aReal, auditZones(readWith(reduced)));
-  assert.equal(aReal.zones.zones.length, 15);
-  assert.equal(aReal.names.length, 15);
-  // Le centre d'une zone facultative écrite n'est jamais rendu sous sa clé (zone pas encore lue par l'appli).
-  for (const k of zoneKeys.filter((x) => !AGGLO_ZONES.ZONES_KEYS.includes(x))) {
+  assert.deepEqual(aReal.zones, pReal);
+  assert.equal(aReal.names.length, 27);
+  // Le centre de la boîte du premier anneau de chaque zone ajoutée, s'il est dans la zone, est rendu sous sa clé.
+  for (const k of OPT_KEYS) {
     const [w, s0, e, n] = real[k][0].reduce(([a, b, c, d], [x, y]) => [Math.min(a, x), Math.min(b, y), Math.max(c, x), Math.max(d, y)], [180, 90, -180, -90]);
     const hit = aggloZoneAt([(w + e) / 2, (s0 + n) / 2], pReal);
-    assert.notEqual(hit, k, k);
+    assert.ok(hit === k || hit === null, `${k} : ${hit}`);
   }
 });

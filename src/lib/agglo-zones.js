@@ -4,9 +4,12 @@
 // sensible, sauf en Île-de-France et dans les grandes agglomérations. La signalisation fait foi.
 // Contours : IGN Admin Express COG 2026 (Licence Ouverte), Action « Contours IGN » : data/zones-agglo.json (Île-de-France,
 // Métropoles du Grand Paris, d'Aix-Marseille-Provence, Européenne de Lille, Bordeaux, Toulouse, Nantes ; v92 : Nice Côte
-// d'Azur, Montpellier Méditerranée, Rennes, Grenoble-Alpes, Rouen Normandie, Toulon-Provence-Méditerranée) et
-// data/contours-ign.json (Métropole de Lyon, Eurométropole de Strasbourg). Anneaux extérieurs [lon, lat] ; un point
-// est en zone s'il est dans l'un des anneaux. Logique pure, même code pour l'appli et l'audit.
+// d'Azur, Montpellier Méditerranée, Rennes, Grenoble-Alpes, Rouen Normandie, Toulon-Provence-Méditerranée ; v93 : Dijon,
+// Metz, Nancy, Reims, Orléans, Tours, Angers, Clermont-Ferrand, Saint-Étienne, Le Havre, Avignon, Brest) et
+// data/contours-ign.json (Métropole de Lyon, Eurométropole de Strasbourg) : 27 zones en v93. Anneaux extérieurs
+// [lon, lat] ; un point est en zone s'il est dans l'un des anneaux. Logique pure, même code pour l'appli et l'audit.
+// Seul recouvrement des contours (v93) : Métropole du Grand Paris entièrement dans l'Île-de-France (aggloZoneAt rend
+// la première zone : ileDeFrance) ; les boîtes d'Aix-Marseille et de Toulon se touchent, leurs anneaux non.
 
 import { inRing } from './hgv-tolls-geo.js';
 
@@ -14,7 +17,10 @@ export const AGGLO_ZONES = Object.freeze({
   ZONES_PATH: './data/zones-agglo.json',
   CONTOURS_PATH: './data/contours-ign.json',
   ZONES_KEYS: Object.freeze(['ileDeFrance', 'metropoleGrandParis', 'aixMarseille', 'lille', 'bordeaux', 'toulouse', 'nantes',
-    'nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']),
+    'nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon',
+    // v93 : 12 agglomérations, dans l'ordre de ZONES de tools/zones-agglo.mjs.
+    'dijon', 'metz', 'nancy', 'reims', 'orleans', 'tours', 'angers', 'clermontFerrand', 'saintEtienne', 'leHavre',
+    'avignon', 'brest']),
   CONTOURS_KEYS: Object.freeze(['metropoleLyon', 'eurometropole']),
   UNAVAILABLE_TEXT: 'Zones des grandes agglomérations indisponibles : ponts sans hauteur au-dessus des autoroutes non examinés. '
     + 'La signalisation fait foi.',
@@ -33,8 +39,9 @@ function zoneOf(key, rings) {
 }
 
 /**
- * Les deux fichiers lus → { zones:[{ key, rings, box }] } ; null si une seule des 15 zones manque ou n'a aucun anneau
- * valide (tout ou rien : jamais une zone écartée en silence).
+ * Les deux fichiers lus → { zones:[{ key, rings, box }] } ; null si une seule des zones de ZONES_KEYS et CONTOURS_KEYS
+ * (27 en v93) manque ou n'a aucun anneau valide (tout ou rien : jamais une zone écartée en silence ; ancienne copie
+ * à 13 clés = null = « zones indisponibles »).
  */
 export function parseAggloZones(zonesJson, contoursJson) {
   const zones = [];
