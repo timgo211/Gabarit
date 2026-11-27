@@ -5,12 +5,12 @@
 //
 // Chaque zone est cherchée par son NOM dans la couche IGN Admin Express COG (comme la Métropole de Lyon en v76),
 // jamais par un code deviné ; le code lu (code_insee, code_siren…) est écrit dans props. Nom comparé sans accents,
-// sans casse, apostrophes ’ et ' confondues, espaces regroupés. Zone absente ou ambiguë (0 ou plusieurs objets au nom
-// exact) : clé non écrite, ⚠ au journal avec les noms proches trouvés ; les autres clés restent écrites.
+// sans casse, apostrophes ’ et ' confondues, espaces regroupés.
 // Les noms seront vérifiés par le run de l'Action (data.geopf.fr est bloqué depuis le conteneur de développement).
-// Zones facultatives (optional, PR A) : Nice, Montpellier, Rennes, Grenoble, Rouen, Toulon ; « facultative » ne change
-// que le journal (fichier écrit sans elles). v92 : elles sont dans AGGLO_ZONES.ZONES_KEYS (src/lib/agglo-zones.js) ;
-// un fichier sans l'une d'elles est refusé par l'appli et l'audit (tout ou rien : zones indisponibles, « à vérifier »).
+// v92 : les 13 zones sont obligatoires (toutes lues par l'appli et l'audit, AGGLO_ZONES.ZONES_KEYS de
+// src/lib/agglo-zones.js, tout ou rien). Une zone absente, ambiguë (0 ou plusieurs objets au nom exact), sans anneau
+// lisible ou dont la requête a échoué : ⚠ au journal avec les noms proches trouvés, et RIEN n'est écrit (l'ancien
+// data/zones-agglo.json reste, jamais un fichier partiel) ; exitCode = 1 dans le résultat.
 //
 // Seuls les anneaux extérieurs ; Douglas-Peucker en mètres (projection locale) : 150 m (région), 50 m (métropoles) ;
 // coordonnées à 4 décimales. Plafond ZONES_MAX_BYTES (500 Ko) : au-delà, rien écrit (jamais un fichier partiel).
@@ -25,13 +25,13 @@ export const ZONES = Object.freeze([
   { key: 'bordeaux', layer: 'epci', name: 'Bordeaux Métropole', like: 'Bordeaux', tol: 50 },
   { key: 'toulouse', layer: 'epci', name: 'Toulouse Métropole', like: 'Toulouse', tol: 50 },
   { key: 'nantes', layer: 'epci', name: 'Nantes Métropole', like: 'Nantes', tol: 50 },
-  { key: 'nice', layer: 'epci', name: "Métropole Nice Côte d'Azur", like: 'Nice', tol: 50, optional: true },
-  { key: 'montpellier', layer: 'epci', name: 'Montpellier Méditerranée Métropole', like: 'Montpellier', tol: 50, optional: true },
-  { key: 'rennes', layer: 'epci', name: 'Rennes Métropole', like: 'Rennes', tol: 50, optional: true },
-  { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50, optional: true },
-  { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50, optional: true },
-  { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50, optional: true },
-].map((z) => Object.freeze({ optional: false, ...z })));
+  { key: 'nice', layer: 'epci', name: "Métropole Nice Côte d'Azur", like: 'Nice', tol: 50 },
+  { key: 'montpellier', layer: 'epci', name: 'Montpellier Méditerranée Métropole', like: 'Montpellier', tol: 50 },
+  { key: 'rennes', layer: 'epci', name: 'Rennes Métropole', like: 'Rennes', tol: 50 },
+  { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50 },
+  { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50 },
+  { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50 },
+].map((z) => Object.freeze(z)));
 
 export const ZONES_MAX_BYTES = 500_000;
 
@@ -101,7 +101,8 @@ export function rings(list, tol) {
 
 /**
  * Fichier des zones. found : { clé: liste d'objets IGN candidats (filtre WFS sur le mot `like`) }, ou absent si la
- * requête a échoué. Renvoie { text, data, log } (text = null si rien à écrire : aucune zone, ou plafond dépassé).
+ * requête a échoué. Renvoie { text, data, log, exitCode } : text = null et exitCode = 1 si rien n'est à écrire (une
+ * des 13 zones manquante, ou plafond dépassé) ; sinon exitCode = 0. Jamais un fichier partiel.
  */
 export function buildZones(found, { prefix = null, year = null, read = null, maxBytes = ZONES_MAX_BYTES } = {}) {
   const log = [];
@@ -114,36 +115,36 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     names: {},
     props: {},
   };
-  let kept = 0;
-  let missingOpt = 0;
+  const missing = [];
   for (const z of ZONES) {
     const list = found?.[z.key];
-    const cle = z.optional ? 'clé facultative non écrite' : 'clé non écrite';
-    if (!Array.isArray(list)) { missingOpt += z.optional; log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, ${cle}.`); continue; }
+    if (!Array.isArray(list)) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, zone manquante.`); continue; }
     const p = pickByName(list, z.name);
     const near = p.names.length ? p.names.map((n) => `« ${n} »`).join(', ') : 'aucun';
     if (p.status !== 'ok') {
-      missingOpt += z.optional;
-      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, ${cle} ; noms proches trouvés : ${near}.`);
+      missing.push(z.key);
+      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, zone manquante ; noms proches trouvés : ${near}.`);
       continue;
     }
     const r = rings([p.feature], z.tol);
-    if (!r.length) { missingOpt += z.optional; log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, ${cle}.`); continue; }
+    if (!r.length) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, zone manquante.`); continue; }
     data[z.key] = r;
     data.names[z.key] = String(p.feature.properties.nom_officiel).trim();
     data.props[z.key] = p.feature.properties;
-    kept += 1;
     log.push(`${z.key} : « ${data.names[z.key]} » (${z.layer}, code ${p.feature.properties.code_insee ?? p.feature.properties.code_siren ?? 'non lu'}), `
       + `${r.length} anneau(x), ${r.reduce((s, x) => s + x.length, 0)} points (${z.tol} m).`);
   }
-  if (!kept) { log.push('⚠ Aucune zone trouvée : data/zones-agglo.json non écrit.'); return { text: null, data, log }; }
+  if (missing.length) {
+    log.push(`⚠ data/zones-agglo.json : ${missing.length} zone(s) manquante(s) sur ${ZONES.length} (${missing.join(', ')}) : `
+      + 'rien écrit, l\'ancien fichier reste.');
+    return { text: null, data, log, exitCode: 1 };
+  }
   const text = `${JSON.stringify(data)}\n`;
   const bytes = Buffer.byteLength(text);
   if (bytes > maxBytes) {
     log.push(`⚠ data/zones-agglo.json : ${bytes} octets > plafond ${maxBytes} octets : rien écrit.`);
-    return { text: null, data, log };
+    return { text: null, data, log, exitCode: 1 };
   }
-  log.push(`data/zones-agglo.json : ${kept}/${ZONES.length} zone(s)${missingOpt ? ` (${missingOpt} facultative(s) manquante(s))` : ''}, `
-    + `${bytes} octets (plafond ${maxBytes}).`);
-  return { text, data, log };
+  log.push(`data/zones-agglo.json : ${ZONES.length}/${ZONES.length} zone(s), ${bytes} octets (plafond ${maxBytes}).`);
+  return { text, data, log, exitCode: 0 };
 }
