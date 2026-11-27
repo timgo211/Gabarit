@@ -11,6 +11,7 @@ import {
   BRIDGE, parseBridgeTile, mergeBridgeTiles, bridgesAlongRoute, bridgeLines, bridgeTechText, parseHeight, lowBridgeText,
 } from '../src/lib/bridge-check.js';
 import { parseGeojsonLine } from '../src/lib/areas-osm-data.js';
+import { AGGLO_ZONES } from '../src/lib/agglo-zones.js';
 import { haversine } from '../src/lib/nav-geo.js';
 
 const features = readFileSync(new URL('./fixtures/osm-ponts-colombier.geojsonseq', import.meta.url), 'utf8')
@@ -192,8 +193,9 @@ test('acceptation (données réelles) : sous le pont 243477938 → « haute » �
 const square = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
 function fakeZones(around) {
   const far = square(0.1, 40.1, 0.2, 40.2);
-  const z = { ileDeFrance: far, metropoleGrandParis: far, aixMarseille: far, lille: far, bordeaux: far, toulouse: far, nantes: far };
-  const c = { metropoleLyon: far, eurometropole: far };
+  // Toutes les clés lues par l'appli (v92 : 13 de data/zones-agglo.json), loin du tracé.
+  const z = Object.fromEntries(AGGLO_ZONES.ZONES_KEYS.map((k) => [k, far]));
+  const c = Object.fromEntries(AGGLO_ZONES.CONTOURS_KEYS.map((k) => [k, far]));
   if (around) z.lille = square(6.20, 47.665, 6.22, 47.68);
   return parseAggloZonesFn(z, c);
 }
@@ -227,10 +229,11 @@ test('v91 : pont portant une hauteur ≤ véhicule au-dessus d\'une autoroute �
   // Tout le tracé en autoroute : le pont 1006 (3,5 m sur le pont) passe au-dessus d'une autoroute.
   r.roadExtras = { waycategory: [[0, r.coordinates.length - 1, 1]], waytype: [[0, r.coordinates.length - 1, 1]] };
   r.steps = [{ name: 'A 36', wayPoints: [0, r.coordinates.length - 1] }];
+  const far = square(0.1, 40.1, 0.2, 40.2);
   const zoneAll = parseAggloZonesFn(
-    { ileDeFrance: square(6.1, 47.6, 6.3, 47.7), metropoleGrandParis: square(0.1, 40.1, 0.2, 40.2), aixMarseille: square(0.1, 40.1, 0.2, 40.2),
-      lille: square(0.1, 40.1, 0.2, 40.2), bordeaux: square(0.1, 40.1, 0.2, 40.2), toulouse: square(0.1, 40.1, 0.2, 40.2), nantes: square(0.1, 40.1, 0.2, 40.2) },
-    { metropoleLyon: square(0.1, 40.1, 0.2, 40.2), eurometropole: square(0.1, 40.1, 0.2, 40.2) });
+    { ...Object.fromEntries(AGGLO_ZONES.ZONES_KEYS.map((k) => [k, far])), ileDeFrance: square(6.1, 47.6, 6.3, 47.7) },
+    Object.fromEntries(AGGLO_ZONES.CONTOURS_KEYS.map((k) => [k, far])));
+  assert.ok(zoneAll);
   for (const zones of [zoneAll, fakeZones(false), null]) {
     const res = bridgesAlongRoute(r, data, { vehicleHeight: 4, zones });
     const low = res.items.find((it) => it.id === 1006);

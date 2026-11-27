@@ -273,7 +273,9 @@ async function main() {
     writeSensitivePoints({ root: ROOT, say, tagged: r.tagged });
     say(`Durée totale : ${Math.round((Date.now() - start) / 60000)} min.`);
     mkdirSync(dirname(REPORT), { recursive: true });
-    writeFileSync(REPORT, auditReport(idx, cards, { located: r.located, unlocated: r.unlocated, axesLog: ax.log, runLog: log }));
+    writeFileSync(REPORT, auditReport(idx, cards, {
+      located: r.located, unlocated: r.unlocated, axesLog: ax.log, runLog: log, zoneNames: zr.names,
+    }));
     console.log(`${REPORT.slice(ROOT.length)} écrit.`);
   } finally {
     rmSync(dir, { recursive: true, force: true });

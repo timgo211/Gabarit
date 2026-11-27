@@ -317,8 +317,10 @@ export function bridgeCards(bridge, crossings, axes, { zones = null, stats = nul
 }
 
 /**
- * Zones de l'audit (v91) : read(chemin relatif) → texte (exception si absent). → { zones } ou { problem } (fichier
- * absent, JSON illisible, zone manquante ou sans anneau).
+ * Zones de l'audit (v91) : read(chemin relatif) → texte (exception si absent). → { zones, names } ou { problem }
+ * (fichier absent, JSON illisible, zone manquante ou sans anneau). v92 : names = noms officiels IGN lus dans les deux
+ * fichiers (names de data/zones-agglo.json, props de data/contours-ign.json), dans l'ordre des zones ; null si un nom
+ * manque (le rapport renvoie alors aux fichiers, sans liste écrite en dur).
  */
 export function auditZones(read) {
   const files = ['data/zones-agglo.json', 'data/contours-ign.json'];
@@ -329,7 +331,11 @@ export function auditZones(read) {
     try { json.push(JSON.parse(text)); } catch { return { problem: `${f} illisible` }; }
   }
   const zones = parseAggloZones(json[0], json[1]);
-  return zones ? { zones } : { problem: `${files.join(' ou ')} : zone manquante ou sans contour` };
+  if (!zones) return { problem: `${files.join(' ou ')} : zone manquante ou sans contour` };
+  // Propriétés IGN de data/contours-ign.json : Eurométropole sous props.epci (taxes PL), Lyon sous props.metropoleLyon.
+  const contourProps = { metropoleLyon: json[1].props?.metropoleLyon, eurometropole: json[1].props?.epci };
+  const names = zones.zones.map((z) => String((json[0].names?.[z.key] ?? contourProps[z.key]?.nom_officiel) || '').trim());
+  return { zones, names: names.every(Boolean) ? names : null };
 }
 
 // ───────── Interdictions connues (tableau 4 de l'étude) ─────────
@@ -543,7 +549,7 @@ const esc = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ');
 const tagText = (o) => Object.entries(o ?? {}).map(([k, v]) => `\`${k}=${v}\``).join(' ') || '—';
 
 /** Texte Markdown de docs/audit-osm-axes.md. */
-export function auditReport(index, cards, { located = [], unlocated = [], axesLog = [], runLog = [] } = {}) {
+export function auditReport(index, cards, { located = [], unlocated = [], axesLog = [], runLog = [], zoneNames = null } = {}) {
   const L = [];
   L.push('# Audit OSM des grands axes (lecture seule)', '');
   L.push(`Rapport écrit par l'Action « Audit OSM » (tools/audit-osm.mjs) ; extrait OpenStreetMap du ${index.updated ?? '?'} `
@@ -553,9 +559,12 @@ export function auditReport(index, cards, { located = [], unlocated = [], axesLo
     '- **la signalisation fait foi** ; seul l\'arrêté fait foi pour la règle ; « en vigueur : à vérifier » ;',
     '- une correction faite dans OSM met 2 à 3 semaines à atteindre l\'API publique d\'ORS (étude, section 1) ;',
     '- données © contributeurs OpenStreetMap, licence ODbL ; fiches complètes dans `data/audit-osm/`.');
-  L.push('- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est en Île-de-France ou dans '
-    + 'une grande agglomération (Métropoles du Grand Paris, d\'Aix-Marseille-Provence, de Lille, Bordeaux, Toulouse, '
-    + 'Nantes, Lyon, Strasbourg ; règle du propriétaire, sans source officielle) ;');
+  // v92 : liste des zones lue dans les fichiers de données (auditZones), jamais écrite en dur ici.
+  const zoneList = Array.isArray(zoneNames) && zoneNames.length
+    ? `l'une des ${zoneNames.length} zones suivantes : ${zoneNames.join(', ')}`
+    : 'une zone de data/zones-agglo.json ou de data/contours-ign.json';
+  L.push(`- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est dans ${zoneList} `
+    + '(Île-de-France et grandes agglomérations ; règle du propriétaire, sans source officielle) ;');
   if (index.levels.includes(3)) {
     L.push('- niveau 3 (grandes départementales : primary ou secondary à référence D…) : fiches de priorité 1 et 2 '
       + 'seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur ».');
