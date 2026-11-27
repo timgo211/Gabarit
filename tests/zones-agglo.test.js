@@ -27,8 +27,10 @@ test('zones : clés, couches, noms cherchés et tolérances', () => {
     'Grenoble-Alpes-Métropole', 'Métropole Rouen Normandie', 'Métropole Toulon-Provence-Méditerranée']);
   assert.deepEqual(ZONES.map((z) => z.layer), ['region', ...Array(12).fill('epci')]);
   assert.deepEqual(ZONES.map((z) => z.tol), [150, ...Array(12).fill(50)]);
-  // Les 7 zones lues par l'appli sont obligatoires ; les 6 nouvelles, facultatives.
-  assert.deepEqual(ZONES.filter((z) => !z.optional).map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
+  // v92 : l'outil écrit exactement les zones lues par l'appli (ZONES_KEYS, même ordre) ; les 6 ajoutées en v92 gardent
+  // la marque « facultative » de l'outil (journal seulement : fichier écrit sans elles, l'appli dit alors « indisponibles »).
+  assert.deepEqual(ZONES.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS]);
+  assert.deepEqual(ZONES.filter((z) => !z.optional).map((z) => z.key), AGGLO_ZONES.ZONES_KEYS.slice(0, 7));
   assert.deepEqual(ZONES.filter((z) => z.optional).map((z) => z.key),
     ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']);
   // Filtre WFS sans recouvrement : « Toulon » ne ramène pas Toulouse.
@@ -146,36 +148,29 @@ test('zones facultatives : candidats des 7 anciennes zones seulement (ancien fic
   found.nantes = [{ properties: { nom_officiel: 'Nantes Métropole', code_siren: '900000010' }, geometry: { type: 'Polygon', coordinates: [[[-1.7, 47.15], [-1.4, 47.15], [-1.4, 47.3], [-1.7, 47.15]]] } }];
   const z = buildZones(found, OPTS);
   const d = JSON.parse(z.text);
-  assert.deepEqual(Object.keys(d).slice(7), [...AGGLO_ZONES.ZONES_KEYS]);
+  assert.deepEqual(Object.keys(d).slice(7), AGGLO_ZONES.ZONES_KEYS.slice(0, 7));
   for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']) {
     assert.equal(d[k], undefined);
     assert.match(z.log.join('\n'), new RegExp(`⚠ ${k} \\(« .+ »\\) : requête échouée, clé facultative non écrite\\.`));
   }
   assert.match(z.log.at(-1), /: 7\/13 zone\(s\) \(6 facultative\(s\) manquante\(s\)\), /);
+  // v92 : un tel fichier est refusé par l'appli (tout ou rien) → zones indisponibles, jamais une erreur.
+  const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
+  assert.equal(parseAggloZones(d, contours), null);
 });
 
-test('appli : fichier à 7 ou 13 clés → mêmes 9 zones lues, clés facultatives ignorées (ZONES_KEYS inchangé)', () => {
-  assert.deepEqual([...AGGLO_ZONES.ZONES_KEYS],
-    ['ileDeFrance', 'metropoleGrandParis', 'aixMarseille', 'lille', 'bordeaux', 'toulouse', 'nantes']);
-  const z7 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
+test('appli (v92) : fichier du dépôt à 13 clés lu (15 zones) ; sans une clé ajoutée en v92 → refusé (tout ou rien)', () => {
+  const z13 = JSON.parse(readFileSync(new URL('../data/zones-agglo.json', import.meta.url), 'utf8'));
   const contours = JSON.parse(readFileSync(new URL('../data/contours-ign.json', import.meta.url), 'utf8'));
-  // Fichier du dépôt : 7 ou 13 clés de zones (avant ou après le run de l'Action), jamais une autre.
-  const zoneKeys = Object.keys(z7).filter((k) => ZONES.some((x) => x.key === k));
-  assert.ok([7, 13].includes(zoneKeys.length), zoneKeys.join());
-  for (const k of AGGLO_ZONES.ZONES_KEYS) assert.ok(zoneKeys.includes(k), k);
-  // 13 clés : contours synthétiques (2 décimales) des 6 zones facultatives, dont un sur Paris.
-  const z13 = { ...z7 };
-  const sq = (x, y) => [[[x, y], [x + 0.1, y], [x + 0.1, y + 0.1], [x, y + 0.1], [x, y]]];
-  z13.nice = sq(7.2, 43.65); z13.montpellier = sq(3.85, 43.6); z13.rennes = sq(-1.7, 48.1);
-  z13.grenoble = sq(5.7, 45.15); z13.rouen = sq(1.05, 49.4); z13.toulon = sq(2.3, 48.8);
-  const p7 = parseAggloZones(z7, contours);
+  assert.deepEqual(Object.keys(z13).filter((k) => ZONES.some((x) => x.key === k)), [...AGGLO_ZONES.ZONES_KEYS]);
   const p13 = parseAggloZones(z13, contours);
-  assert.ok(p7);
-  assert.deepEqual(p13, p7);
-  assert.equal(aggloZoneAt([7.25, 43.7], p13), null);
-  assert.equal(aggloZoneAt([2.35, 48.86], p13), aggloZoneAt([2.35, 48.86], p7));
-  // Clé facultative absente ou illisible : rien ne change.
-  assert.deepEqual(parseAggloZones({ ...z13, rouen: undefined, toulon: 'x' }, contours), p7);
+  assert.ok(p13);
+  assert.deepEqual(p13.zones.map((z) => z.key), [...AGGLO_ZONES.ZONES_KEYS, ...AGGLO_ZONES.CONTOURS_KEYS]);
+  for (const k of ['nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']) {
+    assert.equal(parseAggloZones({ ...z13, [k]: undefined }, contours), null, k);
+    assert.equal(parseAggloZones({ ...z13, [k]: 'x' }, contours), null, k);
+  }
+  assert.equal(aggloZoneAt([6.02, 47.24], p13), null); // Besançon : hors zone
 });
 
 test('plafond 500 Ko : au-delà, rien écrit (jamais partiel), ⚠ avec les chiffres', () => {

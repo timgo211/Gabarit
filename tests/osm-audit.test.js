@@ -7,13 +7,14 @@ import {
   bridgeCards, bridgeCrossings, bridgeNearAxis, buildAxisIndex, locateSection, normName, placeFromFeature, placeIndex,
   restrictionCards, restrictionPresent, restrictionProposal, segmentCrossing, sortCards, splitCards,
 } from '../src/lib/osm-audit.js';
-import { parseAggloZones } from '../src/lib/agglo-zones.js';
+import { AGGLO_ZONES, parseAggloZones } from '../src/lib/agglo-zones.js';
 
 // v91 : zones des grandes agglomérations SYNTHÉTIQUES couvrant toute la fixture (fiches inchangées par rapport à avant).
 const sq = (w, s, e, n) => [[[w, s], [e, s], [e, n], [w, n], [w, s]]];
 const FAR = sq(0.1, 40.1, 0.2, 40.2);
 const ALL_ZONES = parseAggloZones(
-  { ileDeFrance: sq(-10, 35, 20, 60), metropoleGrandParis: FAR, aixMarseille: FAR, lille: FAR, bordeaux: FAR, toulouse: FAR, nantes: FAR },
+  // Toutes les clés lues (v92 : 13) ; seule l'Île-de-France, élargie, couvre les points des tests.
+  { ...Object.fromEntries(AGGLO_ZONES.ZONES_KEYS.map((k) => [k, FAR])), ileDeFrance: sq(-10, 35, 20, 60) },
   { metropoleLyon: FAR, eurometropole: FAR });
 
 const FEATURES = readFileSync(new URL('./fixtures/osm-audit-axes.geojsonseq', import.meta.url), 'utf8')

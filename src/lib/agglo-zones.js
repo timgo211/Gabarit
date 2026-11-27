@@ -3,7 +3,8 @@
 // de ces zones. Règle du propriétaire (Timothée), sans source officielle : pont au-dessus d'une autoroute = pas un point
 // sensible, sauf en Île-de-France et dans les grandes agglomérations. La signalisation fait foi.
 // Contours : IGN Admin Express COG 2026 (Licence Ouverte), Action « Contours IGN » : data/zones-agglo.json (Île-de-France,
-// Métropoles du Grand Paris, d'Aix-Marseille-Provence, Européenne de Lille, Bordeaux, Toulouse, Nantes) et
+// Métropoles du Grand Paris, d'Aix-Marseille-Provence, Européenne de Lille, Bordeaux, Toulouse, Nantes ; v92 : Nice Côte
+// d'Azur, Montpellier Méditerranée, Rennes, Grenoble-Alpes, Rouen Normandie, Toulon-Provence-Méditerranée) et
 // data/contours-ign.json (Métropole de Lyon, Eurométropole de Strasbourg). Anneaux extérieurs [lon, lat] ; un point
 // est en zone s'il est dans l'un des anneaux. Logique pure, même code pour l'appli et l'audit.
 
@@ -12,7 +13,8 @@ import { inRing } from './hgv-tolls-geo.js';
 export const AGGLO_ZONES = Object.freeze({
   ZONES_PATH: './data/zones-agglo.json',
   CONTOURS_PATH: './data/contours-ign.json',
-  ZONES_KEYS: Object.freeze(['ileDeFrance', 'metropoleGrandParis', 'aixMarseille', 'lille', 'bordeaux', 'toulouse', 'nantes']),
+  ZONES_KEYS: Object.freeze(['ileDeFrance', 'metropoleGrandParis', 'aixMarseille', 'lille', 'bordeaux', 'toulouse', 'nantes',
+    'nice', 'montpellier', 'rennes', 'grenoble', 'rouen', 'toulon']),
   CONTOURS_KEYS: Object.freeze(['metropoleLyon', 'eurometropole']),
   UNAVAILABLE_TEXT: 'Zones des grandes agglomérations indisponibles : ponts sans hauteur au-dessus des autoroutes non examinés. '
     + 'La signalisation fait foi.',
@@ -31,7 +33,7 @@ function zoneOf(key, rings) {
 }
 
 /**
- * Les deux fichiers lus → { zones:[{ key, rings, box }] } ; null si une seule des 9 zones manque ou n'a aucun anneau
+ * Les deux fichiers lus → { zones:[{ key, rings, box }] } ; null si une seule des 15 zones manque ou n'a aucun anneau
  * valide (tout ou rien : jamais une zone écartée en silence).
  */
 export function parseAggloZones(zonesJson, contoursJson) {

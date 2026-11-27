@@ -8,9 +8,9 @@
 // sans casse, apostrophes ’ et ' confondues, espaces regroupés. Zone absente ou ambiguë (0 ou plusieurs objets au nom
 // exact) : clé non écrite, ⚠ au journal avec les noms proches trouvés ; les autres clés restent écrites.
 // Les noms seront vérifiés par le run de l'Action (data.geopf.fr est bloqué depuis le conteneur de développement).
-// Zones facultatives (optional, v92) : Nice, Montpellier, Rennes, Grenoble, Rouen, Toulon. Lues par l'outil comme les
-// autres, absentes de AGGLO_ZONES.ZONES_KEYS (src/lib/agglo-zones.js) : l'appli et l'audit les ignorent tant que la
-// liste n'est pas élargie. Fichier à 7 clés (ancien) ou à 13 clés : l'appli lit les mêmes 7 zones.
+// Zones facultatives (optional, PR A) : Nice, Montpellier, Rennes, Grenoble, Rouen, Toulon ; « facultative » ne change
+// que le journal (fichier écrit sans elles). v92 : elles sont dans AGGLO_ZONES.ZONES_KEYS (src/lib/agglo-zones.js) ;
+// un fichier sans l'une d'elles est refusé par l'appli et l'audit (tout ou rien : zones indisponibles, « à vérifier »).
 //
 // Seuls les anneaux extérieurs ; Douglas-Peucker en mètres (projection locale) : 150 m (région), 50 m (métropoles) ;
 // coordonnées à 4 décimales. Plafond ZONES_MAX_BYTES (500 Ko) : au-delà, rien écrit (jamais un fichier partiel).
