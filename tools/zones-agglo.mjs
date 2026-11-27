@@ -8,6 +8,9 @@
 // sans casse, apostrophes ’ et ' confondues, espaces regroupés. Zone absente ou ambiguë (0 ou plusieurs objets au nom
 // exact) : clé non écrite, ⚠ au journal avec les noms proches trouvés ; les autres clés restent écrites.
 // Les noms seront vérifiés par le run de l'Action (data.geopf.fr est bloqué depuis le conteneur de développement).
+// Zones facultatives (optional, v92) : Nice, Montpellier, Rennes, Grenoble, Rouen, Toulon. Lues par l'outil comme les
+// autres, absentes de AGGLO_ZONES.ZONES_KEYS (src/lib/agglo-zones.js) : l'appli et l'audit les ignorent tant que la
+// liste n'est pas élargie. Fichier à 7 clés (ancien) ou à 13 clés : l'appli lit les mêmes 7 zones.
 //
 // Seuls les anneaux extérieurs ; Douglas-Peucker en mètres (projection locale) : 150 m (région), 50 m (métropoles) ;
 // coordonnées à 4 décimales. Plafond ZONES_MAX_BYTES (500 Ko) : au-delà, rien écrit (jamais un fichier partiel).
@@ -22,7 +25,13 @@ export const ZONES = Object.freeze([
   { key: 'bordeaux', layer: 'epci', name: 'Bordeaux Métropole', like: 'Bordeaux', tol: 50 },
   { key: 'toulouse', layer: 'epci', name: 'Toulouse Métropole', like: 'Toulouse', tol: 50 },
   { key: 'nantes', layer: 'epci', name: 'Nantes Métropole', like: 'Nantes', tol: 50 },
-].map((z) => Object.freeze(z)));
+  { key: 'nice', layer: 'epci', name: "Métropole Nice Côte d'Azur", like: 'Nice', tol: 50, optional: true },
+  { key: 'montpellier', layer: 'epci', name: 'Montpellier Méditerranée Métropole', like: 'Montpellier', tol: 50, optional: true },
+  { key: 'rennes', layer: 'epci', name: 'Rennes Métropole', like: 'Rennes', tol: 50, optional: true },
+  { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50, optional: true },
+  { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50, optional: true },
+  { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50, optional: true },
+].map((z) => Object.freeze({ optional: false, ...z })));
 
 export const ZONES_MAX_BYTES = 500_000;
 
@@ -106,17 +115,20 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     props: {},
   };
   let kept = 0;
+  let missingOpt = 0;
   for (const z of ZONES) {
     const list = found?.[z.key];
-    if (!Array.isArray(list)) { log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, clé non écrite.`); continue; }
+    const cle = z.optional ? 'clé facultative non écrite' : 'clé non écrite';
+    if (!Array.isArray(list)) { missingOpt += z.optional; log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, ${cle}.`); continue; }
     const p = pickByName(list, z.name);
     const near = p.names.length ? p.names.map((n) => `« ${n} »`).join(', ') : 'aucun';
     if (p.status !== 'ok') {
-      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, clé non écrite ; noms proches trouvés : ${near}.`);
+      missingOpt += z.optional;
+      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, ${cle} ; noms proches trouvés : ${near}.`);
       continue;
     }
     const r = rings([p.feature], z.tol);
-    if (!r.length) { log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, clé non écrite.`); continue; }
+    if (!r.length) { missingOpt += z.optional; log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, ${cle}.`); continue; }
     data[z.key] = r;
     data.names[z.key] = String(p.feature.properties.nom_officiel).trim();
     data.props[z.key] = p.feature.properties;
@@ -131,6 +143,7 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     log.push(`⚠ data/zones-agglo.json : ${bytes} octets > plafond ${maxBytes} octets : rien écrit.`);
     return { text: null, data, log };
   }
-  log.push(`data/zones-agglo.json : ${kept}/${ZONES.length} zone(s), ${bytes} octets (plafond ${maxBytes}).`);
+  log.push(`data/zones-agglo.json : ${kept}/${ZONES.length} zone(s)${missingOpt ? ` (${missingOpt} facultative(s) manquante(s))` : ''}, `
+    + `${bytes} octets (plafond ${maxBytes}).`);
   return { text, data, log };
 }
