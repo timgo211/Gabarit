@@ -1,42 +1,42 @@
 # Audit OSM des grands axes (lecture seule)
 
-Rapport écrit par l'Action « Audit OSM » (tools/audit-osm.mjs) ; extrait OpenStreetMap du 2026-11-23 (France) ; niveaux audités : 1, 2, 3 (1 autoroutes, 2 nationales, 3 grandes départementales).
+Rapport écrit par l'Action « Audit OSM » (tools/audit-osm.mjs) ; extrait OpenStreetMap du 2026-11-26 (France) ; niveaux audités : 1, 2, 3 (1 autoroutes, 2 nationales, 3 grandes départementales).
 
-Source de l'extrait : OpenStreetMap France (https://download.openstreetmap.fr/extracts/europe/france-latest.osm.pbf) (même donnée OpenStreetMap, licence ODbL).
+Source de l'extrait : Geofabrik (https://download.geofabrik.de/europe/france-latest.osm.pbf) (même donnée OpenStreetMap, licence ODbL).
 
 Règles :
 - rien n'est écrit dans OpenStreetMap : chaque fiche est une proposition, **à vérifier sur place** ;
 - **la signalisation fait foi** ; seul l'arrêté fait foi pour la règle ; « en vigueur : à vérifier » ;
 - une correction faite dans OSM met 2 à 3 semaines à atteindre l'API publique d'ORS (étude, section 1) ;
 - données © contributeurs OpenStreetMap, licence ODbL ; fiches complètes dans `data/audit-osm/`.
-- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est en Île-de-France ou dans une grande agglomération (Métropoles du Grand Paris, d'Aix-Marseille-Provence, de Lille, Bordeaux, Toulouse, Nantes, Lyon, Strasbourg ; règle du propriétaire, sans source officielle) ;
+- niveau 1 (autoroutes) : fiche « pont sans hauteur » seulement si le croisement est dans l'une des 15 zones suivantes : Île-de-France, Métropole du Grand Paris, Métropole d'Aix-Marseille-Provence, Métropole Européenne de Lille, Bordeaux Métropole, Toulouse Métropole, Nantes Métropole, Métropole Nice Côte d'Azur, Montpellier Méditerranée Métropole, Rennes Métropole, Grenoble-Alpes-Métropole, Métropole Rouen Normandie, Métropole Toulon-Provence-Méditerranée, Métropole de Lyon, Eurométropole de Strasbourg (Île-de-France et grandes agglomérations ; règle du propriétaire, sans source officielle) ;
 - niveau 3 (grandes départementales : primary ou secondary à référence D…) : fiches de priorité 1 et 2 seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur ».
 
 ## Chiffres
 
-Fiches : **14002**.
+Fiches : **14125**.
 
 | Priorité | Fiches |
 |---|---|
 | 1 — interdiction PL | 526 |
-| 2 — hauteur basse connue | 2270 |
-| 3 — hauteur inconnue | 11206 |
+| 2 — hauteur basse connue | 2271 |
+| 3 — hauteur inconnue | 11328 |
 
 | Niveau | Fiches |
 |---|---|
-| 1 | 3190 |
-| 2 | 9007 |
-| 3 | 1805 |
+| 1 | 3388 |
+| 2 | 8930 |
+| 3 | 1807 |
 
 | Type | Fiches |
 |---|---|
-| hauteur basse connue | 2256 |
+| hauteur basse connue | 2257 |
 | hauteur sur le pont seulement | 35 |
 | interdiction PL absente | 526 |
-| pont sans hauteur | 10302 |
-| tunnel sans hauteur | 883 |
+| pont sans hauteur | 10504 |
+| tunnel sans hauteur | 803 |
 
-Fichiers : `niveau-1.json` (3190), `niveau-2.json` (9007), `niveau-3.json` (1805).
+Fichiers : `niveau-1.json` (3388), `niveau-2.json` (8930), `niveau-3.json` (1807).
 
 ## Interdictions connues (tableau 4 de l'étude)
 
@@ -89,18 +89,17 @@ Non localisés par l'audit, à documenter (ce que l'étude en dit, rien de devin
 
 ## Copie des axes (data/axes-osm/)
 
-- Axes : 407336 voies (283430 avec référence), 170458 lignes après mise bout à bout ; autoroute 28553 km, voie rapide 17318 km, primaire 62313 km.
-- Axes, simplification 3 m : 9.54 Mo, plus grosse case 2_48 (575 Ko) ; par classe : autoroute 1.77 Mo, voie rapide 1.38 Mo, primaire 6.36 Mo.
+- Axes : 396685 voies (279455 avec référence), 166815 lignes après mise bout à bout ; autoroute 28036 km, voie rapide 17152 km, primaire 61383 km.
+- Axes, simplification 3 m : 9.35 Mo, plus grosse case 2_48 (576 Ko) ; par classe : autoroute 1.72 Mo, voie rapide 1.36 Mo, primaire 6.23 Mo.
 
 ## Journal de l'Action
 
-- Extrait France : source OpenStreetMap France (https://download.openstreetmap.fr/extracts/europe/france-latest.osm.pbf), 5629 Mo téléchargés en 6652 s.
-- Contour france.poly non demandé à Geofabrik (source de secours) : zone couverte reprise de data/ponts-osm/index.json.
-- Filtrage et export osmium : 153 Mo en .pbf, 623 Mo de GeoJSON, 105 s.
-- Passe 1 (axes, communes) : 1820633 objets lus, 407336 voies pour la copie, 637759 voies auditées (niveaux 1, 2, 3), 39052 communes, 5499262 segments au sol indexés ; 13 s, mémoire max 1225 Mo.
-- Passe 2 (ponts) : 290154 ponts lus, 181418 à moins de 50 m d'un axe examinés (garde-fou : les autres écartés sans calcul), 22456 au-dessus d'un axe ; 14 s, mémoire max 1697 Mo.
-- Ponts sans hauteur au-dessus des autoroutes (niveau 1) : 2335 gardés (zones des grandes agglomérations), 9734 retirés (hors zone).
-- Recoupement : data/ponts-osm/ (copie du 2026-11-24) compte 231205 objets ; l'audit a lu 290154 ponts (passerelles comprises).
+- Extrait France : source Geofabrik (https://download.geofabrik.de/europe/france-latest.osm.pbf), 4886 Mo téléchargés en 1055 s.
+- Filtrage et export osmium : 115 Mo en .pbf, 609 Mo de GeoJSON, 95 s.
+- Passe 1 (axes, communes) : 1782504 objets lus, 396685 voies pour la copie, 632931 voies auditées (niveaux 1, 2, 3), 38511 communes, 5477077 segments au sol indexés ; 14 s, mémoire max 1227 Mo.
+- Passe 2 (ponts) : 283592 ponts lus, 179128 à moins de 50 m d'un axe examinés (garde-fou : les autres écartés sans calcul), 22147 au-dessus d'un axe ; 16 s, mémoire max 1678 Mo.
+- Ponts sans hauteur au-dessus des autoroutes (niveau 1) : 2606 gardés (zones des grandes agglomérations), 9107 retirés (hors zone).
+- Recoupement : data/ponts-osm/ (copie du 2026-11-24) compte 231205 objets ; l'audit a lu 283592 ponts (passerelles comprises).
 - Interdictions : 9 sections localisées, 14 non localisées, 526 fiches, 295 voies déjà étiquetées (points de section, pas des fiches).
 -   lyon-a6 : 20 voies, sans étiquette 20, déjà étiquetées 0.
 -   lyon-a7 : 46 voies, sans étiquette 19, déjà étiquetées 27.
@@ -111,12 +110,12 @@ Non localisés par l'audit, à documenter (ce que l'étude en dit, rien de devin
 -   n66 : 220 voies, sans étiquette 170, déjà étiquetées 50.
 -   n7-vienne : 158 voies, sans étiquette 158, déjà étiquetées 0.
 -   le-puy : 17 voies, sans étiquette 17, déjà étiquetées 0.
-- Axes : 407336 voies (283430 avec référence), 170458 lignes après mise bout à bout ; autoroute 28553 km, voie rapide 17318 km, primaire 62313 km.
-- Axes, simplification 3 m : 9.54 Mo, plus grosse case 2_48 (575 Ko) ; par classe : autoroute 1.77 Mo, voie rapide 1.38 Mo, primaire 6.36 Mo.
-- Fiches par niveau : niveau 1 : 3190, niveau 2 : 9007, niveau 3 : 1805 (niveau 3 : priorités 1 et 2 seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur »).
-- data/audit-osm/ : 14002 fiches, 3 fichiers + index.json, 7.38 Mo.
-- data/axes-osm/ : 93 cases + index.json, 9.54 Mo.
-- Points sensibles gardés : 2653 (interdiction (arrêté) 153, interdiction (Bison Futé) 653, hauteur basse 989, tunnel sans hauteur 858).
+- Axes : 396685 voies (279455 avec référence), 166815 lignes après mise bout à bout ; autoroute 28036 km, voie rapide 17152 km, primaire 61383 km.
+- Axes, simplification 3 m : 9.35 Mo, plus grosse case 2_48 (576 Ko) ; par classe : autoroute 1.72 Mo, voie rapide 1.36 Mo, primaire 6.23 Mo.
+- Fiches par niveau : niveau 1 : 3388, niveau 2 : 8930, niveau 3 : 1807 (niveau 3 : priorités 1 et 2 seulement, aucune fiche « pont sans hauteur » ni « tunnel sans hauteur »).
+- data/audit-osm/ : 14125 fiches, 3 fichiers + index.json, 7.46 Mo.
+- data/axes-osm/ : 90 cases + index.json, 9.35 Mo.
+- Points sensibles gardés : 2575 (interdiction (arrêté) 153, interdiction (Bison Futé) 653, hauteur basse 987, tunnel sans hauteur 782).
 -   section frejus : 9 points (sans étiquette 8, déjà étiquetées 1).
 -   section le-puy : 17 points (sans étiquette 17, déjà étiquetées 0).
 -   section lyon-a6 : 20 points (sans étiquette 20, déjà étiquetées 0).
@@ -126,11 +125,11 @@ Non localisés par l'audit, à documenter (ce que l'étude en dit, rien de devin
 -   section n66 : 219 points (sans étiquette 169, déjà étiquetées 50).
 -   section n7-vienne : 147 points (sans étiquette 147, déjà étiquetées 0).
 -   section rn524 : 67 points (sans étiquette 67, déjà étiquetées 0).
-- Écartés faute de cap (aucune voie des axes de même référence à 5 m, ou voies de caps différents) : 1307 (interdiction (arrêté) 0, interdiction (Bison Futé) 15, hauteur basse 1267, tunnel sans hauteur 25).
-- Ponts de l'audit gardés : 2984 ; absents de data/ponts-osm/ (donc non signalés par « ponts à vérifier ») : 45 (way/102438121, way/115256839, way/23881319, way/52245068, way/38082302, way/378696146, way/52245090, way/117166408, way/197529094, way/23002364…) — à revoir.
-- Taille : 77 cases, 119 Ko en tout (plus grosse 2_48 : 23 Ko).
+- Écartés faute de cap (aucune voie des axes de même référence à 5 m, ou voies de caps différents) : 1306 (interdiction (arrêté) 0, interdiction (Bison Futé) 15, hauteur basse 1270, tunnel sans hauteur 21).
+- Ponts de l'audit gardés : 2939 ; absents de data/ponts-osm/ (donc non signalés par « ponts à vérifier ») : 0.
+- Taille : 77 cases, 116 Ko en tout (plus grosse 2_48 : 23 Ko).
 - data/points-sensibles/ : 77 cases + index.json.
-- Durée totale : 113 min.
+- Durée totale : 20 min.
 
 ## Priorité 1 — interdiction PL (50 premières fiches)
 
@@ -250,6 +249,8 @@ Non localisés par l'audit, à documenter (ce que l'étude en dit, rien de devin
 | [2954767](https://www.openstreetmap.org/way/2954767) | 1 | A43 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [2954773](https://www.openstreetmap.org/way/2954773) | 1 | A43 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [2954774](https://www.openstreetmap.org/way/2954774) | 1 | A43 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
+| [4014614](https://www.openstreetmap.org/way/4014614) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4014614](https://www.openstreetmap.org/way/4014614) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4017458](https://www.openstreetmap.org/way/4017458) | 1 | A14 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4017458](https://www.openstreetmap.org/way/4017458) | 1 | A14 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4017458](https://www.openstreetmap.org/way/4017458) | 1 | A14 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
@@ -258,43 +259,41 @@ Non localisés par l'audit, à documenter (ce que l'étude en dit, rien de devin
 | [4017458](https://www.openstreetmap.org/way/4017458) | 1 | A14 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4017458](https://www.openstreetmap.org/way/4017458) | 1 | A14 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4017468](https://www.openstreetmap.org/way/4017468) | 1 | A13 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4017854](https://www.openstreetmap.org/way/4017854) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4017854](https://www.openstreetmap.org/way/4017854) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4017854](https://www.openstreetmap.org/way/4017854) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4042809](https://www.openstreetmap.org/way/4042809) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4042809](https://www.openstreetmap.org/way/4042809) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4042813](https://www.openstreetmap.org/way/4042813) | 1 | A13 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4212607](https://www.openstreetmap.org/way/4212607) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4236064](https://www.openstreetmap.org/way/4236064) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4239441](https://www.openstreetmap.org/way/4239441) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4239441](https://www.openstreetmap.org/way/4239441) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4239441](https://www.openstreetmap.org/way/4239441) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4247774](https://www.openstreetmap.org/way/4247774) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4247774](https://www.openstreetmap.org/way/4247774) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4247774](https://www.openstreetmap.org/way/4247774) | 1 | A41 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4275063](https://www.openstreetmap.org/way/4275063) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4276316](https://www.openstreetmap.org/way/4276316) | 1 | A41 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
+| [4276762](https://www.openstreetmap.org/way/4276762) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4276762](https://www.openstreetmap.org/way/4276762) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4276762](https://www.openstreetmap.org/way/4276762) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4276771](https://www.openstreetmap.org/way/4276771) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4276772](https://www.openstreetmap.org/way/4276772) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4276782](https://www.openstreetmap.org/way/4276782) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4276784](https://www.openstreetmap.org/way/4276784) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4276790](https://www.openstreetmap.org/way/4276790) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4276792](https://www.openstreetmap.org/way/4276792) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
+| [4276845](https://www.openstreetmap.org/way/4276845) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4276845](https://www.openstreetmap.org/way/4276845) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4276845](https://www.openstreetmap.org/way/4276845) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
+| [4276845](https://www.openstreetmap.org/way/4276845) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4287891](https://www.openstreetmap.org/way/4287891) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4287897](https://www.openstreetmap.org/way/4287897) | 1 | A8 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4299599](https://www.openstreetmap.org/way/4299599) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4309127](https://www.openstreetmap.org/way/4309127) | 1 | — | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
-| [4310937](https://www.openstreetmap.org/way/4310937) | 1 | A3 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
 | [4333562](https://www.openstreetmap.org/way/4333562) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4352452](https://www.openstreetmap.org/way/4352452) | 1 | A55 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 | [4352455](https://www.openstreetmap.org/way/4352455) | 1 | A551 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4352457](https://www.openstreetmap.org/way/4352457) | 1 | A55 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4386945](https://www.openstreetmap.org/way/4386945) | 1 | A7 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4536785](https://www.openstreetmap.org/way/4536785) | 1 | A89 | hauteur sur le pont seulement | `maxheight=4.5` | oui | moyenne |
-| [4545357](https://www.openstreetmap.org/way/4545357) | 1 | — | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
-| [4545809](https://www.openstreetmap.org/way/4545809) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4545809](https://www.openstreetmap.org/way/4545809) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4545809](https://www.openstreetmap.org/way/4545809) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4548343](https://www.openstreetmap.org/way/4548343) | 1 | A50 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4572172](https://www.openstreetmap.org/way/4572172) | 1 | A1 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573446](https://www.openstreetmap.org/way/4573446) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573446](https://www.openstreetmap.org/way/4573446) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573453](https://www.openstreetmap.org/way/4573453) | 1 | — | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
-| [4573457](https://www.openstreetmap.org/way/4573457) | 1 | A6B | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573457](https://www.openstreetmap.org/way/4573457) | 1 | A6B | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573469](https://www.openstreetmap.org/way/4573469) | 1 | N449 | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573472](https://www.openstreetmap.org/way/4573472) | 1 | A106 | tunnel sans hauteur | `maxheight=hauteur du panneau B12 (à relever)` | oui | haute |
-| [4573486](https://www.openstreetmap.org/way/4573486) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573486](https://www.openstreetmap.org/way/4573486) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573504](https://www.openstreetmap.org/way/4573504) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
-| [4573504](https://www.openstreetmap.org/way/4573504) | 1 | — | pont sans hauteur | `maxheight=hauteur du panneau B12 ou mesurée (à relever)` | oui | haute |
 
 Toutes les fiches : à vérifier sur place. La signalisation fait foi.
