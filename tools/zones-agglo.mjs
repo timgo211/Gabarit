@@ -7,14 +7,11 @@
 // jamais par un code deviné ; le code lu (code_insee, code_siren…) est écrit dans props. Nom comparé sans accents,
 // sans casse, apostrophes ’ et ' confondues, espaces regroupés.
 // Les noms seront vérifiés par le run de l'Action (data.geopf.fr est bloqué depuis le conteneur de développement).
-// v92 : les 13 zones sont obligatoires (toutes lues par l'appli et l'audit, AGGLO_ZONES.ZONES_KEYS de
-// src/lib/agglo-zones.js, tout ou rien). Une zone absente, ambiguë (0 ou plusieurs objets au nom exact), sans anneau
-// lisible ou dont la requête a échoué : ⚠ au journal avec les noms proches trouvés, et RIEN n'est écrit (l'ancien
-// data/zones-agglo.json reste, jamais un fichier partiel) ; exitCode = 1 dans le résultat.
-// Étape 1/5 (12 agglomérations de plus) : 12 zones FACULTATIVES (optional: true), pas encore lues par l'appli ni par
-// l'audit (absentes de ZONES_KEYS : clés en trop sans effet, parseAggloZones ne lit que ZONES_KEYS). Noms NON
-// PROUVÉS, à confirmer par le run de l'Action : une facultative absente, ambiguë, illisible ou en échec = ⚠ au journal
-// avec les 5 noms les plus proches (contenant le mot du filtre), clé non écrite, les autres zones écrites, exitCode 0.
+// v93 : toutes les zones de ZONES sont obligatoires (25, toutes lues par l'appli et l'audit, AGGLO_ZONES.ZONES_KEYS de
+// src/lib/agglo-zones.js, même ordre, tout ou rien ; v92 : 13). Une zone absente, ambiguë (0 ou plusieurs objets au nom
+// exact), sans anneau lisible ou dont la requête a échoué : ⚠ au journal avec les 5 noms les plus proches trouvés
+// (contenant le mot du filtre), et RIEN n'est écrit (l'ancien data/zones-agglo.json reste, jamais un fichier partiel) ;
+// exitCode = 1 dans le résultat (non branché sur le code de sortie du processus : tools/contours-ign.mjs).
 //
 // Seuls les anneaux extérieurs ; Douglas-Peucker en mètres (projection locale) : 150 m (région), 50 m (métropoles) ;
 // coordonnées à 4 décimales. Plafond ZONES_MAX_BYTES (500 Ko) : au-delà, rien écrit (jamais un fichier partiel).
@@ -35,20 +32,21 @@ export const ZONES = Object.freeze([
   { key: 'grenoble', layer: 'epci', name: 'Grenoble-Alpes-Métropole', like: 'Grenoble', tol: 50 },
   { key: 'rouen', layer: 'epci', name: 'Métropole Rouen Normandie', like: 'Rouen', tol: 50 },
   { key: 'toulon', layer: 'epci', name: 'Métropole Toulon-Provence-Méditerranée', like: 'Toulon', tol: 50 },
-  // Facultatives (étape 1/5) : jamais un code ; mot du filtre sans accent (ILIKE ne confond pas é / e). Étape 1 bis :
-  // Metz, Reims, Angers, Avignon = nom_officiel exact lu au journal du run n° 7 de l'Action « Contours IGN » (27/11/2026).
-  { key: 'dijon', layer: 'epci', name: 'Dijon Métropole', like: 'Dijon', tol: 50, optional: true },
-  { key: 'metz', layer: 'epci', name: 'Euro-métropole de Metz', like: 'Metz', tol: 50, optional: true },
-  { key: 'nancy', layer: 'epci', name: 'Métropole du Grand Nancy', like: 'Nancy', tol: 50, optional: true },
-  { key: 'reims', layer: 'epci', name: 'CU du Grand Reims', like: 'Reims', tol: 50, optional: true },
-  { key: 'orleans', layer: 'epci', name: 'Orléans Métropole', like: 'Orl', tol: 50, optional: true },
-  { key: 'tours', layer: 'epci', name: 'Tours Métropole Val de Loire', like: 'Tours', tol: 50, optional: true },
-  { key: 'angers', layer: 'epci', name: 'CU Angers Loire Métropole', like: 'Angers', tol: 50, optional: true },
-  { key: 'clermontFerrand', layer: 'epci', name: 'Clermont Auvergne Métropole', like: 'Clermont', tol: 50, optional: true },
-  { key: 'saintEtienne', layer: 'epci', name: 'Saint-Étienne Métropole', like: 'tienne', tol: 50, optional: true },
-  { key: 'leHavre', layer: 'epci', name: 'Le Havre Seine Métropole', like: 'Havre', tol: 50, optional: true },
-  { key: 'avignon', layer: 'epci', name: 'CA du Grand Avignon (COGA)', like: 'Avignon', tol: 50, optional: true },
-  { key: 'brest', layer: 'epci', name: 'Brest Métropole', like: 'Brest', tol: 50, optional: true },
+  // Étape 1/5 (12 agglomérations de plus, obligatoires en v93) : jamais un code ; mot du filtre sans accent (ILIKE ne
+  // confond pas é / e). Étape 1 bis : Metz, Reims, Angers, Avignon = nom_officiel exact lu au journal du run n° 7 de
+  // l'Action « Contours IGN » (27/11/2026) ; les 12 lues par le run du 27/11/2026 (aa5739a, 25 zones écrites).
+  { key: 'dijon', layer: 'epci', name: 'Dijon Métropole', like: 'Dijon', tol: 50 },
+  { key: 'metz', layer: 'epci', name: 'Euro-métropole de Metz', like: 'Metz', tol: 50 },
+  { key: 'nancy', layer: 'epci', name: 'Métropole du Grand Nancy', like: 'Nancy', tol: 50 },
+  { key: 'reims', layer: 'epci', name: 'CU du Grand Reims', like: 'Reims', tol: 50 },
+  { key: 'orleans', layer: 'epci', name: 'Orléans Métropole', like: 'Orl', tol: 50 },
+  { key: 'tours', layer: 'epci', name: 'Tours Métropole Val de Loire', like: 'Tours', tol: 50 },
+  { key: 'angers', layer: 'epci', name: 'CU Angers Loire Métropole', like: 'Angers', tol: 50 },
+  { key: 'clermontFerrand', layer: 'epci', name: 'Clermont Auvergne Métropole', like: 'Clermont', tol: 50 },
+  { key: 'saintEtienne', layer: 'epci', name: 'Saint-Étienne Métropole', like: 'tienne', tol: 50 },
+  { key: 'leHavre', layer: 'epci', name: 'Le Havre Seine Métropole', like: 'Havre', tol: 50 },
+  { key: 'avignon', layer: 'epci', name: 'CA du Grand Avignon (COGA)', like: 'Avignon', tol: 50 },
+  { key: 'brest', layer: 'epci', name: 'Brest Métropole', like: 'Brest', tol: 50 },
 ].map((z) => Object.freeze(z)));
 
 export const ZONES_MAX_BYTES = 500_000;
@@ -145,8 +143,7 @@ export function rings(list, tol) {
 /**
  * Fichier des zones. found : { clé: liste d'objets IGN candidats (filtre WFS sur le mot `like`) }, ou absent si la
  * requête a échoué. Renvoie { text, data, log, exitCode } : text = null et exitCode = 1 si rien n'est à écrire (une
- * des 13 zones obligatoires manquante, ou plafond dépassé) ; sinon exitCode = 0. Zone facultative manquante : ⚠,
- * clé non écrite, le reste écrit. Jamais un fichier partiel pour les obligatoires.
+ * des zones de ZONES manquante, ou plafond dépassé) ; sinon exitCode = 0. Jamais un fichier partiel.
  */
 export function buildZones(found, { prefix = null, year = null, read = null, maxBytes = ZONES_MAX_BYTES } = {}) {
   const log = [];
@@ -160,32 +157,27 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     props: {},
   };
   const missing = [];
-  const missingOpt = [];
-  const req = ZONES.filter((z) => !z.optional).length;
-  const opt = ZONES.length - req;
+  const req = ZONES.length;
   for (const z of ZONES) {
-    const lost = z.optional ? 'zone facultative non écrite' : 'zone manquante';
-    const miss = () => (z.optional ? missingOpt : missing).push(z.key);
     const list = found?.[z.key];
-    if (!Array.isArray(list)) { miss(); log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, ${lost}.`); continue; }
+    if (!Array.isArray(list)) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : requête échouée, zone manquante.`); continue; }
     const p = pickByName(list, z.name);
     if (p.status !== 'ok') {
-      miss();
+      missing.push(z.key);
       const near = nearNames(p.names, z.name, z.like);
       const nearText = near.length ? near.map((n) => `« ${n} »`).join(', ') : 'aucun';
-      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, ${lost} ; `
+      log.push(`⚠ ${z.key} (« ${z.name} ») : ${p.status === 'absent' ? 'absent' : `ambigu (${p.count} objets)`}, zone manquante ; `
         + `noms proches trouvés (« ${z.like} », ${NEAR_MAX} au plus) : ${nearText}.`);
       continue;
     }
     const r = rings([p.feature], z.tol);
-    if (!r.length) { miss(); log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, ${lost}.`); continue; }
+    if (!r.length) { missing.push(z.key); log.push(`⚠ ${z.key} (« ${z.name} ») : aucun anneau lisible, zone manquante.`); continue; }
     data[z.key] = r;
     data.names[z.key] = String(p.feature.properties.nom_officiel).trim();
     data.props[z.key] = p.feature.properties;
     log.push(`${z.key} : « ${data.names[z.key]} » (${z.layer}, code ${p.feature.properties.code_insee ?? p.feature.properties.code_siren ?? 'non lu'}), `
-      + `${r.length} anneau(x), ${r.reduce((s, x) => s + x.length, 0)} points (${z.tol} m)${z.optional ? ', facultative' : ''}.`);
+      + `${r.length} anneau(x), ${r.reduce((s, x) => s + x.length, 0)} points (${z.tol} m).`);
   }
-  if (missingOpt.length) log.push(`⚠ ${missingOpt.length} zone(s) facultative(s) non écrite(s) sur ${opt} (${missingOpt.join(', ')}).`);
   if (missing.length) {
     log.push(`⚠ data/zones-agglo.json : ${missing.length} zone(s) obligatoire(s) manquante(s) sur ${req} (${missing.join(', ')}) : `
       + 'rien écrit, l\'ancien fichier reste.');
@@ -197,7 +189,6 @@ export function buildZones(found, { prefix = null, year = null, read = null, max
     log.push(`⚠ data/zones-agglo.json : ${bytes} octets > plafond ${maxBytes} octets : rien écrit, l'ancien fichier reste.`);
     return { text: null, data, log, exitCode: 1 };
   }
-  log.push(`data/zones-agglo.json : ${req}/${req} zone(s) obligatoire(s), ${opt - missingOpt.length}/${opt} facultative(s), `
-    + `${bytes} octets (plafond ${maxBytes}).`);
+  log.push(`data/zones-agglo.json : ${req}/${req} zone(s) obligatoire(s), ${bytes} octets (plafond ${maxBytes}).`);
   return { text, data, log, exitCode: 0 };
 }
