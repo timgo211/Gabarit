@@ -11,7 +11,8 @@ description: Règles du trafic Bison Futé (phase 10 A) : Action « Trafic » et
 - Action « Trafic » (`.github/workflows/trafic.yml`) : `content.xml` du flux « tipi » des DIR (Bison Futé, DATEX II v2
   en SOAP, Licence Ouverte Etalab 2.0) → `trafic.json` sur la branche orpheline `trafic-data`, réécrite à chaque
   lancement (`push --force`), jamais sur main (ni Pages, ni « Données OSM », ni Tests relancés : push du GITHUB_TOKEN).
-  v88 : toutes les heures à :30 UTC (le flux change vers :24) + manuelle. Plan B si GitHub le demande : retirer la
+  Toutes les heures à :17 UTC depuis le 28/11/2026 (v88 : :30) ; le flux change vers :24 : un run à :17 lit celui de
+  l'heure d'avant. + manuelle. Plan B si GitHub le demande : retirer la
   ligne `schedule` (l'appli affiche « Ancien »).
 - Domaines : `tipi.bison-fute.gouv.fr` (Action seulement, contrôlé par le code), `raw.githubusercontent.com` (appli).
 - Gardés : fermeture (`roadClosed`, `carriagewayClosures`, `closedPermanentlyForTheWinter`), bouchon (`AbnormalTraffic`),

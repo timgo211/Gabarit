@@ -215,8 +215,8 @@ description: Carte détaillée des fichiers de Gabarit : rôle de chaque module 
   drapeaux 1 période / 2 dérogation, coordonnées 1e-5° en écarts]) ; grille France reprise de `data/poids-osm/index.json`.
   Dossier remplacé d'un coup, échec → ancien gardé. Tests `dialog-convert.test.js` (même fixture, complétée : cas du
   type boîte Vosges, expirée, période, dérogation seule, MultiLineString). Hors des `paths` d'osm-data.yml.
-- `tools/trafic-update.mjs` + `.github/workflows/trafic.yml` (Action « Trafic », phase 10 A ; toutes les heures à :30
-  UTC depuis v88 + manuelle, `contents: write`, `concurrency` trafic, 10 min) : télécharge `content.xml` du flux « tipi » de Bison Futé
+- `tools/trafic-update.mjs` + `.github/workflows/trafic.yml` (Action « Trafic », phase 10 A ; toutes les heures à :17
+  UTC depuis le 28/11/2026 (:30 en v88) + manuelle, `contents: write`, `concurrency` trafic, 10 min) : télécharge `content.xml` du flux « tipi » de Bison Futé
   (DIR, DATEX II v2 en enveloppe SOAP ; https, domaine `tipi.bison-fute.gouv.fr` seulement, 20 Mo au plus, gzip et
   UTF-8 strict), compte la liste du dossier (complétude ; fichiers par événement jamais lus), convertit par
   `tools/trafic-convert.mjs` (`collectXml` avec `createXmlReader` de `dialog-etude.mjs`, `convertTraffic`,
