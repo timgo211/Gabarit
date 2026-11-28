@@ -10,14 +10,15 @@ name: Trafic
 # Domaines : tipi.bison-fute.gouv.fr (lecture, contrôlé par le code), github.com (push), raw.githubusercontent.com
 # (mesure CORS, en-têtes seulement). Aucun secret : GITHUB_TOKEN de l'Action, jamais affiché.
 # Flux illisible : rien n'est publié, l'ancien JSON reste, le journal le dit (avertissement, pas d'échec).
-# Toutes les heures à :30 (UTC) : le flux change vers :24 (last-modified des runs 1 et 2) ; :30 évite le haut de l'heure,
-# où GitHub retarde ou abandonne des tâches planifiées (docs.github.com, « schedule », lu le 26/11/2026). Charge faible :
+# Toutes les heures à :17 (UTC, depuis le 28/11/2026 ; avant : :30) : hors du haut de l'heure, où GitHub retarde ou
+# abandonne des tâches planifiées (docs.github.com, « schedule », lu le 26/11/2026). Le flux change vers :24
+# (last-modified des runs 1 et 2) : un run parti à l'heure lit le flux de :24 l'heure d'avant. Charge faible :
 # une lecture d'environ 170 Ko compressés et un push de moins de 1 Mo par heure. Plan B si GitHub le demande : retirer
 # la ligne `schedule` (l'appli affiche alors « Ancien »). Aussi lançable à la main : Actions › Trafic › Run workflow.
 
 on:
   schedule:
-    - cron: '30 * * * *' # toutes les heures à :30 (UTC)
+    - cron: '17 * * * *' # toutes les heures à :17 (UTC)
   workflow_dispatch:
 
 permissions:

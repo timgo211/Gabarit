@@ -173,7 +173,7 @@ adresse d'import unique = compteur, jamais `Date.now()`.
   noEntry + hauteur ou poids hors negate, géométrie linéaire ; valeur = maximum ; fin passée ignorée. Détail : skill structure.
   v86 (`dialog-limits.js`) : tronçon suivi 15 m, hauteur + 0,1 ≥ valeur, PTAC > valeur ; fiche et repères pointillés à
   l'arrêt, jamais dits ; « à vérifier — seul l'arrêté fait foi » ; doublon OSM = une ligne ; copie absente = rien.
-- Trafic (10 A, Action « Trafic » horaire à :30, `tools/trafic-*.mjs` ; v88 `traffic.js`) : `content.xml` des DIR
+- Trafic (10 A, Action « Trafic » horaire à :17, `tools/trafic-*.mjs` ; v88 `traffic.js`) : `content.xml` des DIR
   (Bison Futé, Licence Ouverte Etalab 2.0) → `trafic.json` (≤ 1 Mo, ≤ 3 000) sur la branche orpheline `trafic-data`
   réécrite à chaque lancement, jamais sur main ; journal sans coordonnée. Appli : bouton « Trafic » à l'arrêt seulement,
   une requête au toucher (raw.githubusercontent.com, aucune position, jamais en cache), événements à 100 m du tracé

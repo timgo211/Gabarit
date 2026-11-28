@@ -833,7 +833,7 @@ la même conversation, dans l'ordre indiqué). Phases 7d et 3 : chacune seule, c
     Run 2 : 309 événements gardés sur 543 enregistrements, 94 Ko, CORS `*` (chiffres : `docs/etude-trafic.md` § 7).
   - [x] **10 A, PR 2 — Interface (v88)** : bouton « Trafic » à l'arrêt (préparation et guidage), une requête au
     toucher, événements à 100 m du tracé (fiche et repères pointillés), « Ancien » > 3 h, crédit ; lancement horaire
-    (:30 UTC). Jamais dit, aucun effet sur le calcul. Plus tard : option B (contourner une fermeture confirmée), option C
+    (:30 UTC ; :17 depuis le 28/11/2026). Jamais dit, aucun effet sur le calcul. Plus tard : option B (contourner une fermeture confirmée), option C
     (pays voisins).
 
 ## Tout à la fin

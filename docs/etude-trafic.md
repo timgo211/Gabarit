@@ -229,7 +229,7 @@ la petite correction de la PR #108 (<https://github.com/timgo211/Gabarit/actions
 sans coordonnée.
 
 - Flux : `content.xml` lu, 3,0 Mo décodés (gzip), `last-modified` 16:24:35 GMT, `publicationTime` 17:24:34 +01:00 :
-  le flux change bien vers :24 (§ 2) → Action planifiée à :30 UTC.
+  le flux change bien vers :24 (§ 2) → Action planifiée à :30 UTC (28/11/2026 : passée à :17 UTC).
 - Contenu : 340 situations, 543 enregistrements DATEX II v2 (format conforme à l'étude). Types : MaintenanceWorks 160,
   RoadOrCarriagewayOrLaneManagement 118, AbnormalTraffic 54, ReroutingManagement 39, VehicleObstruction 32,
   ConstructionWorks 29, GeneralNetworkManagement 25, SpeedManagement 22, GeneralObstruction 19, autres < 15.
